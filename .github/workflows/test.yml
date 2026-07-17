@@ -86,10 +86,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Create backend .env for CI
+        # docker-compose.yml declara `env_file: ./backend/.env` en el servicio
+        # backend — Compose exige que el archivo exista físicamente (a
+        # diferencia de las variables sueltas, que sí tienen fallback ${VAR:-...}
+        # en el propio compose). No son secretos reales, solo lo mínimo para
+        # que el backend arranque en modo development dentro del contenedor.
+        run: |
+          {
+            echo "SECRET_KEY=ci-secret-key-not-for-prod-but-32-chars-long"
+            echo "ENVIRONMENT=development"
+            echo "DEBUG=false"
+            echo "FIRST_ADMIN_EMAIL=admin@example.com"
+            echo "FIRST_ADMIN_PASSWORD=ci-admin-pass-1234"
+            echo 'ALLOWED_ORIGINS=["http://localhost", "http://localhost:3000"]'
+            echo "WIDGET_BASE_URL=http://localhost:8000"
+          } > backend/.env
+
       - name: Bring up the stack
         run: docker compose up -d --wait mysql redis qdrant backend frontend
-        env:
-          SECRET_KEY: ci-secret-key-not-for-prod
 
       - uses: actions/setup-node@v4
         with:
