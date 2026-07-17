@@ -1,0 +1,158 @@
+# Overrides de producción — usar con:
+#   make prod SERVER=<ip-o-dominio>
+# o manualmente:
+#   MYSQL_ROOT_PASSWORD=... MYSQL_PASSWORD=... REDIS_PASSWORD=... QDRANT_API_KEY=... \
+#   FRONTEND_API_URL=http://mi-servidor.com \
+#     docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build -d
+#
+# Variables OBLIGATORIAS en producción (compose falla con un mensaje claro si faltan):
+#   MYSQL_ROOT_PASSWORD — genera con: openssl rand -hex 16
+#   MYSQL_PASSWORD      — genera con: openssl rand -hex 16
+#   REDIS_PASSWORD      — genera con: openssl rand -hex 16
+#   QDRANT_API_KEY      — genera con: openssl rand -hex 32
+#
+# Nota: MYSQL_ROOT_PASSWORD y MYSQL_PASSWORD solo aplican al inicializar el
+# volumen de datos. Si el volumen ya existe con otra contraseña, cámbiala con
+# ALTER USER antes de arrancar.
+
+services:
+  mysql:
+    restart: unless-stopped
+    # Solo accesible por la red interna de Docker — nunca expuesto al host
+    ports: []
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Define MYSQL_ROOT_PASSWORD para producción (openssl rand -hex 16)}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Define MYSQL_PASSWORD para producción (openssl rand -hex 16)}
+    # Límite de memoria: innodb-buffer-pool-size=512M + overhead. Sin límite, un
+    # pico puede provocar OOM del host entero en vez de reiniciar el contenedor.
+    mem_limit: 1g
+    mem_reservation: 512m
+
+  redis:
+    restart: unless-stopped
+    ports: []
+    # Redefine el command completo para exigir contraseña (sin default débil)
+    command: >
+      redis-server
+        --appendonly yes
+        --maxmemory 512mb
+        --maxmemory-policy allkeys-lru
+        --requirepass ${REDIS_PASSWORD:?Define REDIS_PASSWORD para producción (openssl rand -hex 16)}
+    # maxmemory 512mb interno + overhead de la AOF.
+    mem_limit: 768m
+    mem_reservation: 256m
+
+  qdrant:
+    ports: []
+    environment:
+      QDRANT__STORAGE__QUANTIZATION__ALWAYS_RAM: "true"
+      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:?Define QDRANT_API_KEY para producción (openssl rand -hex 32)}
+    mem_limit: 2g
+    mem_reservation: 1g
+    # Healthcheck: la imagen de qdrant no trae curl/wget, pero sí incluye el
+    # binario `qdrant`. Comprobamos el endpoint TCP de readiness vía bash /dev/tcp.
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/6333' 2>/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  backend:
+    # En producción no se expone el puerto directamente; nginx es el único punto de entrada
+    ports: []
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: mysql+aiomysql://${MYSQL_USER:-chatbot}:${MYSQL_PASSWORD:?Define MYSQL_PASSWORD para producción}@mysql:3306/${MYSQL_DATABASE:-chatbot}
+      QDRANT_API_KEY: ${QDRANT_API_KEY:?Define QDRANT_API_KEY para producción}
+    # Cada worker carga ~1.7 GB de modelos. mem_limit debe escalar con WORKERS:
+    # 1 worker → ~3g; cada worker extra suma ~1.7g. Ajustar si subes WORKERS.
+    mem_limit: ${BACKEND_MEM_LIMIT:-3g}
+    mem_reservation: 2g
+    # Espera a que Qdrant esté SANO (healthcheck añadido arriba), no solo
+    # iniciado como en el compose base. Se restan los tres servicios para no
+    # perder las dependencias de mysql/redis al sobreescribir el mapa.
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    # Quita el bind-mount de desarrollo (./backend:/app) — usa solo volúmenes nombrados
+    volumes:
+      - uploads_data:/app/uploads
+      - model_cache:/home/appuser/.cache/fastembed
+      - reranker_cache:/home/appuser/.cache/flashrank
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${FRONTEND_API_URL:-http://localhost}
+        NEXT_PUBLIC_APP_URL: ${FRONTEND_APP_URL:-${FRONTEND_API_URL:-http://localhost}}
+    # En producción no se expone el puerto; nginx enruta el tráfico
+    ports: []
+    volumes: []           # Sin bind-mounts — usa los archivos compilados en la imagen
+    command: []           # Usa el CMD del Dockerfile (node server.js)
+    environment:
+      - NODE_ENV=production
+      - NEXT_TELEMETRY_DISABLED=1
+    mem_limit: 512m
+    mem_reservation: 256m
+
+  nginx:
+    restart: unless-stopped
+    mem_limit: 128m
+
+  # ── Backups automáticos (A4) ────────────────────────────────────────────────
+  # Vuelca MySQL y copia el storage de Qdrant a un volumen `backups` cada 24h,
+  # con retención de 7 días. Restauración: ver docs/DEPLOYMENT.md.
+  # Desactivar con: docker compose ... up --scale backup=0
+  backup:
+    image: mysql:8.0
+    container_name: chatbot_backup
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      MYSQL_PWD: ${MYSQL_ROOT_PASSWORD:?Define MYSQL_ROOT_PASSWORD para producción}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-chatbot}
+      RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
+    volumes:
+      - backups:/backups
+      - qdrant_data:/qdrant_src:ro
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        echo "[backup] servicio iniciado — vuelca cada 24h, retención $${RETENTION_DAYS}d"
+        while true; do
+          TS=$$(date +%Y%m%d_%H%M%S)
+          echo "[backup] $$TS — dumping MySQL..."
+          if mysqldump -h mysql -u root --single-transaction --routines \
+               "$${MYSQL_DATABASE}" | gzip > "/backups/mysql_$${TS}.sql.gz"; then
+            if gzip -t "/backups/mysql_$${TS}.sql.gz"; then
+              echo "[backup] MySQL OK: mysql_$${TS}.sql.gz (validado)"
+            else
+              echo "[backup] ERROR: dump corrupto"; rm -f "/backups/mysql_$${TS}.sql.gz"
+            fi
+          else
+            echo "[backup] ERROR en mysqldump"; rm -f "/backups/mysql_$${TS}.sql.gz"
+          fi
+          echo "[backup] copiando storage de Qdrant..."
+          tar czf "/backups/qdrant_$${TS}.tar.gz" -C /qdrant_src . 2>/dev/null \
+            && echo "[backup] Qdrant OK: qdrant_$${TS}.tar.gz" \
+            || echo "[backup] aviso: no se pudo copiar Qdrant"
+          # Retención: borra backups con más de RETENTION_DAYS días
+          find /backups -name '*.gz' -type f -mtime +$${RETENTION_DAYS} -delete
+          # Limpia archivos parciales (dump fallido sin extensión .gz)
+          find /backups -type f ! -name '*.gz' -mtime +1 -delete 2>/dev/null || true
+          sleep 86400
+        done
+    mem_limit: 256m
+
+volumes:
+  backups:

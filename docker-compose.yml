@@ -1,0 +1,155 @@
+services:
+
+  mysql:
+    image: mysql:8.0
+    container_name: chatbot_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-chatbot_root_2026}
+      MYSQL_USER: ${MYSQL_USER:-chatbot}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-chatbot}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-chatbot}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "3307:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "--password=${MYSQL_ROOT_PASSWORD:-chatbot_root_2026}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    command: >
+      --innodb-buffer-pool-size=512M
+      --innodb-redo-log-capacity=134217728
+      --max-connections=100
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+
+  redis:
+    image: redis:7-alpine
+    container_name: chatbot_redis
+    restart: unless-stopped
+    command: >
+      redis-server
+        --appendonly yes
+        --maxmemory 512mb
+        --maxmemory-policy allkeys-lru
+        --requirepass ${REDIS_PASSWORD:-chatbot_redis_2026}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-chatbot_redis_2026}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  qdrant:
+    image: qdrant/qdrant:v1.13.6
+    container_name: chatbot_qdrant
+    restart: unless-stopped
+    volumes:
+      - qdrant_data:/qdrant/storage
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    environment:
+      QDRANT__STORAGE__QUANTIZATION__ALWAYS_RAM: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/6333' 2>/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: chatbot_backend
+    restart: unless-stopped
+    env_file: ./backend/.env
+    environment:
+      DATABASE_URL: mysql+aiomysql://${MYSQL_USER:-chatbot}:${MYSQL_PASSWORD:-chatbot}@mysql:3306/${MYSQL_DATABASE:-chatbot}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-chatbot_redis_2026}@redis:6379/0
+      QDRANT_URL: http://qdrant:6333
+      HF_HUB_OFFLINE: "1"
+      # Cada worker carga ~1.7 GB de modelos en RAM (e5-large + flashrank).
+      # RAM mínima recomendada: 8 GB (WORKERS=2), 16 GB (WORKERS=4+).
+      # Sobreescribir desde shell: WORKERS=4 docker compose up
+      WORKERS: ${WORKERS:-1}
+    ports:
+      - "8000:8000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - uploads_data:/app/uploads
+      - model_cache:/home/appuser/.cache/fastembed
+      - reranker_cache:/home/appuser/.cache/flashrank
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request,sys; sys.exit(0 if urllib.request.urlopen(\"http://127.0.0.1:8000/api/v1/health/live\", timeout=5).status==200 else 1)'"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 600s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # NEXT_PUBLIC_* se bake en tiempo de build. Para local basta http://localhost
+        # (nginx en :80). Si FRONTEND_APP_URL no se define, hereda FRONTEND_API_URL.
+        NEXT_PUBLIC_API_URL: ${FRONTEND_API_URL:-http://localhost}
+        NEXT_PUBLIC_APP_URL: ${FRONTEND_APP_URL:-${FRONTEND_API_URL:-http://localhost}}
+    container_name: chatbot_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_TELEMETRY_DISABLED=1
+      # URL interna para llamadas server-side desde Next.js al backend (red Docker).
+      # No es pública — nunca llega al browser.
+      - BACKEND_URL=http://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      # Use 127.0.0.1 explicitly — `localhost` resolves to IPv6 (::1) on alpine
+      # and Next.js binds to IPv4 (0.0.0.0), so the IPv4-only busybox wget fails.
+      test: ["CMD-SHELL", "wget -q --spider --tries=1 http://127.0.0.1:3000/login || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: chatbot_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+
+volumes:
+  mysql_data:
+  redis_data:
+  qdrant_data:
+  uploads_data:
+  model_cache:
+  reranker_cache:

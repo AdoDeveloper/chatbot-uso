@@ -1,0 +1,65 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+dist/
+build/
+*.egg
+
+# Env
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# Claude Code local state (config/estado de la herramienta, no del proyecto)
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+*.log
+
+# Node
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# Test artifacts
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Docs
+docs/
+
+# Backups
+BK2/
+
+# Widget build output
+widget/dist/
+
+# Scratch/working files (diagramas de tesis, renders temporales)
+.scratch/
+
+# Backend uploads and local vector store
+backend/uploads/
+backend/qdrant_storage/
