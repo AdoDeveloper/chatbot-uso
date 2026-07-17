@@ -1,0 +1,47 @@
+# Dependencies and build artifacts
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Logs
+*.log
+logs/
+
+# Cache
+*.cache
+
+# Data uploads
+uploads/
+
+# Static files (build output)
+static/standalone
+static/widget/*.js
+
+# Database
+db.sqlite3
+db/data/
+
+# Temporary files
+*.tmp
+*.temp
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

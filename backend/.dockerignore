@@ -1,0 +1,36 @@
+# Python build / venv / cache
+__pycache__
+*.py[cod]
+*$py.class
+.venv
+venv
+env
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+coverage.xml
+htmlcov
+*.egg-info
+
+# Local data — uploads and embeddings get a docker volume, never the build context
+uploads
+.cache
+.fastembed
+.flashrank
+
+# Local env / IDE / OS
+.env
+.env.*
+!.env.example
+.git
+.gitignore
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+*.log
+
+# Test + coverage
+tests/__pycache__
+tests/*.pyc
