@@ -48,7 +48,6 @@ export default function SsoPage() {
 
   const { data: methodsData, loading: loadingMethods } = useApi<AuthMethodsOut>("/integrations/auth-methods");
   const { data: oauthData, loading: loadingOauth } = useApi<OAuthConfigOut>("/integrations/oauth");
-  const loading = loadingMethods || loadingOauth;
 
   const [oauth, setOauth] = useState<OAuthConfigOut | null>(null);
   const [msActive, setMsActive] = useState(false);

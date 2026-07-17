@@ -1,7 +1,7 @@
 "use client";
 
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { HeartPulse, Wrench, Loader2, Trash2, BarChart2, Database, Save, Bell, Activity } from "lucide-react";
+import { HeartPulse, Wrench, Loader2, Trash2, BarChart2, Database, Save, Activity } from "lucide-react";
 import api from "@/lib/api";
 import { useApi, getErrorMessage } from "@/hooks/use-api";
 import { useToast } from "@/components/ui/toast";

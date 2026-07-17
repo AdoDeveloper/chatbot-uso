@@ -14,7 +14,6 @@ export default function PreviewPage() {
 
  const settings = settingsData ?? SETTINGS_DEFAULTS;
  const deployedWidgetConfig = deployedData && Object.keys(deployedData).length > 0 ? deployedData : null;
- const loading = loadingSettings || loadingWidget || loadingDeployed;
 
  return (
   <div>

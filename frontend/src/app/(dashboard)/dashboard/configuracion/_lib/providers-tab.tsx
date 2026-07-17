@@ -16,7 +16,6 @@ import { useToast } from "@/components/ui/toast";
 import type { LLMProvider } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Modal } from "@/components/composed/modal";
 import { Input } from "@/components/ui/input";
 import { Select, SelectOption } from "@/components/ui/select";

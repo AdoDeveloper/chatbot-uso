@@ -80,7 +80,6 @@ export default function FiltrosPage() {
     useApi<{ category: string; count: number; sample_label: string | null }[]>("/security/injections/by-category?days=30");
   const patterns = patternsData ?? [];
   const categoryImpact: CategoryImpact[] = (impactData ?? []).map(({ category, count }) => ({ category, count }));
-  const loading = loadingConfig || loadingPatterns || loadingImpact;
   const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({});
 
   const [testText, setTestText] = useState("");

@@ -8,7 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatCard } from "@/components/composed/stat-card";
-import { HelpTip } from "@/components/ui/help-tip";
 import { PeriodFilter } from "@/components/composed/period-filter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
