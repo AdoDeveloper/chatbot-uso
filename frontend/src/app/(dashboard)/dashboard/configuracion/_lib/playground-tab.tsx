@@ -402,76 +402,45 @@ export function PlaygroundTab({
         await logout();
         return;
       }
-      if (!response.ok || !response.body)
+      if (!response.ok)
         throw new Error(`HTTP ${response.status}`);
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let fullContent = "";
+      // Respuesta completa (sin streaming): mientras se espera, la burbuja
+      // del asistente queda con content: "" mostrando el indicador de
+      // "escribiendo..."; al llegar la respuesta se rellena de una vez.
+      const event = await response.json();
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const parts = buffer.split("\n\n");
-        buffer = parts.pop() ?? "";
-        for (const part of parts) {
-          const line = part.trim();
-          if (!line.startsWith("data:")) continue;
-          try {
-            const event = JSON.parse(line.slice(5).trim());
-            if (event.type === "token") {
-              fullContent += event.content;
-              setMessages((prev) => {
-                const u = [...prev];
-                u[u.length - 1] = { role: "assistant", content: fullContent };
-                return u;
-              });
-            } else if (event.type === "sources") {
-              const mapped = (event.sources ?? []).map(
-                (s: { source_name: string; score: number; text: string }) => ({
-                  source: s.source_name,
-                  score: s.score,
-                  text: s.text,
-                }),
-              );
-              setLastSources(mapped);
-              setMessages((prev) => {
-                const u = [...prev];
-                if (u.length > 0 && u[u.length - 1].role === "assistant") {
-                  u[u.length - 1] = { ...u[u.length - 1], sources: mapped };
-                }
-                return u;
-              });
-            } else if (event.type === "done") {
-              setMeta({
-                provider: event.provider_name,
-                model: event.model_name,
-                latency: event.latency_ms,
-              });
-              if (event.message_id) {
-                setMessages((prev) => {
-                  const u = [...prev];
-                  u[u.length - 1] = {
-                    ...u[u.length - 1],
-                    id: event.message_id,
-                  };
-                  return u;
-                });
-              }
-            } else if (event.type === "error") {
-              const msg = event.message ?? "Error desconocido";
-              setMessages((prev) => {
-                const u = [...prev];
-                u[u.length - 1] = { role: "assistant", content: msg };
-                return u;
-              });
-            }
-          } catch {
-            /* malformed SSE line */
-          }
-        }
+      if (event.type === "error") {
+        const msg = event.message ?? "Error desconocido";
+        setMessages((prev) => {
+          const u = [...prev];
+          u[u.length - 1] = { role: "assistant", content: msg };
+          return u;
+        });
+      } else {
+        const mapped = (event.sources ?? []).map(
+          (s: { source_name: string; score: number; text: string }) => ({
+            source: s.source_name,
+            score: s.score,
+            text: s.text,
+          }),
+        );
+        setLastSources(mapped);
+        setMessages((prev) => {
+          const u = [...prev];
+          u[u.length - 1] = {
+            role: "assistant",
+            content: event.content ?? "",
+            sources: mapped,
+            id: event.message_id,
+          };
+          return u;
+        });
+        setMeta({
+          provider: event.provider_name,
+          model: event.model_name,
+          latency: event.latency_ms,
+        });
       }
     } catch {
       setMessages((prev) => {

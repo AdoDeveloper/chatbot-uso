@@ -15,8 +15,7 @@ API REST del backend. Prefijo base: `/api/v1`.
 - **Autorización**: los endpoints administrativos exigen un permiso RBAC
   concreto `(módulo.acción)`; un rol sin ese permiso recibe `403`.
 - **Formato**: peticiones y respuestas en JSON, salvo subida de archivos
-  (multipart), el chat (SSE) y las descargas de reportes y exportaciones
-  (PDF/CSV).
+  (multipart) y las descargas de reportes y exportaciones (PDF/CSV).
 - **Códigos**: `200` OK, `201` creado, `204` sin contenido, `401` no
   autenticado, `403` sin permiso, `404` no encontrado, `409` conflicto, `422`
   validación, `429` límite de tasa.
@@ -43,7 +42,7 @@ API REST del backend. Prefijo base: `/api/v1`.
 
 | Método | Ruta | Descripción |
 | --- | --- | --- |
-| POST | `/chat` | Conversación con el chatbot (respuesta en streaming SSE) |
+| POST | `/chat` | Conversación con el chatbot (respuesta única completa, sin streaming) |
 
 ## Conocimiento — Fuentes (`/sources`)
 

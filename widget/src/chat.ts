@@ -1,14 +1,10 @@
 /**
- * SSE streaming client for the chatbot API.
+ * Chat client for the chatbot API.
  *
- * The backend uses POST + StreamingResponse (not standard EventSource GET),
- * so we consume the stream via fetch + ReadableStream.
- *
- * SSE event format from backend:
- *   data: {"type":"sources","sources":[...]}
- *   data: {"type":"token","content":"..."}
- *   data: {"type":"error","message":"..."}
- *   data: {"type":"done"}
+ * The backend responds with a single complete JSON message (no streaming) —
+ * the caller shows a "typing..." indicator while awaiting this response, then
+ * renders the full message at once (similar to WhatsApp/Messenger, not a
+ * token-by-token typewriter effect).
  */
 
 export interface SourceChunk {
@@ -31,6 +27,16 @@ export interface ChatHistoryMessage {
 
 export const SERVICE_UNAVAILABLE_MESSAGE =
   "En este momento el asistente no está disponible. Por favor, inténtalo más tarde.";
+
+interface ChatApiResponse {
+  type?: string;
+  message?: string;
+  sources?: SourceChunk[];
+  content?: string;
+  message_id?: string;
+  conversation_id?: string;
+  escalation_prompt?: boolean;
+}
 
 export async function streamChat(
   apiUrl: string,
@@ -63,63 +69,25 @@ export async function streamChat(
     return;
   }
 
-  if (!resp.ok || !resp.body) {
+  if (!resp.ok) {
     callbacks.onError(SERVICE_UNAVAILABLE_MESSAGE);
     return;
   }
 
-  const reader = resp.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-
+  let data: ChatApiResponse;
   try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-
-      // Split on newlines; keep the last incomplete line in the buffer
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-
-      for (const line of lines) {
-        if (!line.startsWith("data: ")) continue;
-        const raw = line.slice(6).trim();
-        if (!raw) continue;
-
-        let event: Record<string, unknown>;
-        try {
-          event = JSON.parse(raw);
-        } catch {
-          continue;
-        }
-
-        switch (event.type) {
-          case "sources":
-            callbacks.onSources((event.sources as SourceChunk[]) ?? []);
-            break;
-          case "token":
-            callbacks.onToken((event.content as string) ?? "");
-            break;
-          case "error":
-            callbacks.onError(event.message as string);
-            break;
-          case "done":
-            callbacks.onDone(
-              event.message_id as string | undefined,
-              event.conversation_id as string | undefined,
-              event.escalation_prompt as boolean | undefined,
-            );
-            return;
-        }
-      }
-    }
-  } catch (err) {
-    if ((err as Error).name !== "AbortError") {
-      callbacks.onError(SERVICE_UNAVAILABLE_MESSAGE);
-    }
-  } finally {
-    reader.releaseLock();
+    data = await resp.json();
+  } catch {
+    callbacks.onError(SERVICE_UNAVAILABLE_MESSAGE);
+    return;
   }
+
+  if (data.type === "error") {
+    callbacks.onError(data.message ?? SERVICE_UNAVAILABLE_MESSAGE);
+    return;
+  }
+
+  callbacks.onSources(data.sources ?? []);
+  callbacks.onToken(data.content ?? "");
+  callbacks.onDone(data.message_id, data.conversation_id, data.escalation_prompt);
 }

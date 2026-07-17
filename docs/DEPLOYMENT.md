@@ -458,7 +458,8 @@ server {
         proxy_set_header   X-Forwarded-Proto $scheme;
         proxy_read_timeout 300s;
         proxy_send_timeout 120s;
-        # SSE (chat en streaming) — NO bufferear
+        # Sin streaming SSE: el chat responde con un unico JSON completo.
+        # Buffering desactivado igual — no afecta una respuesta JSON normal.
         proxy_buffering off;
         proxy_cache     off;
     }

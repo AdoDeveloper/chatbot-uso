@@ -5,7 +5,6 @@ import uuid
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from pydantic import BaseModel, Field
@@ -113,7 +112,7 @@ async def public_config(
     return widget
 
 
-@router.post("/public/chat")
+@router.post("/public/chat", response_model=None)
 async def public_chat(
     request: Request,
     db: AsyncSession = Depends(get_db),
@@ -121,7 +120,7 @@ async def public_chat(
 ):
     from app.api.v1.chat.router import (
         ChatRequest,
-        _event_stream,
+        run_chat,
         _llm_semaphore,
         _LLM_QUEUE_TIMEOUT,
     )
@@ -143,17 +142,17 @@ async def public_chat(
     # draft configs or unapproved documents.
     chat_req.browser = None
     chat_req.source_scope = None
-    # Enforce per-widget caps before even building the SSE stream — fail fast
-    # so the abusive client gets a 429, not a half-streamed response.
+    # Enforce per-widget caps before even running the pipeline — fail fast
+    # so the abusive client gets a 429, not a half-processed response.
     await svc.enforce_widget_caps(widget, chat_req.session_id or "")
     client_ip = get_client_ip(request)
     origin_url = request.headers.get("Referer") or request.headers.get("Origin")
 
     # Adquirir el semáforo de concurrencia LLM (misma precondición que el
-    # endpoint admin chat()). _event_stream lo libera en su finally, así que
-    # SIEMPRE debe adquirirse aquí antes de crear el StreamingResponse; de
-    # lo contrario el contador crece sin límite y la protección de cuota del
-    # proveedor deja de funcionar en el chat público del widget.
+    # endpoint admin chat()). run_chat lo libera en su finally, así que
+    # SIEMPRE debe adquirirse aquí antes de invocarlo; de lo contrario el
+    # contador crece sin límite y la protección de cuota del proveedor deja
+    # de funcionar en el chat público del widget.
     try:
         await asyncio.wait_for(_llm_semaphore.acquire(), timeout=_LLM_QUEUE_TIMEOUT)
     except asyncio.TimeoutError:
@@ -163,11 +162,7 @@ async def public_chat(
             detail="El asistente está muy solicitado en este momento. Inténtalo de nuevo en unos segundos.",
         )
 
-    return StreamingResponse(
-        _event_stream(chat_req, db, client_ip, origin_url),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-    )
+    return await run_chat(chat_req, db, client_ip, origin_url)
 
 
 @router.patch("/public/messages/{message_id}/feedback", status_code=204)

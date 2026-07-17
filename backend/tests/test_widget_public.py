@@ -52,7 +52,7 @@ class TestPublicConfig:
 
 
 class TestPublicChat:
-    async def test_chat_with_valid_key_returns_sse(self, client, widget_config):
+    async def test_chat_with_valid_key_returns_200(self, client, widget_config):
         async with client.stream(
             "POST", "/api/v1/widget/public/chat",
             json={"question": "hola", "session_id": "test-session"},

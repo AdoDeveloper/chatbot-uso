@@ -118,7 +118,7 @@ sequenceDiagram
     participant DB as MySQL
 
     U->>W: escribe pregunta
-    W->>API: POST /chat (SSE)
+    W->>API: POST /chat
 
     API->>G: validar input (4000 chars, anti-inyección, PII)
     alt Inyección detectada
@@ -135,12 +135,12 @@ sequenceDiagram
     API->>SC: ¿hit cache semántico?
     alt Hit (similarity ≥ 0.93)
         SC-->>API: respuesta cacheada
-        API-->>W: SSE: sources + token + done
+        API-->>W: JSON: sources + content
     else Miss
         API->>R: classify_query()
         alt Greeting
             R-->>API: respuesta predefinida
-            API-->>W: SSE: token + done
+            API-->>W: JSON: content
         else Factual o Complex
             R->>Q: hybrid_search (dense + BM25 RRF)
             Q-->>R: top_k chunks
@@ -149,19 +149,18 @@ sequenceDiagram
                 L-->>R: relevantes
             end
             R->>L: stream_chat (con parent_text)
-            loop tokens
+            loop tokens (acumulados internamente)
                 L-->>R: token
                 R-->>API: token
-                API-->>W: SSE: token
             end
         end
 
         API->>DB: persist conversación + mensajes
         API->>SC: store(question, answer)
-        API-->>W: SSE: done (latency, route, model)
+        API-->>W: JSON: content + latency + route + model
     end
 
-    W-->>U: muestra respuesta token a token
+    W-->>U: muestra "escribiendo..." y luego la respuesta completa
 ```
 
 **Estados del request**:
@@ -169,7 +168,10 @@ sequenceDiagram
 - 1-4: validación de input (< 50 ms).
 - 5: cache semántico (hit ratio esperado 30-60% post-warmup).
 - 6-7: clasificación de la query y retrieval (200-800 ms).
-- 8: streaming del LLM (1-30 s según modelo).
+- 8: generación del LLM (1-30 s según modelo). El backend consume internamente
+  el stream de tokens del proveedor LLM, pero responde al cliente con el
+  mensaje completo en un único JSON — no hay streaming SSE de por medio; el
+  cliente muestra un indicador de "escribiendo..." durante la espera.
 
 ---
 
@@ -324,7 +326,7 @@ chatbot-uso-v2/
 │   │   ├── models/         SQLAlchemy ORM
 │   │   ├── schemas/        Pydantic
 │   │   └── services/       Lógica de negocio
-│   │       ├── chat/       pipeline.py (SSE + cache + scope)
+│   │       ├── chat/       pipeline.py (fases del turno de chat + cache + scope)
 │   │       ├── rag/        Adaptive RAG (corrective.py + router.py)
 │   │       ├── ingestion/  chunking, embedding, vector_store
 │   │       ├── knowledge/  faq.py

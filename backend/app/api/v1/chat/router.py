@@ -3,15 +3,12 @@ from __future__ import annotations
 
 
 import asyncio
-import json
 import time
-from typing import AsyncGenerator
 
 import jwt as pyjwt
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -26,7 +23,7 @@ log = structlog.get_logger()
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
-# Limita cuántas conversaciones usan un proveedor LLM (RAG + streaming) al
+# Limita cuántas conversaciones usan un proveedor LLM (RAG + generación) al
 # mismo tiempo. Las que exceden el límite ESPERAN en cola (asyncio.Semaphore
 # encola por diseño: https://docs.python.org/3/library/asyncio-sync.html)
 # en vez de recibir un error — el usuario percibe una respuesta más lenta en
@@ -52,39 +49,49 @@ class ChatRequest(BaseModel):
     source_scope: str | None = None
 
 
-def _sse(payload: dict) -> str:
-    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+class ChatResponse(BaseModel):
+    """Respuesta completa del chat — sin streaming: el cliente muestra un
+    indicador de "escribiendo..." mientras espera esta respuesta única."""
+    type: str = "message"  # "message" | "error"
+    message: str | None = None  # solo en type == "error"
+    sources: list[dict] = []
+    content: str = ""
+    latency_ms: int | None = None
+    message_id: str | None = None
+    conversation_id: str | None = None
+    provider_name: str | None = None
+    model_name: str | None = None
+    rag_route: str | None = None
+    context_truncated: bool = False
+    escalation_prompt: bool = False
 
 
-async def _event_stream(
+async def run_chat(
     request: ChatRequest,
     db: AsyncSession,
     client_ip: str,
     origin_url: str | None = None,
-) -> AsyncGenerator[str, None]:
-    # PRECONDICIÓN: quien llama a este generador ya adquirió _llm_semaphore
+) -> ChatResponse:
+    # PRECONDICIÓN: quien llama a esta función ya adquirió _llm_semaphore
     # (ver chat() más abajo) — la validación de acceso y todo lo que necesita
-    # HTTPException real (403, no un evento SSE con 200) debe resolverse
-    # ANTES de crear el StreamingResponse, porque una vez que el streaming
-    # empieza el código de estado HTTP queda fijo en 200 sin importar qué se
-    # yield dentro. Este generador solo libera el semáforo al terminar.
+    # HTTPException real (403) debe resolverse ANTES de invocar run_chat.
+    # Esta función solo libera el semáforo al terminar.
     settings = get_settings()
     t_start = time.monotonic()
     try:
-        async for evt in _event_stream_inner(request, db, client_ip, origin_url, settings, t_start):
-            yield evt
+        return await _run_chat_inner(request, db, client_ip, origin_url, settings, t_start)
     finally:
         _llm_semaphore.release()
 
 
-async def _event_stream_inner(
+async def _run_chat_inner(
     request: ChatRequest,
     db: AsyncSession,
     client_ip: str,
     origin_url: str | None,
     settings,
     t_start: float,
-) -> AsyncGenerator[str, None]:
+) -> ChatResponse:
     is_playground = (request.browser or "").lower() in PLAYGROUND_BROWSERS
     use_draft = is_playground and (request.source_scope != "production")
     cfg = await pipeline.load_chat_config(db, use_draft)
@@ -94,30 +101,21 @@ async def _event_stream_inner(
             db, request.question, client_ip, cfg
         )
         if guard_error:
-            yield _sse({"type": "error", "message": guard_error})
-            yield _sse({"type": "done"})
-            return
+            return ChatResponse(type="error", message=guard_error)
 
     limit_error = await pipeline.check_limits(db, client_ip, request.session_id, settings)
     if limit_error:
-        yield _sse({"type": "error", "message": limit_error})
-        yield _sse({"type": "done"})
-        return
+        return ChatResponse(type="error", message=limit_error)
 
     use_cache = not request.messages
     if use_cache:
         cached = await pipeline.lookup_cache(db, request.question, request.source_ids, settings, use_draft)
         if cached:
-            yield _sse({"type": "sources", "sources": cached["sources"]})
-            yield _sse({"type": "token", "content": cached["content"]})
-            yield _sse({"type": "done"})
-            return
+            return ChatResponse(sources=cached["sources"], content=cached["content"])
 
     chain = await pipeline.load_provider_chain(db, use_draft)
     if not chain:
-        yield _sse({"type": "error", "message": cfg.no_providers_message})
-        yield _sse({"type": "done"})
-        return
+        return ChatResponse(type="error", message=cfg.no_providers_message)
 
     primary_provider, primary_key = chain[0]
     provider_name = primary_provider.name
@@ -129,10 +127,10 @@ async def _event_stream_inner(
     )
 
     if isinstance(effective_source_ids, list) and len(effective_source_ids) == 0:
-        yield _sse({"type": "sources", "sources": []})
-        yield _sse({"type": "token", "content": "No tengo información disponible para responder esa pregunta en este momento."})
-        yield _sse({"type": "done"})
-        return
+        return ChatResponse(
+            sources=[],
+            content="No tengo información disponible para responder esa pregunta en este momento.",
+        )
 
     history = [m.model_dump() for m in request.messages] if request.messages else []
     rag_question = pipeline.build_rag_question(request.question, history)
@@ -146,27 +144,25 @@ async def _event_stream_inner(
         )
     except asyncio.TimeoutError:
         log.warning("chat.rag_timeout", session_id=request.session_id)
-        yield _sse({"type": "error", "message": "La consulta tardó demasiado en procesarse. Por favor, intenta de nuevo."})
-        yield _sse({"type": "done"})
-        return
+        return ChatResponse(type="error", message="La consulta tardó demasiado en procesarse. Por favor, intenta de nuevo.")
     except Exception as exc:
         log.error("chat.rag_failed", session_id=request.session_id, error=str(exc))
-        yield _sse({"type": "error", "message": cfg.no_providers_message})
-        yield _sse({"type": "done"})
-        return
+        return ChatResponse(type="error", message=cfg.no_providers_message)
 
     _detected_route = "greeting" if isinstance(rag_result, str) else ("complex" if cfg.use_corrective_rag else "factual")
 
     if isinstance(rag_result, str):
-        yield _sse({"type": "sources", "sources": []})
-        yield _sse({"type": "token", "content": rag_result})
-        yield _sse({"type": "done", "rag_route": "greeting", "provider_name": provider_name, "model_name": model_name})
-        return
+        return ChatResponse(
+            sources=[],
+            content=rag_result,
+            rag_route="greeting",
+            provider_name=provider_name,
+            model_name=model_name,
+        )
 
     context_chunks = rag_result
 
     sources = pipeline.format_sources(context_chunks)
-    yield _sse({"type": "sources", "sources": sources})
 
     llm_chunks = pipeline.context_for_llm(context_chunks)
     llm_chunks, ctx_budget = pipeline.budget_context(
@@ -179,12 +175,13 @@ async def _event_stream_inner(
     full_content: list[str] = []
     deadline = asyncio.get_running_loop().time() + 70.0
 
-    # La conexión a MySQL no se usa durante el streaming del LLM (10-70s), el
+    # La conexión a MySQL no se usa durante la generación del LLM (10-70s), el
     # tramo más largo del request. Se libera aquí y se abre una sesión nueva
     # y corta al final solo para persist_turn — evita retener una conexión
     # ociosa del pool durante todo ese tiempo bajo alta concurrencia.
     await db.close()
 
+    timed_out = False
     try:
         async for token in stream_chat(
             question=request.question,
@@ -197,25 +194,22 @@ async def _event_stream_inner(
         ):
             if asyncio.get_running_loop().time() > deadline:
                 log.warning("chat.llm_stream_timeout", session_id=request.session_id)
-                yield _sse({"type": "token", "content": " [respuesta incompleta por timeout]"})
-                yield _sse({"type": "done"})
-                return
+                full_content.append(" [respuesta incompleta por timeout]")
+                timed_out = True
+                break
             full_content.append(token)
-            yield _sse({"type": "token", "content": token})
     except RuntimeError as exc:
         log.error("chat.llm_stream_failed", session_id=request.session_id, error=str(exc))
-        yield _sse({"type": "error", "message": cfg.no_providers_message})
-        yield _sse({"type": "done"})
-        return
+        return ChatResponse(type="error", message=cfg.no_providers_message)
 
     final_text = "".join(full_content)
-    if settings.GUARDRAILS_ENABLED:
+    if not timed_out and settings.GUARDRAILS_ENABLED:
         final_text = pipeline.apply_output_guardrails(final_text)
 
     latency_ms = int((time.monotonic() - t_start) * 1000)
 
-    # Sesión nueva y corta: la que traía el request se cerró antes del
-    # streaming (ver comentario más arriba) para no retener la conexión
+    # Sesión nueva y corta: la que traía el request se cerró antes de la
+    # generación (ver comentario más arriba) para no retener la conexión
     # ociosa durante la espera al LLM.
     async with AsyncSessionLocal() as fresh_db:
         assistant_message_id, conversation_id, escalation_prompt = await pipeline.persist_turn(
@@ -233,34 +227,33 @@ async def _event_stream_inner(
             context_chunks=context_chunks,
         )
 
-        done_payload: dict = {
-            "type": "done",
-            "latency_ms": latency_ms,
-            "message_id": assistant_message_id,
-            "conversation_id": conversation_id,
-            "provider_name": provider_name,
-            "model_name": model_name,
-            "rag_route": _detected_route,
-        }
-        if ctx_budget["truncated"]:
-            done_payload["context_truncated"] = True
-        if escalation_prompt:
-            done_payload["escalation_prompt"] = True
-        yield _sse(done_payload)
-
-        if use_cache and full_content:
+        if use_cache and full_content and not timed_out:
             await pipeline.store_cache(
                 fresh_db, request.question, request.source_ids, sources, final_text, settings, use_draft
             )
 
+        return ChatResponse(
+            sources=sources,
+            content=final_text,
+            latency_ms=latency_ms,
+            message_id=assistant_message_id,
+            conversation_id=conversation_id,
+            provider_name=provider_name,
+            model_name=model_name,
+            rag_route=_detected_route,
+            context_truncated=bool(ctx_budget["truncated"]),
+            escalation_prompt=bool(escalation_prompt),
+        )
 
-@router.post("")
+
+@router.post("", response_model=ChatResponse)
 async def chat(
     request: ChatRequest,
     req: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    """Endpoint SSE streaming del chatbot."""
+    """Endpoint del chatbot. Responde con el mensaje completo (sin streaming);
+    el cliente debe mostrar un indicador de "escribiendo..." mientras espera."""
     is_authenticated_playground = False
     if (request.browser or "").lower() in PLAYGROUND_BROWSERS:
         from app.core.security import decode_token
@@ -281,13 +274,11 @@ async def chat(
     client_ip = get_client_ip(req)
     origin_url = req.headers.get("Referer") or req.headers.get("Origin")
 
-    # El semáforo se adquiere aquí, antes de crear el StreamingResponse, para
-    # poder devolver un 403 real (HTTPException) si la widget key/dominio no
-    # son válidos — una vez que el streaming empieza el código de estado
-    # queda fijo en 200 sin importar el contenido del stream (ver
-    # _event_stream). Si la validación falla, se libera inmediatamente;
-    # si pasa, _event_stream hereda la responsabilidad de liberarlo al
-    # terminar el generador (éxito, timeout o error de RAG/LLM).
+    # El semáforo se adquiere aquí, antes de correr el pipeline, para poder
+    # devolver un 403 real (HTTPException) si la widget key/dominio no son
+    # válidos. Si la validación falla, se libera inmediatamente; si pasa,
+    # run_chat hereda la responsabilidad de liberarlo al terminar (éxito,
+    # timeout o error de RAG/LLM).
     try:
         await asyncio.wait_for(_llm_semaphore.acquire(), timeout=_LLM_QUEUE_TIMEOUT)
     except asyncio.TimeoutError:
@@ -305,11 +296,4 @@ async def chat(
             _llm_semaphore.release()
             raise
 
-    return StreamingResponse(
-        _event_stream(request, db, client_ip, origin_url=origin_url),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",
-        },
-    )
+    return await run_chat(request, db, client_ip, origin_url=origin_url)
