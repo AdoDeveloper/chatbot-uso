@@ -178,6 +178,10 @@ Crear `/etc/systemd/system/qdrant.service`:
 [Unit]
 Description=Qdrant Vector Database
 After=network.target
+# Si el servicio falla 5 veces en 60s, systemd deja de reintentar y lo marca
+# como failed en vez de reiniciar en bucle infinito con Restart=always.
+StartLimitIntervalSec=60
+StartLimitBurst=5
 
 [Service]
 Type=simple
@@ -316,6 +320,10 @@ Crear `/etc/systemd/system/chatbot-backend.service`:
 Description=Chatbot RAG Backend (FastAPI)
 After=network.target mysql.service redis-server.service qdrant.service
 Requires=mysql.service redis-server.service qdrant.service
+# Si el servicio falla 5 veces en 60s, systemd deja de reintentar y lo marca
+# como failed en vez de reiniciar en bucle infinito con Restart=always.
+StartLimitIntervalSec=60
+StartLimitBurst=5
 
 [Service]
 Type=simple
@@ -368,6 +376,10 @@ Crear `/etc/systemd/system/chatbot-frontend.service`:
 [Unit]
 Description=Chatbot RAG Frontend (Next.js)
 After=network.target
+# Si el servicio falla 5 veces en 60s, systemd deja de reintentar y lo marca
+# como failed en vez de reiniciar en bucle infinito con Restart=always.
+StartLimitIntervalSec=60
+StartLimitBurst=5
 
 [Service]
 Type=simple
