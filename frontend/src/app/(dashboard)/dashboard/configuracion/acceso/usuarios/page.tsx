@@ -116,7 +116,7 @@ function EditUserPanel({ user, meId, availableRoles, onClose, onSaved }: {
       footer={
         <div className="flex gap-3 w-full">
           <Button variant="outline" className="flex-1 gap-1.5" onClick={onClose} type="button"><X className="w-3.5 h-3.5" /> Cancelar</Button>
-          <Button className="flex-1 gap-1.5" type="submit" disabled={isSubmitting}>
+          <Button className="flex-1 gap-1.5" type="submit" form="edit-user-form" disabled={isSubmitting}>
             {isSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
             {isSubmitting ? "Guardando..." : "Guardar"}
           </Button>
@@ -124,7 +124,7 @@ function EditUserPanel({ user, meId, availableRoles, onClose, onSaved }: {
       }
     >
       {user && (
-        <form onSubmit={onSubmit} className="space-y-5">
+        <form id="edit-user-form" onSubmit={onSubmit} className="space-y-5">
           <div className="flex items-center gap-3 p-4 bg-card rounded-xl border border-border">
             <UserAvatar name={user.full_name} email={user.email} />
             <div className="min-w-0">
@@ -221,7 +221,7 @@ function InvitePanel({ open, availableRoles, onClose, onCreated }: {
         ) : (
           <div className="flex gap-3 w-full">
             <Button variant="outline" className="flex-1 gap-1.5" onClick={onClose} type="button"><X className="w-3.5 h-3.5" /> Cancelar</Button>
-            <Button className="flex-1 gap-1.5" type="submit" disabled={isSubmitting}>
+            <Button className="flex-1 gap-1.5" type="submit" form="invite-user-form" disabled={isSubmitting}>
               {isSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
               {isSubmitting ? "Enviando..." : "Enviar invitación"}
             </Button>
@@ -248,7 +248,7 @@ function InvitePanel({ open, availableRoles, onClose, onCreated }: {
           </Button>
         </div>
       ) : (
-        <form onSubmit={onSubmit} className="space-y-5">
+        <form id="invite-user-form" onSubmit={onSubmit} className="space-y-5">
           {error && <Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertDescription>{error}</AlertDescription></Alert>}
           <div>
             <label className="text-13 font-medium text-foreground mb-1.5 block">Correo electrónico</label>
