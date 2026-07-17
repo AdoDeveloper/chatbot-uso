@@ -1,0 +1,24 @@
+# Build artifacts and deps — must NOT be sent to the build context.
+# node_modules alone is ~600 MB; Docker copies the context into a tar before
+# starting the build, so leaving it in inflates build time and may fail when
+# binaries (e.g. node_modules/.bin/*) trigger invalid-file-request errors.
+node_modules
+.next
+out
+dist
+build
+
+# Local env / IDE / OS
+.env
+.env.*
+!.env.example
+.git
+.gitignore
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+# Test + coverage
+coverage
+*.log

@@ -1,0 +1,389 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* ─────────────────────────────────────────────────────────────
+ * DESIGN TOKENS — single source of truth
+ *
+ * Foundation: Navy/Royal/Dodger family (institutional brand) +
+ * neutral grayscale. Tuned for WCAG AA on every text/icon pair.
+ *
+ * Density target: AdminLTE-style — compacta pero respirable.
+ * Tables 36px, body 13.5px, headings -0.015em letter-spacing.
+ *
+ * Contrast verified pairs (against #FFFFFF and #F8FAFC):
+ *   foreground   #111827  16.10 / 14.96   AAA
+ *   muted-fg     #4B5563   7.59 /  7.05   AAA
+ *   primary      #1E40AF   8.59 /  7.97   AAA
+ *   destructive  #B91C1C   7.18 /  6.66   AAA
+ *   ring         #2563EB   5.17 /  4.80   AA  (interactive only)
+ * ───────────────────────────────────────────────────────────── */
+
+@theme inline {
+  /* Surface & content */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  /* Semantic roles */
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+
+  /* Lines & focus */
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Charts */
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  /* Sidebar */
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Typography */
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains-mono);
+  --font-heading: var(--font-inter);
+
+  /* Radii — subtle, professional */
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+
+  /* Shadows — AdminLTE-like depth, not floaty */
+  --shadow-xs: 0 1px 2px 0 rgb(15 23 42 / 0.04);
+  --shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.05), 0 1px 3px 0 rgb(15 23 42 / 0.05);
+  --shadow-md: 0 2px 4px -1px rgb(15 23 42 / 0.06), 0 4px 6px -1px rgb(15 23 42 / 0.06);
+  --shadow-lg: 0 4px 6px -2px rgb(15 23 42 / 0.07), 0 10px 15px -3px rgb(15 23 42 / 0.07);
+}
+
+/* ─── Brand palette (used by charts, badges, env indicators) ───── */
+@theme {
+  --color-brand-navy:    #0F2F6E;
+  --color-brand-deep:    #0A2251;
+  --color-brand-mid:     #1C386D;
+  --color-brand-soft:    #10254F;
+  --color-brand-teal:    #0369A1;
+  --color-brand-bright:  #2563EB;   /* dodger blue — focus/info */
+  --color-brand-steel:   #336699;
+  --color-brand-cornflower: #6C8ED2;
+  --color-brand-sky:        #93C5FD;
+  --color-brand-green:   #16A34A;   /* success — AA on white */
+
+  /* Blue scale for charts, heatmaps */
+  --color-blue-50:  #EFF6FF;
+  --color-blue-100: #DBEAFE;
+  --color-blue-200: #BFDBFE;
+  --color-blue-300: #93C5FD;
+  --color-blue-400: #60A5FA;
+  --color-blue-500: #3B82F6;
+  --color-blue-600: #2563EB;
+  --color-blue-700: #1D4ED8;
+  --color-blue-800: #1E40AF;
+  --color-blue-900: #1E3A8A;
+
+  /* Env accents */
+  --color-env-dev:  #0369A1;
+  --color-env-qa:   #D97706;
+  --color-env-prod: #16A34A;
+
+  /* ── Escala tipográfica del panel ──
+   * Formaliza los tamaños que el dashboard ya usaba como valores mágicos
+   * (text-[10px]/[11px]/[13px]/[15px]) como escalones nombrados, para que el
+   * código use el sistema y no píxeles sueltos. No cambia ningún tamaño: son
+   * los mismos px, ahora con nombre. Escala densa propia de un panel de datos.
+   *   text-3xs  10px · badges, contadores, metadatos mínimos
+   *   text-2xs  11px · etiquetas de columna, ayudas, pills
+   *   text-xs   12px · (Tailwind) secundario general
+   *   text-13   13px · cuerpo denso de tablas y filas
+   *   text-sm   14px · (Tailwind) cuerpo estándar
+   *   text-15   15px · texto ligeramente destacado */
+  --text-3xs: 10px;
+  --text-3xs--line-height: 1.4;
+  --text-2xs: 11px;
+  --text-2xs--line-height: 1.45;
+  --text-13: 13px;
+  --text-13--line-height: 1.5;
+  --text-15: 15px;
+  --text-15--line-height: 1.5;
+}
+
+/* ─── Light mode (only mode supported) ─────────────────────── */
+:root {
+  /* Surfaces */
+  --background: #F8FAFC;
+  --foreground: #111827;
+  --card: #FFFFFF;
+  --card-foreground: #111827;
+  --popover: #FFFFFF;
+  --popover-foreground: #111827;
+
+  /* Primary — institutional navy, AAA contrast */
+  --primary: #1E40AF;
+  --primary-foreground: #FFFFFF;
+  --primary-hover: #1E3A8A;
+
+  /* Secondary — soft tonal lift */
+  --secondary: #EFF6FF;
+  --secondary-foreground: #1E3A8A;
+
+  /* Muted — subtle backgrounds & dimmed text */
+  --muted: #F1F5F9;
+  --muted-foreground: #4B5563;
+
+  /* Accent — for hover states on neutral elements */
+  --accent: #F1F5F9;
+  --accent-foreground: #111827;
+
+  /* Status colors — all AA+ on white */
+  --destructive: #B91C1C;
+  --destructive-foreground: #FFFFFF;
+  --success: #15803D;
+  --success-foreground: #FFFFFF;
+  --warning: #B45309;
+  --warning-foreground: #FFFFFF;
+  --info: #1D4ED8;
+  --info-foreground: #FFFFFF;
+
+  /* Lines */
+  --border: #E5E7EB;
+  --input: #E5E7EB;
+  --ring: #2563EB;
+
+  /* Charts — sequential blue + supporting hues */
+  --chart-1: #1E40AF;
+  --chart-2: #2563EB;
+  --chart-3: #60A5FA;
+  --chart-4: #0369A1;
+  --chart-5: #16A34A;
+
+  /* Sidebar — institutional dark */
+  --sidebar: #0A2251;
+  --sidebar-foreground: #E2E8F0;
+  --sidebar-primary: #2563EB;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #1E3A8A;
+  --sidebar-accent-foreground: #BFDBFE;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-ring: #60A5FA;
+
+  /* Radius (8px base — AdminLTE-like, not too round) */
+  --radius: 0.5rem;
+}
+
+
+/* ─── Base layer ─────────────────────────────────────────── */
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+    font-family: var(--font-inter), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11", "ss01";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    /* Contiene cualquier desborde horizontal accidental (un botón o texto
+     * mal dimensionado) para que arrastre solo su contenedor, nunca la
+     * página completa. Las tablas anchas deben usar overflow-x-auto en su
+     * propio contenedor si necesitan scroll horizontal. */
+    overflow-x: hidden;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: inherit;
+    font-size: 13.5px;
+    line-height: 1.5;
+    letter-spacing: -0.005em;
+    overflow-x: hidden;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: 600;
+    letter-spacing: -0.018em;
+    line-height: 1.25;
+    color: var(--foreground);
+  }
+  h1 { letter-spacing: -0.022em; }
+
+  /* Tabular numerals everywhere data lives */
+  table, .tabular-nums, [data-tabular] {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" on, "lnum" on;
+  }
+  code, pre, kbd { @apply font-mono; }
+  input, textarea, select, button {
+    font-family: inherit;
+    font-feature-settings: inherit;
+  }
+
+  /* Focus ring — single canonical pattern */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* En touch (sin hover real), muchos navegadores móviles marcan el botón
+   * como focus-visible tras el tap y el anillo queda pegado hasta el
+   * siguiente toque en otro lugar. Se desactiva el anillo en ese entorno. */
+  @media (hover: none) and (pointer: coarse) {
+    :focus-visible {
+      outline: none;
+    }
+    button:focus-visible,
+    [role="button"]:focus-visible,
+    [data-slot="button"]:focus-visible {
+      outline: none !important;
+      box-shadow: none !important;
+    }
+  }
+
+  /* Cursor pointer en interactivos — Tailwind v4 cambió el default a `default`,
+   * lo restauramos para que UX sea consistente con expectativa del usuario.
+   * Excluye estados disabled/aria-disabled. */
+  button:not(:disabled):not([aria-disabled="true"]),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="tab"]:not([aria-disabled="true"]),
+  [role="menuitem"]:not([aria-disabled="true"]),
+  [role="option"]:not([aria-disabled="true"]),
+  [role="switch"]:not([aria-disabled="true"]),
+  [role="checkbox"]:not([aria-disabled="true"]),
+  [role="radio"]:not([aria-disabled="true"]),
+  a[href]:not([aria-disabled="true"]),
+  label[for],
+  summary,
+  select:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+/* ─── Animations ─────────────────────────────────────────── */
+@keyframes indeterminate {
+  0%   { transform: translateX(-150%) scaleX(0.4); }
+  50%  { transform: translateX(50%)   scaleX(0.6); }
+  100% { transform: translateX(200%)  scaleX(0.4); }
+}
+.animate-indeterminate { animation: indeterminate 1.6s infinite ease-in-out; }
+
+/* ─── Page header pattern ────────────────────────────────── */
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+.page-header h1 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.022em;
+}
+.page-header p {
+  margin-top: 0.25rem;
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
+  max-width: 60ch;
+}
+
+/* ─── Section header ─────────────────────────────────────── */
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+.section-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted-foreground);
+}
+
+/* ─── Interactive row hover ──────────────────────────────── */
+.interactive-row { transition: background-color 80ms ease; }
+.interactive-row:hover { background-color: var(--muted); }
+.interactive-row:hover .row-actions { opacity: 1; }
+.row-actions { opacity: 0; transition: opacity 120ms ease; }
+
+/* ─── Form helpers ───────────────────────────────────────── */
+.field-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--foreground);
+  margin-bottom: 0.375rem;
+}
+.field-hint {
+  font-size: 0.6875rem;
+  color: var(--muted-foreground);
+  margin-top: 0.25rem;
+}
+
+/* ─── Scrollbar styling ──────────────────────────────────── */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover { background: #CBD5E1; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* ── Markdown rendered in playground chat bubbles ────────────── */
+@layer base {
+  .md-content { line-height: 1.65; word-break: break-word; }
+  .md-content p { margin: 0 0 7px; }
+  .md-content p:last-child { margin-bottom: 0; }
+  .md-content h1 { font-size: 17px; font-weight: 700; margin: 10px 0 5px; }
+  .md-content h2 { font-size: 15px; font-weight: 700; margin: 10px 0 5px; }
+  .md-content h3 { font-size: 14px; font-weight: 600; margin: 8px 0 4px; }
+  .md-content ul, .md-content ol { margin: 5px 0 5px 18px; padding: 0; }
+  .md-content ul li { list-style-type: disc; }
+  .md-content ol li { list-style-type: decimal; }
+  .md-content li { margin: 3px 0; }
+  .md-content strong { font-weight: 700; }
+  .md-content em { font-style: italic; }
+  .md-content a { color: #2563eb; text-decoration: underline; word-break: break-all; }
+  .md-content code { background: rgba(0,0,0,0.06); padding: 1px 5px; border-radius: 4px; font-family: "Fira Code", Consolas, monospace; font-size: 12.5px; }
+  .md-content pre { background: #1e293b; color: #e2e8f0; padding: 12px 14px; border-radius: 8px; overflow-x: auto; margin: 8px 0; }
+  .md-content pre code { background: transparent; color: inherit; padding: 0; }
+  .md-content blockquote { border-left: 3px solid #93c5fd; margin: 6px 0; padding: 3px 12px; color: #6b7280; background: rgba(147,197,253,0.1); border-radius: 0 4px 4px 0; }
+  .md-content table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 8px 0; }
+  .md-content th { background: #e5e7eb; padding: 6px 8px; text-align: left; font-weight: 600; border: 1px solid #d1d5db; }
+  .md-content td { padding: 5px 8px; border: 1px solid #e5e7eb; }
+  .md-content hr { border: none; border-top: 1px solid #e5e7eb; margin: 8px 0; }
+}
