@@ -33,7 +33,8 @@
  *   DOCS_VIEWER_EMAIL=... DOCS_VIEWER_PASSWORD=... \
  *   npx tsx scripts/generate-role-docs.ts
  *
- * Salida: docs/roles/<rol>/*.png + docs/roles/<rol>.docx + docs/roles/README.md
+ * Salida: .scratch/docs-tesis/roles/<rol>/*.png + <rol>.docx + README.md
+ * (material de generación de tesis, fuera del repo — no documentación del proyecto)
  */
 import { chromium, type Locator, type Page } from "@playwright/test";
 import sharp from "sharp";
@@ -44,7 +45,7 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
-const OUT_DIR = path.resolve(__dirname, "../../docs/roles");
+const OUT_DIR = path.resolve(__dirname, "../../.scratch/docs-tesis/roles");
 const VIEWPORT = { width: 1440, height: 900 };
 const MARK_COLOR = "#e11d48";
 

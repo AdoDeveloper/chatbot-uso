@@ -18,9 +18,6 @@ build/
 .idea/
 *.iml
 
-# Claude Code local state (config/estado de la herramienta, no del proyecto)
-.claude/
-
 # OS
 .DS_Store
 Thumbs.db
@@ -47,9 +44,6 @@ htmlcov/
 test-results/
 playwright-report/
 playwright/.cache/
-
-# Docs
-docs/
 
 # Backups
 BK2/
