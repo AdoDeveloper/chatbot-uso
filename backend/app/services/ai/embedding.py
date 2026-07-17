@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """
 Embedding service — multilingual-e5-large via fastembed.
 
@@ -20,6 +18,7 @@ Why multilingual-e5-large over MiniLM:
   roughly half the content before embedding. e5-large handles 512 tokens and
   produces richer 1024-dim semantic representations.
 """
+from __future__ import annotations
 
 import asyncio
 import os

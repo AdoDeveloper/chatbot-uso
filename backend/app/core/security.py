@@ -6,12 +6,10 @@ import hashlib
 import re
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Pattern
 
 import bcrypt
 import jwt as pyjwt
 from cryptography.fernet import Fernet, InvalidToken
-from pydantic import BaseModel
 
 from app.core.config import get_settings
 

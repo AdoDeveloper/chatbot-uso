@@ -13,10 +13,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.db.session import get_db
-
-log = structlog.get_logger()
 from app.models.widget_config import WidgetConfig
 from app.services.widget.service import get_by_api_key
+
+log = structlog.get_logger()
 
 
 async def _extract_api_key(request: Request) -> str:

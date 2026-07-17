@@ -6,11 +6,10 @@ from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError, ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-
-log = structlog.get_logger()
-
 from app.models.enums import PermissionAction
 from app.models.rbac import Module, Permission, Role, RolePermission
+
+log = structlog.get_logger()
 
 MODULES_SEED: list[dict] = [
     {

@@ -19,6 +19,8 @@ from app.models.chat_message import ChatMessage
 from app.models.enums import ConversationStatus
 from app.models.user import User
 from app.schemas.chat_history import ChatConversationDetail, ChatConversationOut, FeedbackUpdate
+from app.services.chat import history as svc
+from app.services.escalation import lifecycle as lifecycle_svc
 from app.services.ingestion.export import excel_response, pdf_response
 from pydantic import BaseModel as _BM
 
@@ -43,10 +45,6 @@ class _BulkBody(_BM):
 class ConversationStatusUpdate(_BM):
     status: ConversationStatus
     resolution_note: str | None = None
-
-
-from app.services.chat import history as svc
-from app.services.escalation import lifecycle as lifecycle_svc
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
 

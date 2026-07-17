@@ -1,9 +1,8 @@
-from __future__ import annotations
-
 """
 Multi-dimensional rate limiting using Redis sliding windows.
 Falls open if Redis is down. All limits configurable via Settings.
 """
+from __future__ import annotations
 
 import asyncio
 import structlog

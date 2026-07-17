@@ -6,6 +6,12 @@ from datetime import datetime, timedelta, timezone
 
 import structlog
 from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db.session import AsyncSessionLocal
+from app.models.health_snapshot import HealthSnapshot
+
+log = structlog.get_logger()
 
 
 def _pct(data: list[float], p: float) -> float:
@@ -16,12 +22,6 @@ def _pct(data: list[float], p: float) -> float:
     k = (n - 1) * p
     lo, hi = int(k), min(int(k) + 1, n - 1)
     return data[lo] + (data[hi] - data[lo]) * (k - lo)
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.db.session import AsyncSessionLocal
-from app.models.health_snapshot import HealthSnapshot
-
-log = structlog.get_logger()
 
 
 # Lista de checks que ejecuta el recolector. Cada tupla es (nombre, función async que devuelve (ok, latency_ms, error))

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """
 Fases del pipeline de chat extraídas del router SSE.
 
@@ -8,6 +6,7 @@ fuentes, RAG, persistencia, escalación) y devuelve datos puros; el router
 decide qué eventos SSE emitir con ellos. Este módulo NO debe importar el
 router para evitar imports circulares.
 """
+from __future__ import annotations
 
 import asyncio
 import hashlib

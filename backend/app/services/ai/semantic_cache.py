@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """
 Semantic cache for chat responses using Redis + embedding similarity.
 
@@ -14,6 +12,7 @@ Architecture:
 
 Falls back gracefully if Redis is unavailable — cache miss, not error.
 """
+from __future__ import annotations
 
 import hashlib
 import json

@@ -1,9 +1,8 @@
-from __future__ import annotations
-
 """
 Corrective RAG — LangGraph state machine: expand → retrieve → grade → optional rewrite.
 Greeting/factual shortcuts skip grading/rewriting. Max 1 rewrite to avoid loops.
 """
+from __future__ import annotations
 
 from typing import TypedDict
 

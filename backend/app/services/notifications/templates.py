@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Plantillas de correo institucional.
 
 Estilo limpio: encabezado azul con el nombre de la institución, tarjeta blanca
@@ -8,6 +6,7 @@ color de marca, sin iconos, sin emojis, sin firma epistolar (son mensajes
 automáticos). Compatible con clientes de correo (layout en tabla, estilos
 inline, responsive por media query).
 """
+from __future__ import annotations
 
 import html as _html
 from datetime import datetime, timezone

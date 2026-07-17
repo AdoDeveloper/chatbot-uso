@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """
 Cross-encoder reranker — post-processes hybrid search results.
 
@@ -12,15 +10,15 @@ Flow:
         ↓
   returns top_k re-ordered by cross-encoder score
 """
+from __future__ import annotations
 
 import asyncio
+import os
 from functools import lru_cache
 
 import structlog
 
 log = structlog.get_logger()
-
-import os
 
 _MODEL = "ms-marco-MultiBERT-L-12"
 _CACHE_DIR = os.path.join(os.path.expanduser("~"), ".cache", "flashrank")

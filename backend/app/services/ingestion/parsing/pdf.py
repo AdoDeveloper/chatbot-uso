@@ -1,7 +1,3 @@
-from __future__ import annotations
-
-import asyncio
-
 """
 PDF parser — extracts text prioritizing clean extraction over OCR.
 
@@ -16,7 +12,9 @@ pymupdf4llm's OCR pass. Since most university documents are Word→PDF
 pymupdf4llm is only useful as fallback for scanned/image-heavy PDFs where
 plain extraction returns very little text.
 """
+from __future__ import annotations
 
+import asyncio
 import structlog
 
 log = structlog.get_logger()

@@ -6,6 +6,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from fastapi.responses import StreamingResponse
+
 # Identidad institucional para los reportes.
 BRAND_NAME = "Universidad de Sonsonate"
 BRAND_COLOR = "#1E40AF"
@@ -46,8 +48,6 @@ _CHART_PALETTE = [
     "#2563EB", "#0EA5E9", "#10B981", "#F59E0B",
     "#EF4444", "#8B5CF6", "#14B8A6", "#F97316",
 ]
-
-from fastapi.responses import StreamingResponse
 
 def build_excel(
     rows: list[dict[str, Any]],

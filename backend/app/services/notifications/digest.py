@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Recopilación de estadísticas para el resumen diario (unanswered_daily).
 
 Reúne, en una sola pasada por la base de datos, las métricas que componen el
@@ -7,6 +5,7 @@ correo de resumen: preguntas sin responder (nuevas vs acumuladas), temas más
 frecuentes, las preguntas más recientes y la actividad de escalamiento y
 resolución del día.
 """
+from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from typing import Any

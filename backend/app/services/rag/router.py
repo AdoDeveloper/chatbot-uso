@@ -1,9 +1,8 @@
-from __future__ import annotations
-
 """
 Adaptive RAG Router — classifies query complexity: greeting/factual/complex.
 Saves 40-60% latency on simple queries by skipping grading/rewriting.
 """
+from __future__ import annotations
 
 import re
 

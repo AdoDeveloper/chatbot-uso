@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """
 Context-aware chunking with Parent-Child retrieval.
 
@@ -17,6 +15,7 @@ Why Parent-Child:
 Public API:
   chunk_text(text, source_id, source_name) -> list[dict]
 """
+from __future__ import annotations
 
 import re
 import uuid

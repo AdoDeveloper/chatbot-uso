@@ -1,9 +1,8 @@
-from __future__ import annotations
-
 """
 Input/output guardrails for the chat pipeline: length, PII, injection.
 Presidio loaded lazily and cached for the process lifetime.
 """
+from __future__ import annotations
 
 import re
 from functools import lru_cache

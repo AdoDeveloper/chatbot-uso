@@ -16,14 +16,13 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
+from app.core.constants import PLAYGROUND_BROWSERS
 from app.core.deps import get_client_ip
 from app.db.session import AsyncSessionLocal, get_db
 from app.services.ai.llm_gateway import stream_chat
 from app.services.chat import pipeline
 
 log = structlog.get_logger()
-
-from app.core.constants import PLAYGROUND_BROWSERS
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 

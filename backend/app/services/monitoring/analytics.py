@@ -3,33 +3,15 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func, or_, select, text
-
-
-def _percentile(data: list[float], p: float) -> float:
-    """Calcula el percentil p (0-1) de una lista ya ordenada ascendentemente.
-    """
-    if not data:
-        return 0.0
-    n = len(data)
-    k = (n - 1) * p
-    lo, hi = int(k), min(int(k) + 1, n - 1)
-    return data[lo] + (data[hi] - data[lo]) * (k - lo)
 from sqlalchemy.ext.asyncio import AsyncSession
 
-
-def sql_date_format(db: AsyncSession, col, fmt: str):
-    """Expresión de formato de fecha portable: strftime en SQLite, DATE_FORMAT en MySQL."""
-    if db.bind is not None and db.bind.dialect.name == "sqlite":
-        return func.strftime(fmt, col)
-    return func.date_format(col, fmt)
-
+from app.core.constants import PLAYGROUND_BROWSERS
+from app.models.audit_log import AuditLog
 from app.models.chat_conversation import ChatConversation
 from app.models.chat_message import ChatMessage
-from app.models.enums import MessageRole, SourceStatus, UnansweredStatus
+from app.models.enums import ConversationStatus, MessageRole, SourceStatus, UnansweredStatus
 from app.models.source import Source
 from app.models.unanswered_question import UnansweredQuestion
-from app.models.audit_log import AuditLog
-from app.models.enums import ConversationStatus
 from app.schemas.analytics import (
     AnalyticsChannels,
     AnalyticsDashboard,
@@ -61,7 +43,22 @@ from app.schemas.analytics import (
 )
 
 
-from app.core.constants import PLAYGROUND_BROWSERS
+def _percentile(data: list[float], p: float) -> float:
+    """Calcula el percentil p (0-1) de una lista ya ordenada ascendentemente.
+    """
+    if not data:
+        return 0.0
+    n = len(data)
+    k = (n - 1) * p
+    lo, hi = int(k), min(int(k) + 1, n - 1)
+    return data[lo] + (data[hi] - data[lo]) * (k - lo)
+
+
+def sql_date_format(db: AsyncSession, col, fmt: str):
+    """Expresión de formato de fecha portable: strftime en SQLite, DATE_FORMAT en MySQL."""
+    if db.bind is not None and db.bind.dialect.name == "sqlite":
+        return func.strftime(fmt, col)
+    return func.date_format(col, fmt)
 
 
 def _source_filter(source: str = "production"):
