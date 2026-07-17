@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chatbot Widget — Demo</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      padding: 2rem;
+      background: #f1f5f9;
+      min-height: 100vh;
+    }
+    .demo-card {
+      max-width: 640px;
+      background: white;
+      border-radius: 16px;
+      padding: 2rem;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+    h1 { color: #1e3a8a; margin: 0 0 0.5rem; font-size: 1.5rem; }
+    p { color: #64748b; margin: 0 0 1rem; }
+    code {
+      background: #f1f5f9;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 13px;
+      color: #1e3a8a;
+    }
+    .snippet {
+      background: #1e293b;
+      color: #e2e8f0;
+      padding: 1rem;
+      border-radius: 8px;
+      font-size: 13px;
+      font-family: monospace;
+      overflow-x: auto;
+      margin-top: 1rem;
+    }
+    .key-form {
+      display: flex;
+      gap: 8px;
+      margin-top: 1rem;
+    }
+    .key-form input {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 13px;
+    }
+    .key-form button {
+      padding: 8px 16px;
+      background: #1C386D;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .key-status { font-size: 12px; margin-top: 6px; }
+    .key-status.ok  { color: #16a34a; }
+    .key-status.err { color: #dc2626; }
+  </style>
+</head>
+<body>
+  <div class="demo-card">
+    <h1>Chatbot Widget Demo</h1>
+    <p>
+      El widget aparece en la esquina inferior derecha. Haz clic en el botón
+      para abrir el chat.
+    </p>
+    <p>
+      Asegúrate de que el backend esté corriendo en
+      <code>http://localhost:8000</code>. Pega tu <code>api-key</code> del
+      dashboard (<em>Config → Widget → Integración</em>):
+    </p>
+    <div class="key-form">
+      <input id="keyInput" placeholder="wk_..." />
+      <button id="keySave">Guardar y recargar</button>
+    </div>
+    <div id="keyStatus" class="key-status"></div>
+    <div class="snippet">
+&lt;chatbot-widget<br>
+&nbsp;&nbsp;api-url="http://localhost:8000"<br>
+&nbsp;&nbsp;api-key="wk_..."<br>
+&nbsp;&nbsp;chatbot-name="Asistente Virtual"<br>
+&nbsp;&nbsp;welcome-message="¡Hola! ¿En qué puedo ayudarte?"<br>
+&gt;&lt;/chatbot-widget&gt;<br>
+&lt;script src="http://localhost:8000/widget/widget.js"&gt;&lt;/script&gt;
+    </div>
+  </div>
+
+  <script>
+    // Dev demo: carga la api-key desde ?api_key=... o localStorage
+    const params = new URLSearchParams(location.search);
+    const urlKey = params.get("api_key");
+    if (urlKey) localStorage.setItem("widget_api_key", urlKey);
+    const apiKey = localStorage.getItem("widget_api_key") ?? "";
+
+    const el = document.createElement("chatbot-widget");
+    el.setAttribute("api-url", "http://localhost:8000");
+    el.setAttribute("api-key", apiKey);
+    el.setAttribute("chatbot-name", "Asistente Virtual");
+    el.setAttribute("welcome-message", "¡Hola! ¿En qué puedo ayudarte?");
+    document.body.appendChild(el);
+
+    // UI: mostrar la key actual y permitir actualizarla
+    const input = document.getElementById("keyInput");
+    const status = document.getElementById("keyStatus");
+    input.value = apiKey;
+    if (apiKey) {
+      status.className = "key-status ok";
+      status.textContent = "✓ Api-key configurada (guardada en localStorage).";
+    } else {
+      status.className = "key-status err";
+      status.textContent = "⚠ Sin api-key — las peticiones fallarán con 403.";
+    }
+    document.getElementById("keySave").addEventListener("click", () => {
+      const v = input.value.trim();
+      if (!v) return;
+      localStorage.setItem("widget_api_key", v);
+      location.reload();
+    });
+  </script>
+
+  <script type="module" src="/src/widget.tsx"></script>
+</body>
+</html>
