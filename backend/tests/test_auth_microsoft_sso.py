@@ -46,12 +46,13 @@ def sso_env(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def reset_local_rate_limit_fallback():
-    """_LOCAL_LIMITS es un dict a nivel de módulo en app.core.rate_limit —
-    persiste entre tests dentro del mismo proceso pytest. Como fakeredis
-    activa el fallback en memoria en este entorno y todos estos tests
-    comparten la misma IP simulada del test client, sin este reset el
-    límite de 5 intentos/min de RATE_LIMIT_LOGIN_PER_MIN se acumula entre
-    tests y dispara 429 en vez del 401/200 que cada test intenta verificar."""
+    """Red de seguridad para el fallback en memoria de app.core.rate_limit
+    (_LOCAL_LIMITS, dict a nivel de módulo que persistiría entre tests si
+    Redis no estuviera disponible). El camino normal ya no depende de esto:
+    rate_limit.py usa `redis_mod.get_redis()` (import del módulo, no del
+    símbolo), por lo que el `monkeypatch.setattr(redis_mod, "get_redis", ...)`
+    de conftest.py sí lo intercepta, y cada test recibe un FakeRedis nuevo
+    vía el fixture `client` — el rate limit se resetea solo entre tests."""
     from app.core.rate_limit import _LOCAL_LIMITS
     _LOCAL_LIMITS.clear()
     yield

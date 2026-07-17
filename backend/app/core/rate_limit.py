@@ -8,7 +8,7 @@ import asyncio
 import structlog
 import time
 
-from app.core.redis import get_redis
+from app.core import redis as redis_mod
 
 log = structlog.get_logger()
 
@@ -42,7 +42,7 @@ async def check_rate_limit(
     a hard guarantee under Redis failure should check `redis_available` separately.
     """
     try:
-        redis = get_redis()
+        redis = redis_mod.get_redis()
         key = f"rl:{key_prefix}:{identifier}:{window_seconds}"
         count = await redis.incr(key)
         if count == 1:
@@ -169,7 +169,7 @@ async def get_throttled_ips(
     threshold_hour = max(1, limit_per_hour // 2)
 
     try:
-        redis = get_redis()
+        redis = redis_mod.get_redis()
         pattern = "rl:chat:*"
         results = []
         cursor = 0
@@ -220,7 +220,7 @@ async def reset_ip(ip: str) -> None:
     (clave = `rl:<prefix...>:<identifier>:<window>`), comparándolo con `ip`.
     """
     try:
-        redis = get_redis()
+        redis = redis_mod.get_redis()
         cursor = 0
         keys_to_delete = []
         while True:
