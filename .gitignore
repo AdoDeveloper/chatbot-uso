@@ -51,7 +51,7 @@ BK2/
 # Widget build output
 widget/dist/
 
-# Scratch/working files (diagramas de tesis, renders temporales)
+# Scratch/working files
 .scratch/
 
 # Backend uploads and local vector store
