@@ -668,19 +668,20 @@ const { register: registerPattern, handleSubmit: handlePatternSubmit, reset: res
             {editingPatternId ? "Editar patrón custom" : "Nuevo patrón custom"}
           </span>
         }
+        onSubmit={onSavePattern}
         footer={
           <>
             <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setPatternModalOpen(false)} type="button" disabled={patternSaving}>
               <X className="w-3.5 h-3.5" /> Cancelar
             </Button>
-            <Button size="sm" type="submit" disabled={patternSaving} className="gap-1.5" form="pattern-form">
+            <Button size="sm" type="submit" disabled={patternSaving} className="gap-1.5">
               {patternSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
               {editingPatternId ? "Guardar" : "Crear"}
             </Button>
           </>
         }
       >
-        <form id="pattern-form" onSubmit={onSavePattern}>
+        <div>
           <div className="space-y-3 py-2">
             <div className="space-y-1.5">
               <Label className="text-2xs font-semibold uppercase tracking-wide">Regex</Label>
@@ -706,7 +707,7 @@ const { register: registerPattern, handleSubmit: handlePatternSubmit, reset: res
               <span>Patrón activo (se evalúa en cada mensaje)</span>
             </label>
           </div>
-        </form>
+        </div>
       </Modal>
     </div>
   );

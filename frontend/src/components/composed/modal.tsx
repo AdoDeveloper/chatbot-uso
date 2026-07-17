@@ -23,10 +23,25 @@ interface ModalProps {
   size?: ModalSize;
   footer?: ReactNode;
   children: ReactNode;
+  /**
+   * Si se pasa, `children` y `footer` se envuelven en un único `<form>` que
+   * llama a este handler al enviarse (típicamente `handleSubmit(onValid)` de
+   * react-hook-form). Esto es OBLIGATORIO usar en vez de un `<form>` propio
+   * dentro de `children`: internamente `footer` se renderiza en un `<div>`
+   * hermano de `children`, no anidado, así que un `<form>` puesto solo en
+   * `children` nunca contendría al botón submit del footer — el click no
+   * dispara ningún envío (bug real ya visto: el botón no hace nada, sin
+   * error ni request). Con esta prop, el propio `<form>` envuelve ambos.
+   * Si no necesitas un formulario nativo (usas `onClick` directo en los
+   * botones del footer), simplemente omite esta prop.
+   */
+  onSubmit?: (e: React.FormEvent) => void;
 }
 
-export function Modal({ open, onClose, title, subtitle, size = "lg", footer, children }: ModalProps) {
+export function Modal({ open, onClose, title, subtitle, size = "lg", footer, children, onSubmit }: ModalProps) {
   const hasFooter = !!footer;
+  const Wrapper = onSubmit ? "form" : "div";
+  const wrapperProps = onSubmit ? { onSubmit } : {};
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
@@ -43,12 +58,12 @@ export function Modal({ open, onClose, title, subtitle, size = "lg", footer, chi
           {subtitle && <p className="text-2xs text-muted-foreground">{subtitle}</p>}
         </DialogHeader>
         {hasFooter ? (
-          <>
+          <Wrapper {...wrapperProps} className="contents">
             <div className="flex-1 overflow-y-auto px-6 py-5">{children}</div>
             <div className="px-6 py-4 border-t border-border flex gap-3 shrink-0 justify-end">
               {footer}
             </div>
-          </>
+          </Wrapper>
         ) : (
           <div className="pb-2">{children}</div>
         )}
