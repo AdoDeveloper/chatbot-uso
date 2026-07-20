@@ -80,7 +80,7 @@ function LoginContent() {
     // el callback server-side pueda leerla y comparar con lo que devuelve Microsoft.
     const state = crypto.randomUUID();
     const secure = window.location.protocol === "https:" ? "; Secure" : "";
-    document.cookie = `oauth_state=${state}; path=/; max-age=300; SameSite=Lax${secure}`;
+    document.cookie = `oauth_state=${state}; path=/; max-age=600; SameSite=Lax${secure}`;
     const params = new URLSearchParams({
       client_id: providers.microsoft_client_id,
       response_type: "code",

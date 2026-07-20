@@ -13,16 +13,18 @@ export function UnpublishedBanner() {
  if (!show) return null;
 
  return (
-  // bg-warning sólido (#B45309 + texto blanco): la versión tenue en amber-50
-  // se fundía con el fondo claro del dashboard y el aviso pasaba desapercibido.
-  <div className="flex items-center gap-2.5 rounded-lg bg-warning px-4 py-2.5 text-sm text-warning-foreground shadow-sm mb-5">
-   <AlertTriangle className="w-4 h-4 shrink-0" />
-   <span className="flex-1">
+  // Mismo patrón que el resto de avisos de warning del sistema (ver
+  // estadisticas/page.tsx): fondo tenue + acento de borde izquierdo, texto
+  // en text-foreground (no text-warning-foreground, pensado para fondo
+  // sólido — sobre bg-warning/10 quedaría casi blanco sobre casi blanco).
+  <div className="flex items-center gap-2.5 rounded-lg border-l-4 border-warning bg-warning/10 px-4 py-2.5 text-sm shadow-sm mb-5">
+   <AlertTriangle className="w-4 h-4 shrink-0 text-warning" />
+   <span className="flex-1 text-foreground">
     Hay cambios sin publicar. Los usuarios del widget siguen viendo la última versión publicada.
    </span>
    <Link
     href="/dashboard/configuracion/publicaciones"
-    className="font-semibold underline underline-offset-2 hover:no-underline shrink-0"
+    className="font-semibold text-warning underline underline-offset-2 hover:no-underline shrink-0"
    >
     Publicar ahora
    </Link>

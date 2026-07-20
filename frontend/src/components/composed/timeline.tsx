@@ -3,6 +3,8 @@ import {
   Database, Rocket, ShieldAlert, Bell, AlertCircle,
   Trash2, LogIn, FileText, TrendingUp, Circle,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 
 export type TimelineEventType =
   | "source_ingested" | "source_promoted" | "guardrail_block" | "escalation"
@@ -19,83 +21,102 @@ export interface TimelineEvent {
   href: string | null;
 }
 
-export const TIMELINE_ICON: Record<TimelineEventType, { icon: typeof LogIn; color: string }> = {
-  source_ingested:  { icon: Database,    color: "text-primary" },
-  source_promoted:  { icon: Rocket,      color: "text-success" },
-  guardrail_block:  { icon: ShieldAlert, color: "text-destructive" },
-  escalation:       { icon: Bell,        color: "text-warning" },
-  provider_error:   { icon: AlertCircle, color: "text-destructive" },
-  cache_cleared:    { icon: Trash2,      color: "text-muted-foreground" },
-  user_login:       { icon: LogIn,       color: "text-muted-foreground" },
-  version_snapshot: { icon: FileText,    color: "text-primary" },
-  unanswered_spike: { icon: TrendingUp,  color: "text-warning" },
-  other:            { icon: Circle,      color: "text-muted-foreground" },
+export const TIMELINE_ICON: Record<TimelineEventType, { icon: typeof LogIn; color: string; bg: string; ring: string; label: string }> = {
+  source_ingested:  { icon: Database,    color: "text-primary",   bg: "bg-primary/10",   ring: "ring-primary/20",   label: "Fuente" },
+  source_promoted:  { icon: Rocket,      color: "text-success",   bg: "bg-success/10",   ring: "ring-success/20",   label: "Publicado" },
+  guardrail_block:  { icon: ShieldAlert, color: "text-destructive", bg: "bg-destructive/10", ring: "ring-destructive/20", label: "Bloqueo" },
+  escalation:       { icon: Bell,        color: "text-warning",   bg: "bg-warning/10",   ring: "ring-warning/20",   label: "Escalamiento" },
+  provider_error:   { icon: AlertCircle, color: "text-destructive", bg: "bg-destructive/10", ring: "ring-destructive/20", label: "Error IA" },
+  cache_cleared:    { icon: Trash2,      color: "text-muted-foreground", bg: "bg-muted",   ring: "ring-border",       label: "Caché" },
+  user_login:       { icon: LogIn,       color: "text-muted-foreground", bg: "bg-muted",   ring: "ring-border",       label: "Acceso" },
+  version_snapshot: { icon: FileText,    color: "text-primary",   bg: "bg-primary/10",   ring: "ring-primary/20",   label: "Versión" },
+  unanswered_spike: { icon: TrendingUp,  color: "text-warning",   bg: "bg-warning/10",   ring: "ring-warning/20",   label: "Pico" },
+  other:            { icon: Circle,      color: "text-muted-foreground", bg: "bg-muted",   ring: "ring-border",       label: "Evento" },
 };
 
-export function TimelineDot({ type }: { type: TimelineEventType }) {
+export function TimelineDot({ type, dimmed }: { type: TimelineEventType; dimmed?: boolean }) {
   const meta = TIMELINE_ICON[type];
   const Icon = meta.icon;
-  const colorMap: Record<string, string> = {
-    "text-primary": "bg-primary/10",
-    "text-success": "bg-success/10",
-    "text-destructive": "bg-destructive/10",
-    "text-warning": "bg-warning/10",
-    "text-muted-foreground": "bg-muted",
-  };
   return (
-    <div className={`absolute -left-[21px] top-0 h-[18px] w-[18px] rounded-full flex items-center justify-center ${colorMap[meta.color] ?? "bg-muted"} ${meta.color}`}>
-      <Icon className="w-2.5 h-2.5" />
+    <div className={cn(
+      "relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ring-4 ring-card",
+      meta.bg, meta.ring,
+      dimmed && "opacity-60",
+    )}>
+      <Icon className={cn("h-3.5 w-3.5", meta.color)} />
     </div>
   );
+}
+
+function groupByDay(events: TimelineEvent[]): { key: string; label: string; events: TimelineEvent[] }[] {
+  const groups: Record<string, TimelineEvent[]> = {};
+  for (const ev of events) {
+    const d = new Date(ev.created_at);
+    const key = d.toISOString().slice(0, 10);
+    (groups[key] ??= []).push(ev);
+  }
+  const fmt = (d: Date) =>
+    d.toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long" });
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
+
+  return Object.entries(groups)
+    .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+    .map(([key, evs]) => {
+      const d = new Date(key + "T00:00:00");
+      let label = fmt(d);
+      if (d.getTime() === today.getTime()) label = "Hoy";
+      else if (d.getTime() === yesterday.getTime()) label = "Ayer";
+      return { key, label: label.charAt(0).toUpperCase() + label.slice(1), events: evs };
+    });
 }
 
 export function TimelineItem({
   event,
   showActor,
-  card,
 }: {
   event: TimelineEvent;
   showActor?: boolean;
-  card?: boolean;
 }) {
   const dt = new Date(event.created_at);
-  const content = (
-    <div className="flex items-start justify-between gap-2">
-      <div className="min-w-0">
-        {event.href ? (
-          <Link href={event.href} className="text-13 font-medium hover:underline">{event.title}</Link>
-        ) : (
-          <p className="text-13 font-medium">{event.title}</p>
-        )}
-        {event.detail && <p className="text-2xs text-muted-foreground mt-0.5 truncate">{event.detail}</p>}
-      </div>
-      <span className="text-3xs tabular-nums text-muted-foreground shrink-0">
-        {dt.toLocaleDateString("es", { day: "2-digit", month: "short" })}
-        <span className={showActor ? "block" : "block text-right"}>
-          {dt.toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" })}
-        </span>
-      </span>
-    </div>
-  );
+  const meta = TIMELINE_ICON[event.type];
+  const timeLabel = dt.toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
 
-  if (card) {
-    return (
-      <div className="relative">
-        <TimelineDot type={event.type} />
-        <div className="rounded-lg border border-border bg-card px-3 py-2 hover:bg-muted/30 transition-colors">
-          {content}
+  const body = (
+    <div className="group flex items-start gap-3 rounded-xl border border-transparent px-3 py-2.5 transition-colors hover:border-border hover:bg-muted/40">
+      <TimelineDot type={event.type} />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <Badge variant="muted" size="xs" className="shrink-0">{meta.label}</Badge>
+          <p className="text-13 font-medium text-foreground truncate">
+            {event.title}
+          </p>
+        </div>
+        {event.detail && (
+          <p className="text-2xs text-muted-foreground mt-1 leading-snug">{event.detail}</p>
+        )}
+        <div className="mt-1 flex items-center gap-2 text-3xs text-muted-foreground tabular-nums">
+          <span>{timeLabel}</span>
           {showActor && event.actor_name && (
-            <p className="text-3xs text-muted-foreground mt-1">por {event.actor_name}</p>
+            <>
+              <span className="h-0.5 w-0.5 rounded-full bg-muted-foreground/50" />
+              <span className="truncate">por {event.actor_name}</span>
+            </>
           )}
         </div>
       </div>
-    );
-  }
+    </div>
+  );
 
   return (
-    <div className="relative">
-      <TimelineDot type={event.type} />
-      {content}
+    <div className={cn("relative", event.href && "cursor-pointer")}>
+      {event.href ? (
+        <Link href={event.href} className="block rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          {body}
+        </Link>
+      ) : (
+        body
+      )}
     </div>
   );
 }
@@ -108,9 +129,41 @@ export function TimelineContainer({
   scrollable?: boolean;
 }) {
   return (
-    <div className={`relative pl-6 space-y-3 ${scrollable ? "max-h-120 overflow-y-auto" : ""}`}>
-      <div className="absolute left-[9px] top-0 bottom-0 w-px bg-border" />
-      {children}
+    <div className={cn("relative", scrollable && "max-h-120 overflow-y-auto pr-1")}>
+      <div className="space-y-4">
+        {children}
+      </div>
     </div>
+  );
+}
+
+/** Renderiza eventos agrupados por día con separadores de fecha. */
+export function TimelineGrouped({
+  events,
+  showActor,
+  scrollable,
+}: {
+  events: TimelineEvent[];
+  showActor?: boolean;
+  scrollable?: boolean;
+}) {
+  const groups = groupByDay(events);
+  return (
+    <TimelineContainer scrollable={scrollable}>
+      {groups.map((g) => (
+        <div key={g.key} className="relative">
+          {/* Riel vertical continuo detrás de los dots */}
+          <div className="absolute left-[15px] top-7 bottom-0 w-px bg-border/70" />
+          <p className="mb-1.5 px-3 text-3xs font-semibold uppercase tracking-wider text-muted-foreground">
+            {g.label}
+          </p>
+          <div className="space-y-0.5">
+            {g.events.map((ev) => (
+              <TimelineItem key={ev.id} event={ev} showActor={showActor} />
+            ))}
+          </div>
+        </div>
+      ))}
+    </TimelineContainer>
   );
 }

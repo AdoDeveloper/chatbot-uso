@@ -17,18 +17,23 @@ const apiOrigin = (() => {
   }
 })();
 
-const csp = [
-  "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'",
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
-  "font-src 'self' data:",
-  `connect-src 'self' ${apiOrigin}`.trim(),
-  "frame-ancestors 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "object-src 'none'",
-].join("; ");
+// `unsafe-eval` solo se agrega en `next dev`: React Fast Refresh evalúa
+// código como string para aplicar hot-reload, y el build de producción
+// (`next build && next start`) no lo necesita ni lo usa.
+function buildCsp(isDevelopment: boolean): string {
+  return [
+    "default-src 'self'",
+    `script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ""}`,
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "font-src 'self' data:",
+    `connect-src 'self' ${apiOrigin}`.trim(),
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "object-src 'none'",
+  ].join("; ");
+}
 
 const BACKEND_INTERNAL = process.env.BACKEND_INTERNAL_URL ?? "http://127.0.0.1:8000";
 const APP_ORIGIN = (() => {
@@ -41,6 +46,7 @@ const APP_ORIGIN = (() => {
 
 export default (phase: string): NextConfig => {
   const isDevelopment = phase === PHASE_DEVELOPMENT_SERVER;
+  const csp = buildCsp(isDevelopment);
 
   return {
     output: "standalone",

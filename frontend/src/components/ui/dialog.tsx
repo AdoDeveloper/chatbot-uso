@@ -48,14 +48,26 @@ function DialogContent({
   ...props
 }: React.HTMLAttributes<HTMLDivElement> & { hideCloseButton?: boolean }) {
   const { open, onOpenChange } = React.useContext(DialogCtx)
+  const triggerRef = React.useRef<HTMLElement | null>(null)
+  const onOpenChangeRef = React.useRef(onOpenChange)
+  onOpenChangeRef.current = onOpenChange
 
   React.useEffect(() => {
     if (!open) return
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onOpenChange(false) }
+    triggerRef.current = document.activeElement as HTMLElement | null
+  }, [open])
+
+  React.useEffect(() => {
+    if (!open) return
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onOpenChangeRef.current(false) }
     document.addEventListener("keydown", handler)
     lockBodyScroll()
-    return () => { document.removeEventListener("keydown", handler); unlockBodyScroll() }
-  }, [open, onOpenChange])
+    return () => {
+      document.removeEventListener("keydown", handler)
+      unlockBodyScroll()
+      triggerRef.current?.focus?.()
+    }
+  }, [open])
 
   if (!open) return null
 

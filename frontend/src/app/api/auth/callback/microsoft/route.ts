@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { APP_URL, BACKEND_INTERNAL_URL } from "@/lib/config";
-import { routeLogger } from "@/lib/logger";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -22,10 +21,9 @@ export async function GET(request: NextRequest) {
 
   // Validar state CSRF (RFC 6749 §10.12): comparar con la cookie que se guardó al iniciar el flujo
   const savedState = request.cookies.get("oauth_state")?.value;
-  const log = routeLogger("microsoft/callback");
 
   if (!state || !savedState || state !== savedState) {
-    log.error("state mismatch — possible CSRF", { state, savedState: !!savedState });
+    console.error("[microsoft/callback] state mismatch", { hasState: !!state, hasSavedState: !!savedState });
     return NextResponse.redirect(loginUrl("Credenciales incorrectas"));
   }
 
@@ -37,6 +35,7 @@ export async function GET(request: NextRequest) {
     });
 
     if (!resp.ok) {
+      console.error("[microsoft/callback] backend rejected", resp.status, await resp.text());
       return NextResponse.redirect(loginUrl("Credenciales incorrectas"));
     }
 
@@ -70,7 +69,7 @@ export async function GET(request: NextRequest) {
 
     return response;
   } catch (err) {
-    log.error("fetch to backend failed:", err instanceof Error ? err.message : err, "BACKEND=", BACKEND_INTERNAL_URL);
+    console.error("[microsoft/callback] fetch to backend failed", err instanceof Error ? err.message : err, "BACKEND=", BACKEND_INTERNAL_URL);
     return NextResponse.redirect(loginUrl("Credenciales incorrectas"));
   }
 }

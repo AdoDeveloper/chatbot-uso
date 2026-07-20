@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Marked } from "marked";
 import {
   Loader2, Send, RotateCcw, FileText, Copy, Check, X, Bot,
@@ -19,13 +20,28 @@ const CHAT_API_URL = `${BASE_URL}/api/v1/chat`;
 
 // marked v10+: instanciar con opciones, usar parseInline sync o lexer+parser
 const _marked = new Marked({ breaks: true, gfm: true, async: false });
+_marked.use({
+  renderer: {
+    link({ href, text }: { href: string; text: string }) {
+      const isPdf = /\.pdf(\?.*)?$/i.test(href || "");
+      const cls = isPdf ? ' class="pdf-link"' : "";
+      return `<a href="${href}" target="_blank" rel="noopener noreferrer"${cls}>${text}</a>`;
+    },
+  },
+});
 
 // DOMPurify needs the browser DOM — lazy-load it client-side only.
 let _purify: ((html: string) => string) | null = null;
 if (typeof window !== "undefined") {
   import("dompurify").then((m) => {
-    _purify = (html: string) => m.default.sanitize(html);
+    _purify = (html: string) => m.default.sanitize(html, { ADD_ATTR: ["target"] });
   });
+}
+
+function maybePortal(condition: boolean, node: React.ReactElement): React.ReactNode {
+  if (!condition) return node;
+  if (typeof document === "undefined") return node;
+  return createPortal(node, document.body);
 }
 
 function escapeHtml(s: string): string {
@@ -163,6 +179,19 @@ export function PlaygroundTab({
   const [highContrast, setHighContrast] = useState(false);
   const [speakingId, setSpeakingId] = useState<string | null>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
+
+  // Mismo breakpoint que las clases `md:` de este componente (768px) — el
+  // chat abierto se porta a un overlay `fixed inset-0` de pantalla completa
+  // en vez de quedar contenido dentro de la card acotada a 82dvh, que en
+  // mobile perdía el input cuando la conversación crecía.
+  const [isMobilePreview, setIsMobilePreview] = useState(false);
+  useEffect(() => {
+    const mql = window.matchMedia("(max-width: 767px)");
+    const onChange = () => setIsMobilePreview(mql.matches);
+    onChange();
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, []);
 
   const ttsBrowserSupported = typeof window !== "undefined" && !!window.speechSynthesis;
   function speakMessage(id: string, text: string) {
@@ -582,11 +611,19 @@ export function PlaygroundTab({
               </div>
             )}
 
-            {/* Chat panel — pantalla completa del panel en mobile, ventana
-                flotante de tamaño fijo desde md: (simula el widget embebido) */}
-            {widgetOpen && (
+            {/* Chat panel — overlay fijo de pantalla completa real en
+                mobile (portal a document.body, fuera de la card acotada a
+                82dvh: si quedaba dentro del flujo normal, el input se
+                perdía al crecer la conversación), ventana flotante de
+                tamaño fijo desde md: (simula el widget embebido). */}
+            {widgetOpen && maybePortal(
+              isMobilePreview,
               <div
-                className="rounded-none md:rounded-2xl overflow-hidden flex flex-col shadow-2xl border-0 md:border border-border bg-background flex-1 w-full md:w-[340px] md:flex-none md:max-w-[calc(100vw-3rem)] md:h-[440px] md:max-h-[calc(100%-1rem)]"
+                className={
+                  isMobilePreview
+                    ? "fixed inset-0 z-100 overflow-hidden flex flex-col bg-background"
+                    : "rounded-none md:rounded-2xl overflow-hidden flex flex-col shadow-2xl border-0 md:border border-border bg-background flex-1 w-full md:w-[340px] md:flex-none md:max-w-[calc(100vw-3rem)] md:h-[440px] md:max-h-[calc(100%-1rem)]"
+                }
               >
                 {/* Widget header */}
                 <div
@@ -739,7 +776,13 @@ export function PlaygroundTab({
                         )}
                       </div>
                     )}
-                    <div className="max-w-[82%] bg-muted text-foreground px-3 py-2 rounded-2xl rounded-bl-sm text-xs leading-relaxed">
+                    <div
+                      className={`max-w-[82%] px-3 py-2 rounded-2xl rounded-bl-sm leading-relaxed ${msgScaleClass} ${
+                        highContrast
+                          ? "bg-black text-white border border-white/40"
+                          : "bg-muted text-foreground"
+                      }`}
+                    >
                       {welcomeMessage}
                     </div>
                   </div>
@@ -787,6 +830,7 @@ export function PlaygroundTab({
                             msg.content ? (
                               <div
                                 className="md-content"
+                                style={{ "--pdf-link-color": primaryColor } as React.CSSProperties}
                                 dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
                               />
                             ) : loading && i === messages.length - 1 ? (

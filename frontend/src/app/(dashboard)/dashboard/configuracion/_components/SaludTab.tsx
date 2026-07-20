@@ -129,7 +129,7 @@ export const SaludTab = forwardRef<SaludTabHandle>(function SaludTab(_props, ref
   return (
     <div className="space-y-4">
       {/* Status banner + controles */}
-      <div className={`flex items-center justify-between gap-3 px-4 py-3 rounded-xl border text-13 font-medium flex-wrap ${
+      <div className={`flex flex-col gap-3 px-4 py-3 rounded-xl border text-13 font-medium sm:flex-row sm:items-center sm:justify-between ${
         allOk
           ? "bg-brand-green/8 border-brand-green/30 text-brand-green"
           : "bg-warning/5 border-warning/30 text-warning"

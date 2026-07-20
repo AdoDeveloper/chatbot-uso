@@ -377,6 +377,7 @@ export function WidgetTab({ subtab, onPreview, config: configProp, setConfig: se
   setSavedConfig(widgetData);
   // Captación abierta si algún campo tiene contenido
   setCaptacionOpen(
+   (widgetData.launcher_label ?? "") !== "" ||
    (widgetData.proactive_message ?? "") !== "" ||
    (widgetData.suggestions ?? []).length > 0
   );
@@ -395,7 +396,7 @@ export function WidgetTab({ subtab, onPreview, config: configProp, setConfig: se
   }
   setSaving(true);
   try {
-   const { data } = await api.put<WidgetConfig>("/widget/config", { ...config, launcher_label: "" });
+   const { data } = await api.put<WidgetConfig>("/widget/config", config);
    setConfig(data);
    setSavedConfig(data);
   } catch (err) {
@@ -409,6 +410,7 @@ export function WidgetTab({ subtab, onPreview, config: configProp, setConfig: se
   if (savedConfig) {
    setConfig(savedConfig);
    setCaptacionOpen(
+    (savedConfig.launcher_label ?? "") !== "" ||
     (savedConfig.proactive_message ?? "") !== "" ||
     (savedConfig.suggestions ?? []).length > 0
    );
@@ -533,6 +535,17 @@ export function WidgetTab({ subtab, onPreview, config: configProp, setConfig: se
        </div>
        {captacionOpen && (
         <div className="mt-4 space-y-4 border-t border-border pt-4">
+         <div>
+          <label className="block text-xs font-medium text-muted-foreground mb-1">Etiqueta del botón</label>
+          <p className="text-2xs text-muted-foreground mb-2">Texto junto al botón flotante mientras el chat está cerrado. Vacío = desactivado.</p>
+          <Input
+           value={config.launcher_label ?? ""}
+           onChange={(e) => setConfig((c) => c ? { ...c, launcher_label: e.target.value } : c)}
+           placeholder="¿Necesitas ayuda?"
+           maxLength={80}
+          />
+          <p className="text-2xs text-muted-foreground mt-1">{(config.launcher_label ?? "").length}/80 caracteres</p>
+         </div>
          <div>
           <label className="block text-xs font-medium text-muted-foreground mb-1">Mensaje proactivo</label>
           <p className="text-2xs text-muted-foreground mb-2">Aparece como burbuja junto al botón cerrado, ~1 s después de cargar. Vacío = desactivado.</p>

@@ -35,14 +35,18 @@ function InlineTagEditor({ source, onUpdated }: { source: Source; onUpdated: () 
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (editing) setTags(source.tags ?? []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing]);
+
+  useEffect(() => {
     if (!editing) return;
-    setTags(source.tags ?? []);
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setEditing(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [editing, source.tags]);
+  }, [editing]);
 
   const save = async () => {
     setSaving(true);

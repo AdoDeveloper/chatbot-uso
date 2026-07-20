@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { FloatingSaveBar } from "../../_lib/save-bar";
 
 function MicrosoftLogo({ className }: { className?: string }) {
   return (
@@ -129,6 +130,10 @@ export default function SsoPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  function discardDomains() {
+    if (oauth) setAllowedDomains(oauth.allowed_domains.join(", "));
   }
 
   function copyRedirectUri() {
@@ -274,17 +279,6 @@ export default function SsoPage() {
             <p className="text-2xs text-muted-foreground">Si se define, solo se aceptarán cuentas de esos dominios.</p>
           </div>
 
-          {canManage && (
-            <div className="flex items-center justify-end gap-3">
-              {domainsDirty && !saving && (
-                <span className="text-2xs text-muted-foreground">Cambios sin guardar</span>
-              )}
-              <Button size="sm" onClick={saveDomains} disabled={saving || !domainsDirty}>
-                {saving ? "Guardando..." : "Guardar"}
-              </Button>
-            </div>
-          )}
-
           {/* Redirect URI (read-only, for Azure app registration) */}
           <div className="space-y-1">
             <label className="block text-2xs font-medium text-muted-foreground">
@@ -311,6 +305,8 @@ export default function SsoPage() {
         </CardContent>
       </Card>
       )}
+
+      <FloatingSaveBar dirty={domainsDirty} saving={saving} onSave={saveDomains} onDiscard={discardDomains} />
     </div>
   );
 }

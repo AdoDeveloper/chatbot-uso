@@ -214,11 +214,14 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
-    /* Contiene cualquier desborde horizontal accidental (un botón o texto
-     * mal dimensionado) para que arrastre solo su contenedor, nunca la
-     * página completa. Las tablas anchas deben usar overflow-x-auto en su
-     * propio contenedor si necesitan scroll horizontal. */
-    overflow-x: hidden;
+    /* NO fijar overflow-x aquí: cualquier valor de overflow distinto de
+     * "visible" en html/body (incluso solo en un eje) convierte a ese
+     * elemento en su propio contenedor de scroll/recorte en vez de dejar
+     * que el viewport real lo maneje. Eso rompe `position: sticky` de
+     * descendientes (el header del dashboard dejaba de quedarse fijo) y
+     * recorta popovers/tooltips posicionados contra el viewport (se
+     * cortaban en vez de mostrarse completos). El desborde horizontal
+     * accidental se contiene en el wrapper del dashboard, no aquí. */
   }
   body {
     @apply bg-background text-foreground;
@@ -226,7 +229,6 @@
     font-size: 13.5px;
     line-height: 1.5;
     letter-spacing: -0.005em;
-    overflow-x: hidden;
   }
   h1, h2, h3, h4, h5, h6 {
     font-weight: 600;
@@ -378,6 +380,21 @@
   .md-content strong { font-weight: 700; }
   .md-content em { font-style: italic; }
   .md-content a { color: #2563eb; text-decoration: underline; word-break: break-all; }
+  .md-content a.pdf-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 4px 0;
+    padding: 7px 12px;
+    background: color-mix(in srgb, var(--pdf-link-color, #1e40af) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--pdf-link-color, #1e40af) 30%, transparent);
+    border-radius: 8px;
+    color: var(--pdf-link-color, #1e40af);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 13px;
+  }
+  .md-content a.pdf-link:hover { background: color-mix(in srgb, var(--pdf-link-color, #1e40af) 18%, transparent); }
   .md-content code { background: rgba(0,0,0,0.06); padding: 1px 5px; border-radius: 4px; font-family: "Fira Code", Consolas, monospace; font-size: 12.5px; }
   .md-content pre { background: #1e293b; color: #e2e8f0; padding: 12px 14px; border-radius: 8px; overflow-x: auto; margin: 8px 0; }
   .md-content pre code { background: transparent; color: inherit; padding: 0; }

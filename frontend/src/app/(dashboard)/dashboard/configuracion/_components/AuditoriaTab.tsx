@@ -1,19 +1,18 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
-import { Search, ShieldCheck, Download, ArrowUp, ArrowDown, ArrowUpDown, ChevronDown, ChevronRight } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Search, ShieldCheck, Download, Eye } from "lucide-react";
 import api from "@/lib/api";
 import { useApi } from "@/hooks/use-api";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import type { AuditLog } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataTable, type Column } from "@/components/composed/data-table";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DateRangeFilter } from "@/components/composed/date-range-filter";
-import { TablePagination } from "@/components/composed/table-pagination";
 import { Loading } from "@/components/ui/loading";
+import { Modal } from "@/components/composed/modal";
 import { formatInProjectTz } from "@/lib/datetime";
 
 function relativeTime(iso: string) {
@@ -67,9 +66,6 @@ const RESOURCE_TYPES = [
   { value: "llm_provider", label: "LLM provider" },
 ];
 
-type SortBy = "created_at" | "action" | "resource_type" | "actor_id" | "ip";
-type SortDir = "asc" | "desc";
-
 interface ActorOption { id: string; name: string; }
 
 export function AuditoriaTab() {
@@ -78,13 +74,10 @@ export function AuditoriaTab() {
   const [actorId, setActorId] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [sortBy, setSortBy] = useState<SortBy>("created_at");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [detail, setDetail] = useState<AuditLog | null>(null);
 
-  // Lista de actores: se carga una sola vez
   const { data: actorsData } = useApi<ActorOption[]>("/audit/actors");
   const actors = actorsData ?? [];
 
@@ -92,8 +85,8 @@ export function AuditoriaTab() {
     const params = new URLSearchParams({
       page: String(page),
       page_size: String(pageSize),
-      sort_by: sortBy,
-      sort_dir: sortDir,
+      sort_by: "created_at",
+      sort_dir: "desc",
     });
     if (search.trim()) params.set("action", search.trim());
     if (resourceType) params.set("resource_type", resourceType);
@@ -101,39 +94,29 @@ export function AuditoriaTab() {
     if (dateFrom) params.set("date_from", new Date(dateFrom).toISOString());
     if (dateTo) params.set("date_to", new Date(dateTo + "T23:59:59").toISOString());
     return params.toString();
-  }, [search, resourceType, actorId, dateFrom, dateTo, sortBy, sortDir, page, pageSize]);
+  }, [search, resourceType, actorId, dateFrom, dateTo, page, pageSize]);
 
   const { data: logsData, loading, error: logsError } =
     useApi<{ logs: AuditLog[]; total: number }>(`/audit/logs?${logsQuery}`);
   const logs = logsError ? [] : (logsData?.logs ?? []);
   const total = logsError ? 0 : (logsData?.total ?? 0);
 
-  function toggleSort(field: SortBy) {
-    if (sortBy === field) {
-      setSortDir(sortDir === "asc" ? "desc" : "asc");
-    } else {
-      setSortBy(field);
-      setSortDir("desc");
-    }
-    setPage(1);
-  }
-
-  function SortIcon({ field }: { field: SortBy }) {
-    if (sortBy !== field) return <ArrowUpDown className="w-3.5 h-3.5 opacity-40" />;
-    return sortDir === "asc" ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />;
-  }
-
   const hasActiveFilters = !!(search || resourceType || actorId || dateFrom || dateTo);
+
+  const columns: Column[] = [
+    { id: "created_at", header: "Hora", className: "w-28" },
+    { id: "actor", header: "Actor", className: "w-36" },
+    { id: "action", header: "Acción" },
+    { id: "resource_type", header: "Recurso", className: "w-32", hideBelow: "md" },
+    { id: "ip", header: "IP", className: "w-28", hideBelow: "sm" },
+    { id: "detail", header: "Detalle", className: "w-20 text-right", sticky: true },
+  ];
+
+  if (loading) return <Loading title="Auditoría" />;
 
   return (
     <>
-      {loading ? (
-        <Loading title="Auditoría" />
-      ) : (
-      <Card className="overflow-hidden">
-      {/* Toolbar fila 1: búsqueda + acciones siempre en la misma línea —
-          la búsqueda se encoge (flex-1 min-w-0), los botones quedan fijos
-          al lado opuesto sin romper a una fila nueva. */}
+      {/* Toolbar fila 1: búsqueda + exportar */}
       <div className="px-4 py-3 border-b border-border flex items-center gap-2">
         <div className="relative flex-1 min-w-0">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
@@ -144,7 +127,6 @@ export function AuditoriaTab() {
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
           />
         </div>
-
         <div className="flex items-center gap-2 shrink-0">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -178,8 +160,7 @@ export function AuditoriaTab() {
         </div>
       </div>
 
-      {/* Toolbar fila 2: todos los filtros secundarios (recurso, actor, IP,
-          fechas) agrupados juntos, separados de las acciones de la fila 1. */}
+      {/* Toolbar fila 2: filtros secundarios */}
       <div className="px-4 py-2 border-b border-border bg-muted/20 flex flex-col sm:flex-row sm:items-center gap-2 text-2xs">
         <div className="grid grid-cols-2 sm:flex gap-2">
           <select
@@ -191,7 +172,6 @@ export function AuditoriaTab() {
               <option key={rt.value} value={rt.value}>{rt.label}</option>
             ))}
           </select>
-
           <select
             value={actorId}
             onChange={(e) => { setActorId(e.target.value); setPage(1); }}
@@ -204,7 +184,6 @@ export function AuditoriaTab() {
             ))}
           </select>
         </div>
-
         <DateRangeFilter
           size="sm"
           from={dateFrom}
@@ -226,150 +205,126 @@ export function AuditoriaTab() {
         )}
       </div>
 
-      {logs.length === 0 ? (
+      <DataTable<AuditLog>
+        columns={columns}
+        data={logs}
+        rowKey={(e) => e.id}
+        loading={false}
+        empty={
           <EmptyState
             icon={ShieldCheck}
             title="Sin entradas"
             description="No hay acciones registradas con los filtros actuales."
             className="py-12"
           />
-      ) : (
-        <>
-        <div className="overflow-x-auto"><Table className="min-w-190">
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-8" />
-              <TableHead
-                className="w-32 cursor-pointer select-none hover:text-foreground"
-                onClick={() => toggleSort("created_at")}
-              >
-                <span className="inline-flex items-center gap-1">Hora <SortIcon field="created_at" /></span>
-              </TableHead>
-              <TableHead
-                className="w-36 cursor-pointer select-none hover:text-foreground"
-                onClick={() => toggleSort("actor_id")}
-              >
-                <span className="inline-flex items-center gap-1">Actor <SortIcon field="actor_id" /></span>
-              </TableHead>
-              <TableHead
-                className="cursor-pointer select-none hover:text-foreground"
-                onClick={() => toggleSort("action")}
-              >
-                <span className="inline-flex items-center gap-1">Acción <SortIcon field="action" /></span>
-              </TableHead>
-              <TableHead
-                className="w-32 hidden md:table-cell cursor-pointer select-none hover:text-foreground"
-                onClick={() => toggleSort("resource_type")}
-              >
-                <span className="inline-flex items-center gap-1">Recurso <SortIcon field="resource_type" /></span>
-              </TableHead>
-              <TableHead
-                className="w-28 hidden sm:table-cell cursor-pointer select-none hover:text-foreground"
-                onClick={() => toggleSort("ip")}
-              >
-                <span className="inline-flex items-center gap-1">IP <SortIcon field="ip" /></span>
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {logs.map((entry) => {
-              const actor = entry.actor_name ?? "sistema";
-              const isSystem = !entry.actor_name;
-              const isExpanded = expandedId === entry.id;
-              const hasMeta = entry.meta_json && Object.keys(entry.meta_json).length > 0;
+        }
+        pagination={{
+          total,
+          page,
+          pageSize,
+          onPageChange: setPage,
+          onPageSizeChange: (n) => { setPageSize(n); setPage(1); },
+          itemLabel: "entradas",
+        }}
+      >
+        {logs.map((entry) => {
+          const actor = entry.actor_name ?? "sistema";
+          const isSystem = !entry.actor_name;
+          const hasDetail = !!entry.resource_id || !!entry.user_agent ||
+            (entry.meta_json && Object.keys(entry.meta_json).length > 0);
 
-              return (
-                <Fragment key={entry.id}>
-                  <TableRow
-                    className="cursor-pointer"
-                    onClick={() => setExpandedId(isExpanded ? null : entry.id)}
+          return (
+            <tr key={entry.id} className="group border-b border-border/60 transition-colors hover:bg-muted/40">
+              <td className="px-3 py-2 align-top">
+                <span className="text-[12px] font-mono text-muted-foreground tabular-nums whitespace-nowrap">
+                  {relativeTime(entry.created_at)}
+                </span>
+              </td>
+              <td className="px-3 py-2 align-top">
+                <div className="flex items-center gap-2">
+                  <div
+                    className={`w-6 h-6 rounded-full flex items-center justify-center text-3xs font-bold shrink-0 ${
+                      isSystem ? "bg-muted text-muted-foreground" : actorColor(actor)
+                    }`}
                   >
-                    <TableCell className="align-top">
-                      {(hasMeta || entry.resource_id) ? (
-                        isExpanded
-                          ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
-                          : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
-                      ) : null}
-                    </TableCell>
-                    <TableCell className="align-top">
-                      <span className="text-[12px] font-mono text-muted-foreground tabular-nums whitespace-nowrap">
-                        {relativeTime(entry.created_at)}
-                      </span>
-                    </TableCell>
-                    <TableCell className="align-top">
-                      <div className="flex items-center gap-2">
-                        <div
-                          className={`w-6 h-6 rounded-full flex items-center justify-center text-3xs font-bold shrink-0 ${
-                            isSystem ? "bg-muted text-muted-foreground" : actorColor(actor)
-                          }`}
-                        >
-                          {isSystem ? "S" : actorInitials(actor)}
-                        </div>
-                        <span className="text-13 font-semibold text-foreground truncate">
-                          {isSystem ? "sistema" : actor.split(" ")[0] + (actor.split(" ")[1] ? ` ${actor.split(" ")[1][0]}.` : "")}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="align-top">
-                      <p className="text-13 text-muted-foreground leading-snug">{entry.action}</p>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      <span className="text-2xs text-muted-foreground">
-                        {entry.resource_type ?? "—"}
-                      </span>
-                    </TableCell>
-                    <TableCell className="hidden sm:table-cell">
-                      <span className="text-2xs font-mono text-muted-foreground/70">
-                        {entry.ip ?? "—"}
-                      </span>
-                    </TableCell>
-                  </TableRow>
-                  {isExpanded && (
-                    <TableRow className="bg-muted/20 hover:bg-muted/20">
-                      <TableCell colSpan={6}>
-                        <div className="text-2xs space-y-1.5 font-mono">
-                          {entry.resource_id && (
-                            <div className="flex gap-2">
-                              <span className="text-muted-foreground w-24">resource_id:</span>
-                              <span className="text-foreground break-all">{entry.resource_id}</span>
-                            </div>
-                          )}
-                          {entry.user_agent && (
-                            <div className="flex gap-2">
-                              <span className="text-muted-foreground w-24">user_agent:</span>
-                              <span className="text-foreground break-all">{entry.user_agent}</span>
-                            </div>
-                          )}
-                          {hasMeta && (
-                            <div className="flex gap-2">
-                              <span className="text-muted-foreground w-24">meta_json:</span>
-                              <pre className="text-foreground bg-background border border-border rounded p-2 text-3xs overflow-auto max-h-60 flex-1">
-{JSON.stringify(entry.meta_json, null, 2)}
-                              </pre>
-                            </div>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </Fragment>
-              );
-            })}
-          </TableBody>
-         </Table></div>
+                    {isSystem ? "S" : actorInitials(actor)}
+                  </div>
+                  <span className="text-13 font-semibold text-foreground truncate">
+                    {isSystem ? "sistema" : actor.split(" ")[0] + (actor.split(" ")[1] ? ` ${actor.split(" ")[1][0]}.` : "")}
+                  </span>
+                </div>
+              </td>
+              <td className="px-3 py-2 align-top">
+                <p className="text-13 text-muted-foreground leading-snug">{entry.action}</p>
+              </td>
+              <td className="px-3 py-2 align-top hidden md:table-cell">
+                <span className="text-2xs text-muted-foreground">{entry.resource_type ?? "—"}</span>
+              </td>
+              <td className="px-3 py-2 align-top hidden sm:table-cell">
+                <span className="text-2xs font-mono text-muted-foreground/70">{entry.ip ?? "—"}</span>
+              </td>
+              <td className="px-3 py-2 align-top text-right sticky right-0 z-10 bg-card group-hover:bg-muted/40 border-l border-border/60">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-muted-foreground"
+                  disabled={!hasDetail}
+                  onClick={() => setDetail(entry)}
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline ml-1">Ver</span>
+                </Button>
+              </td>
+            </tr>
+          );
+        })}
+      </DataTable>
 
-          <TablePagination
-            total={total}
-            page={page}
-            pageSize={pageSize}
-            onPageChange={setPage}
-            onPageSizeChange={(n) => { setPageSize(n); setPage(1); }}
-            itemLabel="entradas"
-          />
-        </>
-      )}
-    </Card>
-    )}
+      <Modal
+        open={!!detail}
+        onClose={() => setDetail(null)}
+        title="Detalle de la entrada"
+        subtitle={detail ? formatInProjectTz(detail.created_at) : undefined}
+        size="lg"
+      >
+        {detail && (
+          <div className="text-13 space-y-3">
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-3xs font-bold shrink-0 ${
+                  !detail.actor_name ? "bg-muted text-muted-foreground" : actorColor(detail.actor_name ?? "sistema")
+                }`}
+              >
+                {!detail.actor_name ? "S" : actorInitials(detail.actor_name ?? "sistema")}
+              </div>
+              <div className="min-w-0">
+                <p className="font-semibold text-foreground truncate">{detail.actor_name ?? "sistema"}</p>
+                <p className="text-2xs text-muted-foreground">{detail.action}</p>
+              </div>
+            </div>
+
+            <dl className="grid grid-cols-[140px_1fr] gap-x-3 gap-y-2 text-2xs">
+              <dt className="text-muted-foreground">Recurso</dt>
+              <dd className="text-foreground break-all">{detail.resource_type ?? "—"}</dd>
+              <dt className="text-muted-foreground">Resource ID</dt>
+              <dd className="text-foreground break-all font-mono">{detail.resource_id ?? "—"}</dd>
+              <dt className="text-muted-foreground">IP</dt>
+              <dd className="text-foreground break-all font-mono">{detail.ip ?? "—"}</dd>
+              <dt className="text-muted-foreground">User agent</dt>
+              <dd className="text-foreground break-all">{detail.user_agent ?? "—"}</dd>
+            </dl>
+
+            {detail.meta_json && Object.keys(detail.meta_json).length > 0 && (
+              <div>
+                <p className="text-2xs text-muted-foreground mb-1.5">meta_json</p>
+                <pre className="text-3xs text-foreground bg-muted/40 border border-border rounded-lg p-3 overflow-auto max-h-72">
+{JSON.stringify(detail.meta_json, null, 2)}
+                </pre>
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
     </>
   );
 }

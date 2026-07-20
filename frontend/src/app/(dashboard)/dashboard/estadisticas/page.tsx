@@ -16,7 +16,7 @@ import {
 import api from "@/lib/api";
 import { useApi, getErrorMessage } from "@/hooks/use-api";
 import { isoDay } from "@/lib/utils";
-import { TimelineContainer, TimelineItem } from "@/components/composed/timeline";
+import { TimelineGrouped } from "@/components/composed/timeline";
 import type { TimelineEvent } from "@/components/composed/timeline";
 import type {
  AnalyticsDashboard, TopicStat, UnansweredGroup,
@@ -487,11 +487,7 @@ function MetricasTab() {
        description="Los eventos del sistema aparecerán aquí conforme ocurran"
       />
      ) : (
-      <TimelineContainer scrollable>
-       {timeline.map((ev) => (
-        <TimelineItem key={ev.id} event={ev} showActor card />
-       ))}
-      </TimelineContainer>
+       <TimelineGrouped events={timeline} showActor scrollable />
      )}
     </CardContent>
    </Card>

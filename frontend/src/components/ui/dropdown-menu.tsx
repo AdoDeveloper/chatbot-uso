@@ -67,8 +67,18 @@ function DropdownMenuContent({ children, className, align = "end", side = "botto
     const r = wrapperRef.current.getBoundingClientRect()
     const gap = 4
 
-    const top = side === "bottom" ? r.bottom + gap : undefined
-    const bottom = side === "top" ? window.innerHeight - r.top + gap : undefined
+    const menuHeight = portalRef.current?.offsetHeight || 220
+    const spaceBelow = window.innerHeight - r.bottom
+    const spaceAbove = r.top
+    let effectiveSide = side
+    if (side === "bottom" && spaceBelow < menuHeight + gap && spaceAbove > spaceBelow) {
+      effectiveSide = "top"
+    } else if (side === "top" && spaceAbove < menuHeight + gap && spaceBelow > spaceAbove) {
+      effectiveSide = "bottom"
+    }
+
+    const top = effectiveSide === "bottom" ? r.bottom + gap : undefined
+    const bottom = effectiveSide === "top" ? window.innerHeight - r.top + gap : undefined
 
     let left: number | undefined
     let right: number | undefined
@@ -82,6 +92,8 @@ function DropdownMenuContent({ children, className, align = "end", side = "botto
   React.useLayoutEffect(() => {
     if (!open) return
     updatePos()
+    const raf = requestAnimationFrame(updatePos)
+    return () => cancelAnimationFrame(raf)
   }, [open, updatePos])
 
   React.useEffect(() => {

@@ -572,14 +572,14 @@ function ProviderRow({
         <MoreHorizontal className="w-4 h-4" />
        </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-44">
+      <DropdownMenuContent align="end" className="w-48">
        {!inChain ? (
-        <DropdownMenuItem onClick={() => handleSetPriority(p, chainCount + 1)}>
+        <DropdownMenuItem onClick={() => handleSetPriority(p, chainCount + 1)} className="whitespace-nowrap">
          <Plus className="w-3.5 h-3.5 mr-2" />
          Agregar a la cadena
         </DropdownMenuItem>
        ) : (
-        <DropdownMenuItem onClick={() => handleSetPriority(p, null)}>
+        <DropdownMenuItem onClick={() => handleSetPriority(p, null)} className="whitespace-nowrap">
          <Minus className="w-3.5 h-3.5 mr-2" />
          Quitar de la cadena
         </DropdownMenuItem>

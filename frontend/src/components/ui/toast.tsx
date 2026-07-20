@@ -46,7 +46,7 @@ const DEFAULT_TITLES: Record<ToastType, string> = {
 
 const ICON_BG: Record<ToastType, string> = {
   info: "bg-info",
-  success: "bg-brand-green",     // Forest green USO — success state
+  success: "bg-success",
   warning: "bg-warning",
   error: "bg-destructive",
 };
@@ -60,7 +60,7 @@ const ICONS: Record<ToastType, React.ElementType> = {
 
 const BORDER_COLOR: Record<ToastType, string> = {
   info: "border-l-info",
-  success: "border-l-brand-green",
+  success: "border-l-success",
   warning: "border-l-warning",
   error: "border-l-destructive",
 };
