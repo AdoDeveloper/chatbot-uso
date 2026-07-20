@@ -380,6 +380,7 @@ def _chart_drawing(rows: list[dict], spec: dict, avail_width: float):
         chart.barLabelFormat = "%.0f"
         chart.barLabels.nudge = 6
 
+    d.add(chart)
     d.add(String(0, height - 8, "", fontSize=1))
     return d
 

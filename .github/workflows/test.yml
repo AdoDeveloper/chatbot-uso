@@ -30,9 +30,6 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-      # MySQL real (no SQLite): algunos endpoints usan SQL específico de MySQL
-      # (json_unquote, ->> path operator) que no tiene equivalente en SQLite —
-      # sin esto, esos endpoints no pueden tener un test de integración real.
       mysql:
         image: mysql:8.0
         env:

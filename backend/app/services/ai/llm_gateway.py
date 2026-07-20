@@ -910,7 +910,11 @@ async def test_connection(
     api_key: str | None = None,
     api_base: str | None = None,
 ) -> dict:
-    adapter = _get_adapter("test", provider_type, model_name, api_base, api_key)
+    try:
+        adapter = _get_adapter("test", provider_type, model_name, api_base, api_key)
+    except Exception as exc:
+        log.info("llm.test", provider_type=provider_type, model=model_name, success=False)
+        return {"success": False, "latency_ms": None, "error": str(exc)}
     result = await adapter.test_connection()
     log.info("llm.test", provider_type=provider_type, model=model_name,
              adapter=type(adapter).__name__, success=result["success"])

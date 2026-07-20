@@ -3,12 +3,15 @@ from __future__ import annotations
 
 import asyncio
 import time
-from datetime import datetime, timezone
+import uuid
+from datetime import datetime, timedelta, timezone
 
 import structlog
+from sqlalchemy import select
 
 from app.core.timezone import now_sv
 from app.db.session import AsyncSessionLocal
+from app.models.global_setting import GlobalSetting
 from app.schemas.report_schedule import ReportSchedule
 
 log = structlog.get_logger()
@@ -16,7 +19,10 @@ log = structlog.get_logger()
 _HEALTH_INTERVAL = 300      # seconds between health snapshots (5 min)
 _WARMUP_INTERVAL = 240      # seconds between embedding warm-up pings (4 min)
 _STALE_CONV_INTERVAL = 600  # seconds between stale-conversation sweeps (10 min)
-_STALE_CONV_MINUTES = 120   # inactivity threshold before auto-resolving (2h — Zendesk-style default)
+_STALE_CONV_MINUTES = 120  # inactivity threshold before auto-resolving (2h — Zendesk-style default)
+# Identificador estable de este proceso, usado para marcar la adquisición del
+# lock en BD (ayuda a depurar, no es estrictamente necesario para el claim).
+_OWNER_ID = uuid.uuid4().hex
 _health_task: asyncio.Task | None = None
 _digest_task: asyncio.Task | None = None
 _warmup_task: asyncio.Task | None = None
@@ -24,20 +30,72 @@ _stale_conv_task: asyncio.Task | None = None
 
 
 async def _acquire_once(key: str, ttl: int) -> bool:
-    """Distributed mutex using Redis SET NX.
+    """Mutex distribuido basado en BD (sin Redis).
 
-    Returns True if this worker acquired the lock (and should run the job).
-    Returns False if another worker already holds it.
-    Falls back to False if Redis is unavailable (fail-closed).
+    Guarda en `global_settings` una fila con el `key` dado y un `expires_at`.
+    Solo un worker puede adquirirlo a la vez gracias a `SELECT ... FOR UPDATE`
+    (pessimistic row lock) a nivel de base de datos. El lock se libera solo
+    cuando expira `expires_at` (no hay DELETE explícito).
+
+    Devuelve True si este worker adquirió el lock (debe correr el job);
+    False si otro worker ya lo tiene o si la BD falla.
+
+    A diferencia de la versión anterior (Redis SET NX), no depende de Redis
+    ni falla cerrado si Redis no está disponible: la base de datos ya es un
+    requisito del sistema, así que el scheduler sigue funcionando sin Redis.
     """
     try:
-        from app.core.redis import get_redis
-        redis = get_redis()
-        acquired = await redis.set(key, "1", nx=True, ex=ttl)
-        return bool(acquired)
-    except Exception:
-        return False  # Redis down → skip this cycle rather than risk duplicates
+        async with AsyncSessionLocal() as db:
+            now = datetime.now(timezone.utc)
+            expires_at = now + timedelta(seconds=ttl)
+            try:
+                row = (
+                    await db.execute(
+                        select(GlobalSetting)
+                        .where(GlobalSetting.key == key)
+                        .with_for_update()
+                    )
+                ).scalar_one_or_none()
+            except Exception:
+                # Dialectos sin soporte de FOR UPDATE (p. ej. SQLite en dev):
+                # reintenta sin el lock de fila. La carrera es rara y el peor
+                # caso es un envío duplicado ocasional, no un correo perdido.
+                row = (
+                    await db.execute(
+                        select(GlobalSetting).where(GlobalSetting.key == key)
+                    )
+                ).scalar_one_or_none()
 
+            if row is None:
+                db.add(
+                    GlobalSetting(
+                        key=key,
+                        value={"owner": "", "expires_at": (now - timedelta(seconds=1)).isoformat()},
+                    )
+                )
+                await db.commit()
+                row = (
+                    await db.execute(
+                        select(GlobalSetting)
+                        .where(GlobalSetting.key == key)
+                        .with_for_update()
+                    )
+                ).scalar_one_or_none()
+                if row is None:
+                    # Rara condición de carrera en la creación inicial: otro
+                    # worker ganó el INSERT. Este ciclo no corre; reintenta luego.
+                    return False
+
+            cur = datetime.fromisoformat(row.value.get("expires_at", "2000-01-01T00:00:00+00:00"))
+            if cur > now:
+                return False  # otro worker ya adquirió el lock vigente
+
+            row.value = {"owner": _OWNER_ID, "expires_at": expires_at.isoformat()}
+            await db.commit()
+            return True
+    except Exception:
+        log.warning("scheduler.lock_acquire_failed", key=key)
+        return False
 
 async def _warmup_loop() -> None:
     """Runs a dummy embedding every _WARMUP_INTERVAL seconds to keep the ONNX
@@ -58,8 +116,9 @@ async def _warmup_loop() -> None:
 async def _health_loop() -> None:
     """Toma un snapshot de salud y ejecuta chequeos de alertas cada _HEALTH_INTERVAL segundos.
 
-    Usa Redis SET NX para que solo un worker por ventana de 5 minutos ejecute
-    el snapshot, evitando snapshots y notificaciones duplicadas con WORKERS>1.
+    Usa un mutex en BD (FOR UPDATE) para que solo un worker por ventana de 5
+    minutos ejecute el snapshot, evitando snapshots y notificaciones duplicadas
+    con WORKERS>1.
     """
     log.info("scheduler.health_loop_started", interval=_HEALTH_INTERVAL)
     while True:
@@ -103,9 +162,15 @@ def _cumple_agenda(now: datetime, schedule: ReportSchedule) -> bool:
 async def _digest_loop() -> None:
     """Envía el reporte unanswered_digest según la cadencia configurada.
 
-    Usa Redis SET NX con TTL de 23h para que solo un worker envíe el digest
-    por día, independientemente de cuántos workers estén corriendo (WORKERS>1),
-    incluso si la cadencia se edita a mitad de día.
+    Usa un mutex en BD (FOR UPDATE) con TTL de 23h para que solo un worker
+    envíe el digest por día, independientemente de cuántos workers estén
+    corriendo (WORKERS>1), incluso si la cadencia se edita a mitad de día.
+
+    Se chequea cada minuto (no cada hora): el loop anterior dormía 3600s desde
+    un arranque arbitrario, así que los chequeos caían en minutos como :05, :05…
+    y casi nunca coincidían con el minuto exacto configurado en el schedule,
+    por lo que el correo programado rara vez se disparaba. Al evaluar cada 60s
+    el minuto configurado sí se alcanza; el lock en BD ya evita el envío doble.
     """
     log.info("scheduler.digest_loop_started")
     while True:
@@ -115,7 +180,7 @@ async def _digest_loop() -> None:
                 from app.services.system.report_schedule import get_report_schedule
                 schedule = await get_report_schedule(db)
                 if not _cumple_agenda(now, schedule):
-                    await asyncio.sleep(3600)
+                    await asyncio.sleep(60)
                     continue
                 today = now.astimezone(now_sv().tzinfo).strftime("%Y-%m-%d")
                 lock_key = f"scheduler:digest:{today}"
@@ -132,7 +197,7 @@ async def _digest_loop() -> None:
                     log.debug("scheduler.digest_skipped_by_lock")
         except Exception:
             log.exception("scheduler.digest_failed")
-        await asyncio.sleep(3600)  # check once per hour
+        await asyncio.sleep(60)  # check every minute
 
 
 async def _stale_conversations_loop() -> None:

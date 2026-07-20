@@ -230,3 +230,151 @@ class TestBulkAction:
         assert r.json()["affected"] == 1
         await db_session.refresh(conv)
         assert conv.tags == ["becas", "urgente"]
+
+
+class TestListConversations:
+    async def test_requires_auth(self, client):
+        r = await client.get("/api/v1/conversations")
+        assert r.status_code == 401
+
+    async def test_empty_returns_zero_total(self, client, admin_user, auth_headers):
+        r = await client.get("/api/v1/conversations", headers=auth_headers(admin_user))
+        assert r.status_code == 200
+        body = r.json()
+        assert body["items"] == []
+        assert body["total"] == 0
+
+    async def test_returns_items_with_message_count_and_preview(
+        self, client, admin_user, auth_headers, db_session
+    ):
+        conv = await _make_conversation(db_session)
+        await _make_message(db_session, conv, role=MessageRole.user)
+        await _make_message(db_session, conv, role=MessageRole.assistant)
+
+        r = await client.get("/api/v1/conversations", headers=auth_headers(admin_user))
+        assert r.status_code == 200
+        body = r.json()
+        assert body["total"] == 1
+        item = body["items"][0]
+        assert item["id"] == str(conv.id)
+        assert item["message_count"] == 2
+        assert item["first_user_message"] == "hola"
+
+    async def test_filters_by_status(self, client, admin_user, auth_headers, db_session):
+        active = await _make_conversation(db_session, status=ConversationStatus.active)
+        await _make_conversation(db_session, status=ConversationStatus.resolved)
+
+        r = await client.get(
+            "/api/v1/conversations",
+            params={"status": "active"},
+            headers=auth_headers(admin_user),
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["total"] == 1
+        assert body["items"][0]["id"] == str(active.id)
+
+    async def test_pagination_page_size(self, client, admin_user, auth_headers, db_session):
+        for _ in range(3):
+            await _make_conversation(db_session)
+
+        r = await client.get(
+            "/api/v1/conversations",
+            params={"page": 1, "page_size": 2},
+            headers=auth_headers(admin_user),
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["total"] == 3
+        assert len(body["items"]) == 2
+        assert body["page"] == 1
+        assert body["page_size"] == 2
+
+    async def test_invalid_page_size_rejected(self, client, admin_user, auth_headers):
+        r = await client.get(
+            "/api/v1/conversations",
+            params={"page_size": 500},
+            headers=auth_headers(admin_user),
+        )
+        assert r.status_code == 422
+
+
+class TestExportConversations:
+    async def test_requires_auth(self, client):
+        r = await client.get("/api/v1/conversations/export")
+        assert r.status_code == 401
+
+    async def test_export_xlsx_returns_file(self, client, admin_user, auth_headers, db_session):
+        conv = await _make_conversation(db_session)
+        await _make_message(db_session, conv, role=MessageRole.user)
+
+        r = await client.get(
+            "/api/v1/conversations/export",
+            params={"format": "xlsx"},
+            headers=auth_headers(admin_user),
+        )
+        assert r.status_code == 200
+        assert "spreadsheet" in r.headers["content-type"] or "excel" in r.headers["content-type"].lower()
+
+    async def test_export_pdf_returns_file(self, client, admin_user, auth_headers, db_session):
+        conv = await _make_conversation(db_session)
+        await _make_message(db_session, conv, role=MessageRole.assistant)
+
+        r = await client.get(
+            "/api/v1/conversations/export",
+            params={"format": "pdf"},
+            headers=auth_headers(admin_user),
+        )
+        assert r.status_code == 200
+        assert "pdf" in r.headers["content-type"].lower()
+
+    async def test_invalid_format_rejected(self, client, admin_user, auth_headers):
+        r = await client.get(
+            "/api/v1/conversations/export",
+            params={"format": "csv"},
+            headers=auth_headers(admin_user),
+        )
+        assert r.status_code == 422
+
+    async def test_rate_limit_exceeded_returns_429(self, client, admin_user, auth_headers, monkeypatch):
+        import app.api.v1.conversations.router as conv_router
+
+        async def _raise_rate_limit(*args, **kwargs):
+            from app.core.rate_limit import RateLimitExceeded
+            raise RateLimitExceeded(retry_after=30)
+
+        monkeypatch.setattr(conv_router, "check_rate_limit", _raise_rate_limit)
+
+        r = await client.get(
+            "/api/v1/conversations/export",
+            headers=auth_headers(admin_user),
+        )
+        assert r.status_code == 429
+        assert r.headers["retry-after"] == "30"
+
+
+class TestListKnownTags:
+    async def test_requires_auth(self, client):
+        r = await client.get("/api/v1/conversations/tags")
+        assert r.status_code == 401
+
+    async def test_empty_when_no_tags(self, client, admin_user, auth_headers):
+        r = await client.get("/api/v1/conversations/tags", headers=auth_headers(admin_user))
+        assert r.status_code == 200
+        assert r.json() == []
+
+    async def test_returns_tags_with_counts_sorted_desc(
+        self, client, admin_user, auth_headers, db_session
+    ):
+        conv1 = await _make_conversation(db_session)
+        conv1.tags = ["becas", "urgente"]
+        conv2 = await _make_conversation(db_session)
+        conv2.tags = ["becas"]
+        await db_session.commit()
+
+        r = await client.get("/api/v1/conversations/tags", headers=auth_headers(admin_user))
+        assert r.status_code == 200
+        body = r.json()
+        by_tag = {row["tag"]: row["count"] for row in body}
+        assert by_tag["becas"] == 2
+        assert by_tag["urgente"] == 1

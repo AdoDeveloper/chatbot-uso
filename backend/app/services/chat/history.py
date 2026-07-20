@@ -242,10 +242,18 @@ async def fetch_first_user_messages(
         .group_by(ChatMessage.conversation_id)
         .subquery()
     )
-    stmt = select(ChatMessage.conversation_id, ChatMessage.content).join(
-        min_q,
-        (ChatMessage.conversation_id == min_q.c.conversation_id)
-        & (ChatMessage.created_at == min_q.c.first_at),
+    stmt = (
+        select(ChatMessage.conversation_id, ChatMessage.content)
+        .join(
+            min_q,
+            (ChatMessage.conversation_id == min_q.c.conversation_id)
+            & (ChatMessage.created_at == min_q.c.first_at),
+        )
+        # Sin este filtro, un mensaje de otro rol con el mismo created_at
+        # exacto (empate de timestamp) puede colarse en el JOIN en vez del
+        # mensaje de usuario real, ya que el JOIN solo empareja por
+        # conversation_id + created_at, no por rol.
+        .where(ChatMessage.role == MessageRole.user)
     )
     result = await db.execute(stmt)
     return {row[0]: row[1] for row in result.all()}
