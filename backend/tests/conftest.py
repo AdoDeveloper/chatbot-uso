@@ -6,13 +6,69 @@ from typing import AsyncGenerator
 import pytest
 import pytest_asyncio
 
-# Must be set before ANY app module import so _make_engine() sees SQLite.
+# Must be set before ANY app module import so _make_engine() ve la BD correcta.
+# DATABASE_URL respeta el valor externo si ya viene seteado (CI usa MySQL real
+# para poder testear SQL específico de MySQL, ej. json_unquote/->>); SQLite
+# in-memory es solo el default para correr los tests localmente sin Docker.
 os.environ["SECRET_KEY"] = "test-secret-key-for-unit-tests-only-please"
-os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
+os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
 os.environ["REDIS_URL"] = "redis://localhost:6379/15"
 os.environ["UPLOADS_DIR"] = "/tmp/test-uploads"
 os.environ["ALLOWED_ORIGINS"] = '["http://testserver"]'
 os.environ["WIDGET_BASE_URL"] = "http://testserver"
+
+_isolation_listener_set = False
+_engine_swapped_for_tests = False
+
+
+def _use_nullpool_engine_for_tests() -> None:
+    """Reemplaza app.db.session.engine por uno con NullPool.
+
+    Bajo MySQL, cada test corre en su propio event loop (pytest-asyncio,
+    default_loop_scope=function). El pool por default (AsyncAdaptedQueuePool)
+    puede devolver, en un test posterior, una conexión física abierta bajo el
+    loop de un test anterior ya cerrado: la conexión asyncio queda ligada a
+    ese loop, y verificamos con instrumentación que esto realmente ocurre
+    (mismo id de conexión física reaparece bajo un loop distinto) y que
+    puede terminar en "Event loop is closed" al recolectar basura. Es un bug
+    latente real de la config de pool en tests, aunque no fue la causa
+    principal del flaky original de test_security_observability_router.py
+    (esa fue el redondeo de MySQL en DATETIME sin fsp — ver
+    app/models/audit_log.py). Se deja NullPool igual, de forma defensiva:
+    abre una conexión física nueva en cada checkout y la cierra por completo
+    en cada checkin, así que ninguna conexión sobrevive al cierre del loop
+    de su test. Es más lento pero solo aplica a tests.
+    """
+    global _engine_swapped_for_tests
+    if _engine_swapped_for_tests:
+        return
+    import app.db.session as db_session_mod
+
+    if db_session_mod.engine.url.get_backend_name().startswith("sqlite"):
+        _engine_swapped_for_tests = True
+        return
+
+    from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+    from sqlalchemy.pool import NullPool
+    import json as _json
+
+    settings = db_session_mod.get_settings()
+    new_engine = create_async_engine(
+        settings.DATABASE_URL,
+        echo=settings.DEBUG,
+        json_serializer=lambda obj: _json.dumps(obj, ensure_ascii=False),
+        json_deserializer=_json.loads,
+        poolclass=NullPool,
+    )
+    db_session_mod.engine = new_engine
+    db_session_mod.AsyncSessionLocal = async_sessionmaker(
+        bind=new_engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+        autocommit=False,
+        autoflush=False,
+    )
+    _engine_swapped_for_tests = True
 
 
 @pytest.fixture(autouse=True)
@@ -83,8 +139,27 @@ async def db_engine():
     creadas. Código como persist_turn() abre sesiones directamente desde
     AsyncSessionLocal (bind=engine) sin pasar por el override de get_db, así
     que el engine de test y el de la app deben ser el mismo objeto."""
+    _use_nullpool_engine_for_tests()
     from app.db.session import Base, engine
     import app.models  # noqa: F401
+
+    # MySQL usa REPEATABLE READ por defecto: una conexión reciclada del pool
+    # puede abrir su snapshot antes del commit del INSERT hecho por otra
+    # sesión en el mismo test, y entonces el request del `client` no ve esa
+    # fila (falla intermitente, imposible bajo SQLite que no aísla así).
+    # READ COMMITTED evita esa carrera y es el nivel que corre en producción;
+    # se aplica a cada conexión nueva vía evento (NullPool: todas lo son).
+    global _isolation_listener_set
+    if not engine.url.get_backend_name().startswith("sqlite") and not _isolation_listener_set:
+        from sqlalchemy import event
+
+        @event.listens_for(engine.sync_engine, "connect")
+        def _set_isolation_level(dbapi_conn, _):
+            cur = dbapi_conn.cursor()
+            cur.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED")
+            cur.close()
+
+        _isolation_listener_set = True
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -94,6 +169,14 @@ async def db_engine():
     finally:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.drop_all)
+        # Con NullPool cada conexión ya se cierra por completo al hacer
+        # checkin (no queda ninguna conexión física ociosa atada al event
+        # loop de este test), pero dispose() igual limpia cualquier estado
+        # residual del pool antes del siguiente test. No-op bajo SQLite
+        # StaticPool (una sola conexión persistente que sí queremos
+        # conservar entre tests).
+        if not engine.url.get_backend_name().startswith("sqlite"):
+            await engine.dispose()
 
 
 @pytest_asyncio.fixture

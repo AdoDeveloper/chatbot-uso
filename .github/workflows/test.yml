@@ -30,6 +30,21 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      # MySQL real (no SQLite): algunos endpoints usan SQL específico de MySQL
+      # (json_unquote, ->> path operator) que no tiene equivalente en SQLite —
+      # sin esto, esos endpoints no pueden tener un test de integración real.
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: chatbot_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h localhost -proot"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - uses: actions/checkout@v4
@@ -52,7 +67,7 @@ jobs:
       - name: Run pytest
         env:
           SECRET_KEY: ci-secret-key-not-for-prod
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+          DATABASE_URL: "mysql+aiomysql://root:root@127.0.0.1:3306/chatbot_test"
           REDIS_URL: "redis://localhost:6379/15"
         run: pytest tests/ -q --cov=app --cov-report=term-missing
 

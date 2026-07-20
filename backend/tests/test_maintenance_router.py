@@ -11,9 +11,14 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from app.models.enums import ReviewStatus, SourceStatus, SourceType
+from app.models.enums import ReviewStatus, SourceStatus, SourceType, UserRole
 from app.models.health_snapshot import HealthSnapshot
 from app.models.source import Source
+
+
+@pytest.fixture
+async def viewer_user(make_user):
+    return await make_user(role=UserRole.viewer)
 
 
 @pytest.fixture
@@ -55,6 +60,16 @@ def patch_qdrant_scroll_and_delete(monkeypatch):
 
 
 class TestSyncQdrant:
+    async def test_requires_auth(self, client):
+        r = await client.post("/api/v1/maintenance/sync-qdrant")
+        assert r.status_code == 401
+
+    async def test_requires_manage_perm(self, client, viewer_user, auth_headers):
+        r = await client.post(
+            "/api/v1/maintenance/sync-qdrant", headers=auth_headers(viewer_user)
+        )
+        assert r.status_code == 403
+
     async def test_sync_qdrant_deletes_orphans(
         self, client, admin_user, auth_headers, patch_qdrant_scroll_and_delete, db_session
     ):
@@ -113,6 +128,17 @@ class TestSyncQdrant:
 
 
 class TestPurgeHealthOutliers:
+    async def test_requires_auth(self, client):
+        r = await client.delete("/api/v1/maintenance/health-snapshots/outliers")
+        assert r.status_code == 401
+
+    async def test_requires_manage_perm(self, client, viewer_user, auth_headers):
+        r = await client.delete(
+            "/api/v1/maintenance/health-snapshots/outliers",
+            headers=auth_headers(viewer_user),
+        )
+        assert r.status_code == 403
+
     async def test_purge_deletes_only_above_threshold(self, client, admin_user, auth_headers, db_session):
         now = datetime.now(timezone.utc)
         db_session.add_all([
