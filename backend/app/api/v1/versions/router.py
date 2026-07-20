@@ -326,6 +326,7 @@ async def rollback_version(
         raise HTTPException(status_code=404, detail=str(exc))
 
     await db.commit()
+    await db.refresh(rollback_version)
     await db.refresh(rollback_version, ["created_by"])
     return RollbackResult(
         version=_to_out(rollback_version),
