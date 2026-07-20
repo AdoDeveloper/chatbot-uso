@@ -151,8 +151,6 @@ async def get_uptime_summary(
 
     from sqlalchemy import case
 
-    # 3 queries bulk agrupadas por service_name (evita el N+1 anterior que
-    # ejecutaba 3 SELECT por cada servicio dentro del loop).
     agg_q = await db.execute(
         select(
             HealthSnapshot.service_name,

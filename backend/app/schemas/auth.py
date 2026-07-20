@@ -32,8 +32,6 @@ class TokenResponse(BaseModel):
 
 
 class RefreshRequest(BaseModel):
-    # Opcional: en modo cookie httpOnly el token viaja en la cookie, no en el
-    # cuerpo. El endpoint lo lee de la cookie cuando el body viene vacío.
     refresh_token: str | None = Field(default=None, min_length=1)
 
 

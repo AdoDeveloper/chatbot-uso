@@ -1,4 +1,4 @@
-"""Recopilación de estadísticas para el resumen diario (unanswered_daily).
+"""Recopilación de estadísticas para el resumen diario (unanswered_digest).
 
 Reúne, en una sola pasada por la base de datos, las métricas que componen el
 correo de resumen: preguntas sin responder (nuevas vs acumuladas), temas más
@@ -23,11 +23,11 @@ _RECENT_LIMIT = 5
 _TOPIC_LIMIT = 5
 
 
-async def collect_daily_digest_stats(db: AsyncSession) -> dict[str, Any]:
+async def collect_digest_stats(db: AsyncSession) -> dict[str, Any]:
     """Devuelve el payload completo del resumen diario.
 
     Las claves se consumen en `service._html_body` para el evento
-    unanswered_daily.
+    unanswered_digest.
     """
     now = datetime.now(timezone.utc)
     since = now - timedelta(hours=24)

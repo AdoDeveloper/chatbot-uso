@@ -64,9 +64,6 @@ async def list_source_chunks(
         for w in (c.get("warnings") or []):
             counter[w] += 1
 
-    # Optional filter by a specific warning flag — applied before pagination
-    # so `total` reflects the filtered count, matching every other list
-    # endpoint's contract (total = count of the filtered set, not the whole source).
     if warning:
         all_chunks = [c for c in all_chunks if warning in (c.get("warnings") or [])]
 

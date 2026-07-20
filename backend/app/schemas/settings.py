@@ -27,21 +27,11 @@ class ChatbotSettings(BaseModel):
         max_length=4000,
     )
     top_k: int = Field(8, ge=1, le=20)
-    # 0.0 = sin filtro por umbral. La búsqueda usa RRF (Reciprocal Rank Fusion),
-    # cuyos scores son pequeños (~0.015–0.03) y NO son similitud coseno 0–1. Un
-    # umbral tipo coseno (p. ej. 0.30) sobre scores RRF descarta casi todo salvo
-    # coincidencias casi literales, provocando "No tengo esa información" ante
-    # preguntas coloquiales. Con 0.0 se confía en top_k (y el reranker/grader)
-    # para limitar; el LLM filtra lo irrelevante vía el system prompt.
     score_threshold: float = Field(0.0, ge=0.0, le=1.0)
     temperature: float = Field(0.3, ge=0.0, le=2.0)
     max_tokens: int = Field(1024, ge=64, le=8192)
     use_corrective_rag: bool = True
     use_reranker: bool = False
-    # Los tamaños de chunk (chunk_parent_size, chunk_child_size, *_overlap)
-    # se controlan exclusivamente desde .env (CHATBOT_CHUNK_*) para garantizar
-    # coherencia del índice vectorial — cambiarlos requiere reingestar todas las
-    # fuentes y no deben modificarse en caliente desde el panel de administración.
     greeting_response: str = Field(
         "¡Hola! Soy el asistente virtual de la universidad. "
         "¿En qué puedo ayudarte? Puedo resolver dudas sobre trámites, "

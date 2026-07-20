@@ -251,8 +251,6 @@ async def get_topics(
     )
     rows = result.all()
 
-    # Conteo de resueltos por tema en UNA sola query agrupada (evita N+1:
-    # antes se ejecutaba 1 SELECT COUNT por cada tema del loop anterior).
     resolved_res = await db.execute(
         select(
             UnansweredQuestion.detected_topic,
@@ -288,8 +286,6 @@ async def get_heatmap(db: AsyncSession, window: str = "week") -> AnalyticsHeatma
     """
     now = datetime.now(timezone.utc)
 
-    # SQLite (suite de tests) no tiene HOUR()/DAYOFWEEK(); strftime('%w') y
-    # DAYOFWEEK()-1 coinciden en la convención 0=domingo…6=sábado.
     if db.bind is not None and db.bind.dialect.name == "sqlite":
         hour_expr = "CAST(strftime('%H', m.created_at) AS INTEGER)"
         dow_expr = "CAST(strftime('%w', m.created_at) AS INTEGER)"
@@ -517,7 +513,7 @@ async def get_timeline(
         elif etype == "source_ingested":
             detail = meta.get("name")
             if a.resource_id:
-                href = f"/dashboard/sources/{a.resource_id}/chunks"
+                href = f"/dashboard/conocimiento/documentos/{a.resource_id}/chunks"
         actor_name = a.actor.full_name if a.actor else None
         events.append(TimelineEvent(
             id=f"audit:{a.id}",
@@ -544,7 +540,7 @@ async def get_timeline(
             detail=f"Sesión {c.session_id[:12]}" if c.session_id else None,
             created_at=c.last_message_at,
             actor_name=None,
-            href=f"/dashboard/history/{c.id}",
+            href=f"/dashboard/conversaciones?id={c.id}",
         ))
 
     src_rows = await db.execute(
@@ -563,7 +559,7 @@ async def get_timeline(
             detail=f"{s.chunk_count} chunks indexados",
             created_at=s.updated_at,
             actor_name=None,
-            href=f"/dashboard/sources/{s.id}/chunks",
+            href=f"/dashboard/conocimiento/documentos/{s.id}/chunks",
         ))
 
     events.sort(key=lambda e: e.created_at, reverse=True)

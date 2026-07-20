@@ -150,6 +150,12 @@ class LLMAdapter(ABC):
         response_format: dict | None = None,
     ) -> str: ...
 
+# This is the DEFAULT adapter. Any provider not explicitly matched by the
+# factory falls here. Works with ~90% of LLM APIs on the market.
+
+# This is the DEFAULT adapter. Any provider not explicitly matched by the
+# factory falls here. Works with ~90% of LLM APIs on the market.
+
     async def test_connection(self) -> dict:
         t0 = time.monotonic()
         try:
@@ -162,10 +168,6 @@ class LLMAdapter(ABC):
             return {"success": True, "latency_ms": latency, "error": None}
         except Exception as exc:
             return {"success": False, "latency_ms": None, "error": str(exc)}
-
-
-# This is the DEFAULT adapter. Any provider not explicitly matched by the
-# factory falls here. Works with ~90% of LLM APIs on the market.
 
 
 class OpenAICompatAdapter(LLMAdapter):
@@ -260,11 +262,6 @@ class OpenAICompatAdapter(LLMAdapter):
         resp.raise_for_status()
         data = resp.json()
         return data["choices"][0]["message"]["content"] or ""
-
-
-# Azure uses api-key header (not Bearer) and a different URL scheme:
-#   https://{resource}.openai.azure.com/openai/deployments/{deployment}/chat/completions?api-version=2024-08-01-preview
-# Admin sets api_base = full deployment URL, model_name = deployment name.
 
 
 class AzureOpenAIAdapter(LLMAdapter):
@@ -718,9 +715,6 @@ def _get_adapter(
     if adapter_cls:
         if adapter_cls in (AnthropicAdapter, GeminiAdapter, CohereAdapter,
                            AzureOpenAIAdapter, BedrockAdapter):
-            # Estos proveedores cloud no funcionan sin API key — fallar aquí con
-            # mensaje claro en vez de mandar un header de auth vacío en runtime.
-            # (OpenAICompatAdapter sí acepta key vacía: Ollama/LMStudio locales.)
             if not api_key:
                 raise RuntimeError(
                     f"El proveedor '{provider_name}' ({pt}) requiere una API key configurada."
@@ -753,7 +747,12 @@ _SYSTEM_TEMPLATE = (
     "- Si el contexto contiene frases como \"ver tabla/lista/anexo al final del documento\", IGNÓRALAS "
     "por completo: nunca las repitas. Usa en su lugar cualquier dato concreto (nombre, cargo, teléfono, "
     "correo, oficina) que sí aparezca en el contexto. Si no hay ningún dato concreto disponible, di que "
-    "no tienes ese contacto específico y sugiere contactar a Secretaría o Coordinación Académica.\n\n"
+    "no tienes ese contacto específico y sugiere contactar a Secretaría o Coordinación Académica.\n"
+    "- Si el contexto incluye una URL que termina en .png, .jpg, .jpeg, .gif o .webp, "
+    "muéstrala como imagen usando sintaxis Markdown ![descripción](URL) en vez de solo pegar el enlace: "
+    "esto sí cuenta como dar la información directamente, no como remitir al documento.\n"
+    "- Si el contexto incluye una URL que termina en .pdf, preséntala como enlace Markdown "
+    "[nombre descriptivo del documento](URL), por ejemplo [Ver tabla de aranceles (PDF)](URL).\n\n"
     "CONTEXTO:\n{context}"
 )
 
@@ -778,13 +777,6 @@ async def stream_chat(
         messages.extend(history[-6:])
     messages.append({"role": "user", "content": question})
 
-    # Se capturan los atributos ORM de cada proveedor en variables simples
-    # ANTES del bucle de streaming: bajo un StreamingResponse, este generador
-    # sigue vivo (y en pausa entre yields) mucho después de que la sesión de
-    # BD que cargó `chain` haya avanzado o se haya cerrado, y volver a acceder
-    # a un atributo del objeto ORM en ese punto puede disparar un lazy-load
-    # que falla con MissingGreenlet (mismo patrón corregido en
-    # app/api/v1/chat/router.py para el proveedor primario).
     plain_chain = [
         (str(provider.id), provider.name, provider.model_name, provider.provider_type,
          provider.api_base, api_key)
@@ -811,18 +803,12 @@ async def stream_chat(
             last_error = exc
             log.warning("llm.provider_failed", provider=provider_name, error=str(exc),
                         tokens_yielded=tokens_yielded)
-            # Solo se puede hacer failover a otro proveedor si AÚN no se emitió
-            # ningún token al cliente. Si ya se emitieron tokens, reintentar con
-            # otro proveedor produciría una respuesta concatenada/duplicada en el
-            # stream SSE — preferimos cortar aquí y propagar el error.
             if tokens_yielded > 0:
                 raise RuntimeError(
                     "La respuesta del servicio de IA se interrumpió. Intenta de nuevo."
                 ) from exc
             continue
 
-    # Detalle a logs; al usuario solo un mensaje genérico (el error del proveedor
-    # puede incluir URLs internas, nombres de modelo o restos de la API key).
     log.error("llm.all_providers_failed", error=str(last_error))
     raise RuntimeError("El servicio de IA no está disponible en este momento. Intenta de nuevo en unos minutos.")
 

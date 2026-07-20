@@ -106,8 +106,6 @@ async def handle_microsoft_callback(
         raise _GENERIC
 
     try:
-        # Verify the id_token signature using Microsoft's public JWKS.
-        # PyJWT 2.x PyJWKClient fetches the key set from the OIDC discovery endpoint.
         from jwt import PyJWKClient
         jwks_url = (
             f"https://login.microsoftonline.com/{settings.MICROSOFT_TENANT_ID}"
@@ -138,8 +136,9 @@ async def handle_microsoft_callback(
         raise _GENERIC
 
     if allowed_domains:
-        domain = "@" + email.split("@")[1]
-        if domain not in allowed_domains:
+        domain = email.split("@")[1]
+        normalized_allowed = {d.lstrip("@").lower() for d in allowed_domains}
+        if domain not in normalized_allowed:
             await log_action(db, action="auth.login_sso_failed", resource_type="user",
                              actor_id=None, resource_id=None, ip=client_ip, user_agent=ua,
                              meta={"provider": "microsoft", "reason": "domain_not_allowed",

@@ -205,10 +205,6 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(SQLATimeoutError)
     async def db_pool_exhausted_handler(req: Request, exc: SQLATimeoutError):
-        # El pool de conexiones a la base de datos se agotó (muchas peticiones
-        # concurrentes reteniendo conexión a la vez). No es un error del
-        # sistema en sí, sino saturación temporal: se comunica como tal en
-        # vez del 500 genérico, para que el cliente sepa que puede reintentar.
         logger.warning("db_pool_exhausted", path=req.url.path, method=req.method, error=repr(exc)[:300])
         return JSONResponse(
             status_code=503,

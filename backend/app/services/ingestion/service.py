@@ -19,7 +19,7 @@ from app.services.ingestion import vector_store
 log = structlog.get_logger()
 
 # Batch size para no saturar RAM con documentos grandes
-_EMBED_BATCH = 16  # multilingual-e5-large es 2.24 GB / 560M params — batches pequeños reducen picos de RAM en CPU
+_EMBED_BATCH = 16
 
 
 async def _set_stage(db: AsyncSession, source: Source, stage: str) -> None:
@@ -74,9 +74,6 @@ async def ingest(db: AsyncSession, source: Source) -> None:
             if not raw_text.strip():
                 raise ValueError("El documento no contiene texto extraíble")
 
-            # Chunking — tamaños leídos de .env (CHATBOT_CHUNK_*) para que
-            # no puedan cambiarse en caliente desde el panel de administración
-            # sin reingestar todas las fuentes.
             await _set_stage(db, source, "chunking")
             env = get_env_settings()
             chunks = chunk_text(
@@ -89,8 +86,6 @@ async def ingest(db: AsyncSession, source: Source) -> None:
                 child_overlap=env.CHATBOT_CHUNK_CHILD_OVERLAP,
             )
 
-            # Attach automatic warnings per chunk so the review UI can flag
-            # them for the admin (short, long, PII, ...). Stored in payload.
             for c in chunks:
                 c["warnings"] = compute_warnings(c["text"], env.CHATBOT_CHUNK_PARENT_SIZE)
 
@@ -112,9 +107,6 @@ async def ingest(db: AsyncSession, source: Source) -> None:
         source.chunk_count = total_upserted
         source.progress_stage = None
         source.updated_at = datetime.now(timezone.utc)
-        # Ingestion finished → hand off to the admin for review.
-        # Re-ingests of an already-approved source drop it back to pending so the
-        # admin can re-confirm the content (same governance as first ingest).
         source.review_status = ReviewStatus.pendiente_revision
         await db.commit()
 
@@ -144,8 +136,6 @@ async def ingest(db: AsyncSession, source: Source) -> None:
         source.error_hint = hint
         source.progress_stage = None
         source.updated_at = datetime.now(timezone.utc)
-        # review_status stays 'procesando' — admin retries after fixing the
-        # underlying problem. Nothing to review yet since no chunks exists.
         await db.commit()
 
         # Notify admins of ingestion failure (best-effort)

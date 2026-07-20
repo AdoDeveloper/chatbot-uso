@@ -34,10 +34,6 @@ class LLMProvider(Base):
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, server_default="1")
 
-    # Posición en la cadena de ejecución:
-    #   1  = proveedor principal
-    #   2+ = fallback en ese orden
-    #   NULL = disponible pero fuera de la cadena activa
     priority: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(

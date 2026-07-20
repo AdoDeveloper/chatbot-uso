@@ -37,7 +37,5 @@ class NotificationRule(Base):
     )
 
     def __repr__(self) -> str:
-        # Usa __dict__.get para no disparar lazy-loads cuando la instancia
-        # está detached (p.ej. dentro de un error handler tras commit).
         d = self.__dict__
         return f"<NotificationRule id={d.get('id')}>"

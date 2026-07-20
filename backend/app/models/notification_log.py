@@ -24,14 +24,10 @@ class NotificationLog(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )
-    # NULL = no leída por el admin. Se setea al hacer click en la notificación
-    # del header o al "marcar todas como leídas".
     read_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
 
     def __repr__(self) -> str:
-        # Usa __dict__.get para no disparar lazy-loads cuando la instancia
-        # está detached (mismo patrón aplicado a NotificationRule).
         d = self.__dict__
         return f"<NotificationLog id={d.get('id')}>"

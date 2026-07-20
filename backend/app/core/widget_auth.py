@@ -72,10 +72,6 @@ async def verify_widget_access(
 
     host = _extract_origin_host(request)
     if not host:
-        # En producción exigimos un Origin/Referer para validar el dominio.
-        # Fuera de producción (dev/localhost: SDK en file://, iframe sandboxed
-        # o same-origin donde el navegador omite Origin) lo permitimos para no
-        # romper las pruebas locales del widget.
         if get_settings().ENVIRONMENT == "production":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

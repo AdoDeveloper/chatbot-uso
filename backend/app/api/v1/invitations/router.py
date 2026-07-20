@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 import uuid
 
 import structlog
@@ -72,9 +73,7 @@ async def create_invitation(
     try:
         from app.core.config import get_settings
         from app.services.notifications.smtp import send_invitation_email
-        origins = get_settings().ALLOWED_ORIGINS
-        public = [o for o in origins if "localhost" not in o and "127.0.0.1" not in o]
-        frontend = (public[0] if public else origins[0]).rstrip("/") if origins else str(request.base_url).rstrip("/")
+        frontend = get_settings().FRONTEND_URL.rstrip("/")
         invite_url = f"{frontend}/invite/{inv.token}"
         _role_labels = {"admin": "Administrador", "editor": "Editor", "viewer": "Consultor"}
         sent = await send_invitation_email(
@@ -154,6 +153,7 @@ async def accept_invitation(
     user = await invitation_service.accept_invitation(
         db, inv, full_name=body.full_name, password=body.password
     )
+    user.last_login_at = datetime.datetime.now(datetime.timezone.utc)
     await db.commit()
     await db.refresh(user)
 

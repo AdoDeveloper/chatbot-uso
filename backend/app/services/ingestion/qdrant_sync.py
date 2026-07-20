@@ -55,8 +55,6 @@ async def sync_qdrant(db: AsyncSession) -> dict:
                 match=MatchAny(any=list(orphan_ids)),
             )]
         )
-        # Contar ANTES de borrar para un delta exacto e independiente de
-        # escrituras concurrentes sobre otros source_ids.
         pre_count = await client.count(
             collection_name=COLLECTION,
             count_filter=orphan_filter,

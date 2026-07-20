@@ -19,9 +19,6 @@ log = structlog.get_logger()
 _DEFAULTS = ChatbotSettings().model_dump()
 
 
-# Ajustes de runtime con fuente única en GlobalSetting. El código define solo
-# el valor de la primera siembra. Caché en proceso de 60 s para no consultar
-# la BD en cada mensaje del chat.
 RUNTIME_DEFAULTS: dict = {
     "rate_limit_chat_per_min": 10,
     "rate_limit_chat_per_hour": 100,
@@ -324,8 +321,6 @@ async def reorder_providers(db: AsyncSession, items: list[tuple[uuid.UUID, int |
     Útil para drag-and-drop: el frontend envía la lista completa con la prioridad
     objetivo y el backend la persiste atómicamente.
     """
-    # Etapa 1: limpiar prioridades para evitar conflictos por unique en transición
-    # (no hay unique sobre priority pero quedaría inconsistente si dos quedan en el mismo número).
     affected_ids = [i for i, _ in items]
     if affected_ids:
         result = await db.execute(select(LLMProvider).where(LLMProvider.id.in_(affected_ids)))

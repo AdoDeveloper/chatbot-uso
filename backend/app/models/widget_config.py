@@ -52,16 +52,10 @@ class WidgetConfig(Base):
     enable_feedback_icons: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, server_default=sa_text("(1)"))
     # Botón de lectura en voz alta (TTS) junto a cada respuesta del bot.
     enable_tts: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, server_default=sa_text("(1)"))
-    # Master switch del menú de accesibilidad (tamaño de texto + alto
-    # contraste + TTS) en el kebab del widget. Si es False, la opción
-    # «Accesibilidad» no aparece en absoluto, sin importar enable_tts.
     enable_accessibility: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, server_default=sa_text("(1)"))
     # Si False, el header del chat y las burbujas del bot no muestran el icono
     # SVG. Permite un look minimalista sin branding.
     show_bot_icon: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, server_default=sa_text("(1)"))
-    # Quick replies ("conversation starters"). Botones que aparecen sobre el
-    # input solo en el welcome y desaparecen tras el primer envío.
-    # Lista vacía = no se muestran.
     suggestions: Mapped[list[str]] = mapped_column(
         JSONList, default=list, nullable=False, server_default=sa_text("('[]')"),
     )
@@ -69,9 +63,6 @@ class WidgetConfig(Base):
     proactive_message: Mapped[str] = mapped_column(
         Text, default="", nullable=False, server_default=sa_text("('')"),
     )
-    # Per-widget abuse mitigation. Null = no widget-level cap (the global IP
-    # rate limits in core.rate_limit still apply). Límite de chats por sesión
-    # y por día configurable por widget.
     max_chats_per_session: Mapped[int | None] = mapped_column(Integer, nullable=True)
     max_chats_per_day: Mapped[int | None] = mapped_column(Integer, nullable=True)
     show_end_chat_button: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, server_default=sa_text("(1)"))
@@ -81,12 +72,7 @@ class WidgetConfig(Base):
         Text, default="¿Cómo calificarías esta conversación?", nullable=False,
         server_default=sa_text("('¿Cómo calificarías esta conversación?')"),
     )
-    # Master switch del escalamiento a humano. Si False, el bot nunca ofrece
-    # "hablar con un humano" ni evalúa reglas de escalamiento, sin importar
-    # cuántas reglas activas existan en /configuracion/escalamiento.
     enable_escalation: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, server_default=sa_text("(1)"))
-    # Texto breve que aparece al lado del botón flotante cuando el panel está
-    # cerrado. Vacío = desactivado. Ej: "¿Necesitás ayuda?"
     launcher_label: Mapped[str] = mapped_column(
         Text, default="", nullable=False, server_default=sa_text("('')"),
     )
@@ -95,9 +81,5 @@ class WidgetConfig(Base):
     )
 
     def __repr__(self) -> str:
-        # Use __dict__ to avoid triggering lazy refresh on detached instances.
-        # Some error handlers (e.g. ResponseValidationError) call repr() on the
-        # offending object after the SQLAlchemy session has been closed, which
-        # would cause a DetachedInstanceError that masks the real error.
         d = self.__dict__
         return f"<WidgetConfig id={d.get('id', '?')} name={d.get('chatbot_name', '?')!r}>"

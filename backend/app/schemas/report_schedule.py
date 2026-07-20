@@ -13,7 +13,7 @@ DEFAULT_REPORT_SCHEDULE: dict = {
 
 
 class ReportSchedule(BaseModel):
-    """Cadencia del reporte de preguntas sin responder (unanswered_daily).
+    """Cadencia del reporte de preguntas sin responder (unanswered_digest).
 
     `hour`/`minute` se interpretan en la zona de El Salvador (UTC-6). El
     scheduler los convierte a UTC al momento de disparar. `days_of_week` usa

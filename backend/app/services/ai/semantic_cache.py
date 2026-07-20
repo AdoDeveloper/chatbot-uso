@@ -30,9 +30,6 @@ CACHE_PREFIX = "semcache:v2:"
 DEFAULT_TTL = 43200  # 12 hours
 SIMILARITY_THRESHOLD = 0.93
 MAX_CACHED_EMBEDDINGS = 10000
-# Límite duro de claves a escanear por request: evita latencia O(n) cuando el
-# caché crece. Con 1000 entradas el escaneo toma ~200ms; con 10k+ puede tomar
-# segundos. Si se alcanza este límite, se devuelve miss en vez de seguir.
 SCAN_BATCH_HARD_LIMIT = 2000
 
 
@@ -82,8 +79,6 @@ async def get_cached_response(
         want_sids = _sids_token(source_ids)
         if threshold is None:
             threshold = _threshold()
-        # Procesa lote a lote (200 claves por SCAN): la memoria queda acotada al
-        # tamaño del lote en vez de cargar las ~10k entradas completas en RAM.
         best_score = 0.0
         best_entry = None
         scanned = 0
@@ -108,9 +103,6 @@ async def get_cached_response(
                 scanned += len(batch)
             if cursor == 0:
                 break
-            # Hard limit: si el caché es muy grande, salir temprano para
-            # evitar latencia excesiva. Mejor un miss ocasional que un
-            # slowdown de segundos en cada request de chat.
             if scanned >= SCAN_BATCH_HARD_LIMIT:
                 log.debug("semantic_cache.scan_hard_limit", scanned=scanned)
                 break
@@ -158,18 +150,7 @@ async def store_cached_response(
 
 
 async def invalidate_by_source(source_id: str) -> int:
-    """Invalida el caché completo (tanto semántico como exacto).
-
-    Importante: el caché es content-keyed (hash de pregunta + source_ids), no
-    source-keyed. Por eso al borrar un Source no podemos saber qué entradas
-    cacheadas lo referenciaban — borramos todo el caché para evitar respuestas
-    "fantasma" que sigan citando el documento eliminado. Se reconstruye en
-    minutos con el tráfico normal del chatbot.
-
-    Borra:
-      - `semcache:v2:*` (cache semántico con embeddings — ver CACHE_PREFIX)
-      - `chat:v1:*` (cache exacto de chat.py, hash de pregunta+sources)
-    """
+    """Invalida el caché completo (tanto semántico como exacto)."""
     try:
         redis = get_redis()
         keys: list[str] = []

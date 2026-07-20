@@ -173,9 +173,6 @@ async def approve_source(
         user_agent=req.headers.get("user-agent"),
     )
     await db.commit()
-    # populate_existing=True fuerza a SQLAlchemy a recargar la entidad y sus
-    # relaciones, ignorando la identity-map cache. Sin esto, `reviewed_by`
-    # queda como None aunque `reviewed_by_id` ya esté seteado.
     result = await db.execute(
         select(Source).where(Source.id == source.id)
         .options(*sources_svc.with_user_options())

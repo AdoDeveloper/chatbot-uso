@@ -156,8 +156,6 @@ async def usage_report(
     )
     thr_by_bucket = {row.bucket: int(row.n) for row in thr_q.all()}
 
-    # Construir serie completa con buckets vacíos en cero.
-    # Buckets are already ISO strings from DATE_FORMAT — no .isoformat() needed.
     all_buckets = sorted(set(req_by_bucket.keys()) | set(thr_by_bucket.keys()))
     points = [
         UsagePoint(

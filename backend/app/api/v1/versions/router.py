@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy import select, func as sa_func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.deps import require_perm
 from app.core.exceptions import NotFoundError
@@ -111,13 +112,12 @@ async def list_versions(
     offset = (page - 1) * page_size
     result = await db.execute(
         select(ConfigVersion)
+        .options(selectinload(ConfigVersion.created_by))
         .order_by(ConfigVersion.version_number.desc())
         .offset(offset)
         .limit(page_size)
     )
     versions = result.scalars().all()
-    for v in versions:
-        await db.refresh(v, ["created_by"])
 
     return VersionListOut(
         versions=[_to_out(v) for v in versions],
@@ -280,8 +280,6 @@ async def deploy(
     )
     pending_sources = int(pending_q.scalar_one() or 0)
 
-    # 409 only when current config is identical to the last *deployed* version.
-    # Intermediate auto-snapshots (from the old middleware) must not block a deploy.
     last_deploy_q = await db.execute(
         select(ConfigVersion)
         .where(ConfigVersion.trigger_source == "deploy")
@@ -295,9 +293,6 @@ async def deploy(
             detail="Sin cambios de configuración desde el último despliegue",
         )
 
-    # Capture current state as a deploy version. force=True skips the dedup check
-    # against the latest active snapshot (which may be an old auto-snapshot that
-    # already reflects the same config the user wants to deploy now).
     version = await svc.capture_snapshot(
         db,
         user_id=user.id,
@@ -311,11 +306,6 @@ async def deploy(
             detail="No se pudo crear la versión de despliegue",
         )
     await db.commit()
-    # Refresh sin restringir attribute_names: limitar el refresh a
-    # ["created_by"] deja otros atributos (p. ej. created_at) en un estado
-    # que dispara un lazy-load fallido en _to_out() bajo este contexto async
-    # (sqlalchemy.exc.MissingGreenlet), aunque expire_on_commit=False está
-    # configurado — el refresh parcial expira igual esos atributos.
     await db.refresh(version)
     await db.refresh(version, ["created_by"])
     return DeployResult(version=_to_out(version), pending_sources=pending_sources)

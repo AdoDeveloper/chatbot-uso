@@ -23,13 +23,6 @@ log = structlog.get_logger()
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
-# Limita cuántas conversaciones usan un proveedor LLM (RAG + generación) al
-# mismo tiempo. Las que exceden el límite ESPERAN en cola (asyncio.Semaphore
-# encola por diseño: https://docs.python.org/3/library/asyncio-sync.html)
-# en vez de recibir un error — el usuario percibe una respuesta más lenta en
-# horas pico, nunca un rechazo. El timeout de espera evita que una petición
-# quede colgada para siempre si la cola no se libera. Ajustable por .env
-# según la cuota real del proveedor contratado (ver docs/DEPLOYMENT.md §0.1).
 _llm_semaphore = asyncio.Semaphore(get_settings().LLM_MAX_CONCURRENCY)
 _LLM_QUEUE_TIMEOUT = get_settings().LLM_QUEUE_TIMEOUT_SECONDS
 
@@ -72,10 +65,6 @@ async def run_chat(
     client_ip: str,
     origin_url: str | None = None,
 ) -> ChatResponse:
-    # PRECONDICIÓN: quien llama a esta función ya adquirió _llm_semaphore
-    # (ver chat() más abajo) — la validación de acceso y todo lo que necesita
-    # HTTPException real (403) debe resolverse ANTES de invocar run_chat.
-    # Esta función solo libera el semáforo al terminar.
     settings = get_settings()
     t_start = time.monotonic()
     try:
@@ -135,6 +124,7 @@ async def _run_chat_inner(
     history = [m.model_dump() for m in request.messages] if request.messages else []
     rag_question = pipeline.build_rag_question(request.question, history)
 
+    t_rag_start = time.monotonic()
     try:
         rag_result = await asyncio.wait_for(
             pipeline.retrieve_context(
@@ -148,6 +138,7 @@ async def _run_chat_inner(
     except Exception as exc:
         log.error("chat.rag_failed", session_id=request.session_id, error=str(exc))
         return ChatResponse(type="error", message=cfg.no_providers_message)
+    rag_latency_ms = int((time.monotonic() - t_rag_start) * 1000)
 
     _detected_route = "greeting" if isinstance(rag_result, str) else ("complex" if cfg.use_corrective_rag else "factual")
 
@@ -175,13 +166,10 @@ async def _run_chat_inner(
     full_content: list[str] = []
     deadline = asyncio.get_running_loop().time() + 70.0
 
-    # La conexión a MySQL no se usa durante la generación del LLM (10-70s), el
-    # tramo más largo del request. Se libera aquí y se abre una sesión nueva
-    # y corta al final solo para persist_turn — evita retener una conexión
-    # ociosa del pool durante todo ese tiempo bajo alta concurrencia.
     await db.close()
 
     timed_out = False
+    t_llm_start = time.monotonic()
     try:
         async for token in stream_chat(
             question=request.question,
@@ -206,11 +194,15 @@ async def _run_chat_inner(
     if not timed_out and settings.GUARDRAILS_ENABLED:
         final_text = pipeline.apply_output_guardrails(final_text)
 
+    llm_latency_ms = int((time.monotonic() - t_llm_start) * 1000)
     latency_ms = int((time.monotonic() - t_start) * 1000)
+    if latency_ms > 15000:
+        log.warning(
+            "chat.slow_response", session_id=request.session_id,
+            total_ms=latency_ms, rag_ms=rag_latency_ms, llm_ms=llm_latency_ms,
+            rag_route=_detected_route, provider=provider_name,
+        )
 
-    # Sesión nueva y corta: la que traía el request se cerró antes de la
-    # generación (ver comentario más arriba) para no retener la conexión
-    # ociosa durante la espera al LLM.
     async with AsyncSessionLocal() as fresh_db:
         assistant_message_id, conversation_id, escalation_prompt = await pipeline.persist_turn(
             fresh_db,
@@ -274,11 +266,6 @@ async def chat(
     client_ip = get_client_ip(req)
     origin_url = req.headers.get("Referer") or req.headers.get("Origin")
 
-    # El semáforo se adquiere aquí, antes de correr el pipeline, para poder
-    # devolver un 403 real (HTTPException) si la widget key/dominio no son
-    # válidos. Si la validación falla, se libera inmediatamente; si pasa,
-    # run_chat hereda la responsabilidad de liberarlo al terminar (éxito,
-    # timeout o error de RAG/LLM).
     try:
         await asyncio.wait_for(_llm_semaphore.acquire(), timeout=_LLM_QUEUE_TIMEOUT)
     except asyncio.TimeoutError:

@@ -72,11 +72,6 @@ async def get_or_create_conversation(
         return result.scalar_one_or_none()
 
     async def _find_reopenable() -> ChatConversation | None:
-        # Igual que Zendesk Messaging: una conversación auto-resuelta por
-        # inactividad (resolved_by_user_id IS NULL, distinto de un cierre
-        # manual de un agente) se reabre si el usuario retoma dentro de la
-        # ventana — evita partir en dos una charla que para el usuario fue
-        # continua. Pasada la ventana, se inicia una conversación nueva.
         cutoff = datetime.now(timezone.utc) - timedelta(hours=_REOPEN_WINDOW_HOURS)
         result = await db.execute(
             select(ChatConversation)
@@ -268,18 +263,7 @@ async def get_conversation(
 async def auto_resolve_stale_conversations(
     db: AsyncSession, *, inactive_minutes: int
 ) -> int:
-    """Marca como `resolved` las conversaciones `active` sin actividad reciente.
-
-    El chat no tiene una conexión persistente (es HTTP por-turno): una vez que
-    el usuario cierra la pestaña, nada avisa al backend, y sin este barrido la
-    conversación quedaría en `active` para siempre. Sigue el patrón de
-    Zendesk Messaging (state-based, no session-based): la conversación no se
-    "cierra" de forma permanente, solo cambia de estado — `resolved_by_user_id`
-    se deja en NULL para marcar que fue el sistema quien la resolvió por
-    inactividad (no un agente), lo que permite a `get_or_create_conversation`
-    reabrirla si el usuario retoma dentro de `_REOPEN_WINDOW_HOURS`, evitando
-    partir en dos una charla que para el usuario fue continua.
-    """
+    """Marca como `resolved` las conversaciones `active` sin actividad reciente."""
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=inactive_minutes)
     result = await db.execute(
         select(ChatConversation).where(

@@ -48,11 +48,6 @@ async def regenerate_api_key(db: AsyncSession) -> WidgetConfig:
 def generate_embed_code(cfg: WidgetConfig) -> EmbedCodeOut:
     settings = get_settings()
     base = settings.WIDGET_BASE_URL
-    # data-position y data-show-bot-icon van inline en el snippet para que el
-    # admin pueda copiarlo y pegarlo en el sitio sin tener que agregar nada.
-    # Igual el widget consulta /widget/public/config en runtime, pero el
-    # snippet ya pre-configura para que la primera carga sea correcta sin
-    # esperar el roundtrip.
     show_icon_attr = "true" if cfg.show_bot_icon else "false"
     script_tag = (
         f'<script src="{base}/widget/widget.js" '
@@ -81,8 +76,6 @@ async def enforce_widget_caps(widget: WidgetConfig, session_id: str) -> None:
             await check_rate_limit(
                 f"widget:{widget.api_key}:session", session_id,
                 max_requests=widget.max_chats_per_session,
-                # 4-hour rolling window — long enough to act as a "session"
-                # cap for typical browse durations without being a hard daily.
                 window_seconds=4 * 3600,
             )
         except RateLimitExceeded as exc:
@@ -131,9 +124,6 @@ async def handle_escalation_consent(
                 detail="Conversación no encontrada.",
             )
 
-        # Solo procede si hay un escalamiento pendiente de confirmación. Sin esta
-        # verificación, un cliente con la widget key podría disparar correos de
-        # escalamiento para cualquier conversation_id válido (spam de notificaciones).
         if not conv.escalation_pending:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,

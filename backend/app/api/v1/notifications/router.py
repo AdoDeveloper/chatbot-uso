@@ -37,7 +37,7 @@ _EVENT_INAPP_AUDIENCE: dict[NotificationEvent, set[UserRole]] = {
     NotificationEvent.doc_ready: {UserRole.admin, UserRole.editor},
     NotificationEvent.doc_error: {UserRole.admin, UserRole.editor},
     NotificationEvent.escalation: {UserRole.admin, UserRole.editor},
-    NotificationEvent.unanswered_daily: {UserRole.admin, UserRole.editor},
+    NotificationEvent.unanswered_digest: {UserRole.admin, UserRole.editor},
     NotificationEvent.provider_down: {UserRole.admin, UserRole.editor, UserRole.viewer},
     NotificationEvent.service_down: {UserRole.admin, UserRole.editor, UserRole.viewer},
     NotificationEvent.rate_limit_threshold: {UserRole.admin, UserRole.editor, UserRole.viewer},

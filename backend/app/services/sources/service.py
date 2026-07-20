@@ -255,8 +255,6 @@ async def delete_source(db: AsyncSession, *, source_id: uuid.UUID, req: Request,
         await qdrant_delete(str(source_id))
     except Exception:
         pass
-    # Invalida cache (semántico + exacto) para que el chatbot deje de servir
-    # respuestas "fantasma" basadas en el documento recién eliminado.
     try:
         await cache_svc.invalidate_by_source(str(source_id))
     except Exception:

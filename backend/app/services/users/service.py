@@ -50,8 +50,6 @@ async def create(
 
 async def authenticate(db: AsyncSession, email: str, password: str) -> User | None:
     user = await get_by_email(db, email)
-    # Always run bcrypt to prevent email enumeration via timing differences.
-    # verify_password on the dummy hash takes the same time as a real check.
     _DUMMY_HASH = "$2b$12$KIXnatB2zMqfZOEbLDwVFOeOS8yh6oq5FzCSRXJAZ8M/J8yXxf7Vy"
     if not user:
         verify_password(password, _DUMMY_HASH)

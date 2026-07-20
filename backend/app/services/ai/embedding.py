@@ -12,11 +12,6 @@ Important — e5 prefix convention:
   embed_texts(texts, prefix="passage: ")  →  at ingestion time (documents)
   embed_texts(texts, prefix="query: ")    →  at search time (user questions)
   Omitting the prefix works but reduces retrieval accuracy.
-
-Why multilingual-e5-large over MiniLM:
-  MiniLM's 128-token limit silently truncated chunks >500 chars, discarding
-  roughly half the content before embedding. e5-large handles 512 tokens and
-  produces richer 1024-dim semantic representations.
 """
 from __future__ import annotations
 
@@ -28,15 +23,6 @@ import structlog
 
 log = structlog.get_logger()
 
-# Serializa la inferencia ONNX entre todos los workers/threads.
-# ONNX en CPU no mejora con paralelismo — solo genera contención.
-# Con este semáforo las requests se encolan y cada una tarda ~0.4s
-# en vez de competir por CPU y tardar 10–24s.
-#
-# The semaphore must be created inside a running event loop, so we
-# initialize it lazily via a module-level lock-free pattern: the first
-# call to embed_texts_async (always within a running loop) creates it.
-# We store it in a list so we can swap it atomically without a global lock.
 _ONNX_SEM: list[asyncio.Semaphore] = []
 
 def _get_onnx_sem() -> asyncio.Semaphore:

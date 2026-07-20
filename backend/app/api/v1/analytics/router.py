@@ -235,8 +235,6 @@ def _fmt_delta(val: float | None) -> str:
     return f"{sign}{val:.1f}%"
 
 
-# Mismas etiquetas que usa el panel de escalamientos, para que el reporte
-# hable el mismo idioma que la UI.
 _TRIGGER_LABELS = {
     "no_answer": "Sin respuesta",
     "user_request": "Solicitud del usuario",

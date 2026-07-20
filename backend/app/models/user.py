@@ -28,15 +28,10 @@ class User(Base):
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, server_default="1")
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default=false())
-    # Si el usuario hizo "Saltar tutorial" en el wizard de onboarding, no se le
-    # vuelve a mostrar aunque el estado del sistema indique pasos pendientes.
     onboarding_dismissed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default=false())
     last_login_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    # Cutoff para revocación masiva de JWT: cualquier token cuyo `iat` sea
-    # anterior a este instante se rechaza. Se actualiza al cambiar la
-    # contraseña, invalidando todas las sesiones previas de una sola escritura.
     tokens_valid_after: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

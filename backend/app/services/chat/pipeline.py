@@ -45,11 +45,7 @@ EXACT_CACHE_TTL = 3600
 
 
 def exact_cache_key(question: str, source_ids: list[str] | None, use_draft: bool = False) -> str:
-    """Genera la clave determinista del caché exacto en Redis.
-
-    El scope (borrador vs producción) forma parte de la key para evitar que
-    respuestas generadas con fuentes no aprobadas se sirvan en modo producción.
-    """
+    """Genera la clave determinista del caché exacto en Redis."""
     q = question.lower().strip()
     sids = json.dumps(sorted(source_ids or []))
     scope = "draft" if use_draft else "prod"
@@ -98,10 +94,6 @@ async def run_input_guardrails(
         await db.rollback()
         log.warning("chat.guardrail_audit_failed", error=str(exc))
 
-    # Override the guardrail's hardcoded rejection message with the
-    # admin-customized one ONLY for prompt-injection matches. Other
-    # rejections (empty input, length cap, suspicious chars) keep
-    # their precise diagnostic so the user knows what to fix.
     user_message = guard.reason
     if guard.matched_pattern and guard.matched_pattern != "__suspicious_chars__":
         user_message = cfg.guardrail_blocked_message
@@ -140,9 +132,7 @@ async def lookup_cache(
     db: AsyncSession, question: str, source_ids: list[str] | None, settings, use_draft: bool = False
 ) -> dict | None:
     """Busca la respuesta primero en el caché exacto (Redis GET, O(1)) y luego
-    en el caché semántico (embedding + SCAN, costoso). Este orden minimiza
-    la latencia cuando la pregunta ya fue respondida de forma idéntica.
-    """
+    en el caché semántico (embedding + SCAN, costoso)."""
     key = exact_cache_key(question, source_ids, use_draft)
     try:
         exact_cached = await get_redis().get(key)
@@ -202,15 +192,7 @@ async def store_cache(
 async def resolve_source_ids(
     db: AsyncSession, requested_ids: list[str] | None, use_all_sources: bool
 ) -> list[str] | None:
-    """Resuelve los IDs de fuentes efectivos según el alcance (borrador o producción).
-
-    El filtro de aprobación se aplica SIEMPRE en modo producción, incluso cuando
-    se pasan IDs explícitos. Esto previene que una petición manipulada acceda a
-    fuentes pendientes o rechazadas saltándose la puerta de revisión.
-
-    playground (draft)              → fuentes ready (incluye pendiente_revision)
-    playground (deployed) / widget  → fuentes ready + aprobada únicamente
-    """
+    """Resuelve los IDs de fuentes efectivos según el alcance (borrador o producción)."""
     query = select(Source.id).where(
         Source.status == SourceStatus.ready,
         Source.deleted_at.is_(None),
@@ -222,9 +204,6 @@ async def resolve_source_ids(
 
     src_q = await db.execute(query)
     ids = [str(r[0]) for r in src_q.all()]
-    # En modo producción (use_all_sources=False) devolver lista vacía en lugar de
-    # None cuando no hay fuentes aprobadas, para que el vector store no busque sin
-    # filtro y devuelva chunks de fuentes no aprobadas.
     if not use_all_sources:
         return ids  # puede ser [] → sin resultados, no sin filtro
     return ids or None
@@ -296,11 +275,7 @@ def budget_context(
     history: list[dict] | None = None,
     max_output_tokens: int = 0,
 ) -> tuple[list[dict], dict]:
-    """Recorta el contexto recuperado para no exceder la ventana del modelo.
-
-    Devuelve (chunks_keep, info). Nunca lanza; si la ventana ya está saturada
-    por system+history+output conserva al menos el chunk de mayor score.
-    """
+    """Recorta el contexto recuperado para no exceder la ventana del modelo."""
     context_window = get_context_window(provider)
     return truncate_context_chunks(
         chunks,
@@ -324,6 +299,7 @@ async def _feedback_negative_ratio(db: AsyncSession, conversation_id) -> float |
     total de mensajes con feedback registrado en la conversación. None si
     aún no hay ninguna valoración (evita falsos positivos con 0/0)."""
     from app.models.chat_message import ChatMessage
+
     from app.models.enums import MessageFeedback, MessageRole
     from sqlalchemy import func as sa_func
 
@@ -353,12 +329,7 @@ async def detect_escalation(
     latency_ms: int | None = None,
 ) -> bool:
     """Evalúa las reglas de escalación activas y marca la conversación si alguna dispara."""
-    # Cuando una regla dispara NO se despacha automáticamente: se marca
-    # la conversación como pendiente y se notifica al widget para que
-    # le pregunte al usuario si desea ser contactado.
     try:
-        # Master switch: si el escalamiento está deshabilitado en la config
-        # del widget, no se evalúa ninguna regla — el bot nunca ofrece humano.
         wc_result = await db.execute(select(WidgetConfig).limit(1))
         widget_cfg = wc_result.scalar_one_or_none()
         if widget_cfg is not None and not widget_cfg.enable_escalation:
@@ -442,8 +413,6 @@ async def persist_turn(
         assistant_message_id = str(assistant_msg.id)
         conversation_id = str(conv.id)
 
-        # Solo para conversaciones reales (no playground) que aún no fueron
-        # escaladas ni tienen ya una solicitud de contacto pendiente.
         if not is_playground and not conv.escalated_at and not conv.escalation_pending:
             try:
                 escalation_prompt = await asyncio.wait_for(

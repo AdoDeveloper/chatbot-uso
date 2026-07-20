@@ -60,7 +60,7 @@ class NotificationEvent(str, enum.Enum):
     doc_error = "doc_error"
     escalation = "escalation"
     provider_down = "provider_down"
-    unanswered_daily = "unanswered_daily"
+    unanswered_digest = "unanswered_digest"
     rate_limit_threshold = "rate_limit_threshold"
     service_down = "service_down"
 

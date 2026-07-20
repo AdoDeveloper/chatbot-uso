@@ -2,15 +2,6 @@
 PDF parser — extracts text prioritizing clean extraction over OCR.
 
 Strategy: plain pymupdf FIRST, pymupdf4llm SECOND.
-
-Why: pymupdf4llm uses OCR (Tesseract) which corrupts tables in text-based
-PDFs (like Word-generated catalogs). A career table that pymupdf extracts
-perfectly as "1) Ingeniería Eléctrica" becomes "|rr|E|e|e|" garbage after
-pymupdf4llm's OCR pass. Since most university documents are Word→PDF
-(not scanned), plain text extraction produces cleaner results.
-
-pymupdf4llm is only useful as fallback for scanned/image-heavy PDFs where
-plain extraction returns very little text.
 """
 from __future__ import annotations
 
@@ -19,8 +10,6 @@ import structlog
 
 log = structlog.get_logger()
 
-# Si pymupdf extrae menos de este promedio de chars por página,
-# el PDF probablemente es escaneado → usar pymupdf4llm como fallback
 _MIN_CHARS_PER_PAGE = 100
 
 

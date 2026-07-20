@@ -82,8 +82,6 @@ async def import_settings(
     if file.content_type and file.content_type not in ("application/json", "text/plain", "application/octet-stream"):
         raise HTTPException(status_code=415, detail="Tipo de contenido no permitido. Se esperaba application/json.")
 
-    # Un export real pesa unos KB; 1 MB es margen de sobra y evita cargar
-    # archivos arbitrariamente grandes en RAM.
     _MAX_IMPORT_BYTES = 1 * 1024 * 1024
     raw = await file.read(_MAX_IMPORT_BYTES + 1)
     if len(raw) > _MAX_IMPORT_BYTES:

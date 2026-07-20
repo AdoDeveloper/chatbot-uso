@@ -28,8 +28,6 @@ async def revoke_jti(jti: str, expires_at: datetime) -> None:
     try:
         await redis_mod.get_redis().set(f"{_DENY_PREFIX}{jti}", "1", ex=ttl)
     except Exception:
-        # Best-effort: a Redis outage must not break logout. The token will
-        # still expire on its own and tokens_valid_after covers bulk cases.
         log.warning("token_revocation.revoke_failed", jti=jti[:8])
 
 

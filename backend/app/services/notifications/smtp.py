@@ -4,6 +4,7 @@ import structlog
 import aiosmtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.utils import make_msgid, formatdate
 from dataclasses import dataclass
 
 log = structlog.get_logger()
@@ -82,6 +83,9 @@ async def send_email(
     msg["Subject"] = subject
     msg["From"] = cfg.from_email
     msg["To"] = to
+    domain = cfg.from_email.rsplit("@", 1)[-1] if "@" in cfg.from_email else "localhost"
+    msg["Message-ID"] = make_msgid(domain=domain)
+    msg["Date"] = formatdate(localtime=True)
 
     if body_text:
         msg.attach(MIMEText(body_text, "plain", "utf-8"))

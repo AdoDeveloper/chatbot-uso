@@ -30,9 +30,6 @@ from app.services.system.audit import log_action
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-# Bearer scheme local para /logout — opcional (auto_error=False) porque en
-# modo cookie el access token no viaja en el header. Un token ya expirado o de
-# una cuenta desactivada igual debe poder "cerrar sesión".
 _bearer = HTTPBearer(auto_error=False)
 
 async def _get_setting(db: AsyncSession, key: str) -> str | None:
@@ -148,8 +145,6 @@ async def login(body: LoginRequest, request: Request, db: AsyncSession = Depends
     ua = request.headers.get("user-agent")
 
     if not user:
-        # Audit the failed attempt so security metrics can detect brute-force.
-        # Store the attempted email in meta so the admin can group by target user.
         await log_action(
             db, action="auth.login_failed", resource_type="user",
             actor_id=None, resource_id=None,
@@ -220,9 +215,6 @@ async def refresh(body: RefreshRequest, request: Request, db: AsyncSession = Dep
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Detección de reuso: un refresh ya rotado (su jti está en la denylist) no
-    # puede volver a usarse. Esto bloquea el replay de un refresh robado tras
-    # una rotación legítima.
     if await is_jti_revoked(payload.get("jti")):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -311,8 +303,6 @@ async def change_password(
 
     current_user.hashed_password = hash_password(body.new_password)
     current_user.must_change_password = False
-    # Invalida TODAS las sesiones previas (access + refresh) emitidas antes de
-    # este instante. Cualquier token robado deja de servir tras el cambio.
     current_user.tokens_valid_after = datetime.datetime.now(datetime.timezone.utc)
     await log_action(
         db, action="auth.change_password", resource_type="user",

@@ -19,7 +19,5 @@ def since_until(
         until = datetime.now(timezone.utc)
     else:
         end = date_to.replace(tzinfo=timezone.utc) if date_to.tzinfo is None else date_to
-        # `date_to` llega como inicio del día (00:00) desde un <input type="date">;
-        # se extiende al final del día para incluirlo completo en el rango.
         until = end + timedelta(days=1) - timedelta(microseconds=1)
     return since, until

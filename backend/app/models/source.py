@@ -29,9 +29,6 @@ class Source(Base):
         nullable=False,
         default=SourceStatus.pending,
     )
-    # Review/approval lifecycle (separate from ingestion `status`).
-    # Sources start in `procesando` while chunking runs, move to `pendiente_revision`
-    # when ready, then admin approves/rejects before promoting to Producción.
     review_status: Mapped[ReviewStatus] = mapped_column(
         SAEnum(ReviewStatus, name="reviewstatus", create_type=False),
         nullable=False,

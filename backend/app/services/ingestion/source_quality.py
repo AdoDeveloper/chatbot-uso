@@ -76,9 +76,6 @@ async def quality_report(db: AsyncSession, source_id) -> dict:
     if not source:
         return {"error": "Source no encontrada"}
 
-    # Última vez que un chunk de esta fuente fue recuperado: buscamos en sources_json
-    # de chat_messages. Es heurístico (depende del schema del JSON), así que envolvemos
-    # en try/except y devolvemos None si no se puede.
     sid = str(source.id)
 
     def _matches(srcs: list) -> bool:

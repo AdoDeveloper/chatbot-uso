@@ -106,7 +106,7 @@ _EVENT_META = {
         "intro": "El proveedor de inteligencia artificial no está respondiendo. El asistente podría no generar respuestas mientras persista la incidencia.",
         "action": "Le recomendamos revisar el estado del proveedor y la configuración de sus credenciales.",
     },
-    NotificationEvent.unanswered_daily: {
+    NotificationEvent.unanswered_digest: {
         "subject": "Resumen diario de preguntas sin respuesta",
         "severity": "info",
         "eyebrow": "Resumen diario",
@@ -168,7 +168,7 @@ def _labeled_rows(payload: dict[str, Any]) -> dict[str, Any]:
 def _html_body(event: NotificationEvent, payload: dict[str, Any]) -> str:
     m = _meta(event)
 
-    if event is NotificationEvent.unanswered_daily and "total_open" in payload:
+    if event is NotificationEvent.unanswered_digest and "total_open" in payload:
         return _daily_digest_body(m, payload)
 
     content = ""

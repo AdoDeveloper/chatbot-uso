@@ -10,11 +10,6 @@ from pydantic import BaseModel, Field, field_validator
 _HEX_RE = re.compile(r"^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
 
 
-# Limites razonables para que el widget no se vea desbordado:
-#   - 6 sugerencias maximas: mas de eso se vuelve un menu y pierde el sentido
-#   - 60 chars por sugerencia: caben 2-3 palabras, ideal para chips
-#   - 200 chars en proactive_message: caben unas 30 palabras, suficiente para
-#     un call-to-action sin tapar la pagina
 MAX_SUGGESTIONS = 6
 MAX_SUGGESTION_LEN = 60
 MAX_PROACTIVE_LEN = 200
@@ -51,9 +46,6 @@ class WidgetConfigUpdate(BaseModel):
             return v
         if not _HEX_RE.match(v.strip()):
             raise ValueError("primary_color debe ser un color hexadecimal válido (ej. #1E40AF)")
-        # Normalise to #rrggbb. Sin restricción de contraste: la universidad
-        # decide su color de marca; no es al sistema a quien le corresponde
-        # bloquearlo por accesibilidad.
         raw = _HEX_RE.match(v.strip()).group(1)  # type: ignore[union-attr]
         if len(raw) == 3:
             raw = "".join(c * 2 for c in raw)
@@ -119,9 +111,6 @@ class WidgetPublicConfigOut(BaseModel):
     show_sources: bool
     enable_copy_action: bool
     enable_feedback_icons: bool
-    # Con default: snapshots de deploy anteriores a que se agregara este campo
-    # al modelo no lo tienen guardado, y sin default rompía la validación de
-    # /widget/public/config con un 500 (ver ResponseValidationError en logs).
     enable_tts: bool = True
     enable_accessibility: bool = False
     show_bot_icon: bool

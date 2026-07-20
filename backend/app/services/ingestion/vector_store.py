@@ -62,9 +62,6 @@ async def ensure_collection() -> None:
             else:
                 raise
 
-    # Full-text payload index on "text" field — idempotent (Qdrant ignores if exists).
-    # TokenizerType.MULTILINGUAL enables Spanish stemming: "matrícula" ↔ "matricular".
-    # Applied always so existing collections also get the index.
     try:
         await client.create_payload_index(
             collection_name=COLLECTION,
@@ -108,8 +105,6 @@ async def upsert_chunks(
             payload["parent_id"] = chunk["parent_id"]
         if "parent_text" in chunk:
             payload["parent_text"] = chunk["parent_text"]
-        # Auto-detected warnings (short, long, pii, ...). Stored even if empty
-        # so the field is always searchable.
         payload["warnings"] = chunk.get("warnings", [])
 
         points.append(
@@ -131,13 +126,6 @@ async def upsert_chunks(
     return len(points)
 
 
-# Tope práctico de chunks por fuente: Qdrant scroll no soporta "saltar a la
-# página N" de forma nativa (su cursor es forward-only), así que para exponer
-# paginación numérica estándar (page/page_size/total) se trae la fuente
-# completa de una vez y se pagina en memoria. Los documentos reales indexados
-# hoy no superan unas pocas centenas de chunks (ver chunk sizes en config),
-# así que esto es seguro; si algún día una fuente supera este tope habría
-# que revisar el enfoque.
 ALL_CHUNKS_CAP = 2000
 
 
@@ -221,9 +209,6 @@ async def hybrid_search(
 
     client = _get_client()
 
-    # source_ids=None  → sin filtro de fuente (busca en todo el vector store)
-    # source_ids=[]    → lista vacía explícita = no hay fuentes permitidas → devolver vacío
-    # source_ids=[...] → filtrar por esos IDs únicamente
     if source_ids is not None and len(source_ids) == 0:
         return []
 
@@ -239,12 +224,8 @@ async def hybrid_search(
     )
     source_filter = Filter(must=must_conditions, must_not=must_not) if (must_conditions or must_not) else None
 
-    # Large prefetch pool so chunks from minority sources (documents, FAQs)
-    # are not crowded out by a dominant web source with hundreds of chunks.
     prefetch_limit = max(top_k * 10, 100)
 
-    # When no source filter, fetch extra candidates so diversity pass has room
-    # to find non-web chunks even if they rank after the web chunks in RRF.
     fetch_limit = max(top_k * 5, 50) if not source_ids else top_k
 
     results = await client.query_points(
@@ -270,13 +251,6 @@ async def hybrid_search(
     if score_threshold > 0.0:
         raw_docs = [d for d in raw_docs if d["score"] >= score_threshold]
 
-    # Parent-Child dedup PRIMERO: si varios hijos del mismo parent matchean,
-    # conservar solo el de mayor score. Como `raw_docs` viene ordenado por score
-    # RRF descendente, el primer hijo visto de cada parent es el mejor. Hacer la
-    # dedup ANTES del balanceo de diversidad garantiza que cada documento quede
-    # representado por su fragmento más relevante (si dedupáramos después del
-    # balanceo, el reordenamiento por fuente podría dejar entrar un hijo de menor
-    # score y descartar el mejor).
     seen_parents: set[str] = set()
     deduped: list[dict] = []
     for d in raw_docs:
@@ -287,10 +261,6 @@ async def hybrid_search(
             seen_parents.add(pid)
         deduped.append(d)
 
-    # Source diversity: when no explicit filter, prevent a single source from
-    # monopolizing all top_k slots. Cap any one source at 60% of top_k so
-    # documents and FAQs can appear alongside a dominant web source. Opera sobre
-    # parents ya deduplicados, así el cap cuenta documentos distintos, no hijos.
     if not source_ids and len(deduped) > top_k:
         max_per_source = max(1, round(top_k * 0.6))
         diverse: list[dict] = []

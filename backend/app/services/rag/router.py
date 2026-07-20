@@ -1,6 +1,5 @@
 """
 Adaptive RAG Router — classifies query complexity: greeting/factual/complex.
-Saves 40-60% latency on simple queries by skipping grading/rewriting.
 """
 from __future__ import annotations
 
@@ -18,11 +17,6 @@ _GREETING_WORD = (
     r"¿?cómo\s+estás\??|¿?qué\s+tal\??"
 )
 
-# Encadena una o más frases de saludo (p. ej. "hola buenos días", "hola,
-# ¿qué tal?") en vez de exigir que TODO el mensaje sea una sola alternativa
-# — sin esto, "hola buenos días" no coincidía con ninguna alternativa
-# completa y caía a la ruta "factual", ejecutando el pipeline de RAG
-# completo para un simple saludo.
 _GREETING_PATTERNS = re.compile(
     rf"^\s*(?:(?:{_GREETING_WORD})\s*[,.!?]*\s*)+$",
     re.IGNORECASE,

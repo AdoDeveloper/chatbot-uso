@@ -64,11 +64,6 @@ async def update_config(
 ):
     cfg = await svc.update_config(db, body.model_dump(exclude_unset=True))
     await db.commit()
-    # Refresh to ensure server-side `onupdate=func.now()` columns (updated_at)
-    # are loaded into the instance before Pydantic serializes it. Without this,
-    # accessing the expired attribute during response validation triggers a
-    # lazy DB hit in an already-closing async context, which fails with
-    # MissingGreenlet/DetachedInstanceError.
     await db.refresh(cfg)
     return cfg
 
@@ -100,9 +95,6 @@ async def public_config(
     db: AsyncSession = Depends(get_db),
     widget: WidgetConfig = Depends(require_widget_key),
 ):
-    # Sin esto, el navegador puede cachear heurísticamente esta respuesta y
-    # seguir sirviendo apariencia/config vieja al widget embebido después de
-    # publicar cambios, ya que es un GET simple sin encabezados de caché.
     response.headers["Cache-Control"] = "no-store"
     from app.services.monitoring.versions import get_published_widget_config
     published = await get_published_widget_config(db)
@@ -136,23 +128,12 @@ async def public_chat(
         field = " → ".join(str(p) for p in first.get("loc", ()) if p != "body")
         msg = first.get("msg", "Datos inválidos")
         raise HTTPException(status_code=422, detail=f"{field}: {msg}" if field else msg)
-    # Force production mode regardless of what the client sends.
-    # browser/source_scope are admin-only fields; a malicious user could send
-    # {"browser": "playground"} to bypass the aprobada filter and access
-    # draft configs or unapproved documents.
     chat_req.browser = None
     chat_req.source_scope = None
-    # Enforce per-widget caps before even running the pipeline — fail fast
-    # so the abusive client gets a 429, not a half-processed response.
     await svc.enforce_widget_caps(widget, chat_req.session_id or "")
     client_ip = get_client_ip(request)
     origin_url = request.headers.get("Referer") or request.headers.get("Origin")
 
-    # Adquirir el semáforo de concurrencia LLM (misma precondición que el
-    # endpoint admin chat()). run_chat lo libera en su finally, así que
-    # SIEMPRE debe adquirirse aquí antes de invocarlo; de lo contrario el
-    # contador crece sin límite y la protección de cuota del proveedor deja
-    # de funcionar en el chat público del widget.
     try:
         await asyncio.wait_for(_llm_semaphore.acquire(), timeout=_LLM_QUEUE_TIMEOUT)
     except asyncio.TimeoutError:

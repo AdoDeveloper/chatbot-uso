@@ -12,6 +12,7 @@ import jwt as pyjwt
 from cryptography.fernet import Fernet, InvalidToken
 
 from app.core.config import get_settings
+from app.core.exceptions import ValidationError
 
 # Patterns for common weak passwords (CVE-2019-1000007 list)
 _COMMON_WEAK_PASSWORDS = {
@@ -40,13 +41,13 @@ def _has_weak_pattern(password: str) -> bool:
 def hash_password(password: str) -> str:
     """Hash password with bcrypt, enforcing minimum security requirements."""
     if len(password) < 8:
-        raise ValueError("Password must be at least 8 characters long")
+        raise ValidationError("La contraseña debe tener al menos 8 caracteres.")
     if len(password) > 512:
-        raise ValueError("Password too long")
+        raise ValidationError("La contraseña es demasiado larga.")
     if _is_common_password(password):
-        raise ValueError("Password is too common. Choose a stronger password.")
+        raise ValidationError("La contraseña es demasiado común. Elija una más segura.")
     if _has_weak_pattern(password):
-        raise ValueError("Password has weak pattern. Avoid repeated characters or sequences.")
+        raise ValidationError("La contraseña tiene un patrón débil. Evite caracteres repetidos o secuencias.")
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
 

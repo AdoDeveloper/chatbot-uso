@@ -12,11 +12,6 @@ from app.core import redis as redis_mod
 
 log = structlog.get_logger()
 
-# --- Fallback en memoria cuando Redis no está disponible -------------------
-# Limitador deslizante por proceso. No se comparte entre workers ni persiste
-# entre reinicios: es una última línea de defensa, NO un reemplazo de Redis.
-# Umbrales 30% más permisivos que Redis para evitar falsos positivos bajo
-# concurrencia multi-worker (el tope real efectivo es N× por worker).
 _LOCAL_LIMITS: dict[str, list[float]] = {}
 _LOCAL_LOCK = asyncio.Lock()
 _LOCAL_PERMISSIVE_FACTOR = 1.3
@@ -54,8 +49,6 @@ async def check_rate_limit(
     except RateLimitExceeded:
         raise
     except Exception as exc:
-        # Redis caído (o cualquier fallo de Redis): en vez de fallar abierto,
-        # aplicar el limitador en memoria de reserva y dejar rastro.
         global _LOCAL_FALLBACK_WARNED
         if not _LOCAL_FALLBACK_WARNED:
             log.warning("ratelimit.local_fallback_active", error=str(exc))
@@ -65,7 +58,6 @@ async def check_rate_limit(
         except RateLimitExceeded:
             raise
         except Exception:
-            # El propio fallback en memoria falló: permitir para no tumbar el servicio.
             log.warning("ratelimit.local_fallback_failed", key_prefix=key_prefix)
         return True
 
@@ -119,8 +111,6 @@ async def check_chat_limits(client_ip: str, limits: dict, *, session_id: str | N
         window_seconds=3600,
     )
     if session_id:
-        # Granularidad por sesión: protege contra un solo cliente que mantenga
-        # una sesión y la inunde, incluso si rota IPs.
         await check_rate_limit(
             "chat:session", session_id,
             max_requests=limits.get("per_session_min", 20),

@@ -26,8 +26,6 @@ async def dispatch_escalation(
     trigger_type: str | None = None,
     extra: dict[str, Any] | None = None,
 ) -> None:
-    # Marcar la conversación como escalada antes de enviar correos — así el
-    # estado en DB es consistente aunque falle la entrega de algún email.
     if conversation_id:
         try:
             conv_uuid = uuid.UUID(conversation_id)

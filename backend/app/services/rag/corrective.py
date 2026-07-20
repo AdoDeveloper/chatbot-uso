@@ -63,11 +63,6 @@ async def _retrieve(state: RagState) -> dict:
         score_threshold=state.get("score_threshold", 0.0),
     )
 
-    # Rerank ANTES del grading: el cross-encoder (más preciso para ordenar)
-    # ordena el pool completo de candidatos y recorta a top_k. Así el grader LLM
-    # evalúa la relevancia sobre el mejor conjunto ya ordenado, en lugar de que
-    # el grader (juicio binario más grosero) decida el conjunto y el reranker
-    # solo reordene las sobras.
     if use_reranker and docs:
         docs = await rerank_async(state["original_question"], docs, top_k)
 
@@ -217,11 +212,8 @@ async def run_corrective_rag(
         "api_key": api_key,
     }
     final_state = await _graph.ainvoke(initial)
-    context = final_state["relevant_docs"] or final_state["documents"]
+    context = final_state["relevant_docs"]
 
-    # NB: el reranking ya se aplicó dentro de `_retrieve` (antes del grading),
-    # así que aquí NO se vuelve a rerankear — `context` ya viene ordenado por el
-    # cross-encoder y recortado a top_k.
     log.info("rag.done", question=question[:80], context_chunks=len(context), reranked=use_reranker)
     return context
 

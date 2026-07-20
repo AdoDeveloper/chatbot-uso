@@ -24,10 +24,6 @@ from app.api.v1.widget.router import router as widget_router
 router = APIRouter()
 
 router.include_router(auth_router)
-# invitations_router debe registrarse ANTES que access_router: ambos exponen
-# rutas bajo /users, y access_router define GET /users/{user_id} — si se
-# registra primero, captura /users/invitations (literal) como si "invitations"
-# fuera un user_id, devolviendo 422 en vez de resolver a invitations_router.
 router.include_router(invitations_router)
 router.include_router(access_router)
 router.include_router(system_router)

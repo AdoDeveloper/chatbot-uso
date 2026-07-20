@@ -154,9 +154,6 @@ async def list_known_tags(
     _: object = Depends(require_perm(P.CONVERSATIONS_READ)),
 ):
     """Lista de tags únicos en uso, con su frecuencia."""
-    # MySQL has no UNNEST. Fetch all tags JSON arrays and count in Python.
-    # tags column is a JSON list; SQLAlchemy deserializes it automatically.
-    # Limit to 5000 rows so memory stays bounded even in large deployments.
     from collections import Counter
     result = await db.execute(
         select(ChatConversation.tags).limit(5000)
@@ -180,25 +177,24 @@ async def bulk_action(
     if body.action not in {"resolve", "add_tag", "remove_tag", "set_tags"}:
         raise HTTPException(status_code=400, detail=f"Acción no soportada: {body.action}")
 
+    result = await db.execute(
+        select(ChatConversation).where(ChatConversation.id.in_(body.conversation_ids))
+    )
+    convs_by_id = {conv.id: conv for conv in result.scalars().all()}
+
     affected = 0
     errors: list[dict] = []
     for cid in body.conversation_ids:
+        conv = convs_by_id.get(cid)
+        if not conv:
+            errors.append({"id": str(cid), "error": "no encontrada"})
+            continue
         try:
             if body.action == "resolve":
-                result = await db.execute(select(ChatConversation).where(ChatConversation.id == cid))
-                conv = result.scalar_one_or_none()
-                if not conv:
-                    errors.append({"id": str(cid), "error": "no encontrada"})
-                    continue
                 conv.status = ConversationStatus.resolved
                 conv.resolved_at = datetime.now(timezone.utc)
                 conv.resolved_by_user_id = current_user.id
             else:
-                result = await db.execute(select(ChatConversation).where(ChatConversation.id == cid))
-                conv = result.scalar_one_or_none()
-                if not conv:
-                    errors.append({"id": str(cid), "error": "no encontrada"})
-                    continue
                 current_tags = list(conv.tags or [])
                 if body.action == "add_tag" and body.tag:
                     t = body.tag.strip().lower()

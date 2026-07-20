@@ -1,12 +1,4 @@
-"""Estimación de tokens y recorte silencioso de contexto (Token Guardrails).
-
-Evita superar la ventana de contexto del modelo antes de llamar al LLM: en
-lugar de dejar que el proveedor devuelva un error de ventana excedida (que
-rompe el streaming SSE), recortamos los chunks menos relevantes por score y
-seguimos con lo que cabe. Heurística conservadora: estima tokens como ~4
-caracteres por token (sin tiktoken, para no acoplarnos al tokenizador de un
-proveedor concreto).
-"""
+"""Estimación de tokens y recorte silencioso de contexto (Token Guardrails)."""
 
 from __future__ import annotations
 
@@ -14,8 +6,6 @@ import structlog
 
 log = structlog.get_logger()
 
-# Ventanas por tipo de proveedor (topes conservadores conocidos). Se usa como
-# límite superior para recortar; es preferible recortar de más a pasarse.
 PROVIDER_CONTEXT_WINDOWS: dict[str, int] = {
     "openai": 128_000,
     "azure": 128_000,
@@ -29,8 +19,6 @@ PROVIDER_CONTEXT_WINDOWS: dict[str, int] = {
     "perplexity": 32_768,
 }
 
-# Overrides por familia de modelo (subcadena en model_name, insensible a
-# mayúsculas). Cubre modelos pequeños dentro de un mismo proveedor.
 MODEL_CONTEXT_OVERRIDES: dict[str, int] = {
     "gpt-3.5": 16_385,
     "gpt-4-32k": 32_768,
@@ -43,6 +31,7 @@ MODEL_CONTEXT_OVERRIDES: dict[str, int] = {
 DEFAULT_CONTEXT_WINDOW = 32_768
 SAFETY_MARGIN_TOKENS = 1_024
 MAX_CONTEXT_FRACTION = 0.6  # tope de la ventana dedicado al contexto recuperado
+
 
 
 def estimate_tokens(text: str | None) -> int:
@@ -98,8 +87,6 @@ def truncate_context_chunks(
     )
 
     if budget <= 0:
-        # Ventana saturada por system+history+output: conservar solo el de
-        # mayor score para no enviar contexto vacío.
         keep_idx = ordered_by_score[:1]
         keep_idx.sort()
         kept = [chunks[i] for i in keep_idx]
