@@ -1,7 +1,7 @@
 "use client";
 
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { HeartPulse, Wrench, Loader2, Trash2, BarChart2, Database, Save, Activity } from "lucide-react";
+import { HeartPulse, Wrench, Loader2, Trash2, BarChart2, Database, Activity } from "lucide-react";
 import api from "@/lib/api";
 import { useApi, getErrorMessage } from "@/hooks/use-api";
 import { useToast } from "@/components/ui/toast";
@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/ui/page-header";
+import { FloatingSaveBar } from "../_lib/save-bar";
 import { SaludTab, type SaludTabHandle } from "../_components/SaludTab";
 import { LimitesTab, type LimitesTabHandle } from "../cuotas/_components/LimitesTab";
 import { TendenciaTab, type TendenciaTabHandle } from "../cuotas/_components/TendenciaTab";
@@ -40,6 +41,7 @@ const CacheConfigCard = forwardRef<CacheConfigCardHandle>(function CacheConfigCa
   const [ttlHours, setTtlHours] = useState(12);
   const [threshold, setThreshold] = useState(0.9);
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState<{ enabled: boolean; ttlHours: number; threshold: number } | null>(null);
 
   useImperativeHandle(ref, () => ({ refetch }), [refetch]);
 
@@ -48,7 +50,10 @@ const CacheConfigCard = forwardRef<CacheConfigCardHandle>(function CacheConfigCa
     setEnabled(data.enabled);
     setTtlHours(Math.max(1, Math.round(data.ttl_seconds / 3600)));
     setThreshold(data.similarity_threshold);
+    setSaved({ enabled: data.enabled, ttlHours: Math.max(1, Math.round(data.ttl_seconds / 3600)), threshold: data.similarity_threshold });
   }, [data]);
+
+  const dirty = !!saved && (enabled !== saved.enabled || ttlHours !== saved.ttlHours || threshold !== saved.threshold);
 
   async function save() {
     setSaving(true);
@@ -63,6 +68,7 @@ const CacheConfigCard = forwardRef<CacheConfigCardHandle>(function CacheConfigCa
       toast({ type: "error", message: getErrorMessage(err, "No se pudo guardar la configuración del caché.") });
     } finally {
       setSaving(false);
+      setSaved({ enabled, ttlHours, threshold });
     }
   }
 
@@ -116,10 +122,7 @@ const CacheConfigCard = forwardRef<CacheConfigCardHandle>(function CacheConfigCa
         </div>
       </div>
 
-      <Button size="sm" onClick={save} disabled={saving} className="gap-1.5">
-        {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-        {saving ? "Guardando..." : "Guardar"}
-      </Button>
+      <FloatingSaveBar dirty={dirty} saving={saving} onSave={save} />
     </Card>
   );
 });

@@ -1,7 +1,7 @@
 "use client";
 
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
-import { Activity, Unlock, Loader2, Save } from "lucide-react";
+import { Activity, Unlock } from "lucide-react";
 import api from "@/lib/api";
 import { useApi, getErrorMessage } from "@/hooks/use-api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
 import { Loading } from "@/components/ui/loading";
+import { FloatingSaveBar } from "../../_lib/save-bar";
 
 interface RateLimitConfig { chat_per_min: number; chat_per_hour: number; }
 interface ThrottledIP { ip: string; current_count: number; limit: number; window: string; ttl_seconds: number; }
@@ -28,6 +29,13 @@ export const LimitesTab = forwardRef<LimitesTabHandle>(function LimitesTab(_prop
   const throttled = throttledData ?? [];
   const loading = loadingConfig || loadingThrottled;
   const [saving, setSaving] = useState(false);
+  const [savedConfig, setSavedConfig] = useState<RateLimitConfig | null>(null);
+
+  useEffect(() => {
+    if (config) setSavedConfig(config);
+  }, [config]);
+
+  const dirty = !!savedConfig && JSON.stringify(config) !== JSON.stringify(savedConfig);
 
   function load() {
     refetchConfig();
@@ -48,7 +56,7 @@ export const LimitesTab = forwardRef<LimitesTabHandle>(function LimitesTab(_prop
       await api.patch("/rate-limits/config", config);
       toast({ type: "success", message: "Configuración guardada." });
     } catch (err) { toast({ type: "error", message: getErrorMessage(err, "No se pudo guardar la configuración.") }); }
-    finally { setSaving(false); }
+    finally { setSaving(false); setSavedConfig(config); }
   }
 
   async function unblockIp(ip: string) {
@@ -88,10 +96,6 @@ export const LimitesTab = forwardRef<LimitesTabHandle>(function LimitesTab(_prop
               onChange={(e) => setConfig({ ...config, chat_per_hour: Number(e.target.value) })}
               className="max-w-32" />
           </div>
-          <Button onClick={saveConfig} disabled={saving} size="sm" className="gap-1.5">
-            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-            {saving ? "Guardando…" : "Guardar"}
-          </Button>
         </CardContent>
       </Card>
 
@@ -125,6 +129,8 @@ export const LimitesTab = forwardRef<LimitesTabHandle>(function LimitesTab(_prop
           )}
         </CardContent>
       </Card>
+
+      <FloatingSaveBar dirty={dirty} saving={saving} onSave={saveConfig} />
     </div>
   );
 });

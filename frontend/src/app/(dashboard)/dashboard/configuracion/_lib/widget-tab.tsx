@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
- Loader2, Save, Copy, Check, Plus, X, ChevronRight, Eye,
+ Copy, Check, Plus, X, ChevronRight, Eye,
 } from "lucide-react";
 
 import api from "@/lib/api";
@@ -604,7 +604,7 @@ export function WidgetTab({ subtab, onPreview, config: configProp, setConfig: se
    )}
 
    {subtab === "limites" && config && (
-    <WidgetUsageCaps config={config} onSaved={(c) => { setConfig(c); setSavedConfig(c); }} />
+    <WidgetUsageCaps config={config} setConfig={setConfig} />
    )}
 
    <FloatingSaveBar dirty={isDirty} saving={saving} onSave={handleSave} onDiscard={handleDiscard} />
@@ -618,40 +618,16 @@ export function WidgetTab({ subtab, onPreview, config: configProp, setConfig: se
 // no duplicar configuración del widget en dos rutas.
 
 function WidgetUsageCaps({
- config, onSaved,
+ config, setConfig,
 }: {
  config: WidgetConfig;
- onSaved: (cfg: WidgetConfig) => void;
+ setConfig: React.Dispatch<React.SetStateAction<WidgetConfig | null>>;
 }) {
- const { toast } = useToast();
- const [perSession, setPerSession] = useState<string>(config.max_chats_per_session?.toString() ?? "");
- const [perDay, setPerDay] = useState<string>(config.max_chats_per_day?.toString() ?? "");
- const [saving, setSaving] = useState(false);
-
  function parseLimit(v: string): number | null {
   const t = v.trim();
   if (!t) return null;
   const n = parseInt(t, 10);
   return Number.isFinite(n) && n > 0 ? n : null;
- }
-
- const dirty = parseLimit(perSession) !== (config.max_chats_per_session ?? null)
-  || parseLimit(perDay) !== (config.max_chats_per_day ?? null);
-
- async function handleSave() {
-  setSaving(true);
-  try {
-   const { data } = await api.put<WidgetConfig>("/widget/config", {
-    max_chats_per_session: parseLimit(perSession),
-    max_chats_per_day: parseLimit(perDay),
-   });
-   onSaved(data);
-   toast({ type: "success", message: "Límites guardados." });
-  } catch (err) {
-   toast({ type: "error", message: getErrorMessage(err, "No se pudieron guardar los límites.") });
-  } finally {
-   setSaving(false);
-  }
  }
 
  return (
@@ -669,10 +645,9 @@ function WidgetUsageCaps({
      <Input
       type="number"
       min={1}
-      value={perSession}
-      onChange={(e) => setPerSession(e.target.value)}
+      value={config.max_chats_per_session ?? ""}
+      onChange={(e) => setConfig((c) => c ? { ...c, max_chats_per_session: parseLimit(e.target.value) } : c)}
       placeholder="Sin límite"
-      disabled={saving}
      />
      <p className="text-2xs text-muted-foreground mt-1">
       Tope por sesión de usuario (ventana de 4h). Vacío = sin límite.
@@ -684,20 +659,14 @@ function WidgetUsageCaps({
      <Input
       type="number"
       min={1}
-      value={perDay}
-      onChange={(e) => setPerDay(e.target.value)}
+      value={config.max_chats_per_day ?? ""}
+      onChange={(e) => setConfig((c) => c ? { ...c, max_chats_per_day: parseLimit(e.target.value) } : c)}
       placeholder="Sin límite"
-      disabled={saving}
      />
      <p className="text-2xs text-muted-foreground mt-1">
       Tope diario sumando TODAS las sesiones del widget.
      </p>
     </div>
-
-    <Button size="sm" onClick={handleSave} disabled={saving || !dirty} className="gap-1.5">
-     {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-     Guardar
-    </Button>
    </div>
   </div>
  );

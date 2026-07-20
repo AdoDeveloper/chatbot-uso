@@ -281,7 +281,7 @@ export type NotificationEvent =
   | "doc_error"
   | "escalation"
   | "provider_down"
-  | "unanswered_daily"
+  | "unanswered_digest"
   | "rate_limit_threshold"
   | "service_down";
 

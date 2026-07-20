@@ -10,13 +10,13 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectOption } from "@/components/ui/select";
 import { formatInProjectTz } from "@/lib/datetime";
 import { Loading } from "@/components/ui/loading";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { FloatingSaveBar } from "../_lib/save-bar";
 import { NotificacionesTab } from "../_components/NotificacionesTab";
 
 interface ReportSchedule {
@@ -117,6 +117,7 @@ export default function NotificacionesHistorialPage() {
   const { data: scheduleData, loading: loadingSchedule } =
     useApi<ReportSchedule>("/notifications/report-schedule");
   const [draft, setDraft] = useState<ReportSchedule>(DEFAULT_SCHEDULE);
+  const [savedDraft, setSavedDraft] = useState<ReportSchedule | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Toggle global de correos: refleja si AL MENOS una regla email está
@@ -146,8 +147,13 @@ export default function NotificacionesHistorialPage() {
   }
 
   useEffect(() => {
-    if (scheduleData) setDraft(scheduleData);
+    if (scheduleData) {
+      setDraft(scheduleData);
+      setSavedDraft(scheduleData);
+    }
   }, [scheduleData]);
+
+  const dirty = !!savedDraft && JSON.stringify(draft) !== JSON.stringify(savedDraft);
 
   function toggleDay(d: number) {
     setDraft((prev) => {
@@ -176,6 +182,7 @@ export default function NotificacionesHistorialPage() {
       toast({ type: "error", message: getErrorMessage(err, "No se pudo guardar la programación.") });
     } finally {
       setSaving(false);
+      setSavedDraft(payload);
     }
   }
 
@@ -239,6 +246,7 @@ export default function NotificacionesHistorialPage() {
           {loadingSchedule ? (
             <Loading title="Programación del reporte" />
           ) : (
+          <>
           <Card>
             <CardHeader className="pb-4 border-b">
               <div className="flex items-center gap-3">
@@ -363,14 +371,12 @@ export default function NotificacionesHistorialPage() {
                     {" a las "}
                     <span className="font-mono text-foreground">{String(draft.hour).padStart(2, "0")}:{String(draft.minute).padStart(2, "0")} (El Salvador)</span>
                   </p>
-                  <Button size="sm" onClick={saveSchedule} disabled={saving} className="gap-1.5 shrink-0">
-                    {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Clock className="w-3.5 h-3.5" />}
-                    Guardar
-                  </Button>
                 </div>
               </>
             </CardContent>
           </Card>
+          <FloatingSaveBar dirty={dirty} saving={saving} onSave={saveSchedule} />
+          </>
           )}
         </TabsContent>
 

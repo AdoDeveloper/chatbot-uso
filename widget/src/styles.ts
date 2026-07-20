@@ -254,6 +254,17 @@ export const STYLES = `
 .md strong { font-weight: 700; }
 .md em { font-style: italic; }
 .md a { color: #2563eb; text-decoration: underline; word-break: break-all; }
+.md img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 8px 0;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 20%, transparent);
+}
+.md p:has(> img) { display: flex; flex-direction: column; gap: 8px; margin: 8px 0; }
+.md p:has(> img) img { margin: 0; }
+.md a:has(> img) { padding: 0; border: 0; background: transparent; text-decoration: none; }
 .md a.pdf-link {
   display: inline-flex;
   align-items: center;
@@ -266,6 +277,25 @@ export const STYLES = `
   color: var(--color-primary);
   text-decoration: none;
   font-weight: 600;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+  font-size: 0;
+}
+.md a.pdf-link::before {
+  content: "";
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  background-color: currentColor;
+  -webkit-mask: no-repeat center / contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/%3E%3Cpolyline points='14 2 14 8 20 8'/%3E%3C/svg%3E");
+  mask: no-repeat center / contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/%3E%3Cpolyline points='14 2 14 8 20 8'/%3E%3C/svg%3E");
+}
+.md a.pdf-link::after {
+  content: "PDF";
+  flex: 0 0 auto;
   font-size: 13px;
 }
 .md a.pdf-link:hover { background: color-mix(in srgb, var(--color-primary) 18%, transparent); }

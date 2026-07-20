@@ -19,6 +19,7 @@ import api from "@/lib/api";
 import { useApi, getErrorMessage } from "@/hooks/use-api";
 import { useToast } from "@/components/ui/toast";
 import { UnpublishedBanner } from "../_lib/tabs";
+import { FloatingSaveBar } from "../_lib/save-bar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -267,23 +268,16 @@ const { register: registerPattern, handleSubmit: handlePatternSubmit, reset: res
             </CardContent>
           </Card>
         ) : (
+          <>
           <Card className="mb-6">
             <CardHeader className="pb-3 border-b">
               <div className="flex flex-col gap-3">
-                <div>
-                  <CardTitle className="text-15 font-semibold">Configuración</CardTitle>
-                  <p className="text-2xs text-muted-foreground mt-0.5">Interruptores y límites del sistema de filtros.</p>
-                </div>
-                {dirty && (
-                  <div className="grid grid-cols-1 sm:flex sm:justify-end">
-                    <Button size="sm" onClick={onSaveConfig} disabled={saving} className="gap-1.5">
-                      {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                      Guardar
-                    </Button>
+                  <div>
+                    <CardTitle className="text-15 font-semibold">Configuración</CardTitle>
+                    <p className="text-2xs text-muted-foreground mt-0.5">Interruptores y límites del sistema de filtros.</p>
                   </div>
-                )}
-              </div>
-            </CardHeader>
+                </div>
+              </CardHeader>
             <CardContent className="pt-4 space-y-4">
               {/* Master toggle */}
               <div className="flex items-center justify-between rounded-lg border px-4 py-3 bg-muted/20">
@@ -330,6 +324,7 @@ const { register: registerPattern, handleSubmit: handlePatternSubmit, reset: res
               </div>
             </CardContent>
           </Card>
+        </>
         )}
 
           {/* PII editable */}
@@ -349,6 +344,7 @@ const { register: registerPattern, handleSubmit: handlePatternSubmit, reset: res
             </CardContent>
           </Card>
           ) : (
+          <>
           <Card className="mb-6">
             <CardHeader className="pb-3 border-b">
               <CardTitle className="text-15 font-semibold">Datos personales a proteger</CardTitle>
@@ -382,16 +378,10 @@ const { register: registerPattern, handleSubmit: handlePatternSubmit, reset: res
                   );
                 })}
               </div>
-              {dirty && (
-                <div className="mt-3 flex justify-end">
-                  <Button size="sm" onClick={onSaveConfig} disabled={saving} className="gap-1.5">
-                    {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                    Guardar
-                  </Button>
-                </div>
-              )}
             </CardContent>
           </Card>
+          <FloatingSaveBar dirty={dirty} saving={saving} onSave={onSaveConfig} onDiscard={() => resetG()} />
+          </>
           )}
 
           {/* Test inline */}
