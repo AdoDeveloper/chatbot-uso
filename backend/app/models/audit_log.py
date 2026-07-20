@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, Index, JSON, String, Text, Uuid, func, text as sa_text
+from sqlalchemy.dialects import mysql
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -30,8 +31,15 @@ class AuditLog(Base):
     meta_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False, server_default=sa_text("('{}')") )
     ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
     user_agent: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # MySQL's DATETIME sin fsp redondea al segundo mas cercano al guardar
+    # (ej. .518s se guarda como el segundo siguiente), lo que puede dejar una
+    # fila recien insertada por fuera de una ventana "< now()" calculada
+    # milisegundos despues -- filas recientes contadas de menos de forma
+    # intermitente en /security/summary y reportes similares. fsp=6 (idéntico
+    # a la precision de microsegundos de Python) elimina ese redondeo.
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+        DateTime(timezone=True).with_variant(mysql.DATETIME(fsp=6), "mysql"),
+        server_default=func.now(), nullable=False, index=True,
     )
 
     actor: Mapped["User | None"] = relationship("User", foreign_keys=[actor_id])  # noqa: F821

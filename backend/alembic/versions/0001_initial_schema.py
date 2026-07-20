@@ -9,21 +9,26 @@ Tipos utilizados:
 
 Incluye: esquema completo + users.tokens_valid_after (JWT mass-revocation)
 + columnas de widget_config: enable_escalation, enable_tts,
-enable_accessibility (unificadas desde las migraciones 0002-0004, que
-se fusionaron aquí en desarrollo con BD regenerable).
+enable_accessibility + índice compuesto (status, last_message_at) en
+chat_conversations + evento notificationevent.unanswered_digest
+(unificadas desde las migraciones 0002-0006, que se fusionaron aquí en
+desarrollo con BD regenerable — no se usa en bases de datos que ya
+tuvieran esas migraciones aplicadas por separado).
 
 Revision ID: 0001
 Revises: —
 Create Date: 2026-06-12
 Updated 2026-07-03: consolidada — ya no crea escalation_channels (nunca se
 conectó al despacho real de escalamientos, siempre usó SMTP directo).
-Updated 2026-07-14: unificadas las migraciones 0002-0004 en esta
-única (widget_config.enable_escalation / enable_tts / enable_accessibility).
+Updated 2026-07-19: unificadas las migraciones 0002-0006 en esta única
+(widget_config.enable_escalation/enable_tts/enable_accessibility, índice
+de chat_conversations, y el nombre unanswered_digest del evento).
 """
 from typing import Sequence, Union
 
 import sqlalchemy as sa
 from sqlalchemy import inspect as sa_inspect
+from sqlalchemy.dialects import mysql
 from alembic import op
 
 revision: str = "0001"
@@ -42,7 +47,7 @@ _E = {
     "unansweredstatus":   ("open", "in_progress", "resolved"),
     "notificationevent":  (
         "doc_ready", "doc_error", "escalation", "provider_down",
-        "unanswered_daily", "rate_limit_threshold", "service_down",
+        "unanswered_digest", "rate_limit_threshold", "service_down",
     ),
     "notificationchannel":   ("email", "in_app"),
     "escalationtrigger":     (
@@ -319,6 +324,7 @@ def upgrade() -> None:
     _ci("ix_chat_conversations_session_id",           "chat_conversations", ["session_id"])
     _ci("ix_chat_conversations_user_id",              "chat_conversations", ["user_id"])
     _ci("ix_chat_conversations_assigned_to_user_id",  "chat_conversations", ["assigned_to_user_id"])
+    _ci("ix_chat_conversations_status_last_message_at", "chat_conversations", ["status", "last_message_at"])
 
     # chat_messages — depends on chat_conversations
     # sources_json usa sa.JSON (JSONList — lista de dicts con source_name, score, etc.)
@@ -424,7 +430,11 @@ def upgrade() -> None:
         sa.Column("meta_json",     sa.JSON,        nullable=False, server_default=sa.text("('{}')") ),
         sa.Column("ip",            sa.String(64),  nullable=True),
         sa.Column("user_agent",    sa.Text,        nullable=True),
-        sa.Column("created_at",    sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        # fsp=6: MySQL redondea DATETIME sin fsp al segundo mas cercano al
+        # guardar, lo que puede empujar una fila recien insertada fuera de
+        # una ventana "< now()" calculada milisegundos despues (conteos
+        # intermitentes de menos en /security/summary y reportes similares).
+        sa.Column("created_at",    mysql.DATETIME(fsp=6), server_default=sa.text("now()"), nullable=False),
     )
     _ci("ix_audit_logs_actor_id",      "audit_logs", ["actor_id"])
     _ci("ix_audit_logs_action",        "audit_logs", ["action"])

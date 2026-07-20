@@ -28,10 +28,7 @@ async def _acquire_once(key: str, ttl: int) -> bool:
 
     Returns True if this worker acquired the lock (and should run the job).
     Returns False if another worker already holds it.
-    Falls back to False if Redis is unavailable (fail-closed): con WORKERS>1,
-    un fail-open permitiría que cada worker ejecutara el job y disparara
-    correos/registros duplicados. Mejor no enviar el digest a que enviarlo
-    repetido; se reintenta al volver Redis.
+    Falls back to False if Redis is unavailable (fail-closed).
     """
     try:
         from app.core.redis import get_redis
@@ -45,11 +42,6 @@ async def _acquire_once(key: str, ttl: int) -> bool:
 async def _warmup_loop() -> None:
     """Runs a dummy embedding every _WARMUP_INTERVAL seconds to keep the ONNX
     Runtime inference thread pool alive.
-
-    Without this, the first request after a period of inactivity takes 15-20 s
-    while the runtime re-initializes its threads and pages model weights back
-    into RAM. Each worker runs its own warm-up independently (no Redis lock
-    needed — the goal is to keep every worker's model hot).
     """
     await asyncio.sleep(30)
     log.info("scheduler.warmup_loop_started", interval=_WARMUP_INTERVAL)
@@ -72,9 +64,6 @@ async def _health_loop() -> None:
     log.info("scheduler.health_loop_started", interval=_HEALTH_INTERVAL)
     while True:
         try:
-            # Bucket = floor(unix_ts / 300) — mismo valor en todos los workers
-            # durante la misma ventana de 5 min. TTL=270s < 300s para liberar
-            # el lock antes de la siguiente ventana.
             bucket = int(time.time() / _HEALTH_INTERVAL)
             lock_key = f"scheduler:health:{bucket}"
             if await _acquire_once(lock_key, ttl=270):
@@ -112,7 +101,7 @@ def _cumple_agenda(now: datetime, schedule: ReportSchedule) -> bool:
 
 
 async def _digest_loop() -> None:
-    """Envía el reporte unanswered_daily según la cadencia configurada.
+    """Envía el reporte unanswered_digest según la cadencia configurada.
 
     Usa Redis SET NX con TTL de 23h para que solo un worker envíe el digest
     por día, independientemente de cuántos workers estén corriendo (WORKERS>1),
@@ -126,6 +115,7 @@ async def _digest_loop() -> None:
                 from app.services.system.report_schedule import get_report_schedule
                 schedule = await get_report_schedule(db)
                 if not _cumple_agenda(now, schedule):
+                    await asyncio.sleep(3600)
                     continue
                 today = now.astimezone(now_sv().tzinfo).strftime("%Y-%m-%d")
                 lock_key = f"scheduler:digest:{today}"
@@ -136,7 +126,7 @@ async def _digest_loop() -> None:
                     stats = await collect_digest_stats(db)
                     # Enviar solo si hay algo que reportar (pendientes o actividad del día).
                     if stats["total_open"] > 0 or stats["resolved_today"] > 0 or stats["escalated_today"] > 0:
-                        await send_notification(db, event=NotificationEvent.unanswered_daily, payload=stats)
+                        await send_notification(db, event=NotificationEvent.unanswered_digest, payload=stats)
                         log.info("scheduler.digest_sent", total_open=stats["total_open"])
                 else:
                     log.debug("scheduler.digest_skipped_by_lock")
@@ -147,11 +137,6 @@ async def _digest_loop() -> None:
 
 async def _stale_conversations_loop() -> None:
     """Auto-resuelve conversaciones `active` sin actividad por _STALE_CONV_MINUTES.
-
-    El chat es HTTP por-turno (sin conexión persistente): si el usuario cierra
-    la pestaña, nada avisa al backend, así que sin este barrido la conversación
-    queda `active` para siempre. Usa Redis SET NX igual que _health_loop para
-    que solo un worker ejecute el barrido por ventana con WORKERS>1.
     """
     log.info("scheduler.stale_conversations_loop_started", interval=_STALE_CONV_INTERVAL, threshold_min=_STALE_CONV_MINUTES)
     while True:

@@ -3,7 +3,8 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum as SAEnum, ForeignKey, Integer, String, Text, Uuid, false, func
+from sqlalchemy import Boolean, DateTime, Enum as SAEnum, ForeignKey, Index, Integer, String, Text, Uuid, false, func
+from sqlalchemy import text as sa_text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.types import JSONList
@@ -13,6 +14,9 @@ from app.models.enums import ConversationStatus
 
 class ChatConversation(Base):
     __tablename__ = "chat_conversations"
+    __table_args__ = (
+        Index("ix_chat_conversations_status_last_message_at", "status", "last_message_at"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         Uuid(native_uuid=False), primary_key=True, default=uuid.uuid4
@@ -58,7 +62,7 @@ class ChatConversation(Base):
     escalation_pending: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=false())
     escalation_trigger_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    tags: Mapped[list[str]] = mapped_column(JSONList, default=list, server_default="[]", nullable=False)
+    tags: Mapped[list[str]] = mapped_column(JSONList, default=list, server_default=sa_text("('[]')"), nullable=False)
 
     user: Mapped["User | None"] = relationship("User", foreign_keys=[user_id])  # noqa: F821
     assignee: Mapped["User | None"] = relationship("User", foreign_keys=[assigned_to_user_id])  # noqa: F821
