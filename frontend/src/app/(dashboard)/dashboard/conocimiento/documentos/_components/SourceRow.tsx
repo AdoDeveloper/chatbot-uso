@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   RefreshCw, Trash2, AlertCircle, Loader2, FileSearch,
@@ -32,20 +32,10 @@ function InlineTagEditor({ source, onUpdated }: { source: Source; onUpdated: () 
   const [editing, setEditing] = useState(false);
   const [tags, setTags] = useState<string[]>(source.tags ?? []);
   const [saving, setSaving] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (editing) setTags(source.tags ?? []);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editing]);
-
-  useEffect(() => {
-    if (!editing) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setEditing(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
   }, [editing]);
 
   const save = async () => {
@@ -60,7 +50,7 @@ function InlineTagEditor({ source, onUpdated }: { source: Source; onUpdated: () 
   };
 
   return (
-    <div className="relative" ref={ref}>
+    <>
       <div className="flex items-center gap-1.5 flex-wrap">
         {(source.tags ?? []).map((tag) => (
           <span key={tag} className="px-2 py-0.5 bg-primary/8 text-primary text-2xs rounded-full border border-primary/20">
@@ -74,20 +64,27 @@ function InlineTagEditor({ source, onUpdated }: { source: Source; onUpdated: () 
           + Agregar
         </button>
       </div>
-      {editing && (
-        <div className="absolute left-0 top-full mt-2 z-50 bg-card border border-border rounded-xl shadow-lg p-4 w-80">
-          <p className="text-sm font-semibold mb-2">Etiquetas</p>
-          <TagInput value={tags} onChange={setTags} />
-          <div className="flex gap-2 mt-3">
-            <Button variant="outline" size="sm" className="flex-1 gap-1.5" onClick={() => setEditing(false)}><X className="w-3.5 h-3.5" /> Cancelar</Button>
-            <Button size="sm" className="flex-1 gap-1.5" onClick={save} disabled={saving}>
+
+      <Modal
+        open={editing}
+        onClose={() => setEditing(false)}
+        title="Etiquetas"
+        size="md"
+        footer={
+          <>
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setEditing(false)}>
+              <X className="w-3.5 h-3.5" /> Cancelar
+            </Button>
+            <Button size="sm" className="gap-1.5" onClick={save} disabled={saving}>
               {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
               {saving ? "Guardando..." : "Guardar"}
             </Button>
-          </div>
-        </div>
-      )}
-    </div>
+          </>
+        }
+      >
+        <TagInput value={tags} onChange={setTags} />
+      </Modal>
+    </>
   );
 }
 

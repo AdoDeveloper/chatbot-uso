@@ -279,7 +279,10 @@ function MarkdownContent({ content, streaming }: { content: string; streaming?: 
     );
   }
   const raw = marked.parse(content || "") as string;
-  const html = DOMPurify.sanitize(raw, { ADD_ATTR: ["target"] });
+  const html = DOMPurify.sanitize(raw, {
+    ADD_TAGS: ["img"],
+    ADD_ATTR: ["target", "src", "alt", "width", "height", "title"],
+  });
   return (
     <div class="md">
       <span dangerouslySetInnerHTML={{ __html: html }} />

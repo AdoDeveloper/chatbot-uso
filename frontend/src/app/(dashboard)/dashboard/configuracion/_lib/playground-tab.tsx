@@ -34,7 +34,11 @@ _marked.use({
 let _purify: ((html: string) => string) | null = null;
 if (typeof window !== "undefined") {
   import("dompurify").then((m) => {
-    _purify = (html: string) => m.default.sanitize(html, { ADD_ATTR: ["target"] });
+    _purify = (html: string) =>
+      m.default.sanitize(html, {
+        ADD_TAGS: ["img"],
+        ADD_ATTR: ["target", "src", "alt", "width", "height", "title"],
+      });
   });
 }
 

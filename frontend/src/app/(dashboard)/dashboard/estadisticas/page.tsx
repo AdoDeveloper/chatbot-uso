@@ -16,8 +16,35 @@ import {
 import api from "@/lib/api";
 import { useApi, getErrorMessage } from "@/hooks/use-api";
 import { isoDay } from "@/lib/utils";
-import { TimelineGrouped } from "@/components/composed/timeline";
-import type { TimelineEvent } from "@/components/composed/timeline";
+import { DataTable, type Column } from "@/components/composed/data-table";
+
+type ActivityEventType =
+  | "source_ingested" | "source_promoted" | "guardrail_block" | "escalation"
+  | "provider_error" | "cache_cleared" | "user_login" | "version_snapshot"
+  | "unanswered_spike" | "other";
+
+interface ActivityEvent {
+  id: string;
+  type: ActivityEventType;
+  title: string;
+  detail: string | null;
+  created_at: string;
+  actor_name: string | null;
+  href: string | null;
+}
+
+const ACTIVITY_LABEL: Record<ActivityEventType, string> = {
+  source_ingested: "Fuente",
+  source_promoted: "Publicado",
+  guardrail_block: "Bloqueo",
+  escalation: "Escalamiento",
+  provider_error: "Error IA",
+  cache_cleared: "Caché",
+  user_login: "Acceso",
+  version_snapshot: "Versión",
+  unanswered_spike: "Pico",
+  other: "Evento",
+};
 import type {
  AnalyticsDashboard, TopicStat, UnansweredGroup,
  PeriodComparison, ChannelStat, CacheStats, PageStat,
@@ -32,6 +59,7 @@ import { SegmentedControl } from "@/components/composed/segmented-control";
 import { PeriodFilter } from "@/components/composed/period-filter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { TableCell } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -117,7 +145,7 @@ function MetricasTab() {
  const qTimeseries = useApi<{ points: TimeSeriesPoint[] }>(periodReady ? `/analytics/timeseries?${periodQuery}&${src}` : null);
  const qRoutes = useApi<{ routes: RouteStat[] }>(periodReady ? `/analytics/routes?${periodQuery}&${src}` : null);
  const qLatency = useApi<{ points: LatencyPoint[] }>(periodReady ? `/analytics/latency/timeseries?${periodQuery}` : null);
- const qTimeline = useApi<{ events: TimelineEvent[]; days: number }>(periodReady ? `/analytics/timeline?days=${timelineDays}&limit=40` : null);
+  const qTimeline = useApi<{ events: ActivityEvent[]; days: number }>(periodReady ? `/analytics/timeline?days=${timelineDays}&limit=40` : null);
  const qComparison = useApi<PeriodComparison>(periodReady ? `/analytics/comparison?days=${compDays}&${src}` : null);
  const qChannels = useApi<{ channels: ChannelStat[]; days: number }>(periodReady ? `/analytics/channels?days=${compDays}` : null);
  const qCache = useApi<CacheStats>(periodReady ? `/analytics/cache?days=${compDays}` : null);
@@ -145,7 +173,16 @@ function MetricasTab() {
  const channels = qChannels.data?.channels ?? [];
  const cache = qCache.data;
  const pages = qPages.data?.pages ?? [];
- const feedback = qFeedback.data;
+  const feedback = qFeedback.data;
+
+  const showActor = true;
+  const activityColumns: Column[] = [
+    { id: "created_at", header: "Fecha/Hora", className: "w-28" },
+    { id: "type", header: "Tipo", className: "w-28" },
+    { id: "event", header: "Evento" },
+    { id: "actor", header: "Actor", className: "w-36 hidden md:table-cell" },
+  ];
+
 
  // Topics bar chart: dynamic height, no cap
  const chartHeight = Math.max(220, topics.length * 32);
@@ -479,18 +516,63 @@ function MetricasTab() {
       </div>
      </div>
     </CardHeader>
-    <CardContent>
-     {timeline.length === 0 ? (
-      <EmptyState
-       icon={Clock}
-       title="Sin actividad reciente"
-       description="Los eventos del sistema aparecerán aquí conforme ocurran"
-      />
-     ) : (
-       <TimelineGrouped events={timeline} showActor scrollable />
-     )}
-    </CardContent>
-   </Card>
+     <CardContent>
+      {timeline.length === 0 ? (
+       <EmptyState
+        icon={Clock}
+        title="Sin actividad reciente"
+        description="Los eventos del sistema aparecerán aquí conforme ocurran"
+       />
+      ) : (
+       <div className="max-h-[28rem] overflow-y-auto -mx-1">
+        <DataTable<ActivityEvent>
+          columns={activityColumns}
+          data={timeline}
+          rowKey={(e) => e.id}
+          noCard
+          renderRow={(e) => {
+            const dt = new Date(e.created_at);
+            const time = dt.toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
+            const day = dt.toLocaleDateString("es", { day: "2-digit", month: "short" });
+            const row = (
+              <>
+                <TableCell className="whitespace-nowrap text-13 tabular-nums text-muted-foreground w-28">
+                  <div className="flex flex-col leading-tight">
+                    <span className="text-foreground">{time}</span>
+                    <span className="text-3xs">{day}</span>
+                  </div>
+                </TableCell>
+                <TableCell className="w-28">
+                  <Badge variant="muted" size="xs">{ACTIVITY_LABEL[e.type]}</Badge>
+                </TableCell>
+                <TableCell>
+                  <p className="text-13 font-medium text-foreground leading-snug">{e.title}</p>
+                  {e.detail && <p className="text-2xs text-muted-foreground mt-0.5 leading-snug">{e.detail}</p>}
+                </TableCell>
+                <TableCell className="hidden md:table-cell w-36 text-2xs text-muted-foreground truncate">
+                  {showActor && e.actor_name ? e.actor_name : "—"}
+                </TableCell>
+              </>
+            );
+            return e.href ? (
+              <tr className="group hover:bg-muted/40 transition-colors">
+                <TableCell className="p-0">
+                  <Link href={e.href} className="block px-3 py-2.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
+                    {row}
+                  </Link>
+                </TableCell>
+              </tr>
+            ) : (
+              <tr className="group hover:bg-muted/40 transition-colors">
+                <TableCell className="px-3 py-2.5">{row}</TableCell>
+              </tr>
+            );
+          }}
+        />
+       </div>
+      )}
+     </CardContent>
+    </Card>
   </div>
  );
 }
