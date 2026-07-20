@@ -141,8 +141,14 @@ prueba. La configuración del servidor de correo se gestiona a nivel del sistema
 ### 4.6 Widget
 
 Configura el chat embebible que se coloca en el sitio web: colores, posición,
-mensaje de bienvenida, sugerencias, dominios permitidos y opciones de
-visualización. Genera el código de integración para el sitio.
+mensaje de bienvenida, sugerencias, etiqueta junto al botón flotante, dominios
+permitidos y opciones de visualización. Genera el código de integración para
+el sitio.
+
+En pantallas de celular, el chat se abre a pantalla completa. Si un documento
+fuente incluye el enlace a una imagen o a un PDF, el chatbot puede mostrarlo
+directamente en la conversación (la imagen se ve embebida; el PDF aparece
+como un botón para abrirlo).
 
 ### 4.7 Playground y Publicaciones
 
@@ -228,6 +234,9 @@ límite.
 - **Reglas**: qué eventos disparan una notificación (servicio caído, proveedor
   caído, etc.).
 - **Canales**: estado del correo saliente.
+- **Resumen de preguntas sin responder**: un correo periódico con las preguntas
+  que el chatbot no pudo contestar. La cadencia (diaria, semanal, mensual o
+  anual) y la hora de envío se configuran aparte.
 
 ---
 

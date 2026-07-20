@@ -10,9 +10,6 @@ export const STYLES = `
   --color-primary: #1e3a8a;
   --color-primary-hover: #1d4ed8;
   --color-bubble: #1e3a8a;
-  /* No fijamos position en :host. El .root adentro del shadow toma el
-   * data-position y se posiciona en la esquina elegida con position:fixed.
-   * Asi evitamos tener que sincronizar atributos host element <-> shadow. */
   z-index: 2147483647;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   font-size: 15px;
@@ -26,13 +23,6 @@ export const STYLES = `
 }
 
 /* ── Root wrapper ─────────────────────────────────────────────────────── */
-/*
- * El root es position:fixed y se ancla a una de las 4 esquinas segun el
- * atributo data-position. Cuando esta en esquina superior, panel y bubble
- * van en orden normal (launcher arriba, panel abajo). Cuando esta en
- * esquina inferior invertimos el orden flex para que el panel quede arriba
- * del launcher al abrirse (sino el panel taparia el bubble desde arriba).
- */
 
 .root {
   position: fixed;
@@ -183,11 +173,6 @@ export const STYLES = `
 .messages::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
 
 /* ── Message rows ────────────────────────────────────────────────────── */
-/*
- * Cada mensaje vive en .msg-row, un flex horizontal: avatar a la izquierda
- * (solo en mensajes del bot) + burbuja. El mensaje del usuario va sin avatar,
- * alineado a la derecha. La burbuja en sí queda en .msg.
- */
 
 .msg-row {
   display: flex;
@@ -211,8 +196,6 @@ export const STYLES = `
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Avatar circular pequeño al lado de cada mensaje del bot. Se mantiene
- * estable en el cabecero de la burbuja aunque la respuesta crezca. */
 .msg-avatar {
   width: 26px;
   height: 26px;
@@ -271,6 +254,21 @@ export const STYLES = `
 .md strong { font-weight: 700; }
 .md em { font-style: italic; }
 .md a { color: #2563eb; text-decoration: underline; word-break: break-all; }
+.md a.pdf-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0;
+  padding: 7px 12px;
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 30%, transparent);
+  border-radius: 8px;
+  color: var(--color-primary);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 13px;
+}
+.md a.pdf-link:hover { background: color-mix(in srgb, var(--color-primary) 18%, transparent); }
 
 .md code {
   background: rgba(0,0,0,0.06);
@@ -438,8 +436,6 @@ export const STYLES = `
 
 /* ── Input row ───────────────────────────────────────────────────────── */
 
-/* Barra de composición estilo "pill" (LiveChat): input y botón de enviar
- * viven dentro de una misma cápsula redondeada, sobre el fondo neutro. */
 .input-row {
   display: flex;
   align-items: flex-end;
@@ -561,11 +557,6 @@ export const STYLES = `
 }
 
 /* ── Quick replies (conversation starters) ──────────── */
-/*
- * Botones que aparecen sobre el input cuando solo hay el welcome message.
- * Se ocultan tras la primera interacción del usuario. Apilados horizontal
- * con flex-wrap; en pantallas chicas hacen 2 columnas naturales.
- */
 
 .suggestions {
   display: flex;
@@ -748,11 +739,6 @@ export const STYLES = `
 }
 
 /* ── Proactive bubble (mensaje sobre el launcher cerrado) ──────────── */
-/*
- * Burbuja flotante que aparece a la izquierda del botón circular cuando
- * el chat está cerrado. Captura atención sin abrir el panel. Click → abre.
- * Aparece con un delay sutil para no saltar al cargar la página.
- */
 
 .proactive-bubble {
   position: absolute;
@@ -960,9 +946,6 @@ export const STYLES = `
 
 /* ── Escalamiento — solicitud de contacto ────────────────────────────── */
 
-/* Tarjeta de contacto/escalamiento: ahora que las burbujas del bot no llevan
- * caja, esta tarjeta interactiva sí lleva su propio contenedor (blanco,
- * redondeado, con borde y sombra suave) para destacar sobre el fondo neutro. */
 .escal-card {
   display: flex;
   flex-direction: column;
@@ -1179,24 +1162,32 @@ export const STYLES = `
 
 /* ── Responsive (small screens) ─────────────────────────────────────── */
 
-@media (max-width: 440px) {
-  /* En pantallas chicas reducimos el inset y dejamos que cada esquina
-   * use 1rem en lugar de 1.5rem. */
+  @media (max-width: 440px) {
   .root[data-position="bottom-right"] { bottom: 1rem; right: 1rem; }
   .root[data-position="bottom-left"]  { bottom: 1rem; left: 1rem; }
   .root[data-position="top-right"]    { top: 1rem; right: 1rem; }
   .root[data-position="top-left"]     { top: 1rem; left: 1rem; }
+
+  /* Panel a pantalla completa en móvil (WhatsApp/Intercom style). */
   .panel {
-    width: calc(100vw - 20px);
-    height: min(520px, calc(100vh - 90px));
-    height: min(520px, calc(100dvh - 90px));
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    width: 100dvw;
+    height: 100vh;
+    height: 100dvh;
+    border-radius: 0;
+    transform-origin: center;
+    transform: scale(1) translateY(0);
+  }
+  .panel-open {
+    transform: scale(1) translateY(0);
   }
   .proactive-bubble { display: none; }
 }
 
-/* Pantallas de poca altura (landscape móvil, ventanas bajas) — el alto fijo
- * de 520px puede desbordar aunque el ancho todavía sea &gt; 440px. */
-@media (max-height: 600px) {
+/* Pantallas de poca altura con ancho &gt; 440px: limita el alto del panel. */
+@media (max-height: 600px) and (min-width: 441px) {
   .panel {
     height: min(520px, calc(100vh - 90px));
     height: min(520px, calc(100dvh - 90px));

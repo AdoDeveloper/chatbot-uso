@@ -14,14 +14,14 @@ La forma más rápida. Requiere Docker Desktop 24+ con Docker Compose v2.
 - 8 GB RAM mínimo (los modelos de IA ocupan ~1.7 GB por worker)
 - 15 GB de disco libre (imágenes + modelos)
 
-> **En Windows**: clonar el repo dentro del filesystem de WSL2 (`~/chatbot-uso-v2`), **no** en `/mnt/c/`. El I/O cruzado NTFS↔WSL2 es 5-10× más lento y corrompe permisos de volúmenes Docker.
+> **En Windows**: clonar el repo dentro del filesystem de WSL2 (`~/chatbot-uso`), **no** en `/mnt/c/`. El I/O cruzado NTFS↔WSL2 es 5-10× más lento y corrompe permisos de volúmenes Docker.
 
 ### Pasos
 
 ```bash
 # 1. Clonar
-git clone <URL_DEL_REPOSITORIO> chatbot-uso-v2
-cd chatbot-uso-v2
+git clone <URL_DEL_REPOSITORIO> chatbot-uso
+cd chatbot-uso
 
 # 2. Variables de entorno
 cp backend/.env.example backend/.env
@@ -245,6 +245,13 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 # Verificar:
 curl http://localhost:8000/api/v1/health/live  # → {"status":"ok"}
 ```
+
+> El primer arranque de `uvicorn`/`gunicorn` ya siembra el admin inicial y los
+> datos por defecto automáticamente (`app/main.py`, evento de arranque). Si
+> necesitas migrar y sembrar la base de datos SIN levantar el servidor (por
+> ejemplo en un script de CI o para verificar antes de exponer el servicio),
+> usa `python -m scripts.init_db` en vez de correr `alembic upgrade head`
+> manualmente — hace ambos pasos en uno solo y es seguro repetirlo.
 
 ### 6. Frontend (Next.js)
 

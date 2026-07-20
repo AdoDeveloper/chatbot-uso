@@ -34,12 +34,12 @@ El backend descarga ~2 GB de modelos de embeddings la primera vez.
 
 **Requisitos**: Docker Desktop 24+ con Docker Compose v2.
 
-> En Windows: clonar dentro del filesystem de WSL2 (`~/chatbot-uso-v2`), **no** en `/mnt/c/`. El I/O cruzado NTFS↔WSL2 es 5-10× más lento.
+> En Windows: clonar dentro del filesystem de WSL2 (`~/chatbot-uso`), **no** en `/mnt/c/`. El I/O cruzado NTFS↔WSL2 es 5-10× más lento.
 
 ```bash
 # 1. Clonar
-git clone <URL_DEL_REPOSITORIO> chatbot-uso-v2
-cd chatbot-uso-v2
+git clone <URL_DEL_REPOSITORIO> chatbot-uso
+cd chatbot-uso
 
 # 2. Variables de entorno
 cp backend/.env.example backend/.env
@@ -113,7 +113,7 @@ evite correr `npm install` desde Windows dentro del mismo checkout.
 ## Estructura del repositorio
 
 ```text
-chatbot-uso-v2/
+chatbot-uso/
 ├── backend/                FastAPI + SQLAlchemy + Alembic
 │   ├── app/                Código de la API
 │   ├── alembic/            Migraciones de BD

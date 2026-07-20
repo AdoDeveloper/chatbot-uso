@@ -317,7 +317,7 @@ stateDiagram-v2
 ## 7. Layout del repositorio
 
 ```text
-chatbot-uso-v2/
+chatbot-uso/
 ├── backend/                FastAPI + SQLAlchemy + Alembic
 │   ├── app/
 │   │   ├── api/v1/         Endpoints (auth, sources, chat, analytics, ...)

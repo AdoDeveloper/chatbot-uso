@@ -110,6 +110,15 @@ if (typeof window !== "undefined" && !window.__USOBOT__) {
 }
 
 marked.use({ breaks: true, gfm: true });
+marked.use({
+  renderer: {
+    link(href: string, _title: string | null | undefined, text: string) {
+      const isPdf = /\.pdf(\?.*)?$/i.test(href || "");
+      const cls = isPdf ? ' class="pdf-link"' : "";
+      return `<a href="${href}" target="_blank" rel="noopener noreferrer"${cls}>${text}</a>`;
+    },
+  },
+});
 
 function BotIcon({ size = 16, logoUrl }: { size?: number; logoUrl?: string | null }) {
   if (logoUrl) {
@@ -494,11 +503,13 @@ function ChatWidget({
   }, [kebabOpen]);
 
   useEffect(() => {
+    let cancelled = false;
     fetch(`${apiUrl}/api/v1/widget/public/config`, {
       headers: apiKey ? { "X-Widget-Key": apiKey } : {},
     })
       .then((r) => r.json())
       .then((data) => {
+        if (cancelled) return;
         setSettings({
           show_sources:          data.show_sources          ?? true,
           enable_copy_action:    data.enable_copy_action    ?? true,
@@ -538,9 +549,10 @@ function ChatWidget({
         }
       })
       .catch(() => {
-        // Backend no disponible → modo offline
+        if (cancelled) return;
         setOfflineMode(true);
       });
+    return () => { cancelled = true; };
   }, [apiUrl, apiKey]);
 
   // Auto-scroll: solo al enviar un mensaje o al terminar el streaming,
@@ -1293,9 +1305,7 @@ class ChatbotWidgetElement extends HTMLElement {
   connectedCallback() {
     if (this._mounted) return;
     this._mounted = true;
-    // Regla cardinal de un widget embebido: fallar en silencio, nunca romper
-    // la página anfitriona. Si algo falla al montar, se registra en consola
-    // pero no se propaga la excepción al sitio del tercero.
+    // Regla cardinal: fallar en silencio, nunca romper la página anfitriona.
     try {
       this._mount();
     } catch (err) {

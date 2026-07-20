@@ -286,6 +286,11 @@ source .venv/bin/activate
 alembic upgrade head
 ```
 
+> Para una instalación nueva (base de datos vacía), `python -m scripts.init_db`
+> hace este paso y además siembra el admin/datos por defecto en un solo
+> comando — útil si quieres poblar la base antes de arrancar el servicio, en
+> vez de esperar a que el seeding corra en el arranque de `gunicorn`.
+
 ### 6.4 Pre-descargar modelos (obligatorio)
 
 Los modelos (~2 GB) deben descargarse antes de arrancar el servicio. Si se omite este paso, el backend falla con `AttributeError: type object 'tqdm' has no attribute '_lock'` porque el prewarm corre en un thread y choca con la descarga multi-hilo de fastembed.
@@ -721,12 +726,18 @@ cp <archivo>.py /opt/chatbot/backend/app/...
 sudo systemctl restart chatbot-backend
 
 # Frontend: build nativo en WSL y desplegar el .next compilado
-cd ~/chatbot-uso-v2/frontend && npm run build
+cd ~/chatbot-uso/frontend && npm run build
 rsync -a --delete .next/ /opt/chatbot/frontend/.next/
 sudo systemctl restart chatbot-frontend
+
+# Widget embebible: build y copiar el bundle servido por el backend
+cd ~/chatbot-uso/widget && npm run build
+cp dist/widget.js /opt/chatbot/backend/static/widget/widget.js
 ```
 
 > **Nota sobre `node_modules`**: no copiar `node_modules` desde Windows a WSL — los enlaces simbólicos y binarios nativos se corrompen al cruzar el sistema de archivos NTFS. Ejecutar `npm install` directamente en WSL.
+>
+> **Nota sobre `nginx.conf`**: la config activa en producción vive en `/etc/nginx/sites-available/chatbot`, gestionada aparte de este repo (nginx nativo vía systemd, no Docker) — `nginx/nginx.conf` es solo la plantilla de referencia para despliegues con Docker. Un cambio en `nginx/nginx.conf` **no** llega solo a producción; hay que aplicarlo también en `/etc/nginx/sites-available/chatbot` y recargar (`nginx -t && sudo systemctl reload nginx`) manualmente.
 
 ### Variable `HF_HUB_OFFLINE`
 
