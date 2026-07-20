@@ -100,7 +100,7 @@ def upgrade() -> None:
         sa.Column("display_name", sa.String(255), nullable=False),
         sa.Column("description",  sa.Text,        nullable=True),
         sa.Column("is_system",    sa.Boolean,     nullable=False, server_default=sa.false()),
-        sa.Column("created_at",   sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("created_at",   mysql.DATETIME(fsp=6), server_default=sa.text("now()"), nullable=False),
     )
     _ci("ix_roles_name", "roles", ["name"], unique=True)
 
@@ -112,7 +112,7 @@ def upgrade() -> None:
         sa.Column("display_name", sa.String(255), nullable=False),
         sa.Column("description",  sa.Text,        nullable=True),
         sa.Column("is_active",    sa.Boolean,     nullable=False, server_default=sa.true()),
-        sa.Column("created_at",   sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("created_at",   mysql.DATETIME(fsp=6), server_default=sa.text("now()"), nullable=False),
     )
     _ci("ix_modules_name", "modules", ["name"], unique=True)
 
@@ -127,10 +127,10 @@ def upgrade() -> None:
         sa.Column("is_active",            sa.Boolean, nullable=False, server_default=sa.true()),
         sa.Column("must_change_password", sa.Boolean, nullable=False, server_default=sa.false()),
         sa.Column("onboarding_dismissed", sa.Boolean, nullable=False, server_default=sa.false()),
-        sa.Column("last_login_at",        sa.DateTime(timezone=True), nullable=True),
-        sa.Column("tokens_valid_after",    sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at",     sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("updated_at",     sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("last_login_at",        mysql.DATETIME(fsp=6), nullable=True),
+        sa.Column("tokens_valid_after",    mysql.DATETIME(fsp=6), nullable=True),
+        sa.Column("created_at",     mysql.DATETIME(fsp=6), server_default=sa.text("now()"), nullable=False),
+        sa.Column("updated_at",     mysql.DATETIME(fsp=6), server_default=sa.text("now()"), nullable=False),
     )
     _ci("ix_users_email", "users", ["email"], unique=True)
 
@@ -142,7 +142,7 @@ def upgrade() -> None:
         sa.Column("action",      _e("permissionaction"), nullable=False),
         sa.Column("name",        sa.String(150), nullable=False),
         sa.Column("description", sa.Text,        nullable=True),
-        sa.Column("created_at",  sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("created_at",  mysql.DATETIME(fsp=6), server_default=sa.text("now()"), nullable=False),
         sa.UniqueConstraint("module_id", "action", name="uq_permission_module_action"),
     )
     _ci("ix_permissions_name", "permissions", ["name"], unique=True)
@@ -153,7 +153,7 @@ def upgrade() -> None:
         sa.Column("id",            sa.Uuid(native_uuid=False), primary_key=True),
         sa.Column("role",          sa.String(100), sa.ForeignKey("roles.name", onupdate="CASCADE", ondelete="CASCADE"), nullable=False),
         sa.Column("permission_id", sa.Uuid(native_uuid=False), sa.ForeignKey("permissions.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("granted_at",    sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("granted_at",    mysql.DATETIME(fsp=6), server_default=sa.text("now()"), nullable=False),
         sa.UniqueConstraint("role", "permission_id", name="uq_role_permission"),
     )
     _ci("ix_role_permissions_role", "role_permissions", ["role"])
@@ -166,10 +166,10 @@ def upgrade() -> None:
         sa.Column("role",           sa.String(100), sa.ForeignKey("roles.name", onupdate="CASCADE", ondelete="RESTRICT"), nullable=False),
         sa.Column("token",          sa.String(64),  nullable=False),
         sa.Column("created_by_id",  sa.Uuid(native_uuid=False), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("expires_at",     sa.DateTime(timezone=True), nullable=False),
-        sa.Column("accepted_at",    sa.DateTime(timezone=True), nullable=True),
+        sa.Column("expires_at",     mysql.DATETIME(fsp=6), nullable=False),
+        sa.Column("accepted_at",    mysql.DATETIME(fsp=6), nullable=True),
         sa.Column("is_active",      sa.Boolean, nullable=False, server_default=sa.true()),
-        sa.Column("created_at",     sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("created_at",     mysql.DATETIME(fsp=6), server_default=sa.text("now()"), nullable=False),
     )
     _ci("ix_invitations_email", "invitations", ["email"])
     _ci("ix_invitations_token", "invitations", ["token"], unique=True)
@@ -179,7 +179,7 @@ def upgrade() -> None:
         "global_settings",
         sa.Column("key",            sa.String(100), primary_key=True),
         sa.Column("value",          sa.JSON, nullable=False),
-        sa.Column("updated_at",     sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("updated_at",     mysql.DATETIME(fsp=6), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_by_id",  sa.Uuid(native_uuid=False), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
     )
 
@@ -211,7 +211,7 @@ def upgrade() -> None:
         sa.Column("enable_escalation",     sa.Boolean,     nullable=False, server_default=sa.true()),
         sa.Column("enable_tts",            sa.Boolean,     nullable=False, server_default=sa.true()),
         sa.Column("enable_accessibility",   sa.Boolean,     nullable=False, server_default=sa.true()),
-        sa.Column("updated_at",            sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("updated_at",            mysql.DATETIME(fsp=6), server_default=sa.text("now()"), nullable=False),
     )
     _ci("ix_widget_config_api_key", "widget_config", ["api_key"], unique=True)
 
@@ -227,9 +227,9 @@ def upgrade() -> None:
         sa.Column("dashboard_url",         sa.String(512), nullable=True),
         sa.Column("is_active",             sa.Boolean,     nullable=False, server_default=sa.true()),
         sa.Column("priority",              sa.Integer,     nullable=True),
-        sa.Column("created_at",            sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("updated_at",            sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("last_test_at",          sa.DateTime(timezone=True), nullable=True),
+        sa.Column("created_at",            mysql.DATETIME(fsp=6), server_default=sa.text("now()"), nullable=False),
+        sa.Column("updated_at",            mysql.DATETIME(fsp=6), server_default=sa.text("now()"), nullable=False),
+        sa.Column("last_test_at",          mysql.DATETIME(fsp=6), nullable=True),
         sa.Column("last_test_ok",          sa.Boolean,     nullable=True),
         sa.Column("last_test_latency_ms",  sa.Integer,     nullable=True),
         sa.Column("last_test_error",       sa.Text,        nullable=True),
@@ -244,7 +244,7 @@ def upgrade() -> None:
         sa.Column("status",           _e("sourcestatus"), nullable=False, server_default="pending"),
         sa.Column("review_status",    _e("reviewstatus"), nullable=False, server_default="procesando"),
         sa.Column("reviewed_by_id",   sa.Uuid(native_uuid=False), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("reviewed_at",      sa.DateTime(timezone=True), nullable=True),
+        sa.Column("reviewed_at",      mysql.DATETIME(fsp=6), nullable=True),
         sa.Column("rejection_reason", sa.Text,        nullable=True),
         sa.Column("file_path",        sa.String(512), nullable=True),
         sa.Column("file_size",        sa.Integer,     nullable=True),
@@ -256,9 +256,9 @@ def upgrade() -> None:
         sa.Column("content_hash",     sa.String(64),  nullable=True),
         sa.Column("meta",             sa.JSON,        nullable=False, server_default=sa.text("('{}')") ),
         sa.Column("created_by_id",    sa.Uuid(native_uuid=False), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("created_at",       sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("updated_at",       sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("deleted_at",       sa.DateTime(timezone=True), nullable=True),
+        sa.Column("created_at",       mysql.DATETIME(fsp=6), server_default=sa.text("now()"), nullable=False),
+        sa.Column("updated_at",       mysql.DATETIME(fsp=6), server_default=sa.text("now()"), nullable=False),
+        sa.Column("deleted_at",       mysql.DATETIME(fsp=6), nullable=True),
     )
     _ci("ix_sources_review_status", "sources", ["review_status"])
     _ci("ix_sources_content_hash",  "sources", ["content_hash"])
@@ -274,9 +274,9 @@ def upgrade() -> None:
         sa.Column("is_active",      sa.Boolean, nullable=False, server_default=sa.true()),
         sa.Column("source_id",      sa.Uuid(native_uuid=False), sa.ForeignKey("sources.id", ondelete="SET NULL"), nullable=True),
         sa.Column("created_by_id",  sa.Uuid(native_uuid=False), sa.ForeignKey("users.id",   ondelete="SET NULL"), nullable=True),
-        sa.Column("created_at",     sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("updated_at",     sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("deleted_at",     sa.DateTime(timezone=True), nullable=True),
+        sa.Column("created_at",     mysql.DATETIME(fsp=6), server_default=sa.text("now()"), nullable=False),
+        sa.Column("updated_at",     mysql.DATETIME(fsp=6), server_default=sa.text("now()"), nullable=False),
+        sa.Column("deleted_at",     mysql.DATETIME(fsp=6), nullable=True),
     )
     _ci("ix_faq_entries_is_active", "faq_entries", ["is_active"])
 
@@ -290,7 +290,7 @@ def upgrade() -> None:
         sa.Column("new_content",      sa.Text,       nullable=False),
         sa.Column("edited_by_id",     sa.Uuid(native_uuid=False), sa.ForeignKey("users.id",    ondelete="SET NULL"), nullable=True),
         sa.Column("reason",           sa.Text,       nullable=True),
-        sa.Column("edited_at",        sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("edited_at",        mysql.DATETIME(fsp=6), server_default=sa.text("now()"), nullable=False),
     )
     _ci("ix_chunk_edits_chunk_point_id", "chunk_edits", ["chunk_point_id"])
     _ci("ix_chunk_edits_source_id",      "chunk_edits", ["source_id"])
@@ -307,13 +307,13 @@ def upgrade() -> None:
         sa.Column("device",                      sa.String(64), nullable=True),
         sa.Column("browser",                     sa.String(64), nullable=True),
         sa.Column("origin_url",                  sa.Text,       nullable=True),
-        sa.Column("created_at",                  sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("started_at",                  sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("last_message_at",             sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("escalated_at",                sa.DateTime(timezone=True), nullable=True),
+        sa.Column("created_at",                  mysql.DATETIME(fsp=6), server_default=sa.text("now()"), nullable=False),
+        sa.Column("started_at",                  mysql.DATETIME(fsp=6), server_default=sa.text("now()"), nullable=False),
+        sa.Column("last_message_at",             mysql.DATETIME(fsp=6), server_default=sa.text("now()"), nullable=False),
+        sa.Column("escalated_at",                mysql.DATETIME(fsp=6), nullable=True),
         sa.Column("assigned_to_user_id",         sa.Uuid(native_uuid=False), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("assigned_at",                 sa.DateTime(timezone=True), nullable=True),
-        sa.Column("resolved_at",                 sa.DateTime(timezone=True), nullable=True),
+        sa.Column("assigned_at",                 mysql.DATETIME(fsp=6), nullable=True),
+        sa.Column("resolved_at",                 mysql.DATETIME(fsp=6), nullable=True),
         sa.Column("resolved_by_user_id",         sa.Uuid(native_uuid=False), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
         sa.Column("csat_score",                  sa.Integer,    nullable=True),
         sa.Column("csat_comment",                sa.String(500), nullable=True),
@@ -340,7 +340,7 @@ def upgrade() -> None:
         sa.Column("feedback",        _e("messagefeedback"), nullable=True),
         sa.Column("annotation",      sa.String(32),        nullable=True),
         sa.Column("annotation_note", sa.Text,              nullable=True),
-        sa.Column("created_at",      sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("created_at",      mysql.DATETIME(fsp=6), server_default=sa.text("now()"), nullable=False),
     )
     _ci("ix_chat_messages_conversation_id",       "chat_messages", ["conversation_id"])
     _ci("ix_chat_messages_conversation_created",  "chat_messages", ["conversation_id", "created_at"])
@@ -356,7 +356,7 @@ def upgrade() -> None:
         sa.Column("note",            sa.Text, nullable=True),
         sa.Column("meta_json",       sa.JSON, nullable=False, server_default=sa.text("('{}')") ),
         sa.Column("trigger_type",    sa.String(64), nullable=True),
-        sa.Column("created_at",      sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("created_at",      mysql.DATETIME(fsp=6), server_default=sa.text("now()"), nullable=False),
     )
     _ci("ix_escalation_events_conversation_id", "escalation_events", ["conversation_id"])
 
@@ -369,8 +369,8 @@ def upgrade() -> None:
         sa.Column("detected_topic",  sa.String(128), nullable=True),
         sa.Column("status",          _e("unansweredstatus"), nullable=False, server_default="open"),
         sa.Column("resolved_by_id",  sa.Uuid(native_uuid=False), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("resolved_at",     sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at",      sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("resolved_at",     mysql.DATETIME(fsp=6), nullable=True),
+        sa.Column("created_at",      mysql.DATETIME(fsp=6), server_default=sa.text("now()"), nullable=False),
     )
     _ci("ix_unanswered_questions_conversation_id", "unanswered_questions", ["conversation_id"])
     _ci("ix_unanswered_questions_detected_topic",  "unanswered_questions", ["detected_topic"])
@@ -385,7 +385,7 @@ def upgrade() -> None:
         sa.Column("enabled",     sa.Boolean, nullable=False, server_default=sa.false()),
         sa.Column("target",      sa.Text,    nullable=True),
         sa.Column("config_json", sa.JSON,    nullable=False, server_default=sa.text("('{}')") ),
-        sa.Column("updated_at",  sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("updated_at",  mysql.DATETIME(fsp=6), server_default=sa.text("now()"), nullable=False),
         sa.UniqueConstraint("event", "channel", name="uq_notification_rules_event_channel"),
     )
     _ci("ix_notification_rules_event", "notification_rules", ["event"])
@@ -400,8 +400,8 @@ def upgrade() -> None:
         sa.Column("status",        sa.String(20),  nullable=False),
         sa.Column("error_message", sa.Text,        nullable=True),
         sa.Column("payload_json",  sa.JSON,        nullable=False, server_default=sa.text("('{}')") ),
-        sa.Column("created_at",    sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("read_at",       sa.DateTime(timezone=True), nullable=True),
+        sa.Column("created_at",    mysql.DATETIME(fsp=6), server_default=sa.text("now()"), nullable=False),
+        sa.Column("read_at",       mysql.DATETIME(fsp=6), nullable=True),
     )
     _ci("ix_notification_logs_event",      "notification_logs", ["event"])
     _ci("ix_notification_logs_created_at", "notification_logs", ["created_at"])
@@ -415,8 +415,8 @@ def upgrade() -> None:
         sa.Column("trigger_type",   _e("escalationtrigger"), nullable=False),
         sa.Column("trigger_config", sa.JSON,        nullable=False, server_default=sa.text("('{}')") ),
         sa.Column("enabled",        sa.Boolean,     nullable=False, server_default=sa.true()),
-        sa.Column("created_at",     sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("updated_at",     sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("created_at",     mysql.DATETIME(fsp=6), server_default=sa.text("now()"), nullable=False),
+        sa.Column("updated_at",     mysql.DATETIME(fsp=6), server_default=sa.text("now()"), nullable=False),
     )
 
     # audit_logs — depends on users
@@ -451,7 +451,7 @@ def upgrade() -> None:
         sa.Column("identifier_type",       sa.String(16),  nullable=False, server_default=sa.text("('ip')")),
         sa.Column("limit_value",           sa.Integer,     nullable=False, server_default=sa.text("(0)")),
         sa.Column("retry_after_seconds",   sa.Integer,     nullable=True),
-        sa.Column("created_at",            sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("created_at",            mysql.DATETIME(fsp=6), server_default=sa.text("now()"), nullable=False),
     )
     _ci("ix_rate_limit_events_dimension",  "rate_limit_events", ["dimension"])
     _ci("ix_rate_limit_events_identifier", "rate_limit_events", ["identifier"])
@@ -465,7 +465,7 @@ def upgrade() -> None:
         sa.Column("is_ok",        sa.Boolean,   nullable=False),
         sa.Column("latency_ms",   sa.Integer,   nullable=True),
         sa.Column("error",        sa.Text,      nullable=True),
-        sa.Column("recorded_at",  sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("recorded_at",  mysql.DATETIME(fsp=6), server_default=sa.text("now()"), nullable=False),
         sa.Column("cpu_percent",  sa.Float,     nullable=True),
         sa.Column("mem_percent",  sa.Float,     nullable=True),
         sa.Column("disk_percent", sa.Float,     nullable=True),
@@ -486,7 +486,7 @@ def upgrade() -> None:
         sa.Column("trigger_source",          sa.String(50),   nullable=True),
         sa.Column("parent_version_id",       sa.Uuid(native_uuid=False), sa.ForeignKey("config_versions.id", ondelete="SET NULL"), nullable=True),
         sa.Column("created_by_id",           sa.Uuid(native_uuid=False), sa.ForeignKey("users.id",            ondelete="SET NULL"), nullable=True),
-        sa.Column("created_at",              sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("created_at",              mysql.DATETIME(fsp=6), server_default=sa.text("now()"), nullable=False),
     )
     _ci("ix_config_versions_parent_version_id", "config_versions", ["parent_version_id"])
 

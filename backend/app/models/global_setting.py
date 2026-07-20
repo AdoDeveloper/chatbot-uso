@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, JSON, String, Uuid, func
+from sqlalchemy.dialects import mysql
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
@@ -22,7 +23,8 @@ class GlobalSetting(Base):
         JSON, nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+        DateTime(timezone=True).with_variant(mysql.DATETIME(fsp=6), "mysql"),
+        server_default=func.now(), onupdate=func.now(), nullable=False
     )
     updated_by_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid(native_uuid=False),

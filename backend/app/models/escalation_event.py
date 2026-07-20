@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import DateTime, Enum as SAEnum, ForeignKey, JSON, String, Text, Uuid, func
+from sqlalchemy.dialects import mysql
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -39,7 +40,8 @@ class EscalationEvent(Base):
     meta_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     trigger_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False,
+        DateTime(timezone=True).with_variant(mysql.DATETIME(fsp=6), "mysql"),
+        server_default=func.now(), nullable=False,
     )
 
     conversation: Mapped["ChatConversation"] = relationship(  # noqa: F821

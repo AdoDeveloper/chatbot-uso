@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, String, Uuid, func
+from sqlalchemy.dialects import mysql
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -28,11 +29,16 @@ class Invitation(Base):
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True).with_variant(mysql.DATETIME(fsp=6), "mysql"), nullable=False
+    )
+    accepted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True).with_variant(mysql.DATETIME(fsp=6), "mysql"), nullable=True
+    )
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
+        DateTime(timezone=True).with_variant(mysql.DATETIME(fsp=6), "mysql"),
+        server_default=func.now(), nullable=False
     )
 
     created_by: Mapped["User | None"] = relationship("User", foreign_keys=[created_by_id])  # noqa: F821

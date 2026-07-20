@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import DateTime, JSON, String, Text, Uuid, func
+from sqlalchemy.dialects import mysql
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
@@ -22,10 +23,11 @@ class NotificationLog(Base):
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     payload_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+        DateTime(timezone=True).with_variant(mysql.DATETIME(fsp=6), "mysql"),
+        server_default=func.now(), nullable=False, index=True
     )
     read_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
+        DateTime(timezone=True).with_variant(mysql.DATETIME(fsp=6), "mysql"), nullable=True
     )
 
     def __repr__(self) -> str:

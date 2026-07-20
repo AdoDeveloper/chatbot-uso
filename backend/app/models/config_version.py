@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, String, Uuid, func, text as sa_text
+from sqlalchemy.dialects import mysql
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -34,7 +35,8 @@ class ConfigVersion(Base):
         nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
+        DateTime(timezone=True).with_variant(mysql.DATETIME(fsp=6), "mysql"),
+        server_default=func.now(), nullable=False
     )
 
     created_by: Mapped["User | None"] = relationship("User", foreign_keys=[created_by_id])  # noqa: F821

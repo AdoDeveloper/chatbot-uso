@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import DateTime, Integer, String, Uuid, func, text as sa_text
+from sqlalchemy.dialects import mysql
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
@@ -29,7 +30,8 @@ class RateLimitEvent(Base):
     limit_value: Mapped[int] = mapped_column(Integer, nullable=False, server_default=sa_text("(0)"))
     retry_after_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True,
+        DateTime(timezone=True).with_variant(mysql.DATETIME(fsp=6), "mysql"),
+        server_default=func.now(), nullable=False, index=True,
     )
 
     def __repr__(self) -> str:

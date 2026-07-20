@@ -131,9 +131,11 @@ class TestListRules:
         assert r.status_code == 200, r.text
         body = r.json()
         assert len(body) == 3
-        # Orden por (event, channel) — doc_error < doc_ready < escalation
+        # ORDER BY event, channel: MySQL ordena el ENUM nativo por posición de
+        # declaración (ver NotificationEvent en app/models/enums.py), no
+        # alfabéticamente — doc_ready antes que doc_error, luego escalation.
         assert [item["event"] for item in body] == [
-            "doc_error", "doc_ready", "escalation",
+            "doc_ready", "doc_error", "escalation",
         ]
 
     async def test_empty_when_no_rules(self, client, admin_user, auth_headers):

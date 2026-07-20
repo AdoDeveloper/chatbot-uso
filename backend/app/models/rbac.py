@@ -5,6 +5,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, Enum as SAEnum, ForeignKey, String, Text, UniqueConstraint, Uuid, false, func
+from sqlalchemy.dialects import mysql
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -20,7 +21,7 @@ class Role(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_system: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default=false())
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
+        DateTime(timezone=True).with_variant(mysql.DATETIME(fsp=6), "mysql"), server_default=func.now(), nullable=False
     )
 
     def __repr__(self) -> str:
@@ -36,7 +37,7 @@ class Module(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, server_default="1")
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
+        DateTime(timezone=True).with_variant(mysql.DATETIME(fsp=6), "mysql"), server_default=func.now(), nullable=False
     )
 
     permissions: Mapped[list[Permission]] = relationship(
@@ -57,7 +58,7 @@ class Permission(Base):
     name: Mapped[str] = mapped_column(String(150), unique=True, nullable=False, index=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
+        DateTime(timezone=True).with_variant(mysql.DATETIME(fsp=6), "mysql"), server_default=func.now(), nullable=False
     )
 
     module: Mapped[Module] = relationship("Module", back_populates="permissions")
@@ -83,7 +84,7 @@ class RolePermission(Base):
         Uuid(native_uuid=False), ForeignKey("permissions.id", ondelete="CASCADE"), nullable=False
     )
     granted_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
+        DateTime(timezone=True).with_variant(mysql.DATETIME(fsp=6), "mysql"), server_default=func.now(), nullable=False
     )
 
     permission: Mapped[Permission] = relationship("Permission", back_populates="role_permissions")

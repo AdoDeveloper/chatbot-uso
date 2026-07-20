@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, Enum as SAEnum, JSON, String, Text, Uuid, func, text as sa_text
+from sqlalchemy.dialects import mysql
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
@@ -25,10 +26,12 @@ class EscalationRule(Base):
     trigger_config: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False, server_default=sa_text("('{}')"))
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, server_default=sa_text("(1)"))
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
+        DateTime(timezone=True).with_variant(mysql.DATETIME(fsp=6), "mysql"),
+        server_default=func.now(), nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+        DateTime(timezone=True).with_variant(mysql.DATETIME(fsp=6), "mysql"),
+        server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
     def __repr__(self) -> str:

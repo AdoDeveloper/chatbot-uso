@@ -5,6 +5,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, Integer, String, Text, Uuid, func, text as sa_text
+from sqlalchemy.dialects import mysql
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.types import JSONList
@@ -77,7 +78,8 @@ class WidgetConfig(Base):
         Text, default="", nullable=False, server_default=sa_text("('')"),
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+        DateTime(timezone=True).with_variant(mysql.DATETIME(fsp=6), "mysql"),
+        server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
     def __repr__(self) -> str:

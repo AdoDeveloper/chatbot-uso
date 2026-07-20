@@ -142,6 +142,7 @@ async def create_version(
     if not version:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Sin cambios desde la última versión")
     await db.commit()
+    await db.refresh(version)
     await db.refresh(version, ["created_by"])
     return _to_out(version)
 

@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import DateTime, Enum as SAEnum, ForeignKey, Index, Integer, JSON, String, Text, Uuid, func, text as sa_text
+from sqlalchemy.dialects import mysql
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -41,7 +42,9 @@ class Source(Base):
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )
-    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True).with_variant(mysql.DATETIME(fsp=6), "mysql"), nullable=True
+    )
     rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     file_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
@@ -63,12 +66,16 @@ class Source(Base):
         nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
+        DateTime(timezone=True).with_variant(mysql.DATETIME(fsp=6), "mysql"),
+        server_default=func.now(), nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+        DateTime(timezone=True).with_variant(mysql.DATETIME(fsp=6), "mysql"),
+        server_default=func.now(), onupdate=func.now(), nullable=False
     )
-    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True).with_variant(mysql.DATETIME(fsp=6), "mysql"), nullable=True
+    )
 
     created_by: Mapped["User | None"] = relationship("User", foreign_keys=[created_by_id])  # noqa: F821
     reviewed_by: Mapped["User | None"] = relationship("User", foreign_keys=[reviewed_by_id])  # noqa: F821
