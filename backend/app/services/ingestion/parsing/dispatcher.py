@@ -3,14 +3,11 @@ from __future__ import annotations
 from app.models.enums import SourceType
 from app.services.ingestion.parsing.pdf import parse_pdf
 from app.services.ingestion.parsing.docx import parse_docx
-from app.services.ingestion.parsing.spreadsheet import parse_csv, parse_xlsx
 from app.services.ingestion.parsing.txt import parse_txt
 
 _PARSERS = {
     SourceType.pdf: parse_pdf,
     SourceType.docx: parse_docx,
-    SourceType.xlsx: parse_xlsx,
-    SourceType.csv: parse_csv,
     SourceType.txt: parse_txt,
 }
 

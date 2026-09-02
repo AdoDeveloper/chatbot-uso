@@ -16,6 +16,7 @@ import uuid
 
 import pytest
 
+from app.api.v1.notifications.router import _summarize_payload
 from app.models.enums import NotificationChannel, NotificationEvent, UserRole
 from app.models.notification_log import NotificationLog
 from app.models.notification_rule import NotificationRule
@@ -68,13 +69,12 @@ async def seed_rules(db_session):
 
 @pytest.fixture
 async def seed_logs(db_session):
-    """3 notification logs in_app visibles para admin, con target para
-    verificar el enmascarado en la respuesta."""
+    """3 notification logs de canal email, con target para verificar el enmascarado."""
     logs = [
         NotificationLog(
             id=uuid.uuid4(),
             event=NotificationEvent.doc_ready.value,
-            channel="in_app",
+            channel="email",
             target="admin@uso.edu.sv",
             status="sent",
             error_message=None,
@@ -84,7 +84,7 @@ async def seed_logs(db_session):
         NotificationLog(
             id=uuid.uuid4(),
             event=NotificationEvent.doc_error.value,
-            channel="in_app",
+            channel="email",
             target="50312345678",
             status="failed",
             error_message="timeout",
@@ -94,7 +94,7 @@ async def seed_logs(db_session):
         NotificationLog(
             id=uuid.uuid4(),
             event=NotificationEvent.escalation.value,
-            channel="in_app",
+            channel="email",
             target="",
             status="sent",
             error_message=None,
@@ -133,7 +133,7 @@ class TestListRules:
         assert len(body) == 3
         # ORDER BY event, channel: MySQL ordena el ENUM nativo por posición de
         # declaración (ver NotificationEvent en app/models/enums.py), no
-        # alfabéticamente — doc_ready antes que doc_error, luego escalation.
+        # alfabéticamente - doc_ready antes que doc_error, luego escalation.
         assert [item["event"] for item in body] == [
             "doc_ready", "doc_error", "escalation",
         ]
@@ -189,6 +189,39 @@ class TestEmailStatus:
         )
         assert r.status_code == 200
         assert r.json()["email_enabled"] is False
+
+    async def test_smtp_configured_true_when_env_vars_set(
+        self, client, admin_user, auth_headers, monkeypatch
+    ):
+        from app.services.notifications import smtp as smtp_mod
+
+        async def _fake_get_smtp_config(db=None):
+            return smtp_mod.SMTPSettings(
+                host="smtp.example.org", port=587, user="bot@example.org",
+                password="s3cr3t", from_email="bot@example.org", tls=True,
+            )
+
+        monkeypatch.setattr(smtp_mod, "get_smtp_config", _fake_get_smtp_config)
+        r = await client.get(
+            "/api/v1/notifications/rules/email/status", headers=auth_headers(admin_user)
+        )
+        assert r.status_code == 200
+        assert r.json()["smtp_configured"] is True
+
+    async def test_smtp_configured_false_when_missing(
+        self, client, admin_user, auth_headers, monkeypatch
+    ):
+        from app.services.notifications import smtp as smtp_mod
+
+        async def _fake_get_smtp_config(db=None):
+            return None
+
+        monkeypatch.setattr(smtp_mod, "get_smtp_config", _fake_get_smtp_config)
+        r = await client.get(
+            "/api/v1/notifications/rules/email/status", headers=auth_headers(admin_user)
+        )
+        assert r.status_code == 200
+        assert r.json()["smtp_configured"] is False
 
 
 # ── PUT /rules/email/toggle ──────────────────────────────────────────────
@@ -390,8 +423,9 @@ class TestListNotifications:
             "/api/v1/notifications", headers=auth_headers(admin_user)
         )
         items = {item["event"]: item for item in r.json()["items"]}
-        email_item = items["doc_ready"]
-        assert email_item["target"] == "ad***@uso.edu.sv"
+        email_channel = items["doc_ready"]["channels"][0]
+        assert email_channel["channel"] == "email"
+        assert email_channel["target"] == "ad***@uso.edu.sv"
         assert "admin@uso.edu.sv" not in r.text
 
     async def test_masks_non_email_target(self, client, admin_user, auth_headers, seed_logs):
@@ -399,8 +433,70 @@ class TestListNotifications:
             "/api/v1/notifications", headers=auth_headers(admin_user)
         )
         items = {item["event"]: item for item in r.json()["items"]}
-        phone_item = items["doc_error"]
-        assert phone_item["target"] == "503***"
+        phone_channel = items["doc_error"]["channels"][0]
+        assert phone_channel["target"] == "503***"
+
+    async def test_groups_multi_channel_trigger_into_one_row(
+        self, client, db_session, admin_user, auth_headers
+    ):
+        """Un mismo trigger_id entregado por correo y a 3 admins in_app
+        aparece como una fila con 2 canales, no 4 filas crudas."""
+        trigger_id = uuid.uuid4()
+        db_session.add(NotificationLog(
+            id=uuid.uuid4(), trigger_id=trigger_id,
+            event=NotificationEvent.service_down.value, channel="email",
+            target="ops@uso.edu.sv", status="sent", error_message=None,
+            payload_json={}, read_at=None,
+        ))
+        for _ in range(3):
+            db_session.add(NotificationLog(
+                id=uuid.uuid4(), trigger_id=trigger_id,
+                event=NotificationEvent.service_down.value, channel="in_app",
+                target="in_app", status="sent", error_message=None,
+                payload_json={}, read_at=None,
+            ))
+        await db_session.commit()
+
+        r = await client.get("/api/v1/notifications", headers=auth_headers(admin_user))
+        assert r.status_code == 200
+        body = r.json()
+        assert body["total"] == 1
+        assert len(body["items"]) == 1
+        trigger = body["items"][0]
+        assert trigger["id"] == str(trigger_id)
+        assert trigger["event"] == "service_down"
+        channels = {c["channel"]: c for c in trigger["channels"]}
+        assert channels["email"]["recipients"] == 1
+        assert channels["email"]["target"] == "op***@uso.edu.sv"
+        assert channels["in_app"]["recipients"] == 3
+        assert channels["in_app"]["target"] is None  # in_app no expone un destino individual
+
+    async def test_channel_status_reflects_any_failure_in_the_group(
+        self, client, db_session, admin_user, auth_headers
+    ):
+        """Si al menos una entrega del canal falló, el canal se reporta 'failed'."""
+        trigger_id = uuid.uuid4()
+        db_session.add(NotificationLog(
+            id=uuid.uuid4(), trigger_id=trigger_id,
+            event=NotificationEvent.doc_ready.value, channel="email",
+            target="a@uso.edu.sv", status="sent", error_message=None,
+            payload_json={}, read_at=None,
+        ))
+        db_session.add(NotificationLog(
+            id=uuid.uuid4(), trigger_id=trigger_id,
+            event=NotificationEvent.doc_ready.value, channel="email",
+            target="b@uso.edu.sv", status="failed", error_message="smtp timeout",
+            payload_json={}, read_at=None,
+        ))
+        await db_session.commit()
+
+        r = await client.get("/api/v1/notifications", headers=auth_headers(admin_user))
+        body = r.json()
+        trigger = next(t for t in body["items"] if t["id"] == str(trigger_id))
+        email_channel = trigger["channels"][0]
+        assert email_channel["status"] == "failed"
+        assert email_channel["error_message"] == "smtp timeout"
+        assert email_channel["recipients"] == 2
 
     async def test_empty_target_masks_to_none(self, client, admin_user, auth_headers, seed_logs):
         """_mask_target trata "" (falsy) igual que None: no revela nada."""
@@ -408,4 +504,130 @@ class TestListNotifications:
             "/api/v1/notifications", headers=auth_headers(admin_user)
         )
         items = {item["event"]: item for item in r.json()["items"]}
-        assert items["escalation"]["target"] is None
+        assert items["escalation"]["channels"][0]["target"] is None
+
+    async def test_summary_reflects_the_distinguishing_payload_field(
+        self, client, db_session, admin_user, auth_headers
+    ):
+        """El historial distingue dos disparos del mismo evento por su summary."""
+        for name in ("Instructivo_alumnos.pdf", "Reglamento_2026.pdf"):
+            db_session.add(NotificationLog(
+                id=uuid.uuid4(), trigger_id=uuid.uuid4(),
+                event=NotificationEvent.doc_ready.value, channel="email",
+                target="a@uso.edu.sv", status="sent", error_message=None,
+                payload_json={"source_name": name}, read_at=None,
+            ))
+        await db_session.commit()
+
+        r = await client.get("/api/v1/notifications", headers=auth_headers(admin_user))
+        summaries = {t["summary"] for t in r.json()["items"] if t["event"] == "doc_ready"}
+        assert "Instructivo_alumnos.pdf" in summaries
+        assert "Reglamento_2026.pdf" in summaries
+
+    async def test_own_log_id_points_to_the_requesting_admins_copy(
+        self, client, db_session, admin_user, make_user, auth_headers
+    ):
+        other_admin = await make_user(role=UserRole.admin, email="other@test.local")
+        trigger_id = uuid.uuid4()
+        own_log = NotificationLog(
+            id=uuid.uuid4(), trigger_id=trigger_id,
+            event=NotificationEvent.doc_ready.value, channel="in_app",
+            target="in_app", status="sent", error_message=None,
+            payload_json={}, read_at=None, user_id=admin_user.id,
+        )
+        other_log = NotificationLog(
+            id=uuid.uuid4(), trigger_id=trigger_id,
+            event=NotificationEvent.doc_ready.value, channel="in_app",
+            target="in_app", status="sent", error_message=None,
+            payload_json={}, read_at=None, user_id=other_admin.id,
+        )
+        db_session.add(own_log)
+        db_session.add(other_log)
+        await db_session.commit()
+
+        r = await client.get("/api/v1/notifications", headers=auth_headers(admin_user))
+        trigger = next(t for t in r.json()["items"] if t["id"] == str(trigger_id))
+        assert trigger["own_log_id"] == str(own_log.id)
+        assert trigger["own_read_at"] is None
+
+    async def test_own_log_id_reflects_read_state(
+        self, client, db_session, admin_user, auth_headers
+    ):
+        from datetime import datetime, timezone
+        trigger_id = uuid.uuid4()
+        db_session.add(NotificationLog(
+            id=uuid.uuid4(), trigger_id=trigger_id,
+            event=NotificationEvent.doc_ready.value, channel="in_app",
+            target="in_app", status="sent", error_message=None,
+            payload_json={}, read_at=datetime.now(timezone.utc), user_id=admin_user.id,
+        ))
+        await db_session.commit()
+
+        r = await client.get("/api/v1/notifications", headers=auth_headers(admin_user))
+        trigger = next(t for t in r.json()["items"] if t["id"] == str(trigger_id))
+        assert trigger["own_read_at"] is not None
+
+    async def test_own_log_id_is_none_when_only_email_channel(
+        self, client, db_session, admin_user, auth_headers
+    ):
+        trigger_id = uuid.uuid4()
+        db_session.add(NotificationLog(
+            id=uuid.uuid4(), trigger_id=trigger_id,
+            event=NotificationEvent.doc_ready.value, channel="email",
+            target="a@uso.edu.sv", status="sent", error_message=None,
+            payload_json={}, read_at=None,
+        ))
+        await db_session.commit()
+
+        r = await client.get("/api/v1/notifications", headers=auth_headers(admin_user))
+        trigger = next(t for t in r.json()["items"] if t["id"] == str(trigger_id))
+        assert trigger["own_log_id"] is None
+
+
+class TestSummarizePayload:
+    """Unit tests de _summarize_payload() (no toca la BD)."""
+
+    def test_doc_ready_uses_source_name(self):
+        assert _summarize_payload("doc_ready", {"source_name": "Instructivo.pdf"}) == "Instructivo.pdf"
+
+    def test_doc_error_uses_source_name(self):
+        assert _summarize_payload("doc_error", {"source_name": "malformado.docx"}) == "malformado.docx"
+
+    def test_escalation_uses_question(self):
+        result = _summarize_payload("escalation", {"question": "¿Cuándo abren las inscripciones?"})
+        assert result == "¿Cuándo abren las inscripciones?"
+
+    def test_service_down_uses_service_name(self):
+        assert _summarize_payload("service_down", {"service": "qdrant"}) == "Servicio: qdrant"
+
+    def test_provider_down_uses_providers(self):
+        result = _summarize_payload("provider_down", {"providers": "Groq, Mistral"})
+        assert result == "Groq, Mistral"
+
+    def test_rate_limit_threshold_uses_percent(self):
+        assert _summarize_payload("rate_limit_threshold", {"percent": 85.0}) == "85.0% del límite alcanzado"
+
+    def test_unanswered_digest_with_pending(self):
+        assert _summarize_payload("unanswered_digest", {"total_open": 3}) == "3 preguntas sin responder"
+
+    def test_unanswered_digest_singular(self):
+        assert _summarize_payload("unanswered_digest", {"total_open": 1}) == "1 pregunta sin responder"
+
+    def test_unanswered_digest_zero_pending(self):
+        assert _summarize_payload("unanswered_digest", {"total_open": 0}) == "Sin pendientes"
+
+    def test_unknown_event_returns_none(self):
+        assert _summarize_payload("some_future_event", {"foo": "bar"}) is None
+
+    def test_empty_payload_returns_none(self):
+        assert _summarize_payload("doc_ready", {}) is None
+
+    def test_missing_distinguishing_field_returns_none(self):
+        assert _summarize_payload("doc_ready", {"chunks": 12}) is None
+
+    def test_long_value_is_truncated(self):
+        long_question = "¿" + "x" * 100 + "?"
+        result = _summarize_payload("escalation", {"question": long_question})
+        assert result is not None
+        assert len(result) <= 80
+        assert result.endswith("…")

@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import datetime
+import secrets
+import string
 import uuid
 from typing import Any
 
@@ -14,6 +17,8 @@ from app.models.enums import UserRole
 from app.models.rbac import Role
 from app.models.user import User
 from app.services.system.audit import log_action
+
+_TEMP_PASSWORD_ALPHABET = string.ascii_letters + string.digits
 
 
 async def get_by_email(db: AsyncSession, email: str) -> User | None:
@@ -124,6 +129,63 @@ async def update_user(
     return user
 
 
+def _generate_temp_password(length: int = 16) -> str:
+    """Contraseña temporal aleatoria: solo letras/dígitos (sin símbolos, para
+    que el admin pueda comunicarla de viva voz o por escrito sin ambigüedad),
+    garantizando al menos una mayúscula, una minúscula y un dígito."""
+    while True:
+        candidate = "".join(secrets.choice(_TEMP_PASSWORD_ALPHABET) for _ in range(length))
+        if (
+            any(c.islower() for c in candidate)
+            and any(c.isupper() for c in candidate)
+            and any(c.isdigit() for c in candidate)
+        ):
+            return candidate
+
+
+async def reset_password(
+    db: AsyncSession,
+    *,
+    user_id: uuid.UUID,
+    current_user: User,
+    ip: str | None,
+) -> tuple[User, str]:
+    """Genera una contraseña temporal para `user_id`, fuerza su cambio en el
+    próximo login e invalida sus sesiones activas.
+
+    Mismas guardas anti-escalada que update_user/delete_user: un admin no
+    puede quedar bloqueado de resetearse a sí mismo por accidente vía este
+    endpoint (se prohíbe, igual que update_user prohíbe auto-desactivación),
+    y solo un admin puede resetear a otro admin.
+    """
+    if user_id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Use 'Cambiar contraseña' para su propia cuenta, no el reseteo de administrador",
+        )
+    user = await get_by_id(db, user_id)
+    if not user:
+        raise NotFoundError("Usuario no encontrado")
+
+    if current_user.role != UserRole.admin and user.role == UserRole.admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo un admin puede resetear la contraseña de otro admin")
+
+    temp_password = _generate_temp_password()
+    user.hashed_password = hash_password(temp_password)
+    user.must_change_password = True
+    user.tokens_valid_after = datetime.datetime.now(datetime.timezone.utc)
+
+    await log_action(
+        db, action="user.reset_password", resource_type="user",
+        actor_id=current_user.id, resource_id=str(user_id),
+        meta={"target_email": user.email},
+        ip=ip,
+    )
+    await db.commit()
+    await db.refresh(user)
+    return user, temp_password
+
+
 async def delete_user(
     db: AsyncSession,
     *,
@@ -139,6 +201,17 @@ async def delete_user(
 
     if current_user.role == UserRole.admin and user.role == UserRole.admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Los admin no pueden eliminar a otro admin")
+
+    # No permitir eliminar al único admin activo del sistema.
+    if user.role == UserRole.admin and user.is_active:
+        active_admins = await db.scalar(
+            select(func.count()).where(User.role == UserRole.admin, User.is_active.is_(True))
+        )
+        if (active_admins or 0) <= 1:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No puede eliminar al último administrador activo del sistema",
+            )
 
     await log_action(
         db, action="user.delete", resource_type="user",

@@ -1,7 +1,7 @@
-"""Tests for app.services.guardrails — input validation, injection detection."""
+"""Tests for app.services.guardrails - input validation, injection detection."""
 from __future__ import annotations
 
-from app.services.ai.guardrails import validate_input, check_system_prompt_leak
+from app.services.ai.guardrails import redact_pii, validate_input, check_system_prompt_leak
 
 
 class TestInputValidation:
@@ -62,3 +62,95 @@ class TestSystemPromptLeak:
 
     def test_partial_canary(self):
         assert check_system_prompt_leak("[[CANARY_TOKEN") is False
+
+
+class TestApplyOutputGuardrails:
+    def test_leak_is_blocked_not_passed_through(self):
+        from app.services.chat.pipeline import apply_output_guardrails, _SYSTEM_PROMPT_LEAK_MESSAGE
+
+        leaked = "Aquí está mi configuración interna: [[CANARY_TOKEN_2024]] fin del prompt."
+        result = apply_output_guardrails(leaked)
+        assert result == _SYSTEM_PROMPT_LEAK_MESSAGE
+        assert "[[CANARY_TOKEN_2024]]" not in result
+
+    def test_normal_text_passes_through_unchanged(self):
+        from app.services.chat.pipeline import apply_output_guardrails
+
+        normal = "El horario de matrícula es de 8am a 5pm."
+        assert apply_output_guardrails(normal) == normal
+
+    def test_pii_in_llm_output_is_redacted(self):
+        """El contexto recuperado (documentos indexados) nunca pasa por
+        validate_input - solo `question` lo hace. Si el LLM cita
+        textualmente un DUI presente en un documento fuente, debe
+        redactarse igual que si lo hubiera escrito el usuario. scan_output
+        estaba importado en pipeline.py pero nunca invocado (dead code)."""
+        from app.services.chat.pipeline import apply_output_guardrails
+
+        leaked_pii = "Según el registro, el estudiante con DUI 12345678-9 está matriculado."
+        result = apply_output_guardrails(leaked_pii)
+        assert "12345678-9" not in result
+
+    def test_pii_redaction_respects_configured_entities(self):
+        from app.services.chat.pipeline import apply_output_guardrails
+
+        text = "Contacto: admin@ejemplo.edu.sv"
+        result = apply_output_guardrails(text, pii_entities=[])
+        assert result == text
+
+
+class TestRedactPiiConfigurableEntities:
+    """pii_entities era configurable desde el panel (PATCH /guardrails/config)
+    y GET /config lo reflejaba, pero redact_pii nunca lo leía - usaba una
+    lista hardcodeada fija. Ahora acepta `entities` desde el caller."""
+
+    def test_default_entities_redacts_email(self):
+        result = redact_pii("mi correo es juan@example.com")
+        assert "juan@example.com" not in result
+
+    def test_empty_entities_list_still_redacts_sv_recognizers(self):
+        """Los reconocedores SV_* (DUI/NIT/NRC/teléfono) son cumplimiento
+        normativo, no un toggle del admin - deben aplicarse siempre aunque
+        el admin desactive todas las entidades genéricas."""
+        result = redact_pii("mi DUI es 12345678-9", entities=[])
+        assert "12345678-9" not in result
+
+    def test_custom_entities_list_is_respected_for_email(self):
+        result = redact_pii("mi correo es juan@example.com", entities=["EMAIL_ADDRESS"])
+        assert "juan@example.com" not in result
+
+    def test_validate_input_passes_pii_entities_through_to_redact(self):
+        result = validate_input(
+            "contáctame al correo juan@example.com",
+            pii_entities=["EMAIL_ADDRESS"],
+        )
+        assert result.passed is True
+        assert "juan@example.com" not in (result.sanitized_text or "")
+
+
+class TestSvPhoneFalsePositives:
+    """El patrón SV_PHONE matcheaba una subcadena de 8 dígitos empezando en
+    2/6/7 dentro de CUALQUIER número largo, sin exigir un límite de palabra
+    al inicio - un timestamp de 13 dígitos usado como texto de prueba se
+    redactó como si fuera un teléfono real, rompiendo la búsqueda por texto
+    exacto de esa conversación en el panel."""
+
+    def test_real_phone_still_detected(self):
+        result = redact_pii("Llámame al 71234567")
+        assert "71234567" not in result
+
+    def test_real_phone_with_prefix_still_detected(self):
+        result = redact_pii("Mi número es +503 7123-4567")
+        assert "7123-4567" not in result
+
+    def test_long_numeric_id_is_not_redacted(self):
+        """Un ID/timestamp largo que por casualidad contiene una subcadena
+        de 8 dígitos empezando en 2/6/7 no debe tratarse como teléfono."""
+        text = "El código de referencia es 1788223266862"
+        result = redact_pii(text)
+        assert result == text
+
+    def test_long_numeric_id_embedded_in_word_is_not_redacted(self):
+        text = "folio-1788223266862"
+        result = redact_pii(text)
+        assert result == text

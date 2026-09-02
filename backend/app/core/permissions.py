@@ -1,4 +1,4 @@
-"""Permission string constants — must match MODULES_SEED in services/system/rbac.py."""
+"""Constantes de strings de permisos - deben coincidir con MODULES_SEED en services/system/rbac.py."""
 
 
 class P:

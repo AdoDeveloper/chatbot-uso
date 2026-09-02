@@ -3,11 +3,11 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.deps import require_perm
+from app.core.deps import get_current_user, require_perm
 from app.core.exceptions import NotFoundError
 from app.core.permissions import P
 from app.db.session import get_db
@@ -19,17 +19,27 @@ from app.schemas.unanswered import CreateFAQFromUnanswered, UnansweredGroup, Una
 router = APIRouter(prefix="/unanswered", tags=["unanswered"])
 
 
+async def _require_conversations_update_and_knowledge_create(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    from app.services.system.rbac import has_permission
+
+    if current_user.must_change_password:
+        raise HTTPException(status_code=403, detail="Debe cambiar su contraseña antes de continuar")
+    if not await has_permission(db, current_user.role, "conversations", "update"):
+        raise HTTPException(status_code=403, detail="Sin permiso para conversations.update")
+    if not await has_permission(db, current_user.role, "knowledge", "create"):
+        raise HTTPException(status_code=403, detail="Sin permiso para knowledge.create")
+    return current_user
+
+
 @router.get("", response_model=UnansweredGroupList)
 async def list_grouped(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_perm(P.CONVERSATIONS_READ)),
 ):
-    """Devuelve las preguntas sin respuesta agrupadas por tema detectado.
-
-    Solo incluye preguntas en estado distinto a `resuelto`. El frontend usa
-    este endpoint para que el editor convierta cada pregunta en FAQ o la
-    marque como resuelta tras añadir la fuente correspondiente.
-    """
+    """Lista todas las preguntas sin responder agrupadas por tópico detectado."""
     result = await db.execute(
         select(UnansweredQuestion)
         .where(UnansweredQuestion.status != UnansweredStatus.resolved)
@@ -85,7 +95,7 @@ async def create_faq_from_unanswered(
     question_id: uuid.UUID,
     body: CreateFAQFromUnanswered,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_perm(P.CONVERSATIONS_UPDATE)),
+    current_user: User = Depends(_require_conversations_update_and_knowledge_create),
 ):
     """Convierte una pregunta sin respuesta en una FAQ y la marca como resuelta.
 

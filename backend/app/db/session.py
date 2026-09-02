@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from typing import AsyncGenerator
 
-from sqlalchemy import text as sa_text
+from sqlalchemy import event, inspect as sa_inspect, text as sa_text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -12,6 +13,20 @@ from app.core.config import get_settings
 
 class Base(DeclarativeBase):
     pass
+
+
+@event.listens_for(Base, "load", propagate=True)
+def _mark_naive_datetimes_as_utc(target, context) -> None:
+    mapper = getattr(target, "__mapper__", None)
+    if mapper is None:
+        return
+    unloaded = sa_inspect(target).unloaded
+    for column_attr in mapper.column_attrs:
+        if column_attr.key in unloaded:
+            continue
+        value = getattr(target, column_attr.key, None)
+        if isinstance(value, datetime) and value.tzinfo is None:
+            setattr(target, column_attr.key, value.replace(tzinfo=timezone.utc))
 
 
 def _make_engine():
@@ -28,11 +43,11 @@ def _make_engine():
         kwargs["poolclass"] = StaticPool
         kwargs["connect_args"] = {"check_same_thread": False}
     if not is_sqlite:
-
         kwargs["pool_pre_ping"] = False
         kwargs["pool_recycle"] = 3600
         kwargs["pool_size"] = settings.DB_POOL_SIZE
         kwargs["max_overflow"] = settings.DB_MAX_OVERFLOW
+        kwargs["connect_args"] = {"init_command": "SET time_zone = '+00:00'"}
     return create_async_engine(settings.DATABASE_URL, **kwargs)
 
 
@@ -47,17 +62,21 @@ AsyncSessionLocal = async_sessionmaker(
 )
 
 
-async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    async with AsyncSessionLocal() as session:
+async def _probe_connection(session: AsyncSession) -> None:
+    try:
+        await session.execute(sa_text("SELECT 1"))
+    except Exception:
+        await session.rollback()
         try:
             await session.execute(sa_text("SELECT 1"))
         except Exception:
             await session.rollback()
-            try:
-                await session.execute(sa_text("SELECT 1"))
-            except Exception:
-                await session.rollback()
-                raise
+            raise
+
+
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    async with AsyncSessionLocal() as session:
+        await _probe_connection(session)
         try:
             yield session
             await session.commit()

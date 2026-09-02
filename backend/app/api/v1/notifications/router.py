@@ -11,11 +11,12 @@ from app.core.deps import require_perm
 from app.core.exceptions import NotFoundError
 from app.core.permissions import P
 from app.db.session import get_db
-from app.models.enums import NotificationChannel, NotificationEvent, UserRole
+from app.models.enums import NotificationChannel
 from app.models.notification_log import NotificationLog
 from app.models.notification_rule import NotificationRule
 from app.models.user import User
 from app.schemas.notification import (
+    ChannelDeliveryOut,
     ChannelToggleIn,
     InboxOut,
     MarkReadOut,
@@ -23,32 +24,16 @@ from app.schemas.notification import (
     NotificationRuleOut,
     NotificationItemOut,
     NotificationRuleUpdate,
+    NotificationTriggerOut,
 )
 from app.schemas.report_schedule import ReportSchedule
+from app.services.notifications.audience import visible_events as _visible_events
 from app.services.system.report_schedule import (
     get_report_schedule as load_report_schedule,
     upsert_report_schedule,
 )
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
-
-
-_EVENT_INAPP_AUDIENCE: dict[NotificationEvent, set[UserRole]] = {
-    NotificationEvent.doc_ready: {UserRole.admin, UserRole.editor},
-    NotificationEvent.doc_error: {UserRole.admin, UserRole.editor},
-    NotificationEvent.escalation: {UserRole.admin, UserRole.editor},
-    NotificationEvent.unanswered_digest: {UserRole.admin, UserRole.editor},
-    NotificationEvent.provider_down: {UserRole.admin, UserRole.editor, UserRole.viewer},
-    NotificationEvent.service_down: {UserRole.admin, UserRole.editor, UserRole.viewer},
-    NotificationEvent.rate_limit_threshold: {UserRole.admin, UserRole.editor, UserRole.viewer},
-}
-
-
-def _visible_events(role: UserRole) -> list[str]:
-    return [
-        ev.value for ev in NotificationEvent
-        if role in (_EVENT_INAPP_AUDIENCE.get(ev) or set())
-    ]
 
 
 def _mask_target(target: str | None) -> str | None:
@@ -59,6 +44,48 @@ def _mask_target(target: str | None) -> str | None:
         local, domain = target.split("@", 1)
         return local[:2] + "***@" + domain
     return target[:3] + "***"
+
+
+_SUMMARY_MAX_LEN = 80
+
+
+def _truncate(text: str, max_len: int = _SUMMARY_MAX_LEN) -> str:
+    text = text.strip()
+    return text if len(text) <= max_len else text[: max_len - 1].rstrip() + "…"
+
+
+def _summarize_payload(event: str, payload: dict) -> str | None:
+    """Extrae el dato distintivo de un disparo según su tipo de evento."""
+    if not payload:
+        return None
+
+    if event in ("doc_ready", "doc_error"):
+        name = payload.get("source_name")
+        return _truncate(str(name)) if name else None
+
+    if event == "escalation":
+        question = payload.get("question")
+        return _truncate(str(question)) if question else None
+
+    if event == "service_down":
+        service = payload.get("service")
+        return f"Servicio: {service}" if service else None
+
+    if event == "provider_down":
+        providers = payload.get("providers")
+        return _truncate(str(providers)) if providers else None
+
+    if event == "rate_limit_threshold":
+        percent = payload.get("percent")
+        return f"{percent}% del límite alcanzado" if percent is not None else None
+
+    if event == "unanswered_digest":
+        total = payload.get("total_open")
+        if total is None:
+            return None
+        return f"{total} pregunta{'s' if total != 1 else ''} sin responder" if total else "Sin pendientes"
+
+    return None
 
 
 @router.get("/rules", response_model=list[NotificationRuleOut])
@@ -75,6 +102,7 @@ async def list_rules(
 class EmailStatusOut(BaseModel):
     """Estado agregado del canal email: true si AL MENOS una regla está activa."""
     email_enabled: bool
+    smtp_configured: bool
 
 
 @router.get("/rules/email/status", response_model=EmailStatusOut)
@@ -82,12 +110,15 @@ async def email_status(
     db: AsyncSession = Depends(get_db),
     _: object = Depends(require_perm(P.NOTIFICATIONS_READ)),
 ):
+    from app.services.notifications.smtp import get_smtp_config
+
     count = await db.scalar(
         select(func.count())
         .select_from(NotificationRule)
         .where(NotificationRule.channel == NotificationChannel.email, NotificationRule.enabled.is_(True))
     )
-    return EmailStatusOut(email_enabled=bool(count))
+    cfg = await get_smtp_config()
+    return EmailStatusOut(email_enabled=bool(count), smtp_configured=cfg is not None)
 
 
 @router.get("/report-schedule", response_model=ReportSchedule)
@@ -167,11 +198,13 @@ async def notifications_inbox(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_perm(P.NOTIFICATIONS_READ)),
 ):
-    """Últimas N notificaciones in-app visibles para el rol + count de no leídas."""
-    visible = _visible_events(current_user.role)
+    """Últimas N notificaciones in-app de ESTE usuario + count de no leídas.
+    """
+    visible = await _visible_events(db, current_user.role)
     result = await db.execute(
         select(NotificationLog)
         .where(NotificationLog.channel == NotificationChannel.in_app.value)
+        .where(NotificationLog.user_id == current_user.id)
         .where(NotificationLog.event.in_(visible))
         .order_by(NotificationLog.created_at.desc())
         .limit(limit)
@@ -181,6 +214,7 @@ async def notifications_inbox(
     unread_q = await db.execute(
         select(func.count(NotificationLog.id))
         .where(NotificationLog.channel == NotificationChannel.in_app.value)
+        .where(NotificationLog.user_id == current_user.id)
         .where(NotificationLog.event.in_(visible))
         .where(NotificationLog.read_at.is_(None))
     )
@@ -198,6 +232,7 @@ async def notifications_inbox(
                 error_message=log.error_message,
                 created_at=str(log.created_at),
                 read_at=str(log.read_at) if log.read_at else None,
+                summary=_summarize_payload(log.event, log.payload_json),
             )
             for log in logs
         ],
@@ -211,36 +246,79 @@ async def list_notifications(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_perm(P.NOTIFICATIONS_READ)),
 ):
-    """Historial de notificaciones in-app visibles para el rol, paginado."""
-    visible = _visible_events(current_user.role)
+    """Historial de notificaciones, agrupado por disparo (trigger_id)."""
+    visible = await _visible_events(db, current_user.role)
+
+    trigger_ts = func.max(NotificationLog.created_at).label("trigger_ts")
     total = await db.scalar(
-        select(func.count()).select_from(NotificationLog)
-        .where(NotificationLog.channel == NotificationChannel.in_app.value)
+        select(func.count(func.distinct(NotificationLog.trigger_id)))
         .where(NotificationLog.event.in_(visible))
     ) or 0
-    result = await db.execute(
-        select(NotificationLog)
-        .where(NotificationLog.channel == NotificationChannel.in_app.value)
+    page_triggers_result = await db.execute(
+        select(NotificationLog.trigger_id, trigger_ts)
         .where(NotificationLog.event.in_(visible))
-        .order_by(NotificationLog.created_at.desc())
+        .group_by(NotificationLog.trigger_id)
+        .order_by(trigger_ts.desc())
         .offset((page - 1) * page_size)
         .limit(page_size)
     )
-    logs = result.scalars().all()
+    page_trigger_ids = [row[0] for row in page_triggers_result.all()]
+    if not page_trigger_ids:
+        return NotificationListOut(items=[], total=total, page=page, page_size=page_size)
 
-    items = [
-        NotificationItemOut(
-            id=str(log.id),
-            event=log.event,
-            channel=log.channel,
-            target=_mask_target(log.target),
-            status=log.status,
-            error_message=log.error_message,
-            created_at=str(log.created_at),
-            read_at=str(log.read_at) if log.read_at else None,
+    logs_result = await db.execute(
+        select(NotificationLog)
+        .where(NotificationLog.trigger_id.in_(page_trigger_ids))
+        .order_by(NotificationLog.created_at.desc())
+    )
+    logs = logs_result.scalars().all()
+
+    by_trigger: dict[uuid.UUID, list[NotificationLog]] = {}
+    for log_row in logs:
+        by_trigger.setdefault(log_row.trigger_id, []).append(log_row)
+
+    items = []
+    for trigger_id in page_trigger_ids:
+        rows = by_trigger.get(trigger_id, [])
+        if not rows:
+            continue
+        channels: dict[str, list[NotificationLog]] = {}
+        for row in rows:
+            channels.setdefault(row.channel, []).append(row)
+
+        channel_items = []
+        for channel_name, channel_rows in channels.items():
+            failed = [r for r in channel_rows if r.status == "failed"]
+            status = "failed" if failed else "sent"
+            error_message = failed[0].error_message if failed else None
+            target = (
+                _mask_target(channel_rows[0].target)
+                if channel_name == NotificationChannel.email.value
+                else None
+            )
+            channel_items.append(ChannelDeliveryOut(
+                channel=channel_name,
+                status=status,
+                recipients=len(channel_rows),
+                target=target,
+                error_message=error_message,
+            ))
+
+        own_row = next(
+            (r for r in rows if r.channel == NotificationChannel.in_app.value and r.user_id == current_user.id),
+            None,
         )
-        for log in logs
-    ]
+
+        items.append(NotificationTriggerOut(
+            id=str(trigger_id),
+            event=rows[0].event,
+            created_at=str(max(r.created_at for r in rows)),
+            channels=channel_items,
+            summary=_summarize_payload(rows[0].event, rows[0].payload_json),
+            own_log_id=str(own_row.id) if own_row else None,
+            own_read_at=str(own_row.read_at) if own_row and own_row.read_at else None,
+        ))
+
     return NotificationListOut(items=items, total=total, page=page, page_size=page_size)
 
 
@@ -252,10 +330,11 @@ async def mark_all_notifications_read(
     from sqlalchemy import update
     from datetime import datetime, timezone
     now = datetime.now(timezone.utc)
-    visible = _visible_events(current_user.role)
+    visible = await _visible_events(db, current_user.role)
     res = await db.execute(
         update(NotificationLog)
         .where(NotificationLog.channel == NotificationChannel.in_app.value)
+        .where(NotificationLog.user_id == current_user.id)
         .where(NotificationLog.event.in_(visible))
         .where(NotificationLog.read_at.is_(None))
         .values(read_at=now)
@@ -268,11 +347,13 @@ async def mark_all_notifications_read(
 async def mark_notification_read(
     notification_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _: object = Depends(require_perm(P.NOTIFICATIONS_UPDATE)),
+    current_user: User = Depends(require_perm(P.NOTIFICATIONS_UPDATE)),
 ):
     from datetime import datetime, timezone
     result = await db.execute(
-        select(NotificationLog).where(NotificationLog.id == notification_id)
+        select(NotificationLog)
+        .where(NotificationLog.id == notification_id)
+        .where(NotificationLog.user_id == current_user.id)
     )
     log = result.scalar_one_or_none()
     if not log:

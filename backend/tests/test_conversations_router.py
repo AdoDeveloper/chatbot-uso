@@ -1,8 +1,8 @@
 """Tests para app/api/v1/conversations/router.py.
 
 Cubre lo que no tenía ningún test: get_conversation, update status, CSAT,
-feedback/annotate de mensajes, tags, y bulk_action (optimizado hoy de N
-SELECTs a un solo IN() — este archivo fija el contrato para que una futura
+feedback de mensajes, tags, y bulk_action (optimizado hoy de N
+SELECTs a un solo IN() - este archivo fija el contrato para que una futura
 regresión de performance o de lógica no pase desapercibida).
 """
 from __future__ import annotations
@@ -140,22 +140,6 @@ class TestMessageFeedback:
         assert r.status_code == 204
         await db_session.refresh(msg)
         assert msg.feedback == MessageFeedback.positive
-
-
-class TestMessageAnnotate:
-    async def test_sets_annotation_and_note(self, client, admin_user, auth_headers, db_session):
-        conv = await _make_conversation(db_session)
-        msg = await _make_message(db_session, conv)
-
-        r = await client.patch(
-            f"/api/v1/conversations/messages/{msg.id}/annotate",
-            json={"annotation": "hallucination", "note": "inventó un teléfono"},
-            headers=auth_headers(admin_user),
-        )
-        assert r.status_code == 204
-        await db_session.refresh(msg)
-        assert msg.annotation == "hallucination"
-        assert msg.annotation_note == "inventó un teléfono"
 
 
 class TestConversationTags:
@@ -378,3 +362,101 @@ class TestListKnownTags:
         by_tag = {row["tag"]: row["count"] for row in body}
         assert by_tag["becas"] == 2
         assert by_tag["urgente"] == 1
+
+
+class TestDeleteConversation:
+    """DELETE /conversations/{id} - permiso conversations.delete, agregado
+    tras la auditoría que encontró el permiso sembrado en el catálogo de
+    roles sin ningún endpoint que lo usara."""
+
+    async def test_requires_auth(self, client):
+        r = await client.delete(f"/api/v1/conversations/{uuid.uuid4()}")
+        assert r.status_code == 401
+
+    async def test_not_found_returns_404(self, client, admin_user, auth_headers):
+        r = await client.delete(f"/api/v1/conversations/{uuid.uuid4()}", headers=auth_headers(admin_user))
+        assert r.status_code == 404
+
+    async def test_viewer_without_permission_gets_403(
+        self, client, viewer_user, auth_headers, db_session,
+    ):
+        """viewer no tiene conversations.delete en el seed (solo read)."""
+        conv = await _make_conversation(db_session)
+        r = await client.delete(f"/api/v1/conversations/{conv.id}", headers=auth_headers(viewer_user))
+        assert r.status_code == 403
+
+    async def test_admin_deletes_conversation_and_cascades_messages(
+        self, client, admin_user, auth_headers, db_session,
+    ):
+        conv = await _make_conversation(db_session)
+        msg = await _make_message(db_session, conv)
+        conv_id, msg_id = conv.id, msg.id
+
+        r = await client.delete(f"/api/v1/conversations/{conv_id}", headers=auth_headers(admin_user))
+        assert r.status_code == 204
+
+        db_session.expire_all()
+        assert await db_session.get(ChatConversation, conv_id) is None
+        assert await db_session.get(ChatMessage, msg_id) is None
+
+    async def test_delete_writes_audit_log(self, client, admin_user, auth_headers, db_session):
+        from sqlalchemy import select as _select
+        from app.models.audit_log import AuditLog
+
+        conv = await _make_conversation(db_session)
+        conv_id = conv.id
+
+        r = await client.delete(f"/api/v1/conversations/{conv_id}", headers=auth_headers(admin_user))
+        assert r.status_code == 204
+
+        rows = (await db_session.execute(
+            _select(AuditLog).where(AuditLog.action == "conversation.delete")
+        )).scalars().all()
+        assert any(row.resource_id == str(conv_id) for row in rows)
+
+
+class TestBulkDeleteConversations:
+    async def test_viewer_without_permission_gets_403(
+        self, client, viewer_user, auth_headers, db_session,
+    ):
+        conv = await _make_conversation(db_session)
+        r = await client.post(
+            "/api/v1/conversations/bulk",
+            json={"conversation_ids": [str(conv.id)], "action": "delete"},
+            headers=auth_headers(viewer_user),
+        )
+        assert r.status_code == 403
+        # No debe haberse borrado pese al 403.
+        assert await db_session.get(ChatConversation, conv.id) is not None
+
+    async def test_admin_bulk_deletes(self, client, admin_user, auth_headers, db_session):
+        conv1 = await _make_conversation(db_session)
+        conv2 = await _make_conversation(db_session)
+
+        r = await client.post(
+            "/api/v1/conversations/bulk",
+            json={"conversation_ids": [str(conv1.id), str(conv2.id)], "action": "delete"},
+            headers=auth_headers(admin_user),
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["affected"] == 2
+        assert body["errors"] == []
+
+        conv1_id, conv2_id = conv1.id, conv2.id
+        db_session.expire_all()
+        assert await db_session.get(ChatConversation, conv1_id) is None
+        assert await db_session.get(ChatConversation, conv2_id) is None
+
+    async def test_nonexistent_id_reported_as_error_not_crash(
+        self, client, admin_user, auth_headers,
+    ):
+        r = await client.post(
+            "/api/v1/conversations/bulk",
+            json={"conversation_ids": [str(uuid.uuid4())], "action": "delete"},
+            headers=auth_headers(admin_user),
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["affected"] == 0
+        assert len(body["errors"]) == 1

@@ -2,7 +2,7 @@
 
 conftest._seed_rbac_for_tests siembra MODULES_SEED/SYSTEM_ROLES con ORM puro
 ANTES de cada test (fixture db_engine, autouse vía db_session), así que la BD
-ya llega con RBAC poblado — seed_rbac() aquí siempre corre en modo idempotente
+ya llega con RBAC poblado - seed_rbac() aquí siempre corre en modo idempotente
 (counts en 0), nunca desde una tabla vacía. Los tests de creación usan un
 helper que vacía esas tablas primero para poder verificar el camino de
 creación real; los demás dependen del seed ya aplicado por el fixture.
@@ -148,13 +148,6 @@ async def test_get_role_permissions_returns_empty_set_on_programming_error(db_se
 
 
 async def test_get_all_roles_returns_system_roles_in_creation_order(db_session):
-    # get_all_roles ordena por created_at, pero _seed_rbac_for_tests inserta
-    # los 3 roles del sistema dentro de la misma transacción — server_default
-    # func.now() en MySQL evalúa una sola vez por sentencia, así que las tres
-    # filas comparten el mismo timestamp y el desempate entre ellas queda
-    # indefinido (no es un bug de este test: get_all_roles no garantiza orden
-    # estable sin una columna de desempate explícita). Verificamos el
-    # contenido, no un orden que la función no promete bajo timestamps iguales.
     await rbac_service.seed_rbac(db_session)
 
     roles = await rbac_service.get_all_roles(db_session)

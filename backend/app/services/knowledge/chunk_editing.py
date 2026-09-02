@@ -24,7 +24,7 @@ log = structlog.get_logger()
 
 
 async def _edited_point_ids(db: AsyncSession, source_id: str) -> set[str]:
-    """Return the set of chunk point-ids that have at least one edit row."""
+    """Devuelve el conjunto de point-ids de chunks que tienen al menos una edición registrada."""
     res = await db.execute(
         select(ChunkEdit.chunk_point_id).where(ChunkEdit.source_id == uuid.UUID(source_id)).distinct()
     )
@@ -41,7 +41,6 @@ def _chunk_to_out(c: dict, *, was_edited: bool) -> ChunkOut:
         section=c.get("section"),
         parent_id=c.get("parent_id"),
         parent_text=c.get("parent_text"),
-        environment=c.get("environment"),
         warnings=c.get("warnings") or [],
         is_discarded=bool(c.get("is_discarded", False)),
         was_edited=was_edited,
@@ -51,11 +50,11 @@ def _chunk_to_out(c: dict, *, was_edited: bool) -> ChunkOut:
 async def list_source_chunks(
     db: AsyncSession, *, source_id: str, page: int, page_size: int, warning: str | None,
 ) -> ChunkListOut:
-    """List chunks for a specific source, paginated with the app-standard
-    page/page_size/total contract (same shape as /conversations, /audit/logs).
+    """Lista los chunks de una fuente específica, paginados con el contrato
+    estándar de la app page/page_size/total (misma forma que /conversations, /audit/logs).
 
-    Also returns an aggregated count of warnings across the whole source so the
-    review UI can show "12 chunks necesitan atención" at the top.
+    También devuelve un conteo agregado de warnings de toda la fuente para que
+    el UI de revisión pueda mostrar "12 chunks necesitan atención" arriba.
     """
     all_chunks = await vector_store.list_all_chunks(source_id)
 
@@ -83,12 +82,12 @@ async def list_source_chunks(
 
 
 async def get_chunk(db: AsyncSession, *, point_id: str) -> ChunkOut:
-    """Get a single chunk by Qdrant point ID."""
+    """Obtiene un solo chunk por su point ID de Qdrant."""
     chunk = await vector_store.get_chunk(point_id)
     if not chunk:
         raise NotFoundError("Chunk no encontrado")
 
-    # Has this chunk ever been edited?
+    # ¿Este chunk fue editado alguna vez?
     res = await db.execute(
         select(ChunkEdit.id).where(ChunkEdit.chunk_point_id == point_id).limit(1)
     )
@@ -102,7 +101,7 @@ async def edit_chunk(
 ) -> ChunkOut:
     """
     Edit a chunk's text. The embedding is regenerated, warnings are recomputed,
-    and an audit row is written. The edit applies immediately — chunks are
+    and an audit row is written. The edit applies immediately - chunks are
     editable at any time, in any review state.
 
     Invalidates the semantic cache of the chunk's environment so stale answers
@@ -126,7 +125,7 @@ async def edit_chunk(
     if not source:
         raise NotFoundError("La fuente del chunk ya no existe")
 
-    # 1. Re-embed
+    # 1. Regenerar embedding
     try:
         [emb] = await embed_texts_async([new_text], prefix="passage: ")
     except Exception as exc:
@@ -134,14 +133,14 @@ async def edit_chunk(
         log.error("chunk.edit_embed_failed", point_id=point_id, error=str(exc))
         raise HTTPException(status_code=500, detail="No se pudo regenerar el embedding. Inténtelo de nuevo más tarde.")
 
-    # 2. Recompute warnings (use .env chunk size to stay consistent with ingestion)
+    # 2. Recalcular warnings (usa el tamaño de chunk del .env para mantener consistencia con la ingesta)
     new_warnings = compute_warnings(new_text, get_env_settings().CHATBOT_CHUNK_PARENT_SIZE)
 
-    # 3. Upsert back into Qdrant (same point_id = update)
+    # 3. Upsert de vuelta en Qdrant (mismo point_id = actualización)
     from qdrant_client.models import PointStruct, SparseVector
     client = vector_store._get_client()
     new_payload = dict(existing)
-    # Drop fields that Qdrant inserts for us (id) and that we're explicitly overwriting
+    # Descarta campos que Qdrant inserta por su cuenta (id) y los que sobrescribimos explícitamente
     new_payload.pop("id", None)
     new_payload["text"] = new_text
     new_payload["warnings"] = new_warnings
@@ -163,7 +162,7 @@ async def edit_chunk(
         wait=True,
     )
 
-    # 4. Audit row
+    # 4. Fila de auditoría
     edit = ChunkEdit(
         chunk_point_id=point_id,
         source_id=source.id,
@@ -175,7 +174,7 @@ async def edit_chunk(
     db.add(edit)
     await db.commit()
 
-    # 5. Invalidate semantic cache (old answers may reference old text)
+    # 5. Invalidar caché semántico (respuestas viejas pueden referenciar texto anterior)
     try:
         await cache_svc.invalidate_by_source(source_id_str)
     except Exception as exc:
@@ -204,7 +203,7 @@ async def edit_chunk(
     )
 
 
-async def set_discarded(*, point_id: str, value: bool, user: User) -> ChunkOut:
+async def set_discarded(db: AsyncSession, *, point_id: str, value: bool, user: User) -> ChunkOut:
     existing = await vector_store.get_chunk(point_id)
     if not existing:
         raise NotFoundError("Chunk no encontrado")
@@ -224,7 +223,7 @@ async def set_discarded(*, point_id: str, value: bool, user: User) -> ChunkOut:
         by=str(user.id),
     )
 
-    # Invalidate cache (discarded chunks must not appear)
+    # Invalidar caché (los chunks descartados no deben aparecer)
     sid = existing.get("source_id")
     if sid:
         try:
@@ -233,6 +232,10 @@ async def set_discarded(*, point_id: str, value: bool, user: User) -> ChunkOut:
             log.warning("chunk.cache_invalidate_discard_failed", source_id=sid, error=str(exc))
 
     existing["is_discarded"] = value
+    res = await db.execute(
+        select(ChunkEdit.id).where(ChunkEdit.chunk_point_id == point_id).limit(1)
+    )
+    was_edited = res.first() is not None
     return ChunkOut(
         id=point_id,
         text=existing.get("text", ""),
@@ -244,12 +247,12 @@ async def set_discarded(*, point_id: str, value: bool, user: User) -> ChunkOut:
         parent_text=existing.get("parent_text"),
         warnings=existing.get("warnings") or [],
         is_discarded=value,
-        was_edited=False,  # no query here; safe default — call /chunks/:id for fresh data
+        was_edited=was_edited,
     )
 
 
 async def chunk_history(db: AsyncSession, *, point_id: str) -> list[ChunkEditOut]:
-    """List edits applied to a chunk, newest first."""
+    """Lista las ediciones aplicadas a un chunk, más recientes primero."""
     res = await db.execute(
         select(ChunkEdit)
         .where(ChunkEdit.chunk_point_id == point_id)

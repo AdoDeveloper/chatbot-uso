@@ -10,6 +10,7 @@ from app.core.deps import require_perm
 from app.core.permissions import P
 from app.db.session import get_db
 from app.models.audit_log import AuditLog
+from app.models.global_setting import GlobalSetting
 from app.schemas.common import OperationStatus
 from app.services.ai.guardrails import validate_input, reload_custom_patterns
 from app.services.system import guardrail_patterns as patterns_svc
@@ -85,14 +86,14 @@ async def get_config(
     db: AsyncSession = Depends(get_db),
     _=Depends(_admin),
 ):
-    from app.core.config import get_settings as get_app_settings
     from app.services.ai.guardrails import get_active_compiled_patterns
-    s = get_app_settings()
+    from app.services.system.settings import get_runtime_overrides
+    overrides = await get_runtime_overrides(db)
     return GuardrailConfig(
-        enabled=s.GUARDRAILS_ENABLED,
-        max_input_chars=s.MAX_INPUT_CHARS,
-        max_output_tokens=s.MAX_OUTPUT_TOKENS,
-        pii_entities=["PHONE_NUMBER", "EMAIL_ADDRESS", "CREDIT_CARD", "IBAN_CODE"],
+        enabled=overrides["guardrails_enabled"],
+        max_input_chars=overrides["max_input_chars"],
+        max_output_tokens=overrides["max_output_tokens"],
+        pii_entities=overrides["pii_entities"],
         injection_patterns_count=len(get_active_compiled_patterns()),
     )
 
@@ -107,12 +108,13 @@ async def update_config(
 
     Solo persiste claves whitelisteadas para prevenir inyección en GlobalSetting.
     """
-    from app.models.global_setting import GlobalSetting
+    from app.services.system.settings import invalidate_runtime_overrides
     allowed = {"guardrails_enabled", "max_input_chars", "max_output_tokens", "pii_entities"}
     for k, v in body.items():
         if k in allowed:
             await db.merge(GlobalSetting(key=k, value=v))
     await db.commit()
+    invalidate_runtime_overrides()
     return OperationStatus()
 
 
@@ -205,7 +207,14 @@ async def test_guardrails(
     """Prueba el motor con un texto. Retorna el patrón que matcheó (si alguno)."""
     # Refresca custom patterns por si se editaron desde otro proceso
     await reload_custom_patterns(db)
-    result = validate_input(body.text)
+    from app.services.system.settings import get_runtime_overrides
+    overrides = await get_runtime_overrides(db)
+    result = validate_input(
+        body.text,
+        enabled=overrides["guardrails_enabled"],
+        max_input_chars=overrides["max_input_chars"],
+        pii_entities=overrides["pii_entities"],
+    )
     return GuardrailTestResponse(
         passed=result.passed,
         reason=result.reason,

@@ -113,7 +113,8 @@ async def microsoft_callback(
     """Recibe el authorization code de Microsoft, lo intercambia por tokens,
     obtiene el email del id_token y devuelve un par JWT propio del sistema.
 
-    Crea el usuario automáticamente si no existe y su dominio está permitido.
+    NO crea usuarios nuevos: el acceso vía SSO requiere que la cuenta ya
+    exista (creada por el flujo normal de invitación).
     """
     from app.services.auth import sso as sso_service
 
@@ -132,7 +133,7 @@ async def login(body: LoginRequest, request: Request, db: AsyncSession = Depends
     """
     await _enforce_auth_rate_limit(request, "login", get_settings().RATE_LIMIT_LOGIN_PER_MIN)
 
-    # Enforce credentials_enabled setting — reject at the backend level
+    # Aplica el setting credentials_enabled - rechaza a nivel de backend
     credentials_raw = await _get_setting(db, "auth_credentials_enabled")
     if credentials_raw is not None and not bool(credentials_raw):
         raise HTTPException(
@@ -295,6 +296,8 @@ async def change_password(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
+    await _enforce_auth_rate_limit(request, "change_password", get_settings().RATE_LIMIT_LOGIN_PER_MIN)
+
     if not verify_password(body.current_password, current_user.hashed_password):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Contraseña actual incorrecta")
 
@@ -388,5 +391,16 @@ async def onboarding_dismiss(
     panel.
     """
     current_user.onboarding_dismissed = True
+    await db.commit()
+    return OperationStatus()
+
+
+@router.post("/onboarding-reset", response_model=OperationStatus)
+async def onboarding_reset(
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+) -> OperationStatus:
+    """Vuelve a mostrar el wizard para este usuario (inverso de dismiss)."""
+    current_user.onboarding_dismissed = False
     await db.commit()
     return OperationStatus()

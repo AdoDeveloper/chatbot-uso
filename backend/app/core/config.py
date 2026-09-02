@@ -44,9 +44,9 @@ class Settings(BaseSettings):
 
     ALLOWED_ORIGINS: list[str] = ["*"]
 
-    # JSON payload size limits
-    MAX_JSON_BODY_SIZE_MB: float = 1.0  # 1MB max
-    MAX_JSON_DEPTH: int = 100  # Max nesting depth
+    # Límites de tamaño del payload JSON
+    MAX_JSON_BODY_SIZE_MB: float = 1.0  # 1MB máximo
+    MAX_JSON_DEPTH: int = 100  # Profundidad máxima de anidación
 
     WIDGET_BASE_URL: str = "http://localhost:8000"
 
@@ -60,9 +60,7 @@ class Settings(BaseSettings):
     LLM_LMSTUDIO_BASE: str = "http://localhost:1234/v1"
     LLM_VLLM_BASE: str = "http://localhost:8000/v1"
 
-    GUARDRAILS_ENABLED: bool = True
     MAX_INPUT_CHARS: int = 4000
-    MAX_OUTPUT_TOKENS: int = 800
 
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587
@@ -95,7 +93,7 @@ class Settings(BaseSettings):
             )
         if self.ENVIRONMENT == "production" and self.DEBUG:
             raise ValueError(
-                "DEBUG must be false in production — it leaks stack traces "
+                "DEBUG must be false in production - it leaks stack traces "
                 "and internal details in HTTP responses and logs."
             )
         if self.FIRST_ADMIN_PASSWORD and len(self.FIRST_ADMIN_PASSWORD) < 8:
@@ -110,7 +108,7 @@ class Settings(BaseSettings):
             )
         if self.ENVIRONMENT == "production" and self.DATABASE_URL.startswith("sqlite"):
             raise ValueError(
-                "DATABASE_URL uses SQLite — not supported in production. "
+                "DATABASE_URL uses SQLite - not supported in production. "
                 "Use MySQL: mysql+aiomysql://user:pass@host:3306/dbname"
             )
         if len(self.SECRET_KEY) < 32:
@@ -131,7 +129,6 @@ class Settings(BaseSettings):
     MICROSOFT_CLIENT_SECRET: str | None = None
     MICROSOFT_TENANT_ID: str | None = None
     MICROSOFT_REDIRECT_URI: str | None = None
-    GRAPH_MAILBOX: str | None = None
 
     CHATBOT_CHUNK_PARENT_SIZE: int = 4000
     CHATBOT_CHUNK_CHILD_SIZE: int = 1024

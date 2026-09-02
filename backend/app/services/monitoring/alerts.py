@@ -21,6 +21,7 @@ log = structlog.get_logger()
 COOLDOWN_SEC = {
     NotificationEvent.service_down: 600,
     NotificationEvent.rate_limit_threshold: 1800,
+    NotificationEvent.provider_down: 600,
 }
 
 
@@ -90,6 +91,41 @@ async def check_rate_limit_threshold(db: AsyncSession, *, ratio: float = 0.8) ->
             })
             return 1
     return 0
+
+
+_PROVIDER_DOWN_SINCE_KEY = "alert:since:provider_down:all"
+_PROVIDER_DOWN_SINCE_TTL = 6 * 3600
+
+
+async def _provider_down_since() -> str:
+    """Devuelve el timestamp ISO del primer fallo de la racha actual (SET NX)."""
+    from datetime import datetime, timezone
+    now_iso = datetime.now(timezone.utc).isoformat()
+    try:
+        redis = get_redis()
+        await redis.set(_PROVIDER_DOWN_SINCE_KEY, now_iso, ex=_PROVIDER_DOWN_SINCE_TTL, nx=True)
+        stored = await redis.get(_PROVIDER_DOWN_SINCE_KEY)
+        return stored or now_iso
+    except Exception:
+        return now_iso
+
+
+async def notify_provider_down(error: str, providers: list[str] | None = None) -> None:
+    """Notifica que todos los proveedores LLM de la cadena fallaron."""
+    if not await _can_fire(NotificationEvent.provider_down, "all"):
+        return
+    try:
+        from app.db.session import AsyncSessionLocal
+        since = await _provider_down_since()
+        payload = {
+            "providers": ", ".join(providers) if providers else "(desconocido)",
+            "error": error[:300] if error else "(sin detalle)",
+            "since": since,
+        }
+        async with AsyncSessionLocal() as db:
+            await send_notification(db, event=NotificationEvent.provider_down, payload=payload)
+    except Exception as exc:
+        log.warning("alerts.provider_down_notify_failed", error=str(exc))
 
 
 async def run_all_checks(db: AsyncSession) -> dict:

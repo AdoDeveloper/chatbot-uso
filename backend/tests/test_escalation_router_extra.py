@@ -41,7 +41,7 @@ class TestTriggerSchemas:
         body = r.json()
         no_answer = next(item for item in body if item["trigger_type"] == "no_answer")
         assert "wait_seconds" in no_answer["fields"]
-        assert no_answer["fields"]["wait_seconds"]["default"] == 120
+        assert no_answer["fields"]["wait_seconds"]["default"] == 8
 
     async def test_list_trigger_schemas_editor_allowed(self, client, editor_user, auth_headers):
         r = await client.get("/api/v1/escalation/triggers/schemas", headers=auth_headers(editor_user))

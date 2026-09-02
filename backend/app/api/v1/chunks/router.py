@@ -20,7 +20,6 @@ from app.schemas.chunk import (
 )
 from app.services.ingestion import vector_store
 from app.services.ai.embedding import embed_texts_async
-from app.services.ai.reranker import rerank_async
 from app.services.knowledge import chunk_editing
 
 router = APIRouter(prefix="/chunks", tags=["chunks"])
@@ -57,14 +56,6 @@ async def edit_chunk(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_perm(P.KNOWLEDGE_UPDATE)),
 ):
-    """
-    Edit a chunk's text. The embedding is regenerated, warnings are recomputed,
-    and an audit row is written. The edit applies immediately — chunks are
-    editable at any time, in any review state.
-
-    Invalidates the semantic cache of the chunk's environment so stale answers
-    referencing the previous text won't be served.
-    """
     return await chunk_editing.edit_chunk(
         db, point_id=point_id, new_text=body.text, reason=body.reason, current_user=current_user,
     )
@@ -76,8 +67,7 @@ async def discard_chunk(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_perm(P.KNOWLEDGE_UPDATE)),
 ):
-    """Mark a chunk as discarded — it will be excluded from retrieval."""
-    return await chunk_editing.set_discarded(point_id=point_id, value=True, user=current_user)
+    return await chunk_editing.set_discarded(db, point_id=point_id, value=True, user=current_user)
 
 
 @router.post("/{point_id}/restore", response_model=ChunkOut)
@@ -86,8 +76,7 @@ async def restore_chunk(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_perm(P.KNOWLEDGE_UPDATE)),
 ):
-    """Undo a previous discard — the chunk becomes retrievable again."""
-    return await chunk_editing.set_discarded(point_id=point_id, value=False, user=current_user)
+    return await chunk_editing.set_discarded(db, point_id=point_id, value=False, user=current_user)
 
 
 @router.get("/{point_id}/history", response_model=list[ChunkEditOut])
@@ -96,19 +85,14 @@ async def chunk_history(
     db: AsyncSession = Depends(get_db),
     _=Depends(require_perm(P.KNOWLEDGE_READ)),
 ):
-    """List edits applied to a chunk, newest first."""
     return await chunk_editing.chunk_history(db, point_id=point_id)
 
 
 @router.post("/test-query", response_model=ChunkTestResponse)
 async def test_query(
     body: ChunkTestRequest,
-    _=Depends(require_perm(P.KNOWLEDGE_UPDATE)),
+    _=Depends(require_perm(P.KNOWLEDGE_READ)),
 ):
-    """
-    Hit-test: execute a query against the knowledge base and return
-    ranked chunks with scores. Does NOT call LLM — retrieval only.
-    """
     start = time.monotonic()
 
     embeddings = await embed_texts_async([body.query], prefix="query: ")
@@ -118,14 +102,11 @@ async def test_query(
         query_dense=emb["dense"],
         query_sparse={"indices": emb["sparse_indices"], "values": emb["sparse_values"]},
         source_ids=body.source_ids,
-        top_k=body.top_k * 4 if body.use_reranker else body.top_k,
+        top_k=body.top_k,
         score_threshold=0.0,
     )
 
-    if body.use_reranker and results:
-        results = await rerank_async(body.query, results, body.top_k)
-    else:
-        results = results[: body.top_k]
+    results = results[: body.top_k]
 
     elapsed_ms = int((time.monotonic() - start) * 1000)
 

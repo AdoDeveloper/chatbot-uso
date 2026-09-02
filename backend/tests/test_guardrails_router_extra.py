@@ -8,7 +8,7 @@ quedaban sin cubrir:
   endpoints, tanto de lectura (require_perm(SYSTEM_READ)) como de escritura
   (require_perm(SYSTEM_MANAGE)).
 - PATCH /config: no tenía ninguna prueba (ni el 200 ni el whitelisting de
-  claves — que una clave no permitida no se persista).
+  claves - que una clave no permitida no se persista).
 - GET /injection-log: solo estaba cubierto el caso vacío; faltaba con
   entradas reales y respetando `page_size`.
 - POST /test: solo estaba cubierto el caso "passed=True" con texto benigno;

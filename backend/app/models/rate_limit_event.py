@@ -12,13 +12,6 @@ from app.db.session import Base
 
 class RateLimitEvent(Base):
     """Registra cada vez que el rate limiter rechaza una petición.
-
-    Distinto de `audit_log`:
-    - `audit_log` registra acciones administrativas (bloqueo manual, etc.).
-    - Aquí se persiste el evento *automático* de throttle por límite de tasa.
-    Útil para construir un historial: cuándo se throttleó qué IP, en qué
-    dimensión (chat:min, chat:hour, api:min) y qué identificador la disparó
-    (ip o session_id).
     """
 
     __tablename__ = "rate_limit_events"

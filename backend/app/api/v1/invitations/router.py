@@ -53,6 +53,29 @@ async def list_invitations(
     return {"items": items, "total": total, "page": page, "page_size": page_size}
 
 
+_ROLE_LABELS = {"admin": "Administrador", "editor": "Editor", "viewer": "Consultor"}
+
+
+async def _send_invitation_email_for(inv: Invitation, invited_by: User) -> bool:
+    email_sent = False
+    try:
+        from app.core.config import get_settings
+        from app.services.notifications.smtp import send_invitation_email
+        frontend = get_settings().FRONTEND_URL.rstrip("/")
+        invite_url = f"{frontend}/invite/{inv.token}"
+        email_sent = await send_invitation_email(
+            to=inv.email,
+            role=_ROLE_LABELS.get(str(getattr(inv.role, "value", inv.role)), str(inv.role)),
+            invite_url=invite_url,
+            invited_by=invited_by.full_name,
+        )
+        if not email_sent:
+            log.warning("invitation.email_not_sent", email=inv.email)
+    except Exception as exc:
+        log.warning("invitation.email_failed", email=inv.email, error=str(exc))
+    return email_sent
+
+
 @router.post("/users/invitations", response_model=InvitationResponse, status_code=status.HTTP_201_CREATED)
 async def create_invitation(
     body: InvitationCreate,
@@ -70,24 +93,32 @@ async def create_invitation(
     await db.commit()
     await db.refresh(inv)
 
-    try:
-        from app.core.config import get_settings
-        from app.services.notifications.smtp import send_invitation_email
-        frontend = get_settings().FRONTEND_URL.rstrip("/")
-        invite_url = f"{frontend}/invite/{inv.token}"
-        _role_labels = {"admin": "Administrador", "editor": "Editor", "viewer": "Consultor"}
-        sent = await send_invitation_email(
-            to=inv.email,
-            role=_role_labels.get(str(getattr(inv.role, "value", inv.role)), str(inv.role)),
-            invite_url=invite_url,
-            invited_by=current_user.full_name,
-        )
-        if not sent:
-            log.warning("invitation.email_not_sent", email=inv.email)
-    except Exception as exc:
-        log.warning("invitation.email_failed", email=inv.email, error=str(exc))
+    email_sent = await _send_invitation_email_for(inv, current_user)
 
-    return _build_response(inv, request)
+    response = _build_response(inv, request)
+    response.email_sent = email_sent
+    return response
+
+
+@router.post("/users/invitations/{invitation_id}/resend", response_model=InvitationResponse)
+async def resend_invitation(
+    invitation_id: uuid.UUID,
+    request: Request = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_perm(P.USERS_MANAGE)),
+):
+    inv = await db.get(Invitation, invitation_id)
+    if not inv:
+        raise NotFoundError("Invitación no encontrada")
+    inv = await invitation_service.resend_invitation(db, inv)
+    await db.commit()
+    await db.refresh(inv)
+
+    email_sent = await _send_invitation_email_for(inv, current_user)
+
+    response = _build_response(inv, request)
+    response.email_sent = email_sent
+    return response
 
 
 @router.delete("/users/invitations/{invitation_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -103,12 +134,41 @@ async def revoke_invitation(
     await db.commit()
 
 
+@router.delete("/users/invitations/{invitation_id}/permanent", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_invitation(
+    invitation_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_perm(P.USERS_MANAGE)),
+):
+    result = await db.get(Invitation, invitation_id)
+    if not result:
+        raise NotFoundError("Invitación no encontrada")
+    await invitation_service.delete_invitation(db, result)
+    await db.commit()
+
+
 @router.get("/auth/invite/{token}", response_model=InvitationPublicResponse)
 async def get_invitation_info(
     token: str,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    """Devuelve los datos públicos del token para mostrar en el formulario de registro."""
+    """Devuelve los datos públicos del token para mostrar en el formulario de registro.
+
+    El token tiene entropía suficiente (secrets.token_urlsafe(48)) para que
+    la fuerza bruta sea impráctica de por sí, pero se agrega rate limit como
+    defensa en profundidad - el mismo patrón que ya protege accept_invitation.
+    """
+    client_ip = get_client_ip(request)
+    try:
+        await check_rate_limit("invite:info", client_ip, max_requests=20, window_seconds=60)
+    except RateLimitExceeded as exc:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Demasiados intentos. Espere un momento y vuelva a intentarlo.",
+            headers={"Retry-After": str(exc.retry_after)},
+        )
+
     inv = await invitation_service.get_by_token(db, token)
     if not inv:
         raise NotFoundError("Invitación no encontrada")

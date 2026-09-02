@@ -29,6 +29,7 @@ class Source(Base):
         SAEnum(SourceStatus, name="sourcestatus", create_type=True),
         nullable=False,
         default=SourceStatus.pending,
+        server_default="pending",
     )
     review_status: Mapped[ReviewStatus] = mapped_column(
         SAEnum(ReviewStatus, name="reviewstatus", create_type=False),

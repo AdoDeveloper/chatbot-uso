@@ -1,4 +1,4 @@
-"""Admin RBAC API — permisos del usuario autenticado y listado de roles."""
+"""Admin RBAC API - permisos del usuario autenticado y listado de roles."""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends

@@ -1,4 +1,4 @@
-"""Configuration version management — list, create, diff, rollback, deploy."""
+"""Configuration version management - list, create, diff, rollback, deploy."""
 from __future__ import annotations
 
 import uuid
@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy import select, func as sa_func
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import load_only, selectinload
 
 from app.core.deps import require_perm
 from app.core.exceptions import NotFoundError
@@ -112,7 +112,15 @@ async def list_versions(
     offset = (page - 1) * page_size
     result = await db.execute(
         select(ConfigVersion)
-        .options(selectinload(ConfigVersion.created_by))
+        .options(
+            load_only(
+                ConfigVersion.id, ConfigVersion.version_number, ConfigVersion.description,
+                ConfigVersion.change_summary, ConfigVersion.trigger_source,
+                ConfigVersion.snapshot_schema_version, ConfigVersion.is_active,
+                ConfigVersion.created_at, ConfigVersion.created_by_id,
+            ),
+            selectinload(ConfigVersion.created_by),
+        )
         .order_by(ConfigVersion.version_number.desc())
         .offset(offset)
         .limit(page_size)
@@ -152,14 +160,9 @@ async def deploy_status(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(_reader),
 ):
-    """Returns what's pending since the last production deploy."""
-    last_deploy = await db.execute(
-        select(ConfigVersion)
-        .where(ConfigVersion.trigger_source == "deploy")
-        .order_by(ConfigVersion.created_at.desc())
-        .limit(1)
-    )
-    deployed = last_deploy.scalar_one_or_none()
+    """Devuelve lo que está pendiente desde el último deploy a producción."""
+    from app.services.system.settings import _latest_deploy_version
+    deployed = await _latest_deploy_version(db)
 
     pending_q = await db.execute(
         select(sa_func.count(Source.id))
@@ -188,19 +191,8 @@ async def deploy_config(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(_reader),
 ):
-    """Returns the widget_config section from the last deployed snapshot.
-
-    Used by the playground to show the true published widget appearance when
-    in 'Publicado' mode, instead of the current draft widget config.
-    Returns {} if nothing has been deployed yet (falls back to draft in UI).
-    """
-    result = await db.execute(
-        select(ConfigVersion)
-        .where(ConfigVersion.trigger_source == "deploy")
-        .order_by(ConfigVersion.created_at.desc())
-        .limit(1)
-    )
-    version = result.scalar_one_or_none()
+    from app.services.system.settings import _latest_deploy_version
+    version = await _latest_deploy_version(db)
     if version is None:
         return {}
     snapshot = version.config_snapshot or {}
@@ -228,11 +220,6 @@ async def diff_version(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(_reader),
 ) -> VersionDiff:
-    """Compara la versión con su padre (o la versión inmediatamente anterior si no
-    tiene parent_version_id explícito) y devuelve los cambios sección por sección.
-
-    Útil para que el admin entienda qué se modificó antes de hacer un rollback.
-    """
     version = await db.get(ConfigVersion, version_id)
     if not version:
         raise NotFoundError("Versión no encontrada")
@@ -267,12 +254,6 @@ async def deploy(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(_admin),
 ):
-    """Publish current draft config as the new production version.
-
-    Creates a ConfigVersion snapshot tagged 'deploy'.  From this point,
-    production chat requests will use this config; playground keeps using
-    the live global_settings (draft).
-    """
     pending_q = await db.execute(
         select(sa_func.count(Source.id))
         .where(Source.status == SourceStatus.ready)
@@ -281,13 +262,8 @@ async def deploy(
     )
     pending_sources = int(pending_q.scalar_one() or 0)
 
-    last_deploy_q = await db.execute(
-        select(ConfigVersion)
-        .where(ConfigVersion.trigger_source == "deploy")
-        .order_by(ConfigVersion.created_at.desc())
-        .limit(1)
-    )
-    last_deployed = last_deploy_q.scalar_one_or_none()
+    from app.services.system.settings import _latest_deploy_version
+    last_deployed = await _latest_deploy_version(db)
     if last_deployed and not await svc.has_config_changed_since(db, last_deployed.config_snapshot):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

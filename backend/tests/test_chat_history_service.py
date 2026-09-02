@@ -51,8 +51,11 @@ async def _make_message(
     *,
     role: MessageRole = MessageRole.user,
     content: str = "hola",
+    created_at: datetime | None = None,
 ) -> ChatMessage:
     msg = ChatMessage(conversation_id=conversation_id, role=role, content=content)
+    if created_at is not None:
+        msg.created_at = created_at
     db_session.add(msg)
     await db_session.commit()
     await db_session.refresh(msg)
@@ -130,18 +133,24 @@ async def test_get_or_create_conversation_does_not_reopen_outside_window(db_sess
         last_message_at=old,
         resolved_by_user_id=None,
     )
+    resolved_id = resolved.id
+    resolved_session_id = resolved.session_id
 
     conv = await history.get_or_create_conversation(
-        db_session, session_id=resolved.session_id
+        db_session, session_id=resolved_session_id
     )
+    # get_or_create_conversation expira los objetos de la sesión (rollback/commit interno); con MySQL el recargado implícito revienta con MissingGreenlet, así que se refresca explícitamente.
+    await db_session.refresh(conv)
+    conv_id = conv.id
+    conv_status = conv.status
 
-    assert conv.id != resolved.id
-    assert conv.status == ConversationStatus.active
+    assert conv_id != resolved_id
+    assert conv_status == ConversationStatus.active
 
     rows = (
         await db_session.execute(
             select(ChatConversation).where(
-                ChatConversation.session_id == resolved.session_id
+                ChatConversation.session_id == resolved_session_id
             )
         )
     ).scalars().all()
@@ -158,12 +167,14 @@ async def test_get_or_create_conversation_does_not_reopen_manually_resolved(db_s
         last_message_at=recent,
         resolved_by_user_id=agent.id,
     )
+    resolved_id = resolved.id
+    resolved_session_id = resolved.session_id
 
     conv = await history.get_or_create_conversation(
-        db_session, session_id=resolved.session_id
+        db_session, session_id=resolved_session_id
     )
 
-    assert conv.id != resolved.id
+    assert conv.id != resolved_id
     assert conv.status == ConversationStatus.active
 
 
@@ -196,7 +207,7 @@ async def test_add_message_persists_and_updates_last_message_at(db_session):
 
     # add_message actualiza last_message_at con un UPDATE de Core (no ORM), así
     # que el objeto `conv` ya cargado en el identity map de la sesión no se
-    # entera solo — hay que refrescarlo explícitamente antes de comparar.
+    # entera solo - hay que refrescarlo explícitamente antes de comparar.
     await db_session.refresh(conv)
     assert conv.last_message_at > old_last_message_at
 
@@ -350,18 +361,62 @@ async def test_list_conversations_ordered_by_last_message_desc(db_session):
     assert rows[1].id == older.id
 
 
+async def test_list_conversations_tiebreak_is_deterministic_across_calls(db_session):
+    same_ts = datetime.now(timezone.utc) - timedelta(minutes=1)
+    conv_a = await _make_conversation(db_session, last_message_at=same_ts)
+    conv_b = await _make_conversation(db_session, last_message_at=same_ts)
+
+    rows1, _ = await history.list_conversations(db_session)
+    rows2, _ = await history.list_conversations(db_session)
+
+    ids1 = [r.id for r in rows1 if r.id in (conv_a.id, conv_b.id)]
+    ids2 = [r.id for r in rows2 if r.id in (conv_a.id, conv_b.id)]
+    assert ids1 == ids2, "el orden entre dos llamadas idénticas debe ser el mismo"
+    assert ids1 == sorted([conv_a.id, conv_b.id], reverse=True)
+
+
 # --- fetch_first_user_messages -------------------------------------------
 
 
 async def test_fetch_first_user_messages_returns_earliest_per_conversation(db_session):
+    base = datetime.now(timezone.utc)
     conv = await _make_conversation(db_session)
-    first = await _make_message(db_session, conv.id, role=MessageRole.user, content="primer mensaje")
-    await _make_message(db_session, conv.id, role=MessageRole.assistant, content="respuesta bot")
-    await _make_message(db_session, conv.id, role=MessageRole.user, content="segundo mensaje usuario")
+    first = await _make_message(
+        db_session, conv.id, role=MessageRole.user, content="primer mensaje",
+        created_at=base,
+    )
+    await _make_message(
+        db_session, conv.id, role=MessageRole.assistant, content="respuesta bot",
+        created_at=base + timedelta(seconds=1),
+    )
+    await _make_message(
+        db_session, conv.id, role=MessageRole.user, content="segundo mensaje usuario",
+        created_at=base + timedelta(seconds=2),
+    )
 
     result = await history.fetch_first_user_messages(db_session, [conv.id])
 
     assert result[conv.id] == "primer mensaje"
+
+
+async def test_fetch_first_user_messages_tiebreak_is_deterministic(db_session):
+    same_ts = datetime.now(timezone.utc)
+    conv = await _make_conversation(db_session)
+    msg_a = await _make_message(
+        db_session, conv.id, role=MessageRole.user, content="mensaje A",
+        created_at=same_ts,
+    )
+    msg_b = await _make_message(
+        db_session, conv.id, role=MessageRole.user, content="mensaje B",
+        created_at=same_ts,
+    )
+
+    result1 = await history.fetch_first_user_messages(db_session, [conv.id])
+    result2 = await history.fetch_first_user_messages(db_session, [conv.id])
+
+    assert result1[conv.id] == result2[conv.id], "el resultado debe ser el mismo entre llamadas"
+    expected = msg_a.content if msg_a.id < msg_b.id else msg_b.content
+    assert result1[conv.id] == expected
 
 
 async def test_fetch_first_user_messages_empty_ids_returns_empty_dict(db_session):
@@ -469,7 +524,7 @@ async def test_auto_resolve_stale_conversations_ignores_non_active(db_session, m
 async def test_acquire_and_release_session_lock_roundtrip(monkeypatch):
     # acquire/release_session_lock hacen `from app.core.redis import get_redis`
     # dentro de la propia función (import perezoso), así que hay que parchear
-    # el binding en su módulo origen — la fixture `client` no aplica aquí
+    # el binding en su módulo origen - la fixture `client` no aplica aquí
     # porque este test no pasa por el override de FastAPI.
     import fakeredis.aioredis
     import app.core.redis as redis_mod
@@ -504,3 +559,32 @@ async def test_release_session_lock_swallows_redis_error(monkeypatch):
 
     # Should not raise.
     await history.release_session_lock(f"lock-{uuid.uuid4().hex[:8]}")
+
+
+async def test_get_or_create_conversation_finds_existing_when_lock_not_acquired(
+    db_session, monkeypatch,
+):
+    """Si el lock no se adquiere (contención o Redis caído), get_or_create_conversation
+    debe re-chequear si ya existe una conversación activa antes de crear una
+    nueva - sin esto, dos requests concurrentes que ambas fallan el lock
+    crean cada una su propia conversación, partiendo el historial en dos."""
+    session_id = f"race-{uuid.uuid4().hex[:8]}"
+
+    existing = ChatConversation(session_id=session_id, status=ConversationStatus.active)
+    db_session.add(existing)
+    await db_session.commit()
+    await db_session.refresh(existing)
+
+    async def _lock_not_acquired(*a, **k):
+        return False
+
+    monkeypatch.setattr(history, "acquire_session_lock", _lock_not_acquired)
+
+    conv = await history.get_or_create_conversation(db_session, session_id=session_id)
+    assert conv.id == existing.id
+
+    result = await db_session.execute(
+        select(ChatConversation).where(ChatConversation.session_id == session_id)
+    )
+    rows = result.scalars().all()
+    assert len(rows) == 1, f"se crearon {len(rows)} conversaciones para el mismo session_id"

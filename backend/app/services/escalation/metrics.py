@@ -27,7 +27,9 @@ async def get_metrics(
     - by_status: desglose por estado actual
     - by_trigger: desglose por tipo de trigger
     - avg_resolution_seconds: tiempo promedio de resolución (solo cerradas)
-    - resolution_rate: % resueltas vs total cerradas (resueltas / (resueltas + abandonadas))
+    - resolution_rate: resueltas / (resueltas + aún en estado "escalated"),
+      excluyendo cualquier escalada que un admin haya devuelto a "active"
+      manualmente (no cuenta como resuelta ni como pendiente)
     - csat_avg: promedio de CSAT entre los que tienen score
     """
     _until = until or datetime.now(timezone.utc)
@@ -88,6 +90,7 @@ async def get_metrics(
 
     closed_q = select(
         func.sum(case((ChatConversation.status == ConversationStatus.resolved, 1), else_=0)).label("resolved"),
+        func.sum(case((ChatConversation.status == ConversationStatus.escalated, 1), else_=0)).label("still_open"),
     ).where(
         ChatConversation.escalated_at.is_not(None),
         ChatConversation.escalated_at >= since,
@@ -95,7 +98,9 @@ async def get_metrics(
     )
     row = (await db.execute(closed_q)).one()
     resolved_count = int(row.resolved or 0)
-    resolution_rate = (resolved_count / total) if total > 0 else None
+    still_open_count = int(row.still_open or 0)
+    resolvable = resolved_count + still_open_count
+    resolution_rate = (resolved_count / resolvable) if resolvable > 0 else None
 
     csat_q = select(func.avg(ChatConversation.csat_score)).where(
         ChatConversation.escalated_at.is_not(None),

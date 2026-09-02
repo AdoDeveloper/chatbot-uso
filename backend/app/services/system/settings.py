@@ -25,6 +25,10 @@ RUNTIME_DEFAULTS: dict = {
     "semantic_cache_enabled": True,
     "semantic_cache_ttl": 43200,
     "semantic_cache_threshold": 0.90,
+    "guardrails_enabled": True,
+    "max_input_chars": 4000,
+    "max_output_tokens": 2048,
+    "pii_entities": ["PHONE_NUMBER", "EMAIL_ADDRESS", "CREDIT_CARD", "IBAN_CODE"],
 }
 _RUNTIME_TTL_SECONDS = 60.0
 _runtime_cache: tuple[float, dict] | None = None
@@ -66,20 +70,25 @@ async def get_settings(db: AsyncSession) -> ChatbotSettings:
     return ChatbotSettings(**{k: merged[k] for k in ChatbotSettings.model_fields if k in merged})
 
 
-async def get_deployed_settings(db: AsyncSession) -> ChatbotSettings:
-    """Returns the config from the last explicit deploy snapshot.
+async def _latest_deploy_version(db: AsyncSession):
+    """Última versión con trigger_source='deploy', o None si no hay ninguna.
 
-    Falls back to get_settings() if no deploy has been published yet,
-    so the system works out-of-the-box before the first deployment.
     """
     from app.models.config_version import ConfigVersion
-    result = await db.execute(
-        select(ConfigVersion)
+    version_id = await db.scalar(
+        select(ConfigVersion.id)
         .where(ConfigVersion.trigger_source == "deploy")
         .order_by(ConfigVersion.created_at.desc())
         .limit(1)
     )
-    version = result.scalar_one_or_none()
+    if version_id is None:
+        return None
+    return await db.get(ConfigVersion, version_id)
+
+
+async def get_deployed_settings(db: AsyncSession) -> ChatbotSettings:
+    """Lee los ajustes efectivos del último deploy (snapshot de global_settings)."""
+    version = await _latest_deploy_version(db)
     if version is None:
         return await get_settings(db)
     snapshot = version.config_snapshot or {}
@@ -89,8 +98,26 @@ async def get_deployed_settings(db: AsyncSession) -> ChatbotSettings:
     return ChatbotSettings(**{k: merged[k] for k in ChatbotSettings.model_fields if k in merged})
 
 
+async def get_deployed_runtime_overrides(db: AsyncSession) -> dict:
+    """Espejo de get_deployed_settings() para las claves de RUNTIME_DEFAULTS
+    (guardrails_enabled, max_input_chars, etc.).
+    """
+    version = await _latest_deploy_version(db)
+    if version is None:
+        return await get_runtime_overrides(db)
+    snapshot = version.config_snapshot or {}
+    sections = snapshot.get("sections", {})
+    raw = sections.get("global_settings") or snapshot.get("global_settings") or {}
+    effective = dict(RUNTIME_DEFAULTS)
+    for key, default in effective.items():
+        if key in raw and raw[key] is not None:
+            value = raw[key]
+            effective[key] = value if isinstance(value, type(default)) else type(default)(value)
+    return effective
+
+
 async def update_settings(db: AsyncSession, data: ChatbotSettings, user_id: uuid.UUID) -> ChatbotSettings:
-    # Auto-snapshot is now handled by VersioningMiddleware (post-response)
+    # El auto-snapshot lo maneja VersioningMiddleware (después de la respuesta)
     for key, value in data.model_dump().items():
         existing = await db.get(GlobalSetting, key)
         if existing:
@@ -234,15 +261,7 @@ async def get_deployed_chain(db: AsyncSession) -> list[tuple[LLMProvider, str | 
 
     Fallback: si no hay ningún deploy previo, delega a get_active_chain().
     """
-    from app.models.config_version import ConfigVersion
-    from sqlalchemy import select as _sel
-    result = await db.execute(
-        _sel(ConfigVersion)
-        .where(ConfigVersion.trigger_source == "deploy")
-        .order_by(ConfigVersion.created_at.desc())
-        .limit(1)
-    )
-    version = result.scalar_one_or_none()
+    version = await _latest_deploy_version(db)
     if version is None:
         return await get_active_chain(db)
 
@@ -259,7 +278,7 @@ async def get_deployed_chain(db: AsyncSession) -> list[tuple[LLMProvider, str | 
     snap_ids = [uuid.UUID(p["id"]) for p in snap_providers]
 
     db_result = await db.execute(
-        _sel(LLMProvider).where(LLMProvider.id.in_(snap_ids))
+        select(LLMProvider).where(LLMProvider.id.in_(snap_ids))
     )
     db_map = {str(p.id): p for p in db_result.scalars().all()}
 
@@ -271,7 +290,7 @@ async def get_deployed_chain(db: AsyncSession) -> list[tuple[LLMProvider, str | 
             continue
         key = await _safe_decrypt(p.api_key_encrypted, p.name)
         if p.api_key_encrypted and key is None:
-            continue  # key cifrada con SECRET_KEY distinto — saltar
+            continue  # key cifrada con SECRET_KEY distinto - saltar
         chain.append((p, key))
     return chain
 
@@ -292,7 +311,7 @@ async def get_active_chain(db: AsyncSession) -> list[tuple[LLMProvider, str | No
     for p in providers:
         key = await _safe_decrypt(p.api_key_encrypted, p.name)
         if p.api_key_encrypted and key is None:
-            continue  # key cifrada con SECRET_KEY distinto — saltar proveedor
+            continue  # key cifrada con SECRET_KEY distinto - saltar proveedor
         chain.append((p, key))
     return chain
 

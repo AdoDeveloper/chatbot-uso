@@ -46,6 +46,25 @@ class TestCollectDigestStats:
         assert stats["conversations_resolved_today"] == 0
         assert "date" in stats
 
+    async def test_date_uses_el_salvador_local_time_not_utc(self, db_session, monkeypatch):
+        import app.services.notifications.digest as digest_mod
+
+        # 2026-03-05 20:00 hora SV == 2026-03-06 02:00 UTC
+        fixed_utc = datetime(2026, 3, 6, 2, 0, tzinfo=timezone.utc)
+
+        class _FixedDatetime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return fixed_utc if tz is not None else fixed_utc.replace(tzinfo=None)
+
+        monkeypatch.setattr(digest_mod, "datetime", _FixedDatetime)
+
+        stats = await collect_digest_stats(db_session)
+        assert stats["date"] == "2026-03-05", (
+            f"esperaba fecha local SV 2026-03-05, obtuvo {stats['date']!r} "
+            "(¿volvió a calcularse en UTC?)"
+        )
+
     async def test_counts_open_and_new_questions(self, db_session):
         now = datetime.now(timezone.utc)
         old = now - timedelta(hours=48)

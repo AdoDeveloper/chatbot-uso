@@ -11,12 +11,13 @@ from app.core.permissions import P
 from app.db.session import get_db
 from app.schemas.analytics import (
     AnalyticsChannels,
+    AnalyticsCsat,
     AnalyticsDashboard,
-    AnalyticsDevices,
     AnalyticsFeedback,
     AnalyticsHeatmap,
     AnalyticsLatencyTimeSeries,
     AnalyticsPages,
+    AnalyticsResponseQuality,
     AnalyticsRoutes,
     AnalyticsSourceQuality,
     AnalyticsTimeSeries,
@@ -32,26 +33,35 @@ router = APIRouter(prefix="/analytics", tags=["analytics"])
 _SourceQ = Query("production", pattern="^(production|playground)$")
 
 
-def _effective_days(
+def _effective_range(
     days: int,
     date_from: datetime | None,
     date_to: datetime | None,
-) -> int:
-    """Convierte un rango de fechas personalizado al número de días equivalente."""
+) -> tuple[int, datetime | None]:
+    """Convierte un rango de fechas personalizado a (días equivalentes, ancla `until`).
+    """
+    from app.core.timezone import PROJECT_TIMEZONE, sv_to_utc
+
     if date_from is None:
-        return days
+        return days, None
     end = date_to or datetime.now(timezone.utc)
+    # date_from/date_to sin tzinfo son un día calendario en El Salvador, no UTC.
     if end.tzinfo is None:
-        end = end.replace(tzinfo=timezone.utc)
-    start = date_from.replace(tzinfo=timezone.utc) if date_from.tzinfo is None else date_from
-    return max(1, min(365, (end - start).days + 1))
+        end = end.replace(tzinfo=PROJECT_TIMEZONE)
+    start = date_from.replace(tzinfo=PROJECT_TIMEZONE) if date_from.tzinfo is None else date_from
+    effective_days = max(1, min(365, (end - start).days + 1))
+    end_local_midnight = end.astimezone(PROJECT_TIMEZONE).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    ) + timedelta(days=1)
+    until = sv_to_utc(end_local_midnight)
+    return effective_days, until
 
 
 @router.get("/dashboard", response_model=AnalyticsDashboard)
 async def dashboard(
     source: str = _SourceQ,
     db: AsyncSession = Depends(get_db),
-    _: object = Depends(require_perm(P.ANALYTICS_READ)),
+    _: object = Depends(require_perm(P.DASHBOARD_READ)),
 ):
     return await svc.get_dashboard(db, source=source)
 
@@ -65,28 +75,18 @@ async def topics(
     db: AsyncSession = Depends(get_db),
     _: object = Depends(require_perm(P.ANALYTICS_READ)),
 ):
-    return await svc.get_topics(db, days=_effective_days(days, date_from, date_to), source=source)
+    eff_days, until = _effective_range(days, date_from, date_to)
+    return await svc.get_topics(db, days=eff_days, source=source, until=until)
 
 
 @router.get("/heatmap", response_model=AnalyticsHeatmap)
 async def heatmap(
     window: str = Query("week", pattern="^(day|week|month|year)$"),
-    db: AsyncSession = Depends(get_db),
-    _: object = Depends(require_perm(P.ANALYTICS_READ)),
-):
-    return await svc.get_heatmap(db, window=window)
-
-
-@router.get("/devices", response_model=AnalyticsDevices)
-async def devices(
-    days: int = Query(30, ge=1, le=365),
-    date_from: datetime | None = Query(None),
-    date_to: datetime | None = Query(None),
     source: str = _SourceQ,
     db: AsyncSession = Depends(get_db),
     _: object = Depends(require_perm(P.ANALYTICS_READ)),
 ):
-    return await svc.get_devices(db, days=_effective_days(days, date_from, date_to), source=source)
+    return await svc.get_heatmap(db, window=window, source=source)
 
 
 @router.get("/timeseries", response_model=AnalyticsTimeSeries)
@@ -98,7 +98,8 @@ async def timeseries(
     db: AsyncSession = Depends(get_db),
     _: object = Depends(require_perm(P.ANALYTICS_READ)),
 ):
-    return await svc.get_timeseries(db, days=_effective_days(days, date_from, date_to), source=source)
+    eff_days, until = _effective_range(days, date_from, date_to)
+    return await svc.get_timeseries(db, days=eff_days, source=source, until=until)
 
 
 @router.get("/routes", response_model=AnalyticsRoutes)
@@ -110,7 +111,8 @@ async def routes(
     db: AsyncSession = Depends(get_db),
     _: object = Depends(require_perm(P.ANALYTICS_READ)),
 ):
-    return await svc.get_route_distribution(db, days=_effective_days(days, date_from, date_to), source=source)
+    eff_days, until = _effective_range(days, date_from, date_to)
+    return await svc.get_route_distribution(db, days=eff_days, source=source, until=until)
 
 
 @router.get("/latency/timeseries", response_model=AnalyticsLatencyTimeSeries)
@@ -118,10 +120,12 @@ async def latency_timeseries(
     days: int = Query(30, ge=1, le=365),
     date_from: datetime | None = Query(None),
     date_to: datetime | None = Query(None),
+    source: str = _SourceQ,
     db: AsyncSession = Depends(get_db),
     _: object = Depends(require_perm(P.ANALYTICS_READ)),
 ):
-    return await svc.get_latency_timeseries(db, days=_effective_days(days, date_from, date_to))
+    eff_days, until = _effective_range(days, date_from, date_to)
+    return await svc.get_latency_timeseries(db, days=eff_days, source=source, until=until)
 
 
 @router.get("/sources/quality", response_model=AnalyticsSourceQuality)
@@ -132,7 +136,20 @@ async def source_quality(
     db: AsyncSession = Depends(get_db),
     _: object = Depends(require_perm(P.ANALYTICS_READ)),
 ):
-    return await svc.get_source_quality(db, days=_effective_days(days, date_from, date_to))
+    eff_days, until = _effective_range(days, date_from, date_to)
+    return await svc.get_source_quality(db, days=eff_days, until=until)
+
+
+@router.get("/quality", response_model=AnalyticsResponseQuality)
+async def response_quality(
+    days: int = Query(30, ge=1, le=365),
+    date_from: datetime | None = Query(None),
+    date_to: datetime | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+    _: object = Depends(require_perm(P.ANALYTICS_READ)),
+):
+    eff_days, until = _effective_range(days, date_from, date_to)
+    return await svc.get_response_quality(db, days=eff_days, until=until)
 
 
 @router.get("/timeline", response_model=AnalyticsTimeline)
@@ -141,10 +158,12 @@ async def timeline(
     date_from: datetime | None = Query(None),
     date_to: datetime | None = Query(None),
     limit: int = Query(50, ge=1, le=200),
+    source: str = _SourceQ,
     db: AsyncSession = Depends(get_db),
     _: object = Depends(require_perm(P.ANALYTICS_READ)),
 ):
-    return await svc.get_timeline(db, days=_effective_days(days, date_from, date_to), limit=limit)
+    eff_days, until = _effective_range(days, date_from, date_to)
+    return await svc.get_timeline(db, days=eff_days, limit=limit, source=source, until=until)
 
 
 @router.get("/comparison", response_model=PeriodComparison)
@@ -156,7 +175,8 @@ async def period_comparison(
     db: AsyncSession = Depends(get_db),
     _: object = Depends(require_perm(P.ANALYTICS_READ)),
 ):
-    return await svc.get_period_comparison(db, days=_effective_days(days, date_from, date_to), source=source)
+    eff_days, until = _effective_range(days, date_from, date_to)
+    return await svc.get_period_comparison(db, days=eff_days, source=source, until=until)
 
 
 @router.get("/channels", response_model=AnalyticsChannels)
@@ -167,7 +187,9 @@ async def channels(
     db: AsyncSession = Depends(get_db),
     _: object = Depends(require_perm(P.ANALYTICS_READ)),
 ):
-    return await svc.get_channels(db, days=_effective_days(days, date_from, date_to))
+    # get_channels() no filtra playground, lo muestra como categoría propia.
+    eff_days, until = _effective_range(days, date_from, date_to)
+    return await svc.get_channels(db, days=eff_days, until=until)
 
 
 @router.get("/pages", response_model=AnalyticsPages)
@@ -179,7 +201,8 @@ async def pages(
     db: AsyncSession = Depends(get_db),
     _: object = Depends(require_perm(P.ANALYTICS_READ)),
 ):
-    return await svc.get_pages(db, days=_effective_days(days, date_from, date_to), source=source)
+    eff_days, until = _effective_range(days, date_from, date_to)
+    return await svc.get_pages(db, days=eff_days, source=source, until=until)
 
 
 @router.get("/feedback", response_model=AnalyticsFeedback)
@@ -191,7 +214,21 @@ async def feedback(
     db: AsyncSession = Depends(get_db),
     _: object = Depends(require_perm(P.ANALYTICS_READ)),
 ):
-    return await svc.get_feedback(db, days=_effective_days(days, date_from, date_to), source=source)
+    eff_days, until = _effective_range(days, date_from, date_to)
+    return await svc.get_feedback(db, days=eff_days, source=source, until=until)
+
+
+@router.get("/csat", response_model=AnalyticsCsat)
+async def csat(
+    days: int = Query(30, ge=1, le=365),
+    date_from: datetime | None = Query(None),
+    date_to: datetime | None = Query(None),
+    source: str = _SourceQ,
+    db: AsyncSession = Depends(get_db),
+    _: object = Depends(require_perm(P.ANALYTICS_READ)),
+):
+    eff_days, until = _effective_range(days, date_from, date_to)
+    return await svc.get_csat(db, days=eff_days, source=source, until=until)
 
 
 @router.get("/cache", response_model=CacheStats)
@@ -199,10 +236,12 @@ async def cache_stats(
     days: int = Query(7, ge=1, le=90),
     date_from: datetime | None = Query(None),
     date_to: datetime | None = Query(None),
+    source: str = _SourceQ,
     db: AsyncSession = Depends(get_db),
     _: object = Depends(require_perm(P.ANALYTICS_READ)),
 ):
-    return await svc.get_cache_stats(db, days=_effective_days(days, date_from, date_to))
+    eff_days, until = _effective_range(days, date_from, date_to)
+    return await svc.get_cache_stats(db, days=eff_days, source=source, until=until)
 
 
 @router.post("/export")
@@ -512,17 +551,6 @@ async def _build_report_sections(
                 ],
             })
 
-        devices = await svc.get_devices(db, days=days, source=source, until=until)
-        if devices.devices:
-            sections.append({
-                "title": "DISTRIBUCIÓN POR DISPOSITIVO",
-                "rows": [
-                    {"Dispositivo": d.device, "Consultas": d.count, "Porcentaje (%)": f"{d.percentage:.1f}"}
-                    for d in devices.devices
-                ],
-                "chart": {"type": "pie", "label": "Dispositivo", "value": "Consultas"},
-            })
-
         channels = await svc.get_channels(db, days=days, until=until)
         if channels.channels:
             sections.append({
@@ -716,7 +744,9 @@ async def generate_report(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="El rango no puede superar un año.",
         )
-    until = datetime.combine(date_to + timedelta(days=1), time.min, tzinfo=timezone.utc)
+    from app.core.timezone import PROJECT_TIMEZONE, sv_to_utc
+    until_local = datetime.combine(date_to + timedelta(days=1), time.min, tzinfo=PROJECT_TIMEZONE)
+    until = sv_to_utc(until_local)
 
     title, filename_base = _REPORT_META.get(report_type, ("Reporte", report_type))
     subtitle = f"Período: {date_from.strftime('%d/%m/%Y')} al {date_to.strftime('%d/%m/%Y')}"

@@ -28,17 +28,19 @@ class ChatConversationOut(BaseModel):
     session_id: str
     user_id: uuid.UUID | None
     status: ConversationStatus
-    device: str | None
     browser: str | None
     origin_url: str | None
+    created_at: datetime
     started_at: datetime
     last_message_at: datetime
+    # True mientras el usuario recibió el prompt de escalamiento pero aún no confirmó su contacto.
+    escalation_pending: bool = False
     escalated_at: datetime | None = None
-    assigned_to_user_id: uuid.UUID | None = None
-    assigned_at: datetime | None = None
     resolved_at: datetime | None = None
     resolved_by_user_id: uuid.UUID | None = None
     csat_score: int | None = None
+    csat_comment: str | None = None
+    csat_reasons: list[str] = []
     escalation_trigger_reason: str | None = None
     tags: list[str] = []
     message_count: int = 0

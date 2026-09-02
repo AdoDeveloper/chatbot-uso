@@ -207,3 +207,42 @@ class TestOnboardingDismiss:
     async def test_unauthenticated_dismiss_rejected(self, client):
         r = await client.post("/api/v1/auth/onboarding-dismiss")
         assert r.status_code in (401, 403)
+
+
+class TestOnboardingReset:
+    async def test_reset_clears_dismissed(self, client, admin_user, auth_headers):
+        """Reset es el inverso de dismiss: vuelve a mostrar el wizard."""
+        await client.post(
+            "/api/v1/auth/onboarding-dismiss",
+            headers=auth_headers(admin_user),
+        )
+        r = await client.post(
+            "/api/v1/auth/onboarding-reset",
+            headers=auth_headers(admin_user),
+        )
+        assert r.status_code == 200
+        assert r.json() == {"ok": True, "message": None}
+
+        status = await client.get(
+            "/api/v1/auth/onboarding-status",
+            headers=auth_headers(admin_user),
+        )
+        assert status.json()["dismissed"] is False
+
+    async def test_reset_is_per_user(self, client, db_session, make_user, auth_headers):
+        """Reset de un admin no afecta a otros admins."""
+        admin_a = await make_user(role=UserRole.admin, email="a@test.local")
+        admin_b = await make_user(role=UserRole.admin, email="b@test.local")
+
+        await client.post("/api/v1/auth/onboarding-dismiss", headers=auth_headers(admin_a))
+        await client.post("/api/v1/auth/onboarding-dismiss", headers=auth_headers(admin_b))
+        await client.post("/api/v1/auth/onboarding-reset", headers=auth_headers(admin_a))
+
+        r_a = await client.get("/api/v1/auth/onboarding-status", headers=auth_headers(admin_a))
+        r_b = await client.get("/api/v1/auth/onboarding-status", headers=auth_headers(admin_b))
+        assert r_a.json()["dismissed"] is False
+        assert r_b.json()["dismissed"] is True
+
+    async def test_unauthenticated_reset_rejected(self, client):
+        r = await client.post("/api/v1/auth/onboarding-reset")
+        assert r.status_code in (401, 403)

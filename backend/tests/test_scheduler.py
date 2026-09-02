@@ -9,13 +9,16 @@ CancelledError tras una iteración).
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from uuid import uuid4
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from sqlalchemy import select
 
 from app.schemas.report_schedule import ReportSchedule
 from app.services.system import scheduler
+from app.models.global_setting import GlobalSetting
 
 
 class _StopLoop(Exception):
@@ -31,23 +34,63 @@ def _sleep_raises_after(n_calls: list[int], limit: int = 1):
 
 
 class TestAcquireOnce:
-    async def test_acquires_lock_when_redis_available(self):
-        fake_redis = AsyncMock()
-        fake_redis.set.return_value = True
-        with patch("app.core.redis.get_redis", return_value=fake_redis):
-            result = await scheduler._acquire_once("key1", ttl=60)
-        assert result is True
-        fake_redis.set.assert_awaited_once_with("key1", "1", nx=True, ex=60)
+    async def test_acquires_lock_when_no_row_exists(self, db_engine):
+        from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+        Session = async_sessionmaker(db_engine, expire_on_commit=False, class_=AsyncSession)
 
-    async def test_returns_false_when_lock_already_held(self):
-        fake_redis = AsyncMock()
-        fake_redis.set.return_value = None
-        with patch("app.core.redis.get_redis", return_value=fake_redis):
+        key = f"lock-{uuid4()}"
+        result = await scheduler._acquire_once(key, ttl=60)
+        assert result is True
+
+        async with Session() as verify_session:
+            row = await verify_session.execute(
+                select(GlobalSetting).where(GlobalSetting.key == key)
+            )
+            gs = row.scalar_one()
+            assert gs.value["owner"] == scheduler._OWNER_ID
+
+    async def test_acquires_lock_when_expired_row_exists(self, db_engine):
+        from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+        Session = async_sessionmaker(db_engine, expire_on_commit=False, class_=AsyncSession)
+
+        key = f"lock-{uuid4()}"
+        from datetime import timedelta
+        expired = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+        async with Session() as write_session:
+            write_session.add(GlobalSetting(key=key, value={"owner": "", "expires_at": expired}))
+            await write_session.commit()
+
+        result = await scheduler._acquire_once(key, ttl=60)
+        assert result is True
+
+        async with Session() as verify_session:
+            row = await verify_session.execute(
+                select(GlobalSetting).where(GlobalSetting.key == key)
+            )
+            gs = row.scalar_one()
+            assert gs.value["owner"] == scheduler._OWNER_ID
+
+    async def test_returns_false_when_lock_still_valid(self):
+        row = AsyncMock()
+        row.value = {
+            "owner": "other-worker",
+            "expires_at": (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat(),
+        }
+        fake_scalars = AsyncMock()
+        fake_scalars.scalar_one_or_none.return_value = row
+        fake_execute = AsyncMock()
+        fake_execute.scalar_one_or_none.return_value = row
+        fake_session = AsyncMock()
+        fake_session.execute.return_value = fake_execute
+        fake_session.__aenter__.return_value = fake_session
+        fake_session.__aexit__.return_value = None
+
+        with patch("app.services.system.scheduler.AsyncSessionLocal", return_value=fake_session):
             result = await scheduler._acquire_once("key1", ttl=60)
         assert result is False
 
-    async def test_fails_closed_when_redis_unavailable(self):
-        with patch("app.core.redis.get_redis", side_effect=RuntimeError("down")):
+    async def test_fails_closed_when_db_unavailable(self):
+        with patch("app.services.system.scheduler.AsyncSessionLocal", side_effect=RuntimeError("db down")):
             result = await scheduler._acquire_once("key1", ttl=60)
         assert result is False
 

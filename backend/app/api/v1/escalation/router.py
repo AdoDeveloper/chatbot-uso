@@ -93,13 +93,13 @@ async def test_escalation(
     db: AsyncSession = Depends(get_db),
     _: object = Depends(require_perm(P.ESCALATION_MANAGE)),
 ):
-    """Dispara un escalamiento de prueba — los correos llegan a todos los
+    """Dispara un escalamiento de prueba - los correos llegan a todos los
     administradores activos registrados en el sistema."""
     await svc.dispatch_escalation(
         db,
         conversation_id="test-conversation",
         question="Esta es una prueba de escalamiento",
-        reason="Prueba manual desde el panel",
+        reason="Prueba manual",
     )
     return EscalationTestResult(success=True, message="Prueba enviada a todos los administradores activos.")
 

@@ -374,6 +374,32 @@ class TestSnapshotForRangeAndPeriodComparison:
         assert result.previous.queries == 1
         assert result.deltas["queries"] == 100.0
 
+    async def test_without_until_end_of_range_uses_el_salvador_midnight_not_utc(
+        self, db_session, monkeypatch,
+    ):
+        import app.services.monitoring.analytics as analytics_mod
+
+        fixed_utc = datetime(2026, 3, 6, 1, 30, tzinfo=timezone.utc)
+
+        class _FixedDatetime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return fixed_utc.astimezone(tz) if tz is not None else fixed_utc.replace(tzinfo=None)
+
+        monkeypatch.setattr(analytics_mod, "datetime", _FixedDatetime)
+
+        conv = _conv(started_at=fixed_utc)
+        db_session.add(conv)
+        await db_session.flush()
+        db_session.add(_msg(conv.id, role=MessageRole.user, created_at=fixed_utc))
+        await db_session.commit()
+
+        result = await svc.get_period_comparison(db_session, days=7)
+        assert result.current.queries == 1, (
+            "el mensaje de las 19:30 hora SV no cayó en el período actual - "
+            "¿el corte se truncó a medianoche UTC en vez de local?"
+        )
+
 
 class TestClassifyChannel:
     def test_playground_browser_wins_regardless_of_origin(self):
@@ -487,33 +513,6 @@ class TestGetTopics:
         assert result.topics == []
 
 
-class TestGetDevices:
-    async def test_no_data_returns_empty(self, db_session):
-        result = await svc.get_devices(db_session, days=30)
-        assert result.devices == []
-
-    async def test_percentages_and_unknown_fallback(self, db_session):
-        db_session.add_all([
-            _conv(device="mobile"),
-            _conv(device="mobile"),
-            _conv(device="desktop"),
-        ])
-        await db_session.commit()
-
-        result = await svc.get_devices(db_session, days=30)
-        by_device = {d.device: d for d in result.devices}
-        assert by_device["mobile"].count == 2
-        assert by_device["mobile"].percentage == round(2 / 3 * 100, 1)
-        assert by_device["desktop"].count == 1
-
-    async def test_null_device_excluded(self, db_session):
-        db_session.add(_conv(device=None))
-        await db_session.commit()
-
-        result = await svc.get_devices(db_session, days=30)
-        assert result.devices == []
-
-
 class TestGetRouteDistribution:
     async def test_no_data_returns_empty(self, db_session):
         result = await svc.get_route_distribution(db_session, days=30)
@@ -607,6 +606,31 @@ class TestGetDashboard:
 
         pg_result = await svc.get_dashboard(db_session, source="playground")
         assert pg_result.queries_today == 1
+
+    async def test_today_uses_el_salvador_local_time_not_utc(self, db_session, monkeypatch):
+        import app.core.timezone as tz_mod
+
+        # 2026-03-05 19:30 hora SV == 2026-03-06 01:30 UTC
+        fixed_utc = datetime(2026, 3, 6, 1, 30, tzinfo=timezone.utc)
+
+        class _FixedDatetime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return fixed_utc.astimezone(tz) if tz is not None else fixed_utc.replace(tzinfo=None)
+
+        monkeypatch.setattr(tz_mod, "datetime", _FixedDatetime)
+
+        conv = _conv(started_at=fixed_utc)
+        db_session.add(conv)
+        await db_session.flush()
+        db_session.add(_msg(conv.id, role=MessageRole.user, created_at=fixed_utc))
+        await db_session.commit()
+
+        result = await svc.get_dashboard(db_session)
+        assert result.queries_today == 1, (
+            "el mensaje de las 19:30 hora SV no se contó como 'hoy' - "
+            "¿volvió a truncarse a medianoche UTC en vez de local?"
+        )
 
 
 class TestGetHeatmap:

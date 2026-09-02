@@ -1,7 +1,7 @@
-"""Tests para app/api/v1/providers/router.py — no tenía ningún test.
+"""Tests para app/api/v1/providers/router.py - no tenía ningún test.
 
 Los endpoints /test, /models y /{id}/test llaman a proveedores LLM externos
-reales (llm_gateway.test_connection / fetch_models) — se mockean con
+reales (llm_gateway.test_connection / fetch_models) - se mockean con
 monkeypatch para no hacer llamadas HTTP de verdad ni depender de que un
 proveedor externo esté disponible.
 """
@@ -83,6 +83,24 @@ class TestUpdateProvider:
         )
         assert r.status_code == 200
         assert r.json()["name"] == "Groq secundario"
+
+    async def test_rejects_api_base_over_max_length(self, client, admin_user, auth_headers):
+        created = await _create_provider(client, admin_user, auth_headers)
+        r = await client.patch(
+            f"/api/v1/providers/{created['id']}",
+            json={"api_base": "https://example.com/" + "x" * 500},
+            headers=auth_headers(admin_user),
+        )
+        assert r.status_code == 422
+
+    async def test_rejects_dashboard_url_over_max_length(self, client, admin_user, auth_headers):
+        created = await _create_provider(client, admin_user, auth_headers)
+        r = await client.patch(
+            f"/api/v1/providers/{created['id']}",
+            json={"dashboard_url": "https://example.com/" + "x" * 500},
+            headers=auth_headers(admin_user),
+        )
+        assert r.status_code == 422
 
 
 class TestDeleteProvider:

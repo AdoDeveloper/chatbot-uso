@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.datastructures import MutableHeaders
 from starlette.requests import Request
 from starlette.responses import Response
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from sqlalchemy import select, update
 from sqlalchemy.exc import TimeoutError as SQLATimeoutError
@@ -14,7 +16,7 @@ from app.api.v1.router import router as v1_router
 from app.core.exceptions import DomainError
 from app.core.config import get_settings
 from app.core.logging import get_logger, setup_logging
-from app.db.session import AsyncSessionLocal
+from app.db import session as db_session
 from app.models.enums import SourceStatus
 from app.models.source import Source
 from app.services.system.seed import seed_first_admin, seed_defaults
@@ -32,6 +34,8 @@ import json
 
 logger = get_logger(__name__)
 
+_warmup_task_ref: asyncio.Task | None = None
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -39,17 +43,17 @@ async def lifespan(app: FastAPI):
     setup_logging(debug=settings.DEBUG)
     logger.info("Starting up", app=settings.APP_NAME, version=settings.APP_VERSION, env=settings.ENVIRONMENT)
 
-    async with AsyncSessionLocal() as db:
+    async with db_session.AsyncSessionLocal() as db:
         try:
             await seed_first_admin(db)
             await seed_defaults(db)
             await seed_default_settings(db)
             await seed_rbac(db)
         except Exception:
-            logger.exception("startup.seed_failed — revisar logs anteriores para detalle")
+            logger.exception("startup.seed_failed - revisar logs anteriores para detalle")
             raise
 
-        # MySQL no soporta RETURNING en UPDATE — SELECT previo para contar,
+        # MySQL no soporta RETURNING en UPDATE - SELECT previo para contar,
         # luego UPDATE sin RETURNING.
         stuck_result = await db.execute(
             select(Source.id)
@@ -71,8 +75,6 @@ async def lifespan(app: FastAPI):
     from app.services.ingestion.vector_store import ensure_collection
     await ensure_collection()
 
-    import asyncio
-
     async def _background_warmup():
         loop = asyncio.get_running_loop()
         logger.info("startup.prewarming_models_and_guardrails")
@@ -88,13 +90,15 @@ async def lifespan(app: FastAPI):
             logger.exception("startup.prewarming_failed")
         try:
             from app.services.ai.guardrails import reload_custom_patterns
-            async with AsyncSessionLocal() as db:
+            async with db_session.AsyncSessionLocal() as db:
                 await reload_custom_patterns(db)
             logger.info("startup.custom_guardrail_patterns_loaded")
         except Exception:
             logger.warning("startup.custom_guardrail_patterns_load_failed")
 
-    asyncio.create_task(_background_warmup())
+    # Referencia retenida para que el GC no recolecte la tarea a mitad de ejecución.
+    global _warmup_task_ref
+    _warmup_task_ref = asyncio.create_task(_background_warmup())
 
     scheduler.start()
 
@@ -125,14 +129,10 @@ def create_app() -> FastAPI:
     _admin_origins = set(settings.ALLOWED_ORIGINS)
     _admin_origins_wildcard = "*" in _admin_origins
 
-    async def _validate_json_body(request: Request) -> None:
+    def _check_json_body(body: bytes) -> HTTPException | None:
         """Valida tamaño y profundidad del JSON para prevenir DoS."""
-        content_type = request.headers.get("content-type", "").lower()
-        if "application/json" not in content_type:
-            return
-        body = await request.body()
         if len(body) > settings.MAX_JSON_BODY_SIZE_MB * 1024 * 1024:
-            raise HTTPException(
+            return HTTPException(
                 status_code=413,
                 detail=f"Payload too large. Maximum size is {settings.MAX_JSON_BODY_SIZE_MB}MB.",
             )
@@ -150,18 +150,49 @@ def create_app() -> FastAPI:
 
             check_depth(data)
         except json.JSONDecodeError:
-            raise HTTPException(status_code=400, detail="Invalid JSON payload")
+            return HTTPException(status_code=400, detail="Invalid JSON payload")
         except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
+            return HTTPException(status_code=400, detail=str(e))
+        return None
 
-    class JsonBodyValidationMiddleware(BaseHTTPMiddleware):
-        async def dispatch(self, request: Request, call_next):
-            if "application/json" in request.headers.get("content-type", "").lower():
-                try:
-                    await _validate_json_body(request)
-                except HTTPException as e:
-                    return JSONResponse(status_code=e.status_code, content={"detail": e.detail})
-            return await call_next(request)
+    class JsonBodyValidationMiddleware:
+        def __init__(self, app: ASGIApp) -> None:
+            self.app = app
+
+        async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+            if scope["type"] != "http":
+                await self.app(scope, receive, send)
+                return
+
+            headers = dict(scope.get("headers") or [])
+            content_type = headers.get(b"content-type", b"").decode("latin-1").lower()
+            if "application/json" not in content_type:
+                await self.app(scope, receive, send)
+                return
+
+            body = b""
+            more_body = True
+            while more_body:
+                message = await receive()
+                body += message.get("body", b"")
+                more_body = message.get("more_body", False)
+
+            error = _check_json_body(body)
+            if error is not None:
+                response = JSONResponse(status_code=error.status_code, content={"detail": error.detail})
+                await response(scope, receive, send)
+                return
+
+            replayed = False
+
+            async def _replay_receive() -> Message:
+                nonlocal replayed
+                if not replayed:
+                    replayed = True
+                    return {"type": "http.request", "body": body, "more_body": False}
+                return await receive()
+
+            await self.app(scope, _replay_receive, send)
 
     @app.exception_handler(RequestValidationError)
     async def request_validation_error_handler(req: Request, exc: RequestValidationError):
@@ -176,9 +207,9 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(ResponseValidationError)
     async def response_validation_error_handler(req: Request, exc: ResponseValidationError):
-        # Be defensive: exc.errors() includes the offending `input` value, and
-        # been closed, calling repr() on it raises DetachedInstanceError —
-        # which masks the actual response-validation problem in the logs.
+        # Ser defensivo: exc.errors() incluye el valor `input` que causó el error, y
+        # si la sesión ya se cerró, llamar repr() sobre él lanza DetachedInstanceError,
+        # lo que enmascara el problema real de validación de la respuesta en los logs.
         try:
             errors_repr = str(exc.errors())[:1500]
         except Exception as repr_err:
@@ -230,22 +261,30 @@ def create_app() -> FastAPI:
             headers=headers,
         )
 
-    # Public paths (widget, auth login, health): open origins, NO credentials
-    # Admin paths: restricted to ALLOWED_ORIGINS with credentials
+    # Rutas públicas (widget, login, health): orígenes abiertos, SIN credenciales
+    # Rutas admin: restringidas a ALLOWED_ORIGINS con credenciales
     _PUBLIC_PREFIXES = (
         "/api/v1/widget/public/",
         "/api/v1/auth/login",
         "/api/v1/health",
-        "/widget/",           # static widget JS assets
+        "/widget/",           # assets JS estáticos del widget
     )
     _ALLOWED_METHODS = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
     _ALLOWED_HEADERS = "Authorization, Content-Type, X-Session-ID, X-Widget-Key, X-Environment"
-    class SplitCORSMiddleware(BaseHTTPMiddleware):
-        async def dispatch(self, request: Request, call_next) -> Response:
+    class SplitCORSMiddleware:
+        def __init__(self, app: ASGIApp) -> None:
+            self.app = app
+
+        async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+            if scope["type"] != "http":
+                await self.app(scope, receive, send)
+                return
+
+            request = Request(scope, receive)
             origin = request.headers.get("origin", "")
             path = request.url.path
             is_public = any(path.startswith(p) for p in _PUBLIC_PREFIXES)
-            is_admin_allowed = origin and (_admin_origins_wildcard or origin in _admin_origins)
+            is_admin_allowed = bool(origin) and (_admin_origins_wildcard or origin in _admin_origins)
 
             if request.method == "OPTIONS":
                 headers: dict[str, str] = {
@@ -259,20 +298,26 @@ def create_app() -> FastAPI:
                     headers["Access-Control-Allow-Origin"] = origin
                     headers["Access-Control-Allow-Credentials"] = "true"
                 else:
-                    return Response(status_code=403)
-                return Response(status_code=204, headers=headers)
+                    response = Response(status_code=403)
+                    await response(scope, receive, send)
+                    return
+                response = Response(status_code=204, headers=headers)
+                await response(scope, receive, send)
+                return
 
-            response = await call_next(request)
+            async def add_cors_headers(message: Message) -> None:
+                if message["type"] == "http.response.start":
+                    response_headers = MutableHeaders(scope=message)
+                    if is_public:
+                        response_headers["Access-Control-Allow-Origin"] = origin or "*"
+                        response_headers["Access-Control-Allow-Headers"] = _ALLOWED_HEADERS
+                    elif is_admin_allowed:
+                        response_headers["Access-Control-Allow-Origin"] = origin
+                        response_headers["Access-Control-Allow-Credentials"] = "true"
+                        response_headers["Access-Control-Allow-Headers"] = _ALLOWED_HEADERS
+                await send(message)
 
-            if is_public:
-                response.headers["Access-Control-Allow-Origin"] = origin or "*"
-                response.headers["Access-Control-Allow-Headers"] = _ALLOWED_HEADERS
-            elif is_admin_allowed:
-                response.headers["Access-Control-Allow-Origin"] = origin
-                response.headers["Access-Control-Allow-Credentials"] = "true"
-                response.headers["Access-Control-Allow-Headers"] = _ALLOWED_HEADERS
-
-            return response
+            await self.app(scope, receive, add_cors_headers)
 
     app.add_middleware(SplitCORSMiddleware)
 
@@ -280,38 +325,41 @@ def create_app() -> FastAPI:
 
     app.add_middleware(VersioningMiddleware)
 
-    class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-        """Add security headers to all responses."""
-        async def dispatch(self, request: Request, call_next) -> Response:
-            response = await call_next(request)
-            
-            # Content Security Policy - restrict resources
-            csp = (
-                "default-src 'self'; "
-                "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
-                "style-src 'self' 'unsafe-inline'; "
-                "img-src 'self' data: https:; "
-                "font-src 'self' data:; "
-                "connect-src 'self' https:; "
-                "frame-ancestors 'none'; "
-                "base-uri 'self'; "
-                "form-action 'self';"
-            )
-            response.headers["Content-Security-Policy"] = csp
-            
-            # Other security headers
-            response.headers["X-Content-Type-Options"] = "nosniff"
-            response.headers["X-Frame-Options"] = "DENY"
-            response.headers["X-XSS-Protection"] = "1; mode=block"
-            response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-            response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
-            
-            # HSTS (only in production)
-            settings = get_settings()
-            if settings.ENVIRONMENT == "production":
-                response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-            
-            return response
+    class SecurityHeadersMiddleware:
+        def __init__(self, app: ASGIApp) -> None:
+            self.app = app
+
+        async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+            if scope["type"] != "http":
+                await self.app(scope, receive, send)
+                return
+
+            async def add_security_headers(message: Message) -> None:
+                if message["type"] == "http.response.start":
+                    response_headers = MutableHeaders(scope=message)
+                    csp = (
+                        "default-src 'self'; "
+                        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+                        "style-src 'self' 'unsafe-inline'; "
+                        "img-src 'self' data: https:; "
+                        "font-src 'self' data:; "
+                        "connect-src 'self' https:; "
+                        "frame-ancestors 'none'; "
+                        "base-uri 'self'; "
+                        "form-action 'self';"
+                    )
+                    response_headers["Content-Security-Policy"] = csp
+                    response_headers["X-Content-Type-Options"] = "nosniff"
+                    response_headers["X-Frame-Options"] = "DENY"
+                    response_headers["X-XSS-Protection"] = "1; mode=block"
+                    response_headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+                    response_headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+                    settings = get_settings()
+                    if settings.ENVIRONMENT == "production":
+                        response_headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+                await send(message)
+
+            await self.app(scope, receive, add_security_headers)
 
     app.add_middleware(SecurityHeadersMiddleware)
 
@@ -320,6 +368,14 @@ def create_app() -> FastAPI:
     widget_dir = Path(__file__).parent.parent / "static" / "widget"
     if widget_dir.is_dir():
         app.mount("/widget", StaticFiles(directory=str(widget_dir)), name="widget-static")
+
+    uploads_dir = Path(__file__).parent.parent / settings.UPLOADS_DIR
+    if uploads_dir.is_dir():
+        app.mount(
+            "/uploads",
+            StaticFiles(directory=str(uploads_dir)),
+            name="uploads",
+        )
 
     return app
 

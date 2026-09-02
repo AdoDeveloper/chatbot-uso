@@ -25,6 +25,8 @@ class InvitationResponse(BaseModel):
     is_active: bool
     created_at: datetime
     invite_url: str | None = None  # construido en el router
+    # None = aún no se intentó enviar; True/False lo asigna create_invitation.
+    email_sent: bool | None = None
 
     model_config = {"from_attributes": True}
 

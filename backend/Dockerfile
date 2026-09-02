@@ -1,4 +1,4 @@
-# ── Stage 1: Builder — compila las dependencias (gcc) en una imagen aparte ────
+# ── Stage 1: Builder - compila las dependencias (gcc) en una imagen aparte ────
 FROM python:3.12-slim AS builder
 
 WORKDIR /app
@@ -9,7 +9,7 @@ RUN sed -i 's|http://deb.debian.org|https://deb.debian.org|g' \
     sed -i 's|http://deb.debian.org|https://deb.debian.org|g' \
         /etc/apt/sources.list 2>/dev/null || true
 
-# Build deps — solo en el builder, NO en la imagen final.
+# Build deps - solo en el builder, NO en la imagen final.
 RUN apt-get update && apt-get install -y --no-install-recommends gcc \
     && rm -rf /var/lib/apt/lists/*
 
@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends gcc \
 COPY requirements.txt .
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
-# ── Stage 2: Runtime — sin compiladores, superficie mínima ────────────────────
+# ── Stage 2: Runtime - sin compiladores, superficie mínima ────────────────────
 FROM python:3.12-slim
 
 WORKDIR /app
@@ -38,20 +38,19 @@ COPY --from=builder /install /usr/local
 # ── Non-root user ────────────────────────────────────────────────────────────
 RUN groupadd -r appuser && useradd -r -g appuser -m appuser
 
-# ── Source code (includes static/widget/widget.js pre-built) ─────────────────
+# ── Código fuente (incluye static/widget/widget.js ya compilado) ─────────────
 COPY --chown=appuser:appuser . .
 
 RUN chmod +x entrypoint.sh
 
-# Ensure upload dir and cache dirs are accessible by appuser.
-# Se pre-crean fastembed/ y flashrank/ explícitamente para que Docker inicialice
-# los volúmenes nombrados con ownership de appuser (no de root).
+# Asegura que el directorio de uploads y los de caché sean accesibles por appuser.
+# Se pre-crea fastembed/ explícitamente para que Docker inicialice el volumen
+# nombrado con ownership de appuser (no de root).
 # Si solo se crea el directorio padre (.cache) Docker crea el subdirectorio
 # del volumen como root en el primer arranque → Permission denied al escribir.
 RUN mkdir -p \
         /app/uploads \
         /home/appuser/.cache/fastembed \
-        /home/appuser/.cache/flashrank \
     && chown -R appuser:appuser /app/uploads /home/appuser/.cache
 
 EXPOSE 8000

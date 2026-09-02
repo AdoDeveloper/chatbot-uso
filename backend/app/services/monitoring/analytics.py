@@ -14,12 +14,13 @@ from app.models.source import Source
 from app.models.unanswered_question import UnansweredQuestion
 from app.schemas.analytics import (
     AnalyticsChannels,
+    AnalyticsCsat,
     AnalyticsDashboard,
-    AnalyticsDevices,
     AnalyticsFeedback,
     AnalyticsHeatmap,
     AnalyticsLatencyTimeSeries,
     AnalyticsPages,
+    AnalyticsResponseQuality,
     AnalyticsRoutes,
     AnalyticsSourceQuality,
     AnalyticsTimeSeries,
@@ -27,7 +28,8 @@ from app.schemas.analytics import (
     AnalyticsTopics,
     CacheStats,
     ChannelStat,
-    DeviceStat,
+    CsatReasonCount,
+    CsatTrendPoint,
     FeedbackStat,
     FeedbackTrend,
     HeatmapCell,
@@ -55,10 +57,15 @@ def _percentile(data: list[float], p: float) -> float:
 
 
 def sql_date_format(db: AsyncSession, col, fmt: str):
-    """Expresión de formato de fecha portable: strftime en SQLite, DATE_FORMAT en MySQL."""
+    """Expresión de formato de fecha portable, agrupando por el DÍA LOCAL
+    (América/El Salvador, UTC-6) en vez del día UTC crudo.
+    """
+    from app.core.timezone import UTC_OFFSET_HOURS
     if db.bind is not None and db.bind.dialect.name == "sqlite":
-        return func.strftime(fmt, col)
-    return func.date_format(col, fmt)
+        local_col = func.datetime(col, f"{UTC_OFFSET_HOURS:+d} hours")
+        return func.strftime(fmt, local_col)
+    local_col = func.date_add(col, text(f"INTERVAL {UTC_OFFSET_HOURS} HOUR"))
+    return func.date_format(local_col, fmt)
 
 
 def _source_filter(source: str = "production"):
@@ -78,13 +85,12 @@ def _source_sql_where(source: str = "production") -> str:
 
 
 _PROD_SQL_JOIN = "JOIN chat_conversations c ON c.id = m.conversation_id"
-# Legacy alias — kept so any existing callers still work
-_PROD_SQL_WHERE = _source_sql_where("production")
 
 
 async def get_dashboard(db: AsyncSession, source: str = "production") -> AnalyticsDashboard:
-    now = datetime.now(timezone.utc)
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    from app.core.timezone import now_sv, sv_to_utc
+    today_start_sv = now_sv().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start = sv_to_utc(today_start_sv)
     yesterday_start = today_start - timedelta(days=1)
     week_start = today_start - timedelta(days=7)
     prev_week_start = week_start - timedelta(days=7)
@@ -276,22 +282,30 @@ async def get_topics(
     return AnalyticsTopics(topics=topics, days=days)
 
 
-async def get_heatmap(db: AsyncSession, window: str = "week") -> AnalyticsHeatmap:
-    """Activity heatmap, in 4 time granularities.
+async def get_heatmap(
+    db: AsyncSession, window: str = "week", source: str = "production",
+) -> AnalyticsHeatmap:
+    """Mapa de calor de actividad, en 4 granularidades temporales.
 
-    - day:   24 hourly buckets covering the last 24 h
-    - week:  7 × 24 grid aggregating the last 30 days (default)
-    - month: 30 daily buckets (last 30 days)
-    - year:  365 daily buckets (last 365 days)
+    - day:   24 buckets por hora cubriendo las últimas 24 h
+    - week:  grid de 7 × 24 agregando los últimos 30 días (default)
+    - month: 30 buckets diarios (últimos 30 días)
+    - year:  365 buckets diarios (últimos 365 días)
     """
     now = datetime.now(timezone.utc)
+    _source_where = _source_sql_where(source)
 
+    from app.core.timezone import UTC_OFFSET_HOURS, utc_to_sv
+    # range_start/range_end se muestran en hora local, no el borde UTC crudo.
+    now_local_date = utc_to_sv(now).date()
     if db.bind is not None and db.bind.dialect.name == "sqlite":
-        hour_expr = "CAST(strftime('%H', m.created_at) AS INTEGER)"
-        dow_expr = "CAST(strftime('%w', m.created_at) AS INTEGER)"
+        _local = f"datetime(m.created_at, '{UTC_OFFSET_HOURS:+d} hours')"
+        hour_expr = f"CAST(strftime('%H', {_local}) AS INTEGER)"
+        dow_expr = f"CAST(strftime('%w', {_local}) AS INTEGER)"
     else:
-        hour_expr = "HOUR(m.created_at)"
-        dow_expr = "DAYOFWEEK(m.created_at) - 1"
+        _local = f"DATE_ADD(m.created_at, INTERVAL {UTC_OFFSET_HOURS} HOUR)"
+        hour_expr = f"HOUR({_local})"
+        dow_expr = f"DAYOFWEEK({_local}) - 1"
 
     if window == "day":
         since = now - timedelta(hours=24)
@@ -303,7 +317,7 @@ async def get_heatmap(db: AsyncSession, window: str = "week") -> AnalyticsHeatma
                 FROM chat_messages m
                 JOIN chat_conversations c ON c.id = m.conversation_id
                 WHERE m.role = 'user' AND m.created_at >= :since
-                  AND (c.browser IS NULL OR c.browser NOT IN ('playground', 'panel', 'admin'))
+                  {_source_where}
                 GROUP BY hour
                 ORDER BY hour
                 """
@@ -312,8 +326,8 @@ async def get_heatmap(db: AsyncSession, window: str = "week") -> AnalyticsHeatma
         cells = [HeatmapCell(hour=r.hour, count=r.cnt) for r in result]
         return AnalyticsHeatmap(
             cells=cells, window="day",
-            range_start=since.date().isoformat(),
-            range_end=now.date().isoformat(),
+            range_start=utc_to_sv(since).date().isoformat(),
+            range_end=now_local_date.isoformat(),
         )
 
     if window == "week":
@@ -327,7 +341,7 @@ async def get_heatmap(db: AsyncSession, window: str = "week") -> AnalyticsHeatma
                 FROM chat_messages m
                 JOIN chat_conversations c ON c.id = m.conversation_id
                 WHERE m.role = 'user' AND m.created_at >= :since
-                  AND (c.browser IS NULL OR c.browser NOT IN ('playground', 'panel', 'admin'))
+                  {_source_where}
                 GROUP BY hour, day
                 """
             ).bindparams(since=since)
@@ -335,20 +349,25 @@ async def get_heatmap(db: AsyncSession, window: str = "week") -> AnalyticsHeatma
         cells = [HeatmapCell(hour=r.hour, day=r.day, count=r.cnt) for r in result]
         return AnalyticsHeatmap(
             cells=cells, window="week",
-            range_start=since.date().isoformat(),
-            range_end=now.date().isoformat(),
+            range_start=utc_to_sv(since).date().isoformat(),
+            range_end=now_local_date.isoformat(),
         )
 
     days = 30 if window == "month" else 365
     since = now - timedelta(days=days)
+    _day_expr = (
+        f"DATE(datetime(m.created_at, '{UTC_OFFSET_HOURS:+d} hours'))"
+        if db.bind is not None and db.bind.dialect.name == "sqlite"
+        else f"DATE(DATE_ADD(m.created_at, INTERVAL {UTC_OFFSET_HOURS} HOUR))"
+    )
     result = await db.execute(
         text(
-            """
-            SELECT DATE(m.created_at) AS day, COUNT(*) AS cnt
+            f"""
+            SELECT {_day_expr} AS day, COUNT(*) AS cnt
             FROM chat_messages m
             JOIN chat_conversations c ON c.id = m.conversation_id
             WHERE m.role = 'user' AND m.created_at >= :since
-              AND (c.browser IS NULL OR c.browser NOT IN ('playground', 'panel', 'admin'))
+              {_source_where}
             GROUP BY day
             """
         ).bindparams(since=since)
@@ -356,36 +375,9 @@ async def get_heatmap(db: AsyncSession, window: str = "week") -> AnalyticsHeatma
     cells = [HeatmapCell(date=str(r.day), count=r.cnt) for r in result]
     return AnalyticsHeatmap(
         cells=cells, window=window,  # type: ignore[arg-type]
-        range_start=since.date().isoformat(),
-        range_end=now.date().isoformat(),
+        range_start=utc_to_sv(since).date().isoformat(),
+        range_end=now_local_date.isoformat(),
     )
-
-
-async def get_devices(
-    db: AsyncSession, days: int = 30, source: str = "production",
-    until: datetime | None = None,
-) -> AnalyticsDevices:
-    _until = until or datetime.now(timezone.utc)
-    since = _until - timedelta(days=days)
-    result = await db.execute(
-        select(
-            ChatConversation.device,
-            func.count(ChatConversation.id).label("cnt"),
-        )
-        .where(ChatConversation.started_at >= since)
-        .where(ChatConversation.started_at < _until)
-        .where(ChatConversation.device.is_not(None))
-        .where(_source_filter(source))
-        .group_by(ChatConversation.device)
-        .order_by(func.count(ChatConversation.id).desc())
-    )
-    rows = result.all()
-    total = sum(r.cnt for r in rows) or 1
-    devices = [
-        DeviceStat(device=r.device or "Unknown", count=r.cnt, percentage=round(r.cnt / total * 100, 1))
-        for r in rows
-    ]
-    return AnalyticsDevices(devices=devices)
 
 
 async def get_timeseries(
@@ -394,10 +386,16 @@ async def get_timeseries(
 ) -> AnalyticsTimeSeries:
     _until = until or datetime.now(timezone.utc)
     since = _until - timedelta(days=days)
+    from app.core.timezone import UTC_OFFSET_HOURS
+    _day_expr = (
+        f"DATE(datetime(m.created_at, '{UTC_OFFSET_HOURS:+d} hours'))"
+        if db.bind is not None and db.bind.dialect.name == "sqlite"
+        else f"DATE(DATE_ADD(m.created_at, INTERVAL {UTC_OFFSET_HOURS} HOUR))"
+    )
     result = await db.execute(
         text(
             f"""
-            SELECT DATE(m.created_at) AS day, COUNT(*) AS cnt
+            SELECT {_day_expr} AS day, COUNT(*) AS cnt
             FROM chat_messages m
             {_PROD_SQL_JOIN}
             WHERE m.role = 'user' AND m.created_at >= :since AND m.created_at < :until
@@ -411,8 +409,11 @@ async def get_timeseries(
     return AnalyticsTimeSeries(points=points, days=days)
 
 
-async def get_route_distribution(db: AsyncSession, days: int = 30, source: str = "production") -> AnalyticsRoutes:
-    since = datetime.now(timezone.utc) - timedelta(days=days)
+async def get_route_distribution(
+    db: AsyncSession, days: int = 30, source: str = "production", until: datetime | None = None,
+) -> AnalyticsRoutes:
+    _until = until or datetime.now(timezone.utc)
+    since = _until - timedelta(days=days)
     result = await db.execute(
         select(
             ChatMessage.rag_route,
@@ -422,6 +423,7 @@ async def get_route_distribution(db: AsyncSession, days: int = 30, source: str =
         .where(ChatMessage.role == MessageRole.assistant)
         .where(ChatMessage.rag_route.is_not(None))
         .where(ChatMessage.created_at >= since)
+        .where(ChatMessage.created_at < _until)
         .where(_source_filter(source))
         .group_by(ChatMessage.rag_route)
         .order_by(func.count(ChatMessage.id).desc())
@@ -439,8 +441,12 @@ async def get_route_distribution(db: AsyncSession, days: int = 30, source: str =
     return AnalyticsRoutes(routes=routes, days=days)
 
 
-async def get_latency_timeseries(db: AsyncSession, days: int = 30) -> AnalyticsLatencyTimeSeries:
-    since = datetime.now(timezone.utc) - timedelta(days=days)
+async def get_latency_timeseries(
+    db: AsyncSession, days: int = 30, source: str = "production",
+    until: datetime | None = None,
+) -> AnalyticsLatencyTimeSeries:
+    _until = until or datetime.now(timezone.utc)
+    since = _until - timedelta(days=days)
     day_fmt = sql_date_format(db, ChatMessage.created_at, "%Y-%m-%d")
     result = await db.execute(
         select(
@@ -451,12 +457,8 @@ async def get_latency_timeseries(db: AsyncSession, days: int = 30) -> AnalyticsL
         .where(ChatMessage.role == MessageRole.assistant)
         .where(ChatMessage.latency_ms.is_not(None))
         .where(ChatMessage.created_at >= since)
-        .where(
-            or_(
-                ChatConversation.browser.is_(None),
-                ChatConversation.browser.notin_(PLAYGROUND_BROWSERS),
-            )
-        )
+        .where(ChatMessage.created_at < _until)
+        .where(_source_filter(source))
         .order_by(day_fmt)
     )
     from collections import defaultdict
@@ -489,16 +491,20 @@ async def get_timeline(
     db: AsyncSession,
     days: int = 7,
     limit: int = 50,
+    source: str = "production",
+    until: datetime | None = None,
 ) -> AnalyticsTimeline:
     from sqlalchemy.orm import selectinload
 
-    since = datetime.now(timezone.utc) - timedelta(days=days)
+    _until = until or datetime.now(timezone.utc)
+    since = _until - timedelta(days=days)
     events: list[TimelineEvent] = []
 
     audit_rows = await db.execute(
         select(AuditLog)
         .options(selectinload(AuditLog.actor))
         .where(AuditLog.created_at >= since)
+        .where(AuditLog.created_at < _until)
         .where(AuditLog.action.in_(list(_AUDIT_EVENT_MAP.keys())))
         .order_by(AuditLog.created_at.desc())
         .limit(limit * 2)
@@ -529,6 +535,8 @@ async def get_timeline(
         select(ChatConversation)
         .where(ChatConversation.status == ConversationStatus.escalated)
         .where(ChatConversation.last_message_at >= since)
+        .where(ChatConversation.last_message_at < _until)
+        .where(_source_filter(source))
         .order_by(ChatConversation.last_message_at.desc())
         .limit(limit)
     )
@@ -547,6 +555,7 @@ async def get_timeline(
         select(Source)
         .where(Source.status == SourceStatus.ready)
         .where(Source.updated_at >= since)
+        .where(Source.updated_at < _until)
         .where(Source.deleted_at.is_(None))
         .order_by(Source.updated_at.desc())
         .limit(limit)
@@ -566,14 +575,18 @@ async def get_timeline(
     return AnalyticsTimeline(events=events[:limit], days=days)
 
 
-async def get_source_quality(db: AsyncSession, days: int = 30) -> AnalyticsSourceQuality:
-    """Analyze which sources appear most in chat responses via sources_json."""
-    since = datetime.now(timezone.utc) - timedelta(days=days)
+async def get_source_quality(
+    db: AsyncSession, days: int = 30, until: datetime | None = None,
+) -> AnalyticsSourceQuality:
+    """Analiza qué fuentes aparecen más en las respuestas del chat vía sources_json."""
+    _until = until or datetime.now(timezone.utc)
+    since = _until - timedelta(days=days)
     result = await db.execute(
         select(ChatMessage.sources_json)
         .join(ChatConversation, ChatMessage.conversation_id == ChatConversation.id)
         .where(ChatMessage.role == MessageRole.assistant)
         .where(ChatMessage.created_at >= since)
+        .where(ChatMessage.created_at < _until)
         .where(ChatMessage.sources_json.is_not(None))
         .where(
             or_(
@@ -614,6 +627,45 @@ async def get_source_quality(db: AsyncSession, days: int = 30) -> AnalyticsSourc
         reverse=True,
     )[:20]
     return AnalyticsSourceQuality(sources=source_list, days=days)
+
+
+async def get_response_quality(
+    db: AsyncSession, days: int = 30, until: datetime | None = None,
+) -> AnalyticsResponseQuality:
+    """Promedios de las métricas de calidad RAG (context relevance, faithfulness,
+    answer relevance) evaluadas async por evaluate_response_quality."""
+    _until = until or datetime.now(timezone.utc)
+    since = _until - timedelta(days=days)
+    q = await db.execute(
+        select(
+            func.avg(ChatMessage.context_relevance_ratio),
+            func.avg(ChatMessage.faithfulness_score),
+            func.avg(ChatMessage.answer_relevance_score),
+            func.count(ChatMessage.context_relevance_ratio),
+            func.count(ChatMessage.faithfulness_score),
+            func.count(ChatMessage.answer_relevance_score),
+        )
+        .join(ChatConversation, ChatMessage.conversation_id == ChatConversation.id)
+        .where(ChatMessage.role == MessageRole.assistant)
+        .where(ChatMessage.created_at >= since)
+        .where(ChatMessage.created_at < _until)
+        .where(
+            or_(
+                ChatConversation.browser.is_(None),
+                ChatConversation.browser.notin_(PLAYGROUND_BROWSERS),
+            )
+        )
+    )
+    avg_ratio, avg_faith, avg_rel, ratio_n, faith_n, rel_n = q.one()
+    return AnalyticsResponseQuality(
+        avg_context_relevance_ratio=round(avg_ratio, 4) if avg_ratio is not None else None,
+        avg_faithfulness_score=round(avg_faith, 4) if avg_faith is not None else None,
+        avg_answer_relevance_score=round(avg_rel, 4) if avg_rel is not None else None,
+        context_relevance_sample_size=int(ratio_n or 0),
+        faithfulness_sample_size=int(faith_n or 0),
+        answer_relevance_sample_size=int(rel_n or 0),
+        days=days,
+    )
 
 
 async def _snapshot_for_range(
@@ -693,7 +745,10 @@ async def get_period_comparison(
 ) -> PeriodComparison:
     """Compara la ventana de N días con los N días anteriores."""
     anchor = until or datetime.now(timezone.utc)
-    end = anchor.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+    from app.core.timezone import utc_to_sv, sv_to_utc
+    anchor_sv = utc_to_sv(anchor)
+    end_sv = anchor_sv.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+    end = sv_to_utc(end_sv)
     cur_start = end - timedelta(days=days)
     prev_end = cur_start
     prev_start = prev_end - timedelta(days=days)
@@ -729,6 +784,8 @@ def _classify_channel(origin_url: str | None, browser: str | None) -> str:
 async def get_channels(
     db: AsyncSession, days: int = 7, until: datetime | None = None,
 ) -> AnalyticsChannels:
+    """Desglosa el tráfico por canal de entrada: widget, api, playground.
+    """
     _until = until or datetime.now(timezone.utc)
     since = _until - timedelta(days=days)
     result = await db.execute(
@@ -756,29 +813,39 @@ async def get_channels(
     return AnalyticsChannels(channels=channels, days=days)
 
 
-async def get_cache_stats(db: AsyncSession, days: int = 7) -> CacheStats:
+async def get_cache_stats(
+    db: AsyncSession, days: int = 7, source: str = "production",
+    until: datetime | None = None,
+) -> CacheStats:
     """Cuenta hits/misses de cache semántica desde `chat_messages.rag_route`.
 
     Convenios actuales:
     - rag_route LIKE 'cache_%' → hit
     - cualquier otro valor de rag_route → miss
     """
-    since = datetime.now(timezone.utc) - timedelta(days=days)
+    _until = until or datetime.now(timezone.utc)
+    since = _until - timedelta(days=days)
 
     hits_q = await db.execute(
         select(func.count(ChatMessage.id))
+        .join(ChatConversation, ChatMessage.conversation_id == ChatConversation.id)
         .where(ChatMessage.role == MessageRole.assistant)
         .where(ChatMessage.created_at >= since)
+        .where(ChatMessage.created_at < _until)
         .where(ChatMessage.rag_route.like("cache_%"))
+        .where(_source_filter(source))
     )
     hits = int(hits_q.scalar_one() or 0)
 
     misses_q = await db.execute(
         select(func.count(ChatMessage.id))
+        .join(ChatConversation, ChatMessage.conversation_id == ChatConversation.id)
         .where(ChatMessage.role == MessageRole.assistant)
         .where(ChatMessage.created_at >= since)
+        .where(ChatMessage.created_at < _until)
         .where(ChatMessage.rag_route.is_not(None))
         .where(~ChatMessage.rag_route.like("cache_%"))
+        .where(_source_filter(source))
     )
     misses = int(misses_q.scalar_one() or 0)
 
@@ -787,14 +854,18 @@ async def get_cache_stats(db: AsyncSession, days: int = 7) -> CacheStats:
     return CacheStats(hits=hits, misses=misses, hit_rate=hit_rate, days=days)
 
 
-async def get_pages(db: AsyncSession, days: int = 30, source: str = "production") -> AnalyticsPages:
-    """Top pages where the widget was opened, grouped by domain + path."""
+async def get_pages(
+    db: AsyncSession, days: int = 30, source: str = "production", until: datetime | None = None,
+) -> AnalyticsPages:
+    """Páginas donde más se abrió el widget, agrupadas por dominio + path."""
     from urllib.parse import urlparse
 
-    since = datetime.now(timezone.utc) - timedelta(days=days)
+    _until = until or datetime.now(timezone.utc)
+    since = _until - timedelta(days=days)
     result = await db.execute(
         select(ChatConversation.origin_url, func.count(ChatConversation.id).label("cnt"))
         .where(ChatConversation.started_at >= since)
+        .where(ChatConversation.started_at < _until)
         .where(ChatConversation.origin_url.is_not(None))
         .where(_source_filter(source))
         .group_by(ChatConversation.origin_url)
@@ -802,7 +873,7 @@ async def get_pages(db: AsyncSession, days: int = 30, source: str = "production"
         .limit(100)
     )
 
-    # Collapse by (scheme + netloc + path) to merge query-string variants
+    # Colapsa por (scheme + netloc + path) para fusionar variantes de query-string
     page_counts: dict[str, int] = {}
     for row in result.all():
         raw_url: str = row.origin_url or ""
@@ -891,3 +962,82 @@ async def get_feedback(
         for d, v in sorted(trend_map.items())
     ]
     return AnalyticsFeedback(summary=summary, trend=trend)
+
+
+async def get_csat(
+    db: AsyncSession, *, days: int = 30, source: str = "production",
+    until: datetime | None = None,
+) -> AnalyticsCsat:
+    """Valoraciones CSAT (estrellas 1-5) de cualquier conversación cerrada
+    con encuesta respondida, sin limitarse a las que fueron escaladas."""
+    from app.services.widget import csat_reasons as csat_reasons_svc
+
+    _until = until or datetime.now(timezone.utc)
+    since = _until - timedelta(days=days)
+    pf = _source_filter(source)
+
+    # ChatConversation no tiene timestamp propio del CSAT; created_at es el más cercano.
+    base_where = (
+        ChatConversation.csat_score.is_not(None),
+        ChatConversation.created_at >= since,
+        ChatConversation.created_at < _until,
+        pf,
+    )
+
+    dist_result = await db.execute(
+        select(ChatConversation.csat_score, func.count(ChatConversation.id).label("cnt"))
+        .where(*base_where)
+        .group_by(ChatConversation.csat_score)
+    )
+    distribution: dict[str, int] = {str(n): 0 for n in range(1, 6)}
+    total = 0
+    score_sum = 0
+    for row in dist_result.all():
+        score = int(row.csat_score)
+        cnt = int(row.cnt)
+        distribution[str(score)] = cnt
+        total += cnt
+        score_sum += score * cnt
+    avg_score = round(score_sum / total, 2) if total else None
+
+    day_fmt = sql_date_format(db, ChatConversation.created_at, "%Y-%m-%d")
+    trend_result = await db.execute(
+        select(
+            day_fmt.label("day"),
+            func.avg(ChatConversation.csat_score).label("avg_score"),
+            func.count(ChatConversation.id).label("cnt"),
+        )
+        .where(*base_where)
+        .group_by(day_fmt)
+        .order_by(day_fmt)
+    )
+    trend = [
+        CsatTrendPoint(date=row.day, avg_score=round(float(row.avg_score), 2), total=int(row.cnt))
+        for row in trend_result.all()
+    ]
+    reasons_result = await db.execute(
+        select(ChatConversation.csat_reasons).where(*base_where)
+    )
+    reason_counts: dict[str, int] = {}
+    for (reasons,) in reasons_result.all():
+        for r in (reasons or []):
+            reason_counts[r] = reason_counts.get(r, 0) + 1
+
+    labels = await csat_reasons_svc.labels_map(db)
+    top_reasons = sorted(
+        (
+            CsatReasonCount(id=rid, label=labels.get(rid, rid), count=cnt)
+            for rid, cnt in reason_counts.items()
+        ),
+        key=lambda r: r.count,
+        reverse=True,
+    )[:10]
+
+    return AnalyticsCsat(
+        total=total,
+        avg_score=avg_score,
+        distribution=distribution,
+        trend=trend,
+        top_reasons=top_reasons,
+        days=days,
+    )

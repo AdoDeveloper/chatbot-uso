@@ -1,12 +1,13 @@
-"""Utilidades de exportación — genera Excel (xlsx) y PDF desde listas de dicts."""
+"""Utilidades de exportación - genera Excel (xlsx) y PDF desde listas de dicts."""
 from __future__ import annotations
 
 import io
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from fastapi.responses import StreamingResponse
+
+from app.core.timezone import now_sv
 
 # Identidad institucional para los reportes.
 BRAND_NAME = "Universidad de Sonsonate"
@@ -75,7 +76,7 @@ def build_excel(
     # ── Membrete: institución, título y metadatos ──
     ws.cell(row=1, column=1, value=BRAND_NAME).font = Font(bold=True, size=13, color="1E40AF")
     ws.cell(row=2, column=1, value=title or sheet_name).font = Font(bold=True, size=11, color="111827")
-    ws.cell(row=3, column=1, value=f"Generado el {datetime.now().strftime('%d/%m/%Y a las %H:%M')}").font = Font(size=9, color="6B7280")
+    ws.cell(row=3, column=1, value=f"Generado el {now_sv().strftime('%d/%m/%Y a las %H:%M')}").font = Font(size=9, color="6B7280")
     ws.cell(row=4, column=1, value=f"Total de registros: {len(rows)}").font = Font(size=9, color="6B7280")
     if n_cols > 1:
         for r in range(1, 5):
@@ -231,7 +232,7 @@ def build_pdf(
     if subtitle:
         story.append(Paragraph(subtitle, meta_style))
     story.append(Paragraph(
-        f"Generado el {datetime.now().strftime('%d/%m/%Y a las %H:%M')}", meta_style
+        f"Generado el {now_sv().strftime('%d/%m/%Y a las %H:%M')}", meta_style
     ))
     story.append(Paragraph(f"Total de registros: {len(rows)}", meta_style))
     story.append(Spacer(1, 0.5 * cm))
@@ -243,7 +244,27 @@ def build_pdf(
         headers = list(first_nonempty.keys())
         col_count = len(headers)
         col_width = (page[0] - 3 * cm) / col_count
-        table_data = [headers] + [[str(row.get(h, "")) for h in headers] for row in rows]
+
+        cell_style = ParagraphStyle(
+            "TableCell", parent=styles["Normal"],
+            fontName="Helvetica", fontSize=8, leading=10,
+        )
+        header_style = ParagraphStyle(
+            "TableHeader", parent=styles["Normal"],
+            fontName="Helvetica-Bold", fontSize=8.5, leading=10,
+            textColor=colors.white,
+        )
+
+        def _cell(value: Any, style: ParagraphStyle) -> Paragraph:
+            text = str(value) if value is not None else ""
+            if len(text) > 400:
+                text = text[:400] + "…"
+            text = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            return Paragraph(text, style)
+
+        table_data = [[_cell(h, header_style) for h in headers]] + [
+            [_cell(row.get(h, ""), cell_style) for h in headers] for row in rows
+        ]
         table = Table(table_data, colWidths=[col_width] * col_count, repeatRows=1)
         table.setStyle(_table_style())
         story.append(table)
@@ -422,7 +443,7 @@ def _cover_story(title: str, subtitle: str | None, page_size) -> list:
         story.append(Paragraph(subtitle, meta_style))
     story.append(Spacer(1, 0.3 * cm))
     story.append(Paragraph(
-        f"Generado el {datetime.now().strftime('%d/%m/%Y a las %H:%M')}", sub_style
+        f"Generado el {now_sv().strftime('%d/%m/%Y a las %H:%M')}", sub_style
     ))
     story.append(PageBreak())
     return story

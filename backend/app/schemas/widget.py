@@ -16,10 +16,10 @@ MAX_PROACTIVE_LEN = 200
 
 
 class WidgetConfigUpdate(BaseModel):
-    chatbot_name: str | None = None
+    chatbot_name: str | None = Field(default=None, max_length=128)
     welcome_message: str | None = None
     primary_color: str | None = None
-    position: str | None = None
+    position: str | None = Field(default=None, max_length=16)
     logo_url: str | None = None
     domain_allowlist: list[str] | None = None
     show_sources: bool | None = None
@@ -102,7 +102,7 @@ class WidgetConfigOut(BaseModel):
 
 
 class WidgetPublicConfigOut(BaseModel):
-    """Safe fields only — no api_key, no domain_allowlist, no id."""
+    """Solo campos seguros - sin api_key, sin domain_allowlist, sin id."""
     chatbot_name: str
     welcome_message: str
     primary_color: str
@@ -112,7 +112,7 @@ class WidgetPublicConfigOut(BaseModel):
     enable_copy_action: bool
     enable_feedback_icons: bool
     enable_tts: bool = True
-    enable_accessibility: bool = False
+    enable_accessibility: bool = True
     show_bot_icon: bool
     suggestions: list[str]
     proactive_message: str
@@ -120,8 +120,10 @@ class WidgetPublicConfigOut(BaseModel):
     show_new_chat_button: bool
     enable_csat: bool
     csat_question: str
+    csat_reasons: dict[str, str] = {}
     enable_escalation: bool = True
     launcher_label: str
+    max_input_chars: int = 4000
 
     model_config = {"from_attributes": True}
 

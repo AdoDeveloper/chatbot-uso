@@ -66,7 +66,7 @@ async def sync_qdrant(db: AsyncSession) -> dict:
             points_selector=orphan_filter,
         )
 
-    # 5. Invalidar caché — respuestas viejas pueden citar chunks huérfanos
+    # 5. Invalidar caché - respuestas viejas pueden citar chunks huérfanos
     cache_count = await cache_svc.invalidate_by_source("maintenance.sync-qdrant")
 
     log.info(

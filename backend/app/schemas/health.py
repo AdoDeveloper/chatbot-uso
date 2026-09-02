@@ -15,7 +15,6 @@ class ServiceStatus(BaseModel):
 
 class ComputeDevice(BaseModel):
     embedding: str       # "cuda" | "cpu"
-    reranker: str        # "cuda" | "cpu"
     gpu_available: bool
 
 

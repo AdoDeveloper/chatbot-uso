@@ -1,6 +1,6 @@
 """
-JWT revocation: per-jti denylist (Redis) + per-user tokens_valid_after cutoff (DB).
-Fail-open on Redis outage — the DB cutoff is always enforced.
+Revocación de JWT: denylist por jti (Redis) + corte tokens_valid_after por usuario (DB).
+Fail-open ante una caída de Redis - el corte de la DB siempre se aplica.
 """
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ _DENY_PREFIX = "jwt:denylist:"
 
 
 async def revoke_jti(jti: str, expires_at: datetime) -> None:
-    """Add a token's jti to the denylist until its natural expiry."""
+    """Agrega el jti de un token a la denylist hasta su expiración natural."""
     if not jti:
         return
     now = datetime.now(timezone.utc)
@@ -24,7 +24,7 @@ async def revoke_jti(jti: str, expires_at: datetime) -> None:
         expires_at = expires_at.replace(tzinfo=timezone.utc)
     ttl = int((expires_at - now).total_seconds())
     if ttl <= 0:
-        return  # already expired — nothing to deny
+        return  # ya expiró - nada que denegar
     try:
         await redis_mod.get_redis().set(f"{_DENY_PREFIX}{jti}", "1", ex=ttl)
     except Exception:
@@ -32,7 +32,7 @@ async def revoke_jti(jti: str, expires_at: datetime) -> None:
 
 
 async def is_jti_revoked(jti: str | None) -> bool:
-    """Return True if this jti has been explicitly revoked. Fail-open."""
+    """Devuelve True si este jti fue revocado explícitamente. Fail-open."""
     if not jti:
         return False
     try:
@@ -43,20 +43,14 @@ async def is_jti_revoked(jti: str | None) -> bool:
 
 
 def is_token_stale(payload: dict, tokens_valid_after: datetime | None) -> bool:
-    """True if the token was issued before the user's tokens_valid_after cutoff.
-
-    A token without `iat` (legacy, pre-revocation) is treated as stale only if
-    a cutoff exists — otherwise older tokens silently bypassed the check.
-    """
+    """True si el token fue emitido antes del corte tokens_valid_after del usuario."""
     if tokens_valid_after is None:
         return False
     iat = payload.get("iat")
     if iat is None:
-        # No iat means it predates this feature; if a cutoff was set after a
-        # password change, such a token must be rejected.
         return True
     issued = datetime.fromtimestamp(iat, tz=timezone.utc)
     if tokens_valid_after.tzinfo is None:
         tokens_valid_after = tokens_valid_after.replace(tzinfo=timezone.utc)
-    # 1s grace: a token minted in the same second as the cutoff is valid.
+    # Margen de 1s: un token emitido en el mismo segundo que el corte es válido.
     return issued < tokens_valid_after.replace(microsecond=0)

@@ -2,7 +2,7 @@
 
 Ningún archivo de test cubría sync_qdrant ni purge_health_outliers antes
 de esto. Se fijan aquí antes de mover sync_qdrant a servicio. Qdrant se
-sustituye por un stub — no hay Qdrant real en el entorno de test.
+sustituye por un stub - no hay Qdrant real en el entorno de test.
 """
 from __future__ import annotations
 

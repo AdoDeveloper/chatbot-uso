@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.deps import require_perm
 from app.core.permissions import P
 from app.db.session import get_db
@@ -24,6 +25,13 @@ from app.services.sources import service as sources_svc
 
 router = APIRouter(prefix="/sources", tags=["sources"])
 log = structlog.get_logger()
+
+
+@router.get("/upload-limits")
+async def upload_limits(
+    _: User = Depends(require_perm(P.KNOWLEDGE_READ)),
+):
+    return {"source_mb": get_settings().MAX_SOURCE_UPLOAD_MB}
 
 
 @router.get("", response_model=list[SourceResponse])
@@ -56,7 +64,7 @@ async def upload_source(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_perm(P.KNOWLEDGE_CREATE)),
 ):
-    """Sube un archivo (PDF/DOCX/XLSX) y dispara la ingestión en background."""
+    """Sube un archivo (PDF/DOCX/TXT) y dispara la ingestión en background."""
     source = await sources_svc.upload_source(
         db, req=req, background_tasks=background_tasks, file=file,
         name=name, description=description, tags=tags, current_user=current_user,
@@ -127,6 +135,11 @@ async def reingest_source(
     _: User = Depends(require_perm(P.KNOWLEDGE_UPDATE)),
 ):
     source = await sources_svc.get_or_404(db, source_id)
+    if source.status == SourceStatus.processing:
+        raise HTTPException(
+            status_code=409,
+            detail="Esta fuente ya se está procesando. Espera a que termine antes de reintentar.",
+        )
     source.status = SourceStatus.pending
     source.error_message = None
     await db.commit()
@@ -137,6 +150,25 @@ async def reingest_source(
         select(Source).where(Source.id == source.id).options(*sources_svc.with_user_options())
     )
     return SourceResponse.from_source(result.scalar_one())
+
+
+@router.post("/{source_id}/replace-file", response_model=SourceResponse)
+async def replace_source_file(
+    source_id: uuid.UUID,
+    req: Request,
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_perm(P.KNOWLEDGE_UPDATE)),
+):
+    """Reemplaza el archivo de una fuente existente (ej. tras un rechazo) y
+    dispara una nueva ingestión. Distinto de /ingest, que reprocesa el mismo
+    archivo sin cambios."""
+    source = await sources_svc.replace_source_file(
+        db, source_id=source_id, req=req, background_tasks=background_tasks,
+        file=file, current_user=current_user,
+    )
+    return SourceResponse.from_source(source)
 
 
 class RejectRequest(BaseModel):
@@ -152,7 +184,7 @@ async def approve_source(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_perm(P.KNOWLEDGE_MANAGE)),
 ):
-    """Marca la fuente como aprobada — el chatbot puede usarla en sus respuestas.
+    """Marca la fuente como aprobada - el chatbot puede usarla en sus respuestas.
 
     Si la fuente venía de un estado `rechazada` se limpia `rejection_reason`.
     Cada aprobación queda registrada en audit_log con la acción `source.approve`.
@@ -315,6 +347,8 @@ async def preview_source(
                 preview_text = "\n\n".join(pages)
             elif ext in (".docx",):
                 from docx import Document
+                from app.services.ingestion.parsing.docx import _check_zip_bomb
+                _check_zip_bomb(str(p))
                 doc = Document(str(p))
                 preview_text = "\n".join(par.text for par in doc.paragraphs[:200])
             else:

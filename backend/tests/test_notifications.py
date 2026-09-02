@@ -47,8 +47,13 @@ async def seed_rule(db_session):
 
 
 @pytest.fixture
-async def seed_logs(db_session):
-    """Inserta 3 notification logs: 2 no leídas, 1 leída."""
+async def seed_logs(db_session, admin_user):
+    """Inserta 3 notification logs para admin_user: 2 no leídas, 1 leída.
+
+    El inbox es individual (user_id) desde que se agregó fan-out por
+    destinatario, así que las filas deben pertenecer a quien las consulta
+    en el test.
+    """
     logs = [
         NotificationLog(
             id=uuid.uuid4(),
@@ -59,6 +64,7 @@ async def seed_logs(db_session):
             error_message=None,
             payload_json={"source_id": "abc"},
             read_at=None,
+            user_id=admin_user.id,
         ),
         NotificationLog(
             id=uuid.uuid4(),
@@ -69,6 +75,7 @@ async def seed_logs(db_session):
             error_message="Connection timeout",
             payload_json={},
             read_at=None,
+            user_id=admin_user.id,
         ),
         NotificationLog(
             id=uuid.uuid4(),
@@ -79,6 +86,7 @@ async def seed_logs(db_session):
             error_message=None,
             payload_json={},
             read_at=datetime.now(timezone.utc),
+            user_id=admin_user.id,
         ),
     ]
     for log in logs:
@@ -92,10 +100,6 @@ class TestUpdateRule:
     async def test_update_rule_returns_fresh_data_no_detached_error(
         self, client, admin_user, auth_headers, seed_rule
     ):
-        """El bug original: tras commit, los atributos quedan expirados,
-        FastAPI lanza ResponseValidationError, el handler intenta __repr__
-        sobre instancia detached → DetachedInstanceError.
-        Verificamos que el flujo completo retorna 200 con datos correctos."""
         r = await client.put(
             f"/api/v1/notifications/rules/{seed_rule.id}",
             json={"enabled": True, "target": "soporte@uso.edu.sv", "config_json": {"foo": "bar"}},
@@ -147,7 +151,7 @@ class TestInbox:
         assert "items" in body
         assert body["unread_count"] == 2  # 2 sin read_at, 1 con read_at
         assert len(body["items"]) == 3
-        # Orden DESC por created_at — el más reciente primero
+        # Orden DESC por created_at - el más reciente primero
         assert body["items"][0]["id"] is not None
 
     async def test_inbox_empty_when_no_logs(
@@ -181,6 +185,20 @@ class TestInbox:
             "/api/v1/notifications/inbox", headers=auth_headers(viewer_user)
         )
         assert r.status_code in (401, 403)
+
+    async def test_inbox_is_per_user_not_shared(
+        self, client, admin_user, auth_headers, seed_logs, make_user
+    ):
+        """Las notificaciones de admin_user no deben aparecer en el inbox de
+        otro admin: el buzón es individual, no un estado global por rol."""
+        other_admin = await make_user(role=UserRole.admin)
+        r = await client.get(
+            "/api/v1/notifications/inbox", headers=auth_headers(other_admin)
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["unread_count"] == 0
+        assert body["items"] == []
 
 
 # ── Mark as read ───────────────────────────────────────────────────────────

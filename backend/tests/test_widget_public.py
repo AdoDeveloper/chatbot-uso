@@ -38,6 +38,10 @@ class TestPublicConfig:
         assert r.status_code == 200
         body = r.json()
         assert body["chatbot_name"] == "Test Bot"
+        # Sin motivos personalizados en BD, se exponen los 4 por defecto
+        # (ver csat_reasons.py _DEFAULT_REASONS) hasta que el admin los edite.
+        assert "helpful_answer" in body["csat_reasons"]
+        assert "no_solution" in body["csat_reasons"]
 
     async def test_get_config_without_key_is_403(self, client):
         r = await client.get("/api/v1/widget/public/config")
@@ -53,12 +57,12 @@ class TestPublicConfig:
 
 class TestPublicChat:
     async def test_chat_with_valid_key_returns_200(self, client, widget_config):
-        async with client.stream(
-            "POST", "/api/v1/widget/public/chat",
+        r = await client.post(
+            "/api/v1/widget/public/chat",
             json={"question": "hola", "session_id": "test-session"},
             headers={"X-Widget-Key": widget_config.api_key},
-        ) as resp:
-            assert resp.status_code == 200
+        )
+        assert r.status_code == 200
 
     async def test_chat_without_key_is_403(self, client):
         r = await client.post(

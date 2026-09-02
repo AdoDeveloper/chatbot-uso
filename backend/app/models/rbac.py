@@ -1,4 +1,4 @@
-"""Modelos RBAC — roles dinámicos, módulos, permisos y asignaciones."""
+"""Modelos RBAC - roles dinámicos, módulos, permisos y asignaciones."""
 from __future__ import annotations
 
 import uuid

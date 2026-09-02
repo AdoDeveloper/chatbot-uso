@@ -13,11 +13,10 @@ coverage.xml
 htmlcov
 *.egg-info
 
-# Local data — uploads and embeddings get a docker volume, never the build context
+# Local data - uploads and embeddings get a docker volume, never the build context
 uploads
 .cache
 .fastembed
-.flashrank
 
 # Local env / IDE / OS
 .env

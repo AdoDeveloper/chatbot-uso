@@ -1,4 +1,4 @@
-"""Tests for app.core.security — password hashing, JWT, Fernet encryption."""
+"""Tests for app.core.security - password hashing, JWT, Fernet encryption."""
 from __future__ import annotations
 
 import pytest
@@ -79,19 +79,3 @@ class TestFernetEncryption:
         e1 = encrypt_secret("same-value")
         e2 = encrypt_secret("same-value")
         assert e1 != e2  # Fernet uses timestamp + random IV
-
-    def test_legacy_fallback(self):
-        """Data encrypted with old SHA256 derivation should still decrypt."""
-        import base64
-        import hashlib
-        from cryptography.fernet import Fernet
-        from app.core.config import get_settings
-        from app.core.security import decrypt_secret
-
-        settings = get_settings()
-        source = settings.ENCRYPTION_KEY or settings.SECRET_KEY
-        raw = hashlib.sha256(source.encode()).digest()
-        legacy_fernet = Fernet(base64.urlsafe_b64encode(raw))
-        legacy_encrypted = legacy_fernet.encrypt(b"old-api-key").decode()
-
-        assert decrypt_secret(legacy_encrypted) == "old-api-key"

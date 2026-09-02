@@ -15,7 +15,7 @@ class UserResponse(BaseModel):
     id: uuid.UUID
     email: str
     full_name: str
-    role: str          # nombre del rol dinámico (ej. "superadmin", "moderador")
+    role: str          # nombre del rol dinámico (ej. "admin", "moderador")
     is_active: bool
     must_change_password: bool = False
     last_login_at: datetime | None
@@ -41,7 +41,7 @@ class ChangePasswordRequest(BaseModel):
 
 
 class RoleSummaryOut(BaseModel):
-    """Respuesta de GET /rbac/roles — resumen de un rol del sistema."""
+    """Respuesta de GET /rbac/roles - resumen de un rol del sistema."""
     name: str
     display_name: str
     description: str | None = None
@@ -50,6 +50,6 @@ class RoleSummaryOut(BaseModel):
 
 
 class MyPermissionsOut(BaseModel):
-    """Respuesta de GET /rbac/my-permissions — permisos del usuario autenticado."""
+    """Respuesta de GET /rbac/my-permissions - permisos del usuario autenticado."""
     role: str
     permissions: list[str]

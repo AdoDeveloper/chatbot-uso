@@ -4,7 +4,7 @@ Estos tests fijan el comportamiento ACTUAL de los endpoints de chunks
 (no cubiertos por ningún otro archivo de test) antes de mover su lógica
 a una capa de servicio, para poder confirmar que la migración no cambia
 nada observable. Qdrant y el modelo de embeddings se sustituyen por
-monkeypatch — no hay Qdrant real en el entorno de test.
+monkeypatch - no hay Qdrant real en el entorno de test.
 """
 from __future__ import annotations
 
@@ -260,10 +260,20 @@ class TestChunkHistory:
         self, client, admin_user, auth_headers, patch_vector_store, seeded_source, db_session
     ):
         """Dos ediciones consecutivas pueden caer en el mismo instante bajo
-        SQLite (resolución de timestamp insuficiente para distinguir orden),
-        así que forzamos edited_at distintos tras la segunda edición en vez
-        de depender del reloj real — lo que importa es que el endpoint
-        efectivamente ordena DESC por edited_at, no la precisión del reloj."""
+        SQLite o incluso MySQL - DATETIME(fsp=6) tiene precisión de
+        microsegundos, pero `server_default=func.now()` puede evaluarse una
+        sola vez por transacción/statement y dos PATCH consecutivos corriendo
+        sin red real (solo el test client) pueden terminar con edited_at
+        idéntico. Forzamos edited_at distintos en vez de depender del reloj
+        real - lo que importa es que el endpoint efectivamente ordena DESC
+        por edited_at, no la precisión del reloj.
+
+        Identificar cuál fila es "v2" (la que hay que envejecer) por su
+        propio contenido (new_content), no por `ORDER BY edited_at` - ese
+        mismo ORDER BY es ambiguo sin desempate cuando ambas filas comparten
+        timestamp, exactamente el problema que este workaround intenta
+        evitar (confirmado empíricamente: ese SELECT hacía el test flaky,
+        pasando ~2 de cada 3 corridas)."""
         import datetime as dt
         from sqlalchemy import select
         from app.models.chunk_edit import ChunkEdit
@@ -279,11 +289,11 @@ class TestChunkHistory:
         )
 
         res = await db_session.execute(
-            select(ChunkEdit).where(ChunkEdit.chunk_point_id == point_id).order_by(ChunkEdit.edited_at)
+            select(ChunkEdit).where(ChunkEdit.chunk_point_id == point_id)
         )
-        edits = res.scalars().all()
-        assert len(edits) == 2
-        edits[0].edited_at = dt.datetime.now(dt.timezone.utc) - dt.timedelta(seconds=10)
+        edits = {e.new_content: e for e in res.scalars().all()}
+        assert set(edits) == {"v2", "v3"}
+        edits["v2"].edited_at = dt.datetime.now(dt.timezone.utc) - dt.timedelta(seconds=10)
         await db_session.commit()
 
         r = await client.get(f"/api/v1/chunks/{point_id}/history", headers=auth_headers(admin_user))
@@ -292,3 +302,41 @@ class TestChunkHistory:
         assert len(body) == 2
         assert body[0]["new_content"] == "v3"
         assert body[1]["new_content"] == "v2"
+
+
+class TestTestQueryValidation:
+    """ChunkTestRequest no tenía cotas (top_k sin ge/le, query sin
+    max_length) - un top_k extremo se pasaba directo a la búsqueda vectorial
+    en Qdrant sin ninguna barrera, arriesgando saturar memoria/latencia."""
+
+    async def test_rejects_top_k_over_max(self, client, admin_user, auth_headers):
+        r = await client.post(
+            "/api/v1/chunks/test-query",
+            json={"query": "test", "top_k": 999999},
+            headers=auth_headers(admin_user),
+        )
+        assert r.status_code == 422
+
+    async def test_rejects_top_k_zero_or_negative(self, client, admin_user, auth_headers):
+        r = await client.post(
+            "/api/v1/chunks/test-query",
+            json={"query": "test", "top_k": 0},
+            headers=auth_headers(admin_user),
+        )
+        assert r.status_code == 422
+
+    async def test_rejects_query_over_max_length(self, client, admin_user, auth_headers):
+        r = await client.post(
+            "/api/v1/chunks/test-query",
+            json={"query": "x" * 5000},
+            headers=auth_headers(admin_user),
+        )
+        assert r.status_code == 422
+
+    async def test_rejects_empty_query(self, client, admin_user, auth_headers):
+        r = await client.post(
+            "/api/v1/chunks/test-query",
+            json={"query": ""},
+            headers=auth_headers(admin_user),
+        )
+        assert r.status_code == 422

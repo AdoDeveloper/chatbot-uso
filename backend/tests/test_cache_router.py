@@ -1,4 +1,4 @@
-"""Tests para app/api/v1/system/cache/router.py — no tenía ningún test.
+"""Tests para app/api/v1/system/cache/router.py - no tenía ningún test.
 
 Cubre stats, listado de entradas, borrado (total y por key) y actualización
 de config del caché semántico. Usa el Redis fake (fakeredis) inyectado por
@@ -28,7 +28,7 @@ async def viewer_user(make_user):
 def _patch_cache_svc_redis(client, monkeypatch):
     """El fixture `client` mockea `app.core.redis.get_redis` con un FakeRedis,
     pero app/services/ai/semantic_cache.py hace `from app.core.redis import
-    get_redis` (import directo) — ese binding ya quedó resuelto al importar
+    get_redis` (import directo) - ese binding ya quedó resuelto al importar
     el módulo, así que el monkeypatch de conftest no lo alcanza. Reapuntamos
     `cache_svc.get_redis` al mismo `get_redis` (ya parcheado) para que el
     router de cache y este helper de seed usen la misma instancia FakeRedis.
@@ -236,5 +236,29 @@ class TestUpdateConfig:
             "/api/v1/cache/config",
             json={"enabled": "no-es-booleano"},
             headers=auth_headers(admin_user),
+        )
+        assert r.status_code == 422
+
+    async def test_rejects_negative_ttl(self, client, admin_user, auth_headers):
+        r = await client.patch(
+            "/api/v1/cache/config", json={"ttl_seconds": -100}, headers=auth_headers(admin_user),
+        )
+        assert r.status_code == 422
+
+    async def test_rejects_similarity_threshold_above_one(self, client, admin_user, auth_headers):
+        r = await client.patch(
+            "/api/v1/cache/config", json={"similarity_threshold": 5.0}, headers=auth_headers(admin_user),
+        )
+        assert r.status_code == 422
+
+    async def test_rejects_similarity_threshold_below_zero(self, client, admin_user, auth_headers):
+        r = await client.patch(
+            "/api/v1/cache/config", json={"similarity_threshold": -0.5}, headers=auth_headers(admin_user),
+        )
+        assert r.status_code == 422
+
+    async def test_rejects_ttl_above_max(self, client, admin_user, auth_headers):
+        r = await client.patch(
+            "/api/v1/cache/config", json={"ttl_seconds": 10_000_000}, headers=auth_headers(admin_user),
         )
         assert r.status_code == 422

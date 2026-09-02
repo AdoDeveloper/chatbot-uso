@@ -33,7 +33,8 @@ class ChannelToggleIn(BaseModel):
 
 
 class NotificationItemOut(BaseModel):
-    """Una notificación en el inbox / historial (target enmascarado)."""
+    """Una notificación en el inbox (target enmascarado). `summary` es el
+    dato distintivo de este disparo (documento, pregunta, servicio, etc.)."""
     id: str
     event: str
     channel: str
@@ -42,18 +43,43 @@ class NotificationItemOut(BaseModel):
     error_message: str | None = None
     created_at: str
     read_at: str | None = None
+    summary: str | None = None
 
 
 class InboxOut(BaseModel):
-    """Respuesta de GET /notifications/inbox — últimas N + count no leídas."""
+    """Respuesta de GET /notifications/inbox - últimas N + count no leídas."""
     unread_count: int
     items: list[NotificationItemOut]
 
 
+class ChannelDeliveryOut(BaseModel):
+    """Estado de entrega de un canal dentro de un disparo agrupado.
+    `recipients` cuenta las filas de ese canal en el trigger; `target`
+    solo aplica al canal email."""
+    channel: str
+    status: str
+    recipients: int
+    target: str | None = None
+    error_message: str | None = None
+
+
+class NotificationTriggerOut(BaseModel):
+    """Un disparo agrupado por trigger_id, con un ChannelDeliveryOut por
+    canal. `own_log_id`/`own_read_at` son la entrega in_app del usuario
+    actual (si tuvo una), para marcarla leída sin afectar a otros admins."""
+    id: str  # trigger_id
+    event: str
+    created_at: str
+    channels: list[ChannelDeliveryOut]
+    summary: str | None = None
+    own_log_id: str | None = None
+    own_read_at: str | None = None
+
+
 class NotificationListOut(BaseModel):
-    """Respuesta paginada de GET /notifications — mismo formato que el resto
-    de listas del panel (items / total / page / page_size)."""
-    items: list[NotificationItemOut]
+    """Respuesta paginada de GET /notifications. `items` son disparos
+    agrupados, no filas crudas de NotificationLog."""
+    items: list[NotificationTriggerOut]
     total: int
     page: int
     page_size: int

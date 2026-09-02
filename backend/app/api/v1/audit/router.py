@@ -148,4 +148,4 @@ async def list_actors(
         .group_by(AuditLog.actor_id, User.full_name)
         .order_by(User.full_name.asc())
     )
-    return [{"id": str(row[0]), "name": row[1] or "—"} for row in result.all()]
+    return [{"id": str(row[0]), "name": row[1] or "-"} for row in result.all()]

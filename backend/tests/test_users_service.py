@@ -83,7 +83,7 @@ async def test_authenticate_unknown_email(db_session):
 
 
 # ---------------------------------------------------------------------------
-# update_user — bloque más grande sin cobertura (líneas 73-124)
+# update_user - bloque más grande sin cobertura (líneas 73-124)
 # ---------------------------------------------------------------------------
 
 async def test_update_user_not_found_raises(db_session, make_user):
@@ -307,6 +307,44 @@ async def test_delete_user_admin_cannot_delete_admin(db_session, make_user):
     assert "no pueden eliminar a otro admin" in exc_info.value.detail
 
 
+async def test_delete_user_last_active_admin_blocked_even_for_non_admin_actor(db_session, make_user):
+    """Mismo espíritu que la guarda de update_user (líneas 88-93): sin esto,
+    un actor no-admin con el permiso users.delete (p. ej. vía un rol
+    dinámico personalizado, que el sistema RBAC ya soporta) podría eliminar
+    al único admin del sistema. La guarda de update_user existente
+    ('admin no puede eliminar a otro admin') no cubre este caso porque el
+    actor de esta prueba no es admin."""
+    from sqlalchemy import update
+    from app.models.user import User
+
+    only_admin = await make_user(role=UserRole.admin)
+    non_admin_actor = await make_user(role=UserRole.editor)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await user_service.delete_user(
+            db_session, user_id=only_admin.id, current_user=non_admin_actor, ip=None
+        )
+    assert exc_info.value.status_code == 403
+    assert "último administrador" in exc_info.value.detail
+
+    # Sigue existiendo - no se llegó a borrar.
+    assert await user_service.get_by_id(db_session, only_admin.id) is not None
+
+
+async def test_delete_user_admin_when_another_admin_active_allowed(db_session, make_user):
+    """Con dos admins activos, eliminar uno (por un actor no-admin con
+    permiso) debe seguir funcionando - la guarda no debe bloquear de más."""
+    first_admin = await make_user(role=UserRole.admin)
+    second_admin = await make_user(role=UserRole.admin)
+    non_admin_actor = await make_user(role=UserRole.editor)
+
+    await user_service.delete_user(
+        db_session, user_id=second_admin.id, current_user=non_admin_actor, ip=None
+    )
+    assert await user_service.get_by_id(db_session, second_admin.id) is None
+    assert await user_service.get_by_id(db_session, first_admin.id) is not None
+
+
 async def test_delete_user_success(db_session, make_user):
     admin = await make_user(role=UserRole.admin)
     target = await make_user(role=UserRole.viewer)
@@ -314,3 +352,81 @@ async def test_delete_user_success(db_session, make_user):
     await user_service.delete_user(db_session, user_id=target.id, current_user=admin, ip="127.0.0.1")
 
     assert await user_service.get_by_id(db_session, target.id) is None
+
+
+async def test_reset_password_success_sets_temp_password_and_forces_change(db_session, make_user):
+    admin = await make_user(role=UserRole.admin)
+    target = await make_user(role=UserRole.viewer, password="OldPass123!")
+
+    user, temp_password = await user_service.reset_password(
+        db_session, user_id=target.id, current_user=admin, ip="127.0.0.1",
+    )
+
+    assert user.must_change_password is True
+    assert user.tokens_valid_after is not None
+    # La contraseña vieja ya no debe funcionar; la temporal sí.
+    assert await user_service.authenticate(db_session, target.email, "OldPass123!") is None
+    authenticated = await user_service.authenticate(db_session, target.email, temp_password)
+    assert authenticated is not None
+    assert authenticated.id == target.id
+
+
+async def test_reset_password_temp_password_meets_min_length(db_session, make_user):
+    """ChangePasswordRequest exige min_length=8 - la temporal generada debe
+    cumplirlo siempre, o un admin podría generar una contraseña que el
+    propio backend rechazaría en el próximo cambio forzado."""
+    admin = await make_user(role=UserRole.admin)
+    target = await make_user(role=UserRole.viewer)
+
+    _, temp_password = await user_service.reset_password(
+        db_session, user_id=target.id, current_user=admin, ip=None,
+    )
+    assert len(temp_password) >= 8
+    assert any(c.islower() for c in temp_password)
+    assert any(c.isupper() for c in temp_password)
+    assert any(c.isdigit() for c in temp_password)
+
+
+async def test_reset_password_cannot_reset_self(db_session, make_user):
+    admin = await make_user(role=UserRole.admin)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await user_service.reset_password(
+            db_session, user_id=admin.id, current_user=admin, ip=None,
+        )
+    assert exc_info.value.status_code == 400
+    assert "Cambiar contraseña" in exc_info.value.detail
+
+
+async def test_reset_password_not_found(db_session, make_user):
+    admin = await make_user(role=UserRole.admin)
+
+    with pytest.raises(NotFoundError):
+        await user_service.reset_password(
+            db_session, user_id=uuid.uuid4(), current_user=admin, ip=None,
+        )
+
+
+async def test_reset_password_non_admin_cannot_reset_admin(db_session, make_user):
+    non_admin_actor = await make_user(role=UserRole.editor)
+    target_admin = await make_user(role=UserRole.admin)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await user_service.reset_password(
+            db_session, user_id=target_admin.id, current_user=non_admin_actor, ip=None,
+        )
+    assert exc_info.value.status_code == 403
+    assert "Solo un admin puede resetear" in exc_info.value.detail
+
+
+async def test_reset_password_non_admin_can_reset_non_admin(db_session, make_user):
+    """La guarda solo protege a admins - un actor no-admin con el permiso
+    users.manage sí puede resetear a un usuario de menor rango."""
+    non_admin_actor = await make_user(role=UserRole.editor)
+    target = await make_user(role=UserRole.viewer)
+
+    user, temp_password = await user_service.reset_password(
+        db_session, user_id=target.id, current_user=non_admin_actor, ip=None,
+    )
+    assert user.must_change_password is True
+    assert temp_password

@@ -13,7 +13,8 @@ from app.core.config import get_settings
 from app.core.dates import since_until as _since_until
 from app.core.deps import require_perm
 from app.core.permissions import P
-from app.db.session import AsyncSessionLocal, get_db
+from app.db import session as db_session
+from app.db.session import get_db
 from app.schemas.health import (
     ComputeDevice, HealthDetailed, HealthHistoryEntry,
     HealthSnapshotResult, IncidentEntry, ServiceStatus, UptimeSummary,
@@ -22,7 +23,7 @@ from app.services.monitoring import health as health_history
 
 log = structlog.get_logger()
 router = APIRouter(prefix="/health", tags=["health"])
-_admin = require_perm(P.SYSTEM_READ)
+_system_read = require_perm(P.SYSTEM_READ)
 
 
 class LivenessResponse(BaseModel):
@@ -38,7 +39,7 @@ class ReadinessResponse(BaseModel):
 
 @router.get("/live", response_model=LivenessResponse)
 async def liveness() -> LivenessResponse:
-    """Liveness probe — responde 200 si el proceso está vivo, sin tocar dependencias.
+    """Liveness probe - responde 200 si el proceso está vivo, sin tocar dependencias.
 
     Apto para Kubernetes liveness probe o para uptimers que solo quieren saber
     si el contenedor responde.
@@ -48,7 +49,7 @@ async def liveness() -> LivenessResponse:
 
 @router.get("/ready", response_model=ReadinessResponse)
 async def readiness(response: Response) -> ReadinessResponse:
-    """Readiness probe — verifica BD + Redis + Qdrant.
+    """Readiness probe - verifica BD + Redis + Qdrant.
 
     Retorna 200 si todas las dependencias responden, 503 si alguna falla.
     Pensado para UptimeRobot / Healthchecks.io / Kubernetes readiness probe.
@@ -58,7 +59,7 @@ async def readiness(response: Response) -> ReadinessResponse:
 
     # MySQL
     try:
-        async with AsyncSessionLocal() as db:
+        async with db_session.AsyncSessionLocal() as db:
             await db.execute(text("SELECT 1"))
         checks["mysql"] = "ok"
     except Exception as exc:
@@ -96,14 +97,14 @@ async def readiness(response: Response) -> ReadinessResponse:
 
 
 @router.get("/detailed", response_model=HealthDetailed)
-async def health_detailed(_: object = Depends(_admin)):
+async def health_detailed(_: object = Depends(_system_read)):
     settings = get_settings()
     services: list[ServiceStatus] = []
     overall = "ok"
 
     t0 = time.monotonic()
     try:
-        async with AsyncSessionLocal() as db:
+        async with db_session.AsyncSessionLocal() as db:
             await db.execute(text("SELECT 1"))
         latency = int((time.monotonic() - t0) * 1000)
         services.append(ServiceStatus(name="MySQL", status="ok", latency_ms=latency))
@@ -141,9 +142,41 @@ async def health_detailed(_: object = Depends(_admin)):
         overall = "degraded"
         services.append(ServiceStatus(name="Embedding Model", status="error", detail=str(exc)[:128]))
 
+    try:
+        async with db_session.AsyncSessionLocal() as db:
+            sync_result = await health_history.check_index_sync(db)
+        if sync_result.get("ok"):
+            services.append(ServiceStatus(name="Índice Qdrant↔MySQL", status="ok"))
+        else:
+            overall = "degraded"
+            missing = sync_result.get("missing")
+            detail = (
+                f"Faltan {missing} chunks en Qdrant respecto a lo declarado en MySQL"
+                if missing is not None else sync_result.get("error", "desincronizado")
+            )
+            services.append(ServiceStatus(name="Índice Qdrant↔MySQL", status="error", detail=detail[:128]))
+    except Exception as exc:
+        overall = "degraded"
+        services.append(ServiceStatus(name="Índice Qdrant↔MySQL", status="error", detail=str(exc)[:128]))
+
+    try:
+        from app.services.system.settings import get_deployed_chain
+        async with db_session.AsyncSessionLocal() as db:
+            chain = await get_deployed_chain(db)
+        if chain:
+            services.append(ServiceStatus(name="Proveedor LLM", status="ok"))
+        else:
+            overall = "degraded"
+            services.append(ServiceStatus(
+                name="Proveedor LLM", status="error",
+                detail="Sin proveedores activos con credenciales válidas en la cadena desplegada",
+            ))
+    except Exception as exc:
+        overall = "degraded"
+        services.append(ServiceStatus(name="Proveedor LLM", status="error", detail=str(exc)[:128]))
+
     gpu_available = False
     embedding_device = "cpu"
-    reranker_device = "cpu"
     try:
         import onnxruntime
         if "CUDAExecutionProvider" in onnxruntime.get_available_providers():
@@ -155,7 +188,6 @@ async def health_detailed(_: object = Depends(_admin)):
         import torch
         if torch.cuda.is_available():
             gpu_available = True
-            reranker_device = "cuda"
     except Exception:
         pass
 
@@ -166,7 +198,6 @@ async def health_detailed(_: object = Depends(_admin)):
         environment=settings.ENVIRONMENT,
         compute=ComputeDevice(
             embedding=embedding_device,
-            reranker=reranker_device,
             gpu_available=gpu_available,
         ),
     )
@@ -176,7 +207,7 @@ async def health_detailed(_: object = Depends(_admin)):
 @router.post("/snapshot", response_model=HealthSnapshotResult)
 async def take_snapshot(
     db: AsyncSession = Depends(get_db),
-    _=Depends(_admin),
+    _=Depends(_system_read),
 ):
     """Recolecta una muestra inmediata de todos los servicios y la persiste.
 
@@ -191,7 +222,7 @@ async def history(
     service: str | None = Query(None),
     hours: int = Query(24, ge=1, le=168),
     db: AsyncSession = Depends(get_db),
-    _=Depends(_admin),
+    _=Depends(_system_read),
 ):
     """Serie temporal de snapshots (default: últimas 24h). Filtrable por servicio."""
     return await health_history.get_history(db, service=service, hours=hours)
@@ -203,7 +234,7 @@ async def uptime_summary(
     date_from: datetime | None = Query(None),
     date_to: datetime | None = Query(None),
     db: AsyncSession = Depends(get_db),
-    _=Depends(_admin),
+    _=Depends(_system_read),
 ):
     """Por servicio: % uptime + P50/P95/P99 de latencia + último estado."""
     since, until = _since_until(date_from, date_to)
@@ -216,7 +247,7 @@ async def incidents(
     date_from: datetime | None = Query(None),
     date_to: datetime | None = Query(None),
     db: AsyncSession = Depends(get_db),
-    _=Depends(_admin),
+    _=Depends(_system_read),
 ):
     """Lista de incidentes (rachas con is_ok=False) en los últimos N horas (default 7d)."""
     since, until = _since_until(date_from, date_to)

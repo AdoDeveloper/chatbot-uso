@@ -1,12 +1,3 @@
-"""Tests de caracterización adicionales para app/api/v1/widget/router.py.
-
-test_widget_public.py solo cubre autenticación (403 sin widget key) y un
-happy-path superficial de /public/chat. Estos tests cubren los caminos de
-éxito/error reales de public_escalation_contact, public_feedback,
-public_csat y el timeout del semáforo LLM en public_chat — que no tenían
-ninguna prueba y donde se detectó un bug real (NameError: `log` no
-definido en el router, usado solo en la rama de timeout).
-"""
 from __future__ import annotations
 
 import uuid
@@ -75,16 +66,19 @@ def stub_dispatch_escalation(monkeypatch):
 
 
 class TestPublicEscalationContact:
-    async def test_no_pending_escalation_returns_409(
+    async def test_manual_request_without_pending_flag_succeeds(
         self, client, widget_config, make_conversation, stub_dispatch_escalation
     ):
+        """Un contacto manual sin escalation_pending previo debe aceptarse igual."""
         conv = await make_conversation(escalation_pending=False)
         r = await client.post(
             "/api/v1/widget/public/escalation/contact",
             json={"conversation_id": str(conv.id), "contact_type": "email", "contact_value": "a@b.com"},
             headers={"X-Widget-Key": widget_config.api_key},
         )
-        assert r.status_code == 409
+        assert r.status_code == 204
+        assert len(stub_dispatch_escalation) == 1
+        assert stub_dispatch_escalation[0]["trigger_type"] == "user_consent"
 
     async def test_conversation_not_found_returns_404(self, client, widget_config, stub_dispatch_escalation):
         r = await client.post(
@@ -107,6 +101,19 @@ class TestPublicEscalationContact:
         assert len(stub_dispatch_escalation) == 1
         assert stub_dispatch_escalation[0]["trigger_type"] == "user_consent"
 
+        await db_session.refresh(conv)
+        assert conv.escalation_pending is False
+
+    async def test_manual_request_leaves_pending_flag_unaffected(
+        self, client, widget_config, make_conversation, stub_dispatch_escalation, db_session
+    ):
+        """El flag sigue False: nunca estuvo True, no hay nada que limpiar."""
+        conv = await make_conversation(escalation_pending=False)
+        await client.post(
+            "/api/v1/widget/public/escalation/contact",
+            json={"conversation_id": str(conv.id), "contact_type": "whatsapp", "contact_value": "+50370000000"},
+            headers={"X-Widget-Key": widget_config.api_key},
+        )
         await db_session.refresh(conv)
         assert conv.escalation_pending is False
 
@@ -135,7 +142,7 @@ class TestPublicFeedback:
 
         r = await client.patch(
             f"/api/v1/widget/public/messages/{msg.id}/feedback",
-            json={"feedback": "positive"},
+            json={"feedback": "positive", "conversation_id": str(conv.id)},
             headers={"X-Widget-Key": widget_config.api_key},
         )
         assert r.status_code == 204
@@ -145,10 +152,56 @@ class TestPublicFeedback:
     async def test_feedback_on_nonexistent_message_is_noop_204(self, client, widget_config):
         r = await client.patch(
             f"/api/v1/widget/public/messages/{uuid.uuid4()}/feedback",
-            json={"feedback": "negative"},
+            json={"feedback": "negative", "conversation_id": str(uuid.uuid4())},
             headers={"X-Widget-Key": widget_config.api_key},
         )
         assert r.status_code == 204
+
+    async def test_feedback_requires_conversation_id(self, client, widget_config, db_session, make_conversation):
+        """conversation_id ahora es obligatorio - sin él, message_id por sí
+        solo no prueba que el llamante pertenezca a esa conversación."""
+        from app.models.chat_message import ChatMessage
+        from app.models.enums import MessageRole
+
+        conv = await make_conversation()
+        msg = ChatMessage(id=uuid.uuid4(), conversation_id=conv.id, role=MessageRole.assistant, content="respuesta")
+        db_session.add(msg)
+        await db_session.commit()
+
+        r = await client.patch(
+            f"/api/v1/widget/public/messages/{msg.id}/feedback",
+            json={"feedback": "positive"},
+            headers={"X-Widget-Key": widget_config.api_key},
+        )
+        assert r.status_code == 422
+
+    async def test_feedback_with_wrong_conversation_id_is_rejected(
+        self, client, widget_config, db_session, make_conversation,
+    ):
+        """IDOR: un mensaje real, pero con un conversation_id que no le
+        pertenece, no debe poder alterar el feedback - antes bastaba con
+        adivinar/interceptar el message_id, sin ninguna prueba de que el
+        llamante fuera parte de esa conversación."""
+        from app.models.chat_message import ChatMessage
+        from app.models.enums import MessageRole
+
+        real_conv = await make_conversation()
+        other_conv = await make_conversation()
+        msg = ChatMessage(
+            id=uuid.uuid4(), conversation_id=real_conv.id,
+            role=MessageRole.assistant, content="respuesta",
+        )
+        db_session.add(msg)
+        await db_session.commit()
+
+        r = await client.patch(
+            f"/api/v1/widget/public/messages/{msg.id}/feedback",
+            json={"feedback": "positive", "conversation_id": str(other_conv.id)},
+            headers={"X-Widget-Key": widget_config.api_key},
+        )
+        assert r.status_code == 204  # noop, mismo comportamiento que "mensaje inexistente"
+        await db_session.refresh(msg)
+        assert msg.feedback is None
 
 
 class TestPublicCsat:
@@ -181,13 +234,48 @@ class TestPublicCsat:
         await db_session.refresh(conv)
         assert conv.csat_score == 4
         assert conv.csat_comment == "buena atención"
+        assert conv.csat_reasons == []
+
+    async def test_csat_records_known_reasons(self, client, widget_config, make_conversation, db_session):
+        conv = await make_conversation()
+        r = await client.post(
+            "/api/v1/widget/public/csat",
+            json={
+                "conversation_id": str(conv.id), "score": 5,
+                "reasons": ["helpful_answer", "fast_response"],
+            },
+            headers={"X-Widget-Key": widget_config.api_key},
+        )
+        assert r.status_code == 204
+        await db_session.refresh(conv)
+        assert conv.csat_reasons == ["helpful_answer", "fast_response"]
+
+    async def test_csat_rejects_unknown_reason(self, client, widget_config, make_conversation):
+        conv = await make_conversation()
+        r = await client.post(
+            "/api/v1/widget/public/csat",
+            json={"conversation_id": str(conv.id), "score": 5, "reasons": ["not_a_real_reason"]},
+            headers={"X-Widget-Key": widget_config.api_key},
+        )
+        assert r.status_code == 422
+
+    async def test_csat_deduplicates_reasons(self, client, widget_config, make_conversation, db_session):
+        conv = await make_conversation()
+        r = await client.post(
+            "/api/v1/widget/public/csat",
+            json={"conversation_id": str(conv.id), "score": 3, "reasons": ["no_solution", "no_solution"]},
+            headers={"X-Widget-Key": widget_config.api_key},
+        )
+        assert r.status_code == 204
+        await db_session.refresh(conv)
+        assert conv.csat_reasons == ["no_solution"]
 
 
 class TestPublicChatLlmQueueTimeout:
     async def test_llm_queue_timeout_returns_503(self, client, widget_config, monkeypatch):
         """Reproduce el timeout de adquisición del semáforo LLM. La rama de
         error usa `log.warning(...)`, pero `log` nunca se define/importa en
-        app/api/v1/widget/router.py — esto dispara un NameError que oculta
+        app/api/v1/widget/router.py - esto dispara un NameError que oculta
         el 503 real detrás de un 500 genérico del handler global."""
         import asyncio
         import app.api.v1.widget.router as widget_router

@@ -57,12 +57,14 @@ async def root_cause_analysis(db: AsyncSession, *, question_id: uuid.UUID) -> di
 
         if bot_msgs:
             last = bot_msgs[-1]
-            route = (last.rag_route or "").lower()
-            if "no_context" in route or "no_match" in route:
+
+            # Sin fuentes recuperadas: caso real de docs vacío tras la búsqueda.
+            sources = last.sources_json or []
+            if not sources:
                 causes.append({
                     "code": "no_coverage",
                     "label": "Sin cobertura RAG",
-                    "detail": f"La última respuesta usó la ruta '{route}', sin chunks recuperados con confianza suficiente.",
+                    "detail": "La búsqueda no recuperó ningún chunk con confianza suficiente para responder.",
                 })
                 suggestions.append(
                     f"Agregar un documento que cubra el tema {q.detected_topic or '(sin clasificar)'}."
@@ -79,9 +81,8 @@ async def root_cause_analysis(db: AsyncSession, *, question_id: uuid.UUID) -> di
                     })
                     suggestions.append("Revisar el prompt o agregar un trigger de escalación 'loop_detected'.")
 
-            # Score bajo en sources
+            # Score bajo en sources (hubo chunks, pero de baja confianza)
             try:
-                sources = last.sources_json or []
                 if sources:
                     scores = [float(s.get("score") or 0) for s in sources if isinstance(s, dict)]
                     if scores and max(scores) < 0.3:

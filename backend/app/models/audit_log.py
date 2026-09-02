@@ -31,12 +31,7 @@ class AuditLog(Base):
     meta_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False, server_default=sa_text("('{}')") )
     ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
     user_agent: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # MySQL's DATETIME sin fsp redondea al segundo mas cercano al guardar
-    # (ej. .518s se guarda como el segundo siguiente), lo que puede dejar una
-    # fila recien insertada por fuera de una ventana "< now()" calculada
-    # milisegundos despues -- filas recientes contadas de menos de forma
-    # intermitente en /security/summary y reportes similares. fsp=6 (idéntico
-    # a la precision de microsegundos de Python) elimina ese redondeo.
+    # fsp=6: sin esto, MySQL redondea DATETIME al segundo y filas recién insertadas quedan mal contadas en ventanas "< now()".
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True).with_variant(mysql.DATETIME(fsp=6), "mysql"),
         server_default=func.now(), nullable=False, index=True,

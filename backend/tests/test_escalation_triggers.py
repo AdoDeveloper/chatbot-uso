@@ -7,7 +7,9 @@ sin importar la configuración ni el comportamiento real del chatbot.
 """
 from __future__ import annotations
 
+import itertools
 import uuid
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -15,7 +17,10 @@ from app.models.chat_conversation import ChatConversation
 from app.models.chat_message import ChatMessage
 from app.models.enums import MessageFeedback, MessageRole
 from app.models.escalation_rule import EscalationRule
-from app.services.chat.pipeline import _feedback_negative_ratio, detect_escalation
+from app.services.chat.pipeline import _feedback_negative_ratio, _recent_assistant_rag_scores, detect_escalation
+
+# Timestamp creciente explícito: varios mensajes insertados en el mismo instante de reloj de MySQL no tendrían desempate estable en el ORDER BY created_at.
+_next_ts = itertools.count()
 
 
 async def _make_conversation(db_session) -> ChatConversation:
@@ -30,6 +35,17 @@ async def _add_assistant_message(db_session, conv_id, feedback: MessageFeedback 
     msg = ChatMessage(
         id=uuid.uuid4(), conversation_id=conv_id, role=MessageRole.assistant,
         content="respuesta", feedback=feedback,
+        created_at=datetime(2025, 1, 1, tzinfo=timezone.utc) + timedelta(seconds=next(_next_ts)),
+    )
+    db_session.add(msg)
+    await db_session.commit()
+
+
+async def _add_assistant_message_with_score(db_session, conv_id, score: float) -> None:
+    msg = ChatMessage(
+        id=uuid.uuid4(), conversation_id=conv_id, role=MessageRole.assistant,
+        content="respuesta", sources_json=[{"source_id": "s1", "score": score}],
+        created_at=datetime(2025, 1, 1, tzinfo=timezone.utc) + timedelta(seconds=next(_next_ts)),
     )
     db_session.add(msg)
     await db_session.commit()
@@ -68,7 +84,7 @@ async def test_negative_feedback_rule_triggers_with_real_ratio(db_session):
 
     escalated = await detect_escalation(
         db_session, conv, question="test", history=[], final_text="respuesta",
-        context_chunks=[], latency_ms=500,
+        latency_ms=500,
     )
     assert escalated is True
     assert conv.escalation_pending is True
@@ -89,7 +105,7 @@ async def test_no_answer_rule_triggers_with_real_latency(db_session):
     # latency_ms=8000 → 8s, por encima del umbral de 5s configurado.
     escalated = await detect_escalation(
         db_session, conv, question="test", history=[], final_text="respuesta",
-        context_chunks=[], latency_ms=8000,
+        latency_ms=8000,
     )
     assert escalated is True
     assert conv.escalation_pending is True
@@ -109,7 +125,150 @@ async def test_no_answer_rule_does_not_trigger_when_fast(db_session):
 
     escalated = await detect_escalation(
         db_session, conv, question="test", history=[], final_text="respuesta",
-        context_chunks=[], latency_ms=500,
+        latency_ms=500,
     )
     assert escalated is False
     assert conv.escalation_pending is False
+
+
+@pytest.mark.asyncio
+async def test_recent_assistant_rag_scores_reads_real_history_chronologically(db_session):
+    """confidence_below promete "N respuestas consecutivas" - antes de este
+    fix se evaluaban N chunks de la respuesta actual (una señal distinta),
+    porque no existía ningún acumulador de scores por conversación."""
+    conv = await _make_conversation(db_session)
+    await _add_assistant_message_with_score(db_session, conv.id, 0.01)
+    await _add_assistant_message_with_score(db_session, conv.id, 0.02)
+    await _add_assistant_message_with_score(db_session, conv.id, 0.03)
+
+    scores = await _recent_assistant_rag_scores(db_session, conv.id, limit=5)
+    assert scores == [0.01, 0.02, 0.03]
+
+
+@pytest.mark.asyncio
+async def test_recent_assistant_rag_scores_respects_limit_keeping_most_recent(db_session):
+    conv = await _make_conversation(db_session)
+    for score in [0.01, 0.02, 0.03, 0.04, 0.05, 0.06]:
+        await _add_assistant_message_with_score(db_session, conv.id, score)
+
+    scores = await _recent_assistant_rag_scores(db_session, conv.id, limit=3)
+    assert scores == [0.04, 0.05, 0.06]
+
+
+@pytest.mark.asyncio
+async def test_recent_assistant_rag_scores_excludes_turns_without_sources(db_session):
+    conv = await _make_conversation(db_session)
+    await _add_assistant_message(db_session, conv.id, feedback=None)  # saludo, sin sources_json
+    await _add_assistant_message(db_session, conv.id, feedback=None)  # saludo, sin sources_json
+    await _add_assistant_message_with_score(db_session, conv.id, 0.9)  # respuesta real, alta confianza
+
+    scores = await _recent_assistant_rag_scores(db_session, conv.id, limit=5)
+    assert scores == [0.9]
+
+
+@pytest.mark.asyncio
+async def test_confidence_below_rule_does_not_trigger_on_greetings_without_sources(db_session):
+    conv = await _make_conversation(db_session)
+    await _add_assistant_message(db_session, conv.id, feedback=None)  # saludo
+    await _add_assistant_message(db_session, conv.id, feedback=None)  # saludo
+
+    rule = EscalationRule(
+        id=uuid.uuid4(), name="Confianza baja", trigger_type="confidence_below",
+        trigger_config={"threshold": 0.02, "consecutive": 2}, enabled=True,
+    )
+    db_session.add(rule)
+    await db_session.commit()
+
+    escalated = await detect_escalation(
+        db_session, conv, question="hola", history=[], final_text="¡Hola! ¿En qué puedo ayudarte?",
+        latency_ms=100,
+    )
+    assert escalated is False
+    assert conv.escalation_pending is False
+
+
+@pytest.mark.asyncio
+async def test_detect_escalation_fails_safe_and_logs_degraded(db_session, monkeypatch):
+    """Si evaluate_rule lanza (p.ej. trigger_config corrupto guardado por un
+    admin), detect_escalation debía devolver False sin propagar la excepción
+    - eso ya funcionaba. Lo que faltaba: el log de este camino era idéntico
+    al de "ninguna regla se disparó" (mismo mensaje, sin marca distintiva),
+    así que un fallo sistemático de evaluación era indistinguible de que
+    simplemente no hubiera nada que escalar. degraded=True lo hace visible,
+    igual que llm.grade_failed_open."""
+    from app.services.chat import pipeline as pipeline_mod
+
+    conv = await _make_conversation(db_session)
+    rule = EscalationRule(
+        id=uuid.uuid4(), name="Regla rota", trigger_type="confidence_below",
+        trigger_config={"threshold": 0.02, "consecutive": 2}, enabled=True,
+    )
+    db_session.add(rule)
+    await db_session.commit()
+
+    def _boom(*a, **k):
+        raise RuntimeError("trigger_config corrupto")
+
+    monkeypatch.setattr(pipeline_mod, "evaluate_rule", _boom)
+
+    calls: list[tuple[str, dict]] = []
+    monkeypatch.setattr(
+        pipeline_mod.log, "warning",
+        lambda event, **kwargs: calls.append((event, kwargs)),
+    )
+
+    escalated = await detect_escalation(
+        db_session, conv, question="test", history=[], final_text="respuesta",
+        latency_ms=500,
+    )
+
+    assert escalated is False
+    # detect_escalation hace rollback() en el camino de error, lo que expira los atributos in-memory de `conv` - se relee explícitamente.
+    await db_session.refresh(conv)
+    assert conv.escalation_pending is False
+    degraded_calls = [kwargs for event, kwargs in calls if event == "chat.escalation_eval_failed"]
+    assert len(degraded_calls) == 1
+    assert degraded_calls[0]["degraded"] is True
+
+
+@pytest.mark.asyncio
+async def test_confidence_below_rule_triggers_on_real_consecutive_turns(db_session):
+    """El propio turno actual (persistido por persist_turn antes de llamar a
+    detect_escalation) ya cuenta como el N-ésimo de la secuencia."""
+    conv = await _make_conversation(db_session)
+    await _add_assistant_message_with_score(db_session, conv.id, 0.01)
+    await _add_assistant_message_with_score(db_session, conv.id, 0.015)  # turno "actual"
+
+    rule = EscalationRule(
+        id=uuid.uuid4(), name="Confianza baja", trigger_type="confidence_below",
+        trigger_config={"threshold": 0.02, "consecutive": 2}, enabled=True,
+    )
+    db_session.add(rule)
+    await db_session.commit()
+
+    escalated = await detect_escalation(
+        db_session, conv, question="test", history=[], final_text="respuesta",
+        latency_ms=500,
+    )
+    assert escalated is True
+    assert "Confianza baja" in conv.escalation_trigger_reason
+
+
+@pytest.mark.asyncio
+async def test_confidence_below_rule_does_not_trigger_with_one_good_turn(db_session):
+    conv = await _make_conversation(db_session)
+    await _add_assistant_message_with_score(db_session, conv.id, 0.01)
+    await _add_assistant_message_with_score(db_session, conv.id, 0.03)  # buena, rompe la racha
+
+    rule = EscalationRule(
+        id=uuid.uuid4(), name="Confianza baja", trigger_type="confidence_below",
+        trigger_config={"threshold": 0.02, "consecutive": 2}, enabled=True,
+    )
+    db_session.add(rule)
+    await db_session.commit()
+
+    escalated = await detect_escalation(
+        db_session, conv, question="test", history=[], final_text="respuesta",
+        latency_ms=500,
+    )
+    assert escalated is False

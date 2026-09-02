@@ -1,6 +1,6 @@
 """
-Widget authentication and domain validation.
-Usage as FastAPI dependency: Depends(verify_widget_access)
+Autenticación del widget y validación de dominio.
+Uso como dependencia de FastAPI: Depends(verify_widget_access)
 """
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ log = structlog.get_logger()
 
 
 async def _extract_api_key(request: Request) -> str:
-    """Read API key from X-Widget-Key header or widget_key query param."""
+    """Lee la API key desde el header X-Widget-Key o el query param widget_key."""
     key = request.headers.get("X-Widget-Key") or request.query_params.get("widget_key")
     if not key:
         raise HTTPException(
@@ -34,7 +34,7 @@ async def require_widget_key(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> WidgetConfig:
-    """Validate API key and return the WidgetConfig."""
+    """Valida la API key y devuelve el WidgetConfig."""
     key = await _extract_api_key(request)
     cfg = await get_by_api_key(db, key)
     if cfg is None:
@@ -46,7 +46,7 @@ async def require_widget_key(
 
 
 def _extract_origin_host(request: Request) -> str | None:
-    """Extract hostname from Origin or Referer header."""
+    """Extrae el hostname del header Origin o Referer."""
     origin = request.headers.get("Origin") or request.headers.get("Referer")
     if not origin:
         return None
@@ -61,7 +61,7 @@ async def verify_widget_access(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> WidgetConfig:
-    """Validate API key + check domain allowlist."""
+    """Valida la API key y verifica la allowlist de dominios."""
     cfg = await require_widget_key(request, db)
 
     allowlist = cfg.domain_allowlist or []

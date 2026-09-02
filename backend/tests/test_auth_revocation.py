@@ -83,11 +83,8 @@ async def test_admin_can_update_other_user(client, admin_user, make_user, auth_h
 async def test_logout_revokes_access_token(client, admin_user, auth_headers):
     """Tras logout, el access token deja de ser válido (denylist)."""
     headers = auth_headers(admin_user)
-    # Antes del logout: /me responde 200
     assert (await client.get("/api/v1/auth/me", headers=headers)).status_code == 200
-    # Logout
     assert (await client.post("/api/v1/auth/logout", json={}, headers=headers)).status_code == 200
-    # Después: el mismo token es rechazado
     assert (await client.get("/api/v1/auth/me", headers=headers)).status_code == 401
 
 
@@ -96,10 +93,8 @@ async def test_refresh_rotation_invalidates_old_token(client, admin_user):
     from app.core.security import create_refresh_token
 
     rt = create_refresh_token(str(admin_user.id))
-    # Primer uso: ok
     r1 = await client.post("/api/v1/auth/refresh", json={"refresh_token": rt})
     assert r1.status_code == 200
-    # Segundo uso del mismo refresh: rechazado
     r2 = await client.post("/api/v1/auth/refresh", json={"refresh_token": rt})
     assert r2.status_code == 401
 

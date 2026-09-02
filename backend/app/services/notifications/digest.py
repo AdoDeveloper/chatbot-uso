@@ -13,6 +13,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.timezone import utc_to_sv
 from app.models.chat_conversation import ChatConversation
 from app.models.enums import ConversationStatus, UnansweredStatus
 from app.models.unanswered_question import UnansweredQuestion
@@ -85,7 +86,7 @@ async def collect_digest_stats(db: AsyncSession) -> dict[str, Any]:
     )).scalar_one()
 
     return {
-        "date": now.strftime("%Y-%m-%d"),
+        "date": utc_to_sv(now).strftime("%Y-%m-%d"),
         "total_open": total_open,
         "new_open": new_open,
         "resolved_today": resolved_today,

@@ -57,7 +57,6 @@ async def get_or_create_conversation(
     *,
     session_id: str,
     user_id: uuid.UUID | None = None,
-    device: str | None = None,
     browser: str | None = None,
     origin_url: str | None = None,
 ) -> ChatConversation:
@@ -90,11 +89,12 @@ async def get_or_create_conversation(
 
     acquired = await acquire_session_lock(session_id)
     try:
+        # Re-chequear incluso sin lock: otra corrutina pudo crear la conversación ya.
         if acquired:
             await db.rollback()
-            conv = await _find()
-            if conv:
-                return conv
+        conv = await _find()
+        if conv:
+            return conv
 
         reopened = await _find_reopenable()
         if reopened:
@@ -110,7 +110,6 @@ async def get_or_create_conversation(
         conv = ChatConversation(
             session_id=session_id,
             user_id=user_id,
-            device=device,
             browser=browser,
             origin_url=origin_url,
             status=ConversationStatus.active,
@@ -136,6 +135,7 @@ async def add_message(
     sources: list[dict] | None = None,
     latency_ms: int | None = None,
     rag_route: str | None = None,
+    context_relevance_ratio: float | None = None,
 ) -> ChatMessage:
     msg = ChatMessage(
         conversation_id=conversation_id,
@@ -144,6 +144,7 @@ async def add_message(
         sources_json=sources or [],
         latency_ms=latency_ms,
         rag_route=rag_route,
+        context_relevance_ratio=context_relevance_ratio,
     )
     db.add(msg)
 
@@ -189,7 +190,7 @@ async def list_conversations(
         base = base.where(ChatConversation.status == status_filter)
         count_base = count_base.where(ChatConversation.status == status_filter)
 
-    # Text search: find conversations containing matching messages
+    # Búsqueda de texto: encuentra conversaciones con mensajes coincidentes
     if search and search.strip():
         from sqlalchemy import exists
         term = f"%{search.strip()}%"
@@ -210,7 +211,7 @@ async def list_conversations(
 
     if tag and tag.strip():
         t = tag.strip().lower()
-        # MySQL JSON: json_contains(tags, json_quote(value))
+        # JSON de MySQL: json_contains(tags, json_quote(value))
         base = base.where(func.json_contains(ChatConversation.tags, func.json_quote(t)))
         count_base = count_base.where(func.json_contains(ChatConversation.tags, func.json_quote(t)))
 
@@ -218,7 +219,7 @@ async def list_conversations(
     total = total_result.scalar_one()
 
     result = await db.execute(
-        base.order_by(ChatConversation.last_message_at.desc())
+        base.order_by(ChatConversation.last_message_at.desc(), ChatConversation.id.desc())
         .offset(offset)
         .limit(page_size)
     )
@@ -229,32 +230,23 @@ async def list_conversations(
 async def fetch_first_user_messages(
     db: AsyncSession, conversation_ids: list[uuid.UUID]
 ) -> dict[uuid.UUID, str]:
-    """Return the first user message content for each conversation (for list previews)."""
+    """Devuelve el contenido del primer mensaje de usuario de cada conversación (para vistas previas en listas)."""
     if not conversation_ids:
         return {}
-    min_q = (
+    ranked = (
         select(
             ChatMessage.conversation_id,
-            func.min(ChatMessage.created_at).label("first_at"),
+            ChatMessage.content,
+            func.row_number().over(
+                partition_by=ChatMessage.conversation_id,
+                order_by=(ChatMessage.created_at.asc(), ChatMessage.id.asc()),
+            ).label("rn"),
         )
         .where(ChatMessage.conversation_id.in_(conversation_ids))
         .where(ChatMessage.role == MessageRole.user)
-        .group_by(ChatMessage.conversation_id)
         .subquery()
     )
-    stmt = (
-        select(ChatMessage.conversation_id, ChatMessage.content)
-        .join(
-            min_q,
-            (ChatMessage.conversation_id == min_q.c.conversation_id)
-            & (ChatMessage.created_at == min_q.c.first_at),
-        )
-        # Sin este filtro, un mensaje de otro rol con el mismo created_at
-        # exacto (empate de timestamp) puede colarse en el JOIN en vez del
-        # mensaje de usuario real, ya que el JOIN solo empareja por
-        # conversation_id + created_at, no por rol.
-        .where(ChatMessage.role == MessageRole.user)
-    )
+    stmt = select(ranked.c.conversation_id, ranked.c.content).where(ranked.c.rn == 1)
     result = await db.execute(stmt)
     return {row[0]: row[1] for row in result.all()}
 

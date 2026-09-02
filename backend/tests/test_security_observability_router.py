@@ -1,7 +1,7 @@
-"""Tests para app/api/v1/security/router.py — no tenía ningún test.
+"""Tests para app/api/v1/security/router.py - no tenía ningún test.
 
 login_failures e injections_by_category usan SQL específico de MySQL
-(func.json_unquote, ->>'$.path') sin equivalente en SQLite — por eso el CI
+(func.json_unquote, ->>'$.path') sin equivalente en SQLite - por eso el CI
 ahora corre contra un servicio MySQL real en vez de SQLite in-memory.
 """
 from __future__ import annotations
@@ -83,7 +83,7 @@ class TestSecuritySummary:
 
 
 class TestLoginFailures:
-    """Ejercita func.json_unquote(...) — solo funciona contra MySQL real."""
+    """Ejercita func.json_unquote(...) - solo funciona contra MySQL real."""
 
     async def test_requires_perm(self, client, viewer_user, auth_headers):
         r = await client.get("/api/v1/security/login-failures", headers=auth_headers(viewer_user))
@@ -104,7 +104,7 @@ class TestLoginFailures:
 
 
 class TestInjectionsByCategory:
-    """Ejercita el operador MySQL ->>'$.pattern' — solo funciona contra MySQL real."""
+    """Ejercita el operador MySQL ->>'$.pattern' - solo funciona contra MySQL real."""
 
     async def test_requires_perm(self, client, viewer_user, auth_headers):
         r = await client.get("/api/v1/security/injections/by-category", headers=auth_headers(viewer_user))

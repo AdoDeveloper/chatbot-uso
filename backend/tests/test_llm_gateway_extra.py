@@ -3,7 +3,7 @@ un adaptador: circuit breaker, retries, selección/fallback entre proveedores
 en la cadena, fetch_models, test_connection, grade_documents, rewrite_query
 y el helper _clean_rewrite.
 
-test_llm_adapters.py ya cubre el parsing SSE/JSON de cada adaptador — este
+test_llm_adapters.py ya cubre el parsing SSE/JSON de cada adaptador - este
 archivo cubre el código que decide QUÉ adaptador usar, CUÁNDO reintentar,
 CUÁNDO saltar a otro proveedor de la cadena, y qué mensaje de error final
 llega al usuario cuando todo falla. Es exactamente el código que puede fallar
@@ -259,7 +259,12 @@ class TestStreamChatOrchestration:
             system_prompt="Prompt custom con {context}",
         ):
             pass
-        assert captured["messages"][0]["content"] == "Prompt custom con d"
+        # El canario de seguridad (check_system_prompt_leak) se añade a
+        # CUALQUIER system prompt, incluido el configurable del panel - sin
+        # eso, un prompt custom nunca podría delatar su propia fuga.
+        system_msg = captured["messages"][0]["content"]
+        assert system_msg.startswith("Prompt custom con d")
+        assert "[[CANARY_TOKEN_2024]]" in system_msg
 
     async def test_history_is_truncated_to_last_six_and_ordered_before_question(self, monkeypatch):
         provider = _make_provider()
@@ -327,9 +332,6 @@ class TestStreamChatOrchestration:
         assert call_count["n"] == 2
 
     async def test_does_not_fallback_once_tokens_were_already_yielded(self, monkeypatch):
-        """Bug-sensitive: si el primer proveedor ya entregó tokens y luego se
-        corta, NO debe reintentar con el siguiente proveedor (repetiría
-        contenido parcial al usuario) — debe lanzar un error claro."""
         p1 = _make_provider(name="PartialFail")
         p2 = _make_provider(name="ShouldNotBeCalled")
 
@@ -357,6 +359,35 @@ class TestStreamChatOrchestration:
                 received.append(tok)
         assert received == ["un poco de texto"]
         assert second_call_happened["v"] is False
+
+    async def test_falls_back_when_primary_has_invalid_config(self, monkeypatch):
+        """_get_adapter() puede lanzar ANTES de que exista un adapter con el
+        que llamar stream_chat (p. ej. Anthropic/Gemini/Cohere/Azure/Bedrock
+        sin API key configurada) - a diferencia de los demás tests de esta
+        clase, que mockean adapter.stream_chat, aquí el fallo ocurre en la
+        selección del adapter en sí. Cubre el fix que movió _get_adapter()
+        dentro del try/except del bucle de fallback: antes esa excepción se
+        propagaba fuera de stream_chat() sin registrar el fallo en el circuit
+        breaker y sin probar el resto de la cadena."""
+        # provider_type "anthropic" exige api_key en _get_adapter(); se pasa
+        # api_key=None para forzar el RuntimeError de configuración inválida.
+        p1 = _make_provider(name="SinApiKey", provider_type="anthropic")
+        p2 = _make_provider(name="Sano")
+
+        async def ok_stream(self, messages, temperature, max_tokens):
+            yield "resultado"
+
+        monkeypatch.setattr(gw.OpenAICompatAdapter, "stream_chat", ok_stream)
+
+        chunks = [
+            c async for c in gw.stream_chat(
+                "pregunta", [{"text": "d"}], [(p1, None), (p2, "k2")]
+            )
+        ]
+        assert chunks == ["resultado"]
+        # El proveedor mal configurado debe quedar registrado como fallo en
+        # el circuit breaker, igual que un fallo de red normal.
+        assert len(gw._breaker._failures.get(str(p1.id), [])) == 1
 
     async def test_all_providers_fail_raises_generic_unavailable_error(self, monkeypatch):
         p1 = _make_provider(name="A")
@@ -551,7 +582,7 @@ class TestGradeDocuments:
     async def test_parses_grades_json_response(self, monkeypatch):
         provider = _make_provider()
 
-        async def fake_complete(self, messages, temperature, max_tokens, response_format=None):
+        async def fake_complete(self, messages, temperature, max_tokens, response_format=None, reasoning_effort=None):
             return '{"grades": [true, false, true]}'
 
         monkeypatch.setattr(gw.OpenAICompatAdapter, "complete", fake_complete)
@@ -559,10 +590,38 @@ class TestGradeDocuments:
         result = await gw.grade_documents("pregunta", docs, provider, "key")
         assert result == [True, False, True]
 
+    async def test_passes_low_reasoning_effort_for_groq(self, monkeypatch):
+        """gpt-oss vía Groq gasta tiempo en razonamiento interno antes de
+        emitir el JSON de grades - reasoning_effort='low' baja esa latencia
+        ~45% (medido empíricamente) sin cambiar el resultado. Solo se pasa
+        para provider_type='groq', otros backends podrían no soportarlo."""
+        provider = _make_provider(provider_type="groq")
+        captured = {}
+
+        async def fake_complete(self, messages, temperature, max_tokens, response_format=None, reasoning_effort=None):
+            captured["reasoning_effort"] = reasoning_effort
+            return '{"grades": [true]}'
+
+        monkeypatch.setattr(gw.OpenAICompatAdapter, "complete", fake_complete)
+        await gw.grade_documents("pregunta", [{"text": "a"}], provider, "key")
+        assert captured["reasoning_effort"] == "low"
+
+    async def test_does_not_pass_reasoning_effort_for_other_providers(self, monkeypatch):
+        provider = _make_provider(provider_type="openai")
+        captured = {}
+
+        async def fake_complete(self, messages, temperature, max_tokens, response_format=None, reasoning_effort=None):
+            captured["reasoning_effort"] = reasoning_effort
+            return '{"grades": [true]}'
+
+        monkeypatch.setattr(gw.OpenAICompatAdapter, "complete", fake_complete)
+        await gw.grade_documents("pregunta", [{"text": "a"}], provider, "key")
+        assert captured["reasoning_effort"] is None
+
     async def test_pads_missing_grades_with_true(self, monkeypatch):
         provider = _make_provider()
 
-        async def fake_complete(self, messages, temperature, max_tokens, response_format=None):
+        async def fake_complete(self, messages, temperature, max_tokens, response_format=None, reasoning_effort=None):
             return '{"grades": [false]}'
 
         monkeypatch.setattr(gw.OpenAICompatAdapter, "complete", fake_complete)
@@ -573,7 +632,7 @@ class TestGradeDocuments:
     async def test_truncates_extra_grades(self, monkeypatch):
         provider = _make_provider()
 
-        async def fake_complete(self, messages, temperature, max_tokens, response_format=None):
+        async def fake_complete(self, messages, temperature, max_tokens, response_format=None, reasoning_effort=None):
             return '{"grades": [false, false, false, false, false]}'
 
         monkeypatch.setattr(gw.OpenAICompatAdapter, "complete", fake_complete)
@@ -582,12 +641,9 @@ class TestGradeDocuments:
         assert result == [False]
 
     async def test_llm_failure_defaults_to_all_true_fail_open(self, monkeypatch):
-        """Bug-sensitive: si el LLM evaluador falla, el sistema debe fallar
-        ABIERTO (dejar pasar todos los documentos) para no bloquear
-        respuestas legítimas por un error transitorio del grader."""
         provider = _make_provider()
 
-        async def fake_complete(self, messages, temperature, max_tokens, response_format=None):
+        async def fake_complete(self, messages, temperature, max_tokens, response_format=None, reasoning_effort=None):
             raise httpx.ConnectError("down")
 
         monkeypatch.setattr(gw.OpenAICompatAdapter, "complete", fake_complete)
@@ -598,7 +654,7 @@ class TestGradeDocuments:
     async def test_malformed_json_response_defaults_to_all_true(self, monkeypatch):
         provider = _make_provider()
 
-        async def fake_complete(self, messages, temperature, max_tokens, response_format=None):
+        async def fake_complete(self, messages, temperature, max_tokens, response_format=None, reasoning_effort=None):
             return "esto no es json"
 
         monkeypatch.setattr(gw.OpenAICompatAdapter, "complete", fake_complete)
@@ -610,7 +666,7 @@ class TestGradeDocuments:
         provider = _make_provider()
         captured = {}
 
-        async def fake_complete(self, messages, temperature, max_tokens, response_format=None):
+        async def fake_complete(self, messages, temperature, max_tokens, response_format=None, reasoning_effort=None):
             captured["messages"] = messages
             return '{"grades": [true]}'
 
@@ -622,11 +678,44 @@ class TestGradeDocuments:
         assert "x" * 1001 not in user_msg
 
 
+class TestOpenAICompatAdapterCompleteReasoningEffort:
+    """Payload HTTP real armado por OpenAICompatAdapter.complete() - a
+    diferencia de TestGradeDocuments (que mockea complete() entero), esto
+    verifica que el kwarg reasoning_effort efectivamente llegue al JSON
+    enviado al proveedor, no solo que la firma lo acepte."""
+
+    async def test_reasoning_effort_included_in_payload_when_set(self, monkeypatch):
+        captured = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            import json as _json
+            captured["body"] = _json.loads(request.content)
+            return httpx.Response(200, json={"choices": [{"message": {"content": "ok"}}]})
+
+        _patch_client(monkeypatch, handler)
+        adapter = gw.OpenAICompatAdapter("groq", "openai/gpt-oss-120b", "key", None)
+        await adapter.complete([{"role": "user", "content": "hi"}], reasoning_effort="low")
+        assert captured["body"]["reasoning_effort"] == "low"
+
+    async def test_reasoning_effort_omitted_from_payload_when_none(self, monkeypatch):
+        captured = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            import json as _json
+            captured["body"] = _json.loads(request.content)
+            return httpx.Response(200, json={"choices": [{"message": {"content": "ok"}}]})
+
+        _patch_client(monkeypatch, handler)
+        adapter = gw.OpenAICompatAdapter("openai", "gpt-4o", "key", None)
+        await adapter.complete([{"role": "user", "content": "hi"}])
+        assert "reasoning_effort" not in captured["body"]
+
+
 class TestRewriteQuery:
     async def test_returns_cleaned_rewrite(self, monkeypatch):
         provider = _make_provider()
 
-        async def fake_complete(self, messages, temperature, max_tokens, response_format=None):
+        async def fake_complete(self, messages, temperature, max_tokens, response_format=None, reasoning_effort=None):
             return "  - trámite matrícula requisitos  "
 
         monkeypatch.setattr(gw.OpenAICompatAdapter, "complete", fake_complete)
@@ -636,7 +725,7 @@ class TestRewriteQuery:
     async def test_llm_failure_falls_back_to_original_question(self, monkeypatch):
         provider = _make_provider()
 
-        async def fake_complete(self, messages, temperature, max_tokens, response_format=None):
+        async def fake_complete(self, messages, temperature, max_tokens, response_format=None, reasoning_effort=None):
             raise httpx.ReadTimeout("slow")
 
         monkeypatch.setattr(gw.OpenAICompatAdapter, "complete", fake_complete)
@@ -646,7 +735,7 @@ class TestRewriteQuery:
     async def test_empty_rewrite_falls_back_to_original_question(self, monkeypatch):
         provider = _make_provider()
 
-        async def fake_complete(self, messages, temperature, max_tokens, response_format=None):
+        async def fake_complete(self, messages, temperature, max_tokens, response_format=None, reasoning_effort=None):
             return "   "
 
         monkeypatch.setattr(gw.OpenAICompatAdapter, "complete", fake_complete)

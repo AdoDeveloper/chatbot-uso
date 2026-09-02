@@ -111,6 +111,33 @@ class TestCreateFaqFromUnanswered:
         await db_session.refresh(q)
         assert q.status == UnansweredStatus.resolved
 
+    async def test_create_faq_requires_knowledge_create_not_only_conversations_update(
+        self, client, make_user, auth_headers, make_question, db_session,
+    ):
+        from app.models.rbac import Role, Permission, RolePermission
+        from sqlalchemy import select
+
+        role_name = f"convs-only-{uuid.uuid4().hex[:8]}"
+        db_session.add(Role(name=role_name, display_name="Solo conversaciones", is_system=False))
+        await db_session.commit()
+
+        perm = await db_session.scalar(
+            select(Permission).where(Permission.name == "conversations.update")
+        )
+        assert perm is not None, "seed_rbac debe haber corrido ya (fixture db_session)"
+        db_session.add(RolePermission(role=role_name, permission_id=perm.id))
+        await db_session.commit()
+
+        limited_user = await make_user(role=role_name)
+        q = await make_question(question="¿Horario de biblioteca?")
+
+        r = await client.post(
+            f"/api/v1/unanswered/{q.id}/create-faq",
+            json={"answer": "8am a 6pm", "tags": []},
+            headers=auth_headers(limited_user),
+        )
+        assert r.status_code == 403
+
 
 class TestRootCause:
     async def test_root_cause_not_found(self, client, admin_user, auth_headers):

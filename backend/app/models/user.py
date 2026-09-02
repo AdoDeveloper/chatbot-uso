@@ -45,9 +45,5 @@ class User(Base):
         server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
-    @property
-    def is_admin(self) -> bool:
-        return self.role == UserRole.admin
-
     def __repr__(self) -> str:
         return f"<User id={self.id} email={self.email} role={self.role}>"

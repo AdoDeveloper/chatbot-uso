@@ -47,5 +47,5 @@ router.include_router(health_router)
 
 @router.get("/health")
 async def health():
-    """Compatibility health endpoint. Prefer /health/live for liveness."""
+    """Endpoint de salud por compatibilidad. Se prefiere /health/live para liveness."""
     return await liveness()

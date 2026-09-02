@@ -10,8 +10,6 @@ class UserRole(str, enum.Enum):
 class SourceType(str, enum.Enum):
     pdf = "pdf"
     docx = "docx"
-    xlsx = "xlsx"
-    csv = "csv"
     txt = "txt"
     faq = "faq"
 
@@ -30,13 +28,10 @@ class ConversationStatus(str, enum.Enum):
 
 
 class EscalationEventType(str, enum.Enum):
-    """Lifecycle event in an escalated conversation."""
-    escalated = "escalated"          # conversation entered escalated state
-    assigned = "assigned"            # admin took ownership
-    unassigned = "unassigned"        # admin released ownership
-    resolved = "resolved"            # admin marked as resolved
-    abandoned = "abandoned"          # closed without resolution
-    csat_recorded = "csat_recorded"  # post-attention satisfaction score
+    """Evento del ciclo de vida de una conversación escalada."""
+    escalated = "escalated"          # la conversación entró en estado escalado
+    resolved = "resolved"            # el admin la marcó como resuelta
+    csat_recorded = "csat_recorded"  # puntaje de satisfacción tras la atención
 
 
 class MessageRole(str, enum.Enum):

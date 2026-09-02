@@ -1,4 +1,4 @@
-"""Tests para app/api/v1/settings/router.py — no tenía ningún test.
+"""Tests para app/api/v1/settings/router.py - no tenía ningún test.
 
 Cubre get/update settings (con warnings por parámetros riesgosos) y el
 ciclo completo export -> import, incluyendo las validaciones de import
@@ -46,7 +46,9 @@ class TestUpdateSettings:
         current = r.json()
         current["temperature"] = 0.5
         current["top_k"] = 8
-        current["score_threshold"] = 0.1
+        # Dentro de la escala real de la búsqueda híbrida (RRF, scores ~0.03):
+        # a partir de 0.05 el umbral se considera fuera de escala y se advierte.
+        current["score_threshold"] = 0.03
 
         r2 = await client.put("/api/v1/settings", json=current, headers=auth_headers(admin_user))
         assert r2.status_code == 200

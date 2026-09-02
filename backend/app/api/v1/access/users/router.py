@@ -32,6 +32,15 @@ class UsersSummary(BaseModel):
     admins: int
 
 
+class PasswordResetResponse(BaseModel):
+    """La contraseña temporal se devuelve una sola vez en esta respuesta -
+    no se persiste en texto plano ni se puede recuperar después. El admin
+    debe comunicarla al usuario por un canal seguro; must_change_password
+    fuerza que la reemplace en su próximo login."""
+    temp_password: str
+    user: UserResponse
+
+
 @router.get("", response_model=dict)
 async def list_users(
     page: int = Query(1, ge=1),
@@ -54,7 +63,7 @@ async def users_summary(
     _: User = Depends(require_perm(P.USERS_READ)),
 ):
     """Conteos agregados del equipo completo, independientes de la paginación
-    de GET /users — mismo patrón que /security/summary."""
+    de GET /users - mismo patrón que /security/summary."""
     total_members = await db.scalar(select(func.count()).select_from(User)) or 0
     active = await db.scalar(select(func.count()).where(User.is_active.is_(True))) or 0
     no_access_yet = await db.scalar(
@@ -96,6 +105,22 @@ async def update_user(
         ip=get_client_ip(request),
     )
     return UserResponse.model_validate(user)
+
+
+@router.post("/{user_id}/reset-password", response_model=PasswordResetResponse)
+async def reset_user_password(
+    user_id: uuid.UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_perm(P.USERS_MANAGE)),
+):
+    user, temp_password = await user_service.reset_password(
+        db,
+        user_id=user_id,
+        current_user=current_user,
+        ip=get_client_ip(request),
+    )
+    return PasswordResetResponse(temp_password=temp_password, user=UserResponse.model_validate(user))
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)

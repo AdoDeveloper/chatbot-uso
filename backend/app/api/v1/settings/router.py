@@ -28,14 +28,14 @@ async def get_settings(
 
 
 def _validate_settings(data: ChatbotSettings) -> list[str]:
-    """Return warnings for potentially problematic parameter combinations."""
+    """Devuelve advertencias para combinaciones de parámetros potencialmente problemáticas."""
     warnings = []
-    if data.score_threshold > 0.95:
-        warnings.append(f"score_threshold ({data.score_threshold}) es muy alto — puede que no se recupere ningún chunk")
+    if data.score_threshold >= 0.05:
+        warnings.append(f"score_threshold ({data.score_threshold}) queda fuera de la escala de la búsqueda híbrida (RRF, scores ~0.03) y se ignorará - use un valor menor a 0.05 o 0 para desactivarlo")
     if data.temperature > 1.5:
-        warnings.append(f"temperature ({data.temperature}) es muy alta — las respuestas pueden ser incoherentes")
+        warnings.append(f"temperature ({data.temperature}) es muy alta - las respuestas pueden ser incoherentes")
     if data.top_k > 15:
-        warnings.append(f"top_k ({data.top_k}) es alto — puede aumentar la latencia y el costo significativamente")
+        warnings.append(f"top_k ({data.top_k}) es alto - puede aumentar la latencia y el costo significativamente")
     return warnings
 
 

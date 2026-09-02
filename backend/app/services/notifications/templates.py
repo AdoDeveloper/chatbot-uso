@@ -1,10 +1,4 @@
 """Plantillas de correo institucional.
-
-Estilo limpio: encabezado azul con el nombre de la institución, tarjeta blanca
-con el contenido (título, texto y datos en tabla) y un pie discreto. Un solo
-color de marca, sin iconos, sin emojis, sin firma epistolar (son mensajes
-automáticos). Compatible con clientes de correo (layout en tabla, estilos
-inline, responsive por media query).
 """
 from __future__ import annotations
 
@@ -135,9 +129,7 @@ def greeting(text: str = "") -> str:
 
 
 def detail_table(rows: dict[str, object], *, heading_text: str | None = None) -> str:
-    """Lista de datos: cada dato como un bloque con la etiqueta arriba (pequeña,
-    gris) y el valor debajo. Se ve bien en escritorio y móvil sin depender de
-    media queries (clave para Gmail en Android, que las ignora a menudo)."""
+    """Lista de datos"""
     head = ""
     if heading_text:
         head = (
@@ -226,6 +218,22 @@ def topic_list(topics: list[tuple[str, int]]) -> str:
         f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px">'
         f"{rows}</table>"
     )
+
+
+def chip_list(items: list[str]) -> str:
+    """Lista de valores cortos como chips independientes, uno por línea -
+    en vez de una sola cadena separada por comas, que en un correo se ve
+    como texto corrido difícil de escanear cuando hay varios proveedores."""
+    if not items:
+        return ""
+    rows = "".join(
+        f'<tr><td style="padding:3px 0">'
+        f'<span class="bg-row t-main" style="display:inline-block;background:{ROW_BG};border:1px solid {BORDER_COLOR};'
+        f'border-radius:6px;padding:5px 12px;font-size:13px;color:{TEXT_COLOR};font-weight:600">{_html.escape(str(it))}</span>'
+        f"</td></tr>"
+        for it in items
+    )
+    return f'<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0">{rows}</table>'
 
 
 def quote_list(items: list[str]) -> str:

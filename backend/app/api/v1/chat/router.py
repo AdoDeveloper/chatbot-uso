@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-
-
 import asyncio
 import time
 
@@ -15,7 +13,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.core.constants import PLAYGROUND_BROWSERS
 from app.core.deps import get_client_ip
-from app.db.session import AsyncSessionLocal, get_db
+from app.core.versioning import _background_tasks
+from app.db import session as db_session
+from app.db.session import get_db
 from app.services.ai.llm_gateway import stream_chat
 from app.services.chat import pipeline
 
@@ -26,24 +26,20 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 _llm_semaphore = asyncio.Semaphore(get_settings().LLM_MAX_CONCURRENCY)
 _LLM_QUEUE_TIMEOUT = get_settings().LLM_QUEUE_TIMEOUT_SECONDS
 
-
 class ChatMessage(BaseModel):
     role: str = Field(..., max_length=32)
     content: str = Field(..., max_length=4000)
-
 
 class ChatRequest(BaseModel):
     question: str = Field(..., min_length=1, max_length=4000)
     source_ids: list[str] | None = None
     messages: list[ChatMessage] | None = Field(default=None, max_length=20)
     session_id: str | None = Field(default=None, max_length=128)
-    device: str | None = Field(default=None, max_length=64)
     browser: str | None = Field(default=None, max_length=64)
     source_scope: str | None = None
 
-
 class ChatResponse(BaseModel):
-    """Respuesta completa del chat — sin streaming: el cliente muestra un
+    """Respuesta completa del chat - sin streaming: el cliente muestra un
     indicador de "escribiendo..." mientras espera esta respuesta única."""
     type: str = "message"  # "message" | "error"
     message: str | None = None  # solo en type == "error"
@@ -57,6 +53,47 @@ class ChatResponse(BaseModel):
     rag_route: str | None = None
     context_truncated: bool = False
     escalation_prompt: bool = False
+
+async def _persist_and_respond(
+    request: ChatRequest,
+    *,
+    client_ip: str,
+    origin_url: str | None,
+    is_playground: bool,
+    final_text: str,
+    sources: list[dict],
+    latency_ms: int,
+    history: list[dict],
+    response_kwargs: dict,
+    context_relevance_ratio: float | None = None,
+) -> ChatResponse:
+    """Persiste el turno (nueva sesión de BD, ver comentario en persist_turn
+    sobre por qué "fresh") y arma el ChatResponse final.
+    """
+    async with db_session.AsyncSessionLocal() as fresh_db:
+        message_id, conversation_id, escalation_prompt = await pipeline.persist_turn(
+            fresh_db,
+            session_id=request.session_id or client_ip,
+            browser=request.browser,
+            origin_url=origin_url,
+            question=request.question,
+            final_text=final_text,
+            sources=sources,
+            latency_ms=latency_ms,
+            is_playground=is_playground,
+            history=history,
+            context_relevance_ratio=context_relevance_ratio,
+            rag_route=response_kwargs.get("rag_route"),
+        )
+    return ChatResponse(
+        sources=sources,
+        content=final_text,
+        latency_ms=latency_ms,
+        message_id=message_id,
+        conversation_id=conversation_id,
+        escalation_prompt=bool(escalation_prompt),
+        **response_kwargs,
+    )
 
 
 async def run_chat(
@@ -85,12 +122,18 @@ async def _run_chat_inner(
     use_draft = is_playground and (request.source_scope != "production")
     cfg = await pipeline.load_chat_config(db, use_draft)
 
-    if settings.GUARDRAILS_ENABLED:
-        guard_error, request.question = await pipeline.run_input_guardrails(
-            db, request.question, client_ip, cfg
-        )
-        if guard_error:
-            return ChatResponse(type="error", message=guard_error)
+    if use_draft:
+        from app.services.system.settings import get_runtime_overrides
+        overrides = await get_runtime_overrides(db)
+    else:
+        from app.services.system.settings import get_deployed_runtime_overrides
+        overrides = await get_deployed_runtime_overrides(db)
+
+    guard_error, request.question = await pipeline.run_input_guardrails(
+        db, request.question, client_ip, cfg
+    )
+    if guard_error:
+        return ChatResponse(type="error", message=guard_error)
 
     limit_error = await pipeline.check_limits(db, client_ip, request.session_id, settings)
     if limit_error:
@@ -100,11 +143,43 @@ async def _run_chat_inner(
     if use_cache:
         cached = await pipeline.lookup_cache(db, request.question, request.source_ids, settings, use_draft)
         if cached:
-            return ChatResponse(sources=cached["sources"], content=cached["content"])
+            cache_latency_ms = int((time.monotonic() - t_start) * 1000)
+            return await _persist_and_respond(
+                request,
+                client_ip=client_ip,
+                origin_url=origin_url,
+                is_playground=is_playground,
+                final_text=cached["content"],
+                sources=cached["sources"],
+                latency_ms=cache_latency_ms,
+                history=[],
+                response_kwargs={"rag_route": "cache"},
+            )
+
+    history = pipeline.sanitize_history(
+        [m.model_dump() for m in request.messages] if request.messages else [],
+        guardrails_enabled=overrides["guardrails_enabled"],
+        max_input_chars=overrides["max_input_chars"],
+        pii_entities=overrides["pii_entities"],
+    )
+
+    from app.services.ai.semantic_cache import get_cache_generation
+    cache_generation_at_start = await get_cache_generation()
 
     chain = await pipeline.load_provider_chain(db, use_draft)
     if not chain:
-        return ChatResponse(type="error", message=cfg.no_providers_message)
+        no_chain_latency_ms = int((time.monotonic() - t_start) * 1000)
+        return await _persist_and_respond(
+            request,
+            client_ip=client_ip,
+            origin_url=origin_url,
+            is_playground=is_playground,
+            final_text=cfg.no_providers_message,
+            sources=[],
+            latency_ms=no_chain_latency_ms,
+            history=history,
+            response_kwargs={"type": "error", "message": cfg.no_providers_message},
+        )
 
     primary_provider, primary_key = chain[0]
     provider_name = primary_provider.name
@@ -121,7 +196,6 @@ async def _run_chat_inner(
             content="No tengo información disponible para responder esa pregunta en este momento.",
         )
 
-    history = [m.model_dump() for m in request.messages] if request.messages else []
     rag_question = pipeline.build_rag_question(request.question, history)
 
     t_rag_start = time.monotonic()
@@ -140,20 +214,31 @@ async def _run_chat_inner(
         return ChatResponse(type="error", message=cfg.no_providers_message)
     rag_latency_ms = int((time.monotonic() - t_rag_start) * 1000)
 
-    _detected_route = "greeting" if isinstance(rag_result, str) else ("complex" if cfg.use_corrective_rag else "factual")
+    if isinstance(rag_result, str):
+        _detected_route = "greeting"
+    else:
+        from app.services.rag.router import classify_query
+        _detected_route = classify_query(rag_question) if cfg.use_corrective_rag else "factual"
 
     if isinstance(rag_result, str):
-        return ChatResponse(
+        greeting_latency_ms = int((time.monotonic() - t_start) * 1000)
+        return await _persist_and_respond(
+            request,
+            client_ip=client_ip,
+            origin_url=origin_url,
+            is_playground=is_playground,
+            final_text=rag_result,
             sources=[],
-            content=rag_result,
-            rag_route="greeting",
-            provider_name=provider_name,
-            model_name=model_name,
+            latency_ms=greeting_latency_ms,
+            history=history,
+            response_kwargs={
+                "rag_route": "greeting",
+                "provider_name": provider_name,
+                "model_name": model_name,
+            },
         )
 
-    context_chunks = rag_result
-
-    sources = pipeline.format_sources(context_chunks)
+    context_chunks, context_relevance_ratio = rag_result
 
     llm_chunks = pipeline.context_for_llm(context_chunks)
     llm_chunks, ctx_budget = pipeline.budget_context(
@@ -161,8 +246,10 @@ async def _run_chat_inner(
         provider=primary_provider,
         system_prompt=cfg.system_prompt,
         history=history,
-        max_output_tokens=min(cfg.max_tokens, settings.MAX_OUTPUT_TOKENS),
+        max_output_tokens=min(cfg.max_tokens, overrides['max_output_tokens']),
     )
+
+    sources = pipeline.format_sources(llm_chunks)
     full_content: list[str] = []
     deadline = asyncio.get_running_loop().time() + 70.0
 
@@ -170,16 +257,17 @@ async def _run_chat_inner(
 
     timed_out = False
     t_llm_start = time.monotonic()
+    llm_gen = stream_chat(
+        question=request.question,
+        context_chunks=llm_chunks,
+        chain=chain,
+        system_prompt=cfg.system_prompt,
+        temperature=cfg.temperature,
+        max_tokens=min(cfg.max_tokens, overrides['max_output_tokens']),
+        history=history or None,
+    )
     try:
-        async for token in stream_chat(
-            question=request.question,
-            context_chunks=llm_chunks,
-            chain=chain,
-            system_prompt=cfg.system_prompt,
-            temperature=cfg.temperature,
-            max_tokens=min(cfg.max_tokens, settings.MAX_OUTPUT_TOKENS),
-            history=history or None,
-        ):
+        async for token in llm_gen:
             if asyncio.get_running_loop().time() > deadline:
                 log.warning("chat.llm_stream_timeout", session_id=request.session_id)
                 full_content.append(" [respuesta incompleta por timeout]")
@@ -188,11 +276,29 @@ async def _run_chat_inner(
             full_content.append(token)
     except RuntimeError as exc:
         log.error("chat.llm_stream_failed", session_id=request.session_id, error=str(exc))
-        return ChatResponse(type="error", message=cfg.no_providers_message)
+        from app.services.monitoring.alerts import notify_provider_down
+        provider_names = [p.name for p, _key in chain]
+        task = asyncio.create_task(notify_provider_down(str(exc), providers=provider_names))
+        _background_tasks.add(task)
+        task.add_done_callback(_background_tasks.discard)
+        fail_latency_ms = int((time.monotonic() - t_start) * 1000)
+        return await _persist_and_respond(
+            request,
+            client_ip=client_ip,
+            origin_url=origin_url,
+            is_playground=is_playground,
+            final_text=cfg.no_providers_message,
+            sources=[],
+            latency_ms=fail_latency_ms,
+            history=history,
+            response_kwargs={"type": "error", "message": cfg.no_providers_message},
+        )
+    finally:
+        await llm_gen.aclose()
 
     final_text = "".join(full_content)
-    if not timed_out and settings.GUARDRAILS_ENABLED:
-        final_text = pipeline.apply_output_guardrails(final_text)
+    if not timed_out and overrides["guardrails_enabled"]:
+        final_text = pipeline.apply_output_guardrails(final_text, pii_entities=overrides["pii_entities"])
 
     llm_latency_ms = int((time.monotonic() - t_llm_start) * 1000)
     latency_ms = int((time.monotonic() - t_start) * 1000)
@@ -203,11 +309,10 @@ async def _run_chat_inner(
             rag_route=_detected_route, provider=provider_name,
         )
 
-    async with AsyncSessionLocal() as fresh_db:
+    async with db_session.AsyncSessionLocal() as fresh_db:
         assistant_message_id, conversation_id, escalation_prompt = await pipeline.persist_turn(
             fresh_db,
             session_id=request.session_id or client_ip,
-            device=request.device,
             browser=request.browser,
             origin_url=origin_url,
             question=request.question,
@@ -216,12 +321,22 @@ async def _run_chat_inner(
             latency_ms=latency_ms,
             is_playground=is_playground,
             history=history,
-            context_chunks=context_chunks,
+            context_relevance_ratio=context_relevance_ratio,
+            rag_route=_detected_route,
         )
+
+        if assistant_message_id and not is_playground:
+            task = asyncio.create_task(pipeline.evaluate_response_quality(
+                assistant_message_id, request.question, final_text, llm_chunks,
+                primary_provider, primary_key,
+            ))
+            _background_tasks.add(task)
+            task.add_done_callback(_background_tasks.discard)
 
         if use_cache and full_content and not timed_out:
             await pipeline.store_cache(
-                fresh_db, request.question, request.source_ids, sources, final_text, settings, use_draft
+                fresh_db, request.question, request.source_ids, sources, final_text, settings, use_draft,
+                min_generation=cache_generation_at_start,
             )
 
         return ChatResponse(

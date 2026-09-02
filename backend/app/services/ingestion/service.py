@@ -22,11 +22,29 @@ log = structlog.get_logger()
 _EMBED_BATCH = 16
 
 
+class _SourceDeletedDuringIngestion(Exception):
+    """Señal interna: el source fue borrado (soft-delete) mientras se
+    ingería en background. No es un error real, se captura aparte para no
+    marcar status=error ni reinsertar vectores para un source ya borrado."""
+
+
 async def _set_stage(db: AsyncSession, source: Source, stage: str) -> None:
     """Persiste la etapa de progreso actual para que el frontend la muestre."""
     source.progress_stage = stage
     source.updated_at = datetime.now(timezone.utc)
     await db.commit()
+
+
+async def _abort_if_deleted(db: AsyncSession, source_pk) -> None:
+    """Releída best-effort de `deleted_at` para detectar si delete_source()
+    corrió en paralelo (la ingesta es una tarea de background sin forma de
+    cancelarse desde afuera). Sin esto, una ingesta que sigue viva tras el
+    soft-delete reinserta vectores en Qdrant para un source ya "borrado",
+    invisibles en la UI pero vivos en el índice indefinidamente."""
+    result = await db.execute(select(Source.deleted_at).where(Source.id == source_pk))
+    deleted_at = result.scalar_one_or_none()
+    if deleted_at is not None:
+        raise _SourceDeletedDuringIngestion()
 
 
 async def ingest(db: AsyncSession, source: Source) -> None:
@@ -45,7 +63,7 @@ async def ingest(db: AsyncSession, source: Source) -> None:
 
     try:
         if source.type == SourceType.faq:
-            # FAQ sources: data already lives in faq_entries — one chunk per entry.
+            # Fuentes FAQ: los datos ya viven en faq_entries - un chunk por entrada.
             await _set_stage(db, source, "parsing")
             from app.models.faq_entry import FAQEntry
             result = await db.execute(
@@ -91,18 +109,21 @@ async def ingest(db: AsyncSession, source: Source) -> None:
 
         await vector_store.ensure_collection()
 
+        await _abort_if_deleted(db, source.id)
         await _set_stage(db, source, "cleaning")
         await vector_store.delete_source(source_id)
 
         total_upserted = 0
         total_batches = (len(chunks) + _EMBED_BATCH - 1) // _EMBED_BATCH
         for batch_num, i in enumerate(range(0, len(chunks), _EMBED_BATCH), 1):
+            await _abort_if_deleted(db, source.id)
             await _set_stage(db, source, f"embedding:{batch_num}:{total_batches}")
             batch = chunks[i: i + _EMBED_BATCH]
             texts = [c["text"] for c in batch]
             embeddings = await embed_texts_async(texts, prefix="passage: ")
             total_upserted += await vector_store.upsert_chunks(batch, embeddings)
 
+        await _abort_if_deleted(db, source.id)
         source.status = SourceStatus.ready
         source.chunk_count = total_upserted
         source.progress_stage = None
@@ -125,12 +146,26 @@ async def ingest(db: AsyncSession, source: Source) -> None:
         except Exception as exc:
             log.debug("ingestion.notify_doc_ready_failed", source_id=source_id, error=str(exc))
 
+    except _SourceDeletedDuringIngestion:
+        # Source soft-deleted durante el background task: no es error, se limpia y termina.
+        log.info("ingestion.aborted_source_deleted", source_id=source_id)
+        try:
+            await vector_store.delete_source(source_id)
+        except Exception:
+            pass
+
     except Exception as exc:
         from app.services.ingestion.source_quality import classify_error
         raw = str(exc)[:1000]
         code, friendly, hint = classify_error(raw)
         log.error("ingestion.failed", source_id=source_id, error=raw, code=code)
         source.status = SourceStatus.error
+        # El chunk_count parcial no representa el documento completo; se limpia lo indexado.
+        source.chunk_count = 0
+        try:
+            await vector_store.delete_source(source_id)
+        except Exception:
+            pass
         source.error_message = friendly or raw
         source.error_code = code
         source.error_hint = hint
@@ -138,7 +173,7 @@ async def ingest(db: AsyncSession, source: Source) -> None:
         source.updated_at = datetime.now(timezone.utc)
         await db.commit()
 
-        # Notify admins of ingestion failure (best-effort)
+        # Notifica a los admins del fallo de ingesta (best-effort)
         try:
             from app.models.enums import NotificationEvent
             from app.services.notifications.service import send_notification

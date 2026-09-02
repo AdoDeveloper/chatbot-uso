@@ -67,15 +67,50 @@ async def load_provider_chain(db: AsyncSession, use_draft: bool):
     return await settings_service.get_deployed_chain(db)
 
 
+def sanitize_history(
+    history: list[dict],
+    *,
+    guardrails_enabled: bool = True,
+    max_input_chars: int | None = None,
+    pii_entities: list[str] | None = None,
+) -> list[dict]:
+    """Sanea el historial que el cliente reenvía en cada turno.
+    """
+    sanitized: list[dict] = []
+    for m in history:
+        role = m.get("role")
+        content = m.get("content")
+        if role not in ("user", "assistant") or not isinstance(content, str):
+            continue
+        guard = validate_input(
+            content,
+            enabled=guardrails_enabled,
+            max_input_chars=max_input_chars,
+            pii_entities=pii_entities,
+        )
+        if not guard.passed:
+            log.warning("chat.history_message_dropped", reason=guard.reason)
+            continue
+        sanitized.append({"role": role, "content": guard.sanitized_text or content})
+    return sanitized
+
+
 async def run_input_guardrails(
     db: AsyncSession, question: str, client_ip: str, cfg
 ) -> tuple[str | None, str]:
     """Valida la entrada con guardrails, audita inyecciones y devuelve (error, pregunta saneada)."""
-    guard = validate_input(question)
+    from app.services.system.settings import get_runtime_overrides
+    overrides = await get_runtime_overrides(db)
+    guard = validate_input(
+        question,
+        enabled=overrides["guardrails_enabled"],
+        max_input_chars=overrides["max_input_chars"],
+        pii_entities=overrides["pii_entities"],
+    )
     if guard.passed:
         return None, (guard.sanitized_text or question)
 
-    # Persist injection detection to AuditLog for admin review
+    # Persiste la detección de inyección en AuditLog para revisión administrativa
     try:
         db.add(AuditLog(
             action="guardrails.injection_detected",
@@ -118,7 +153,7 @@ async def check_limits(db: AsyncSession, client_ip: str, session_id: str | None,
             session_id=session_id,
         )
     except RateLimitExceeded as exc:
-        # Persistir el evento de throttle para historial — best-effort
+        # Persistir el evento de throttle para historial - best-effort
         await record_throttle_event(
             dimension="chat", identifier=client_ip, identifier_type="ip",
             limit_value=per_min,
@@ -165,8 +200,24 @@ async def store_cache(
     final_text: str,
     settings,
     use_draft: bool = False,
+    min_generation: int | None = None,
 ) -> None:
-    """Guarda la respuesta en el caché exacto y semántico (best-effort)."""
+    """Guarda la respuesta en el caché exacto y semántico (best-effort).
+    Si se proporciona `min_generation`, se verifica que la generación actual
+    sea la misma antes de almacenar en el caché. Si no lo es, se omite el
+    almacenamiento y se registra un mensaje de advertencia.
+    """
+    from app.services.ai.semantic_cache import get_cache_generation
+
+    if min_generation is not None:
+        current_gen = await get_cache_generation()
+        if current_gen != min_generation:
+            log.info(
+                "chat.cache_store_skipped_stale_generation",
+                min_generation=min_generation, current_generation=current_gen,
+            )
+            return
+
     try:
         await get_redis().setex(
             exact_cache_key(question, source_ids, use_draft),
@@ -222,8 +273,8 @@ def build_rag_question(question: str, history: list[dict]) -> str:
 
 async def retrieve_context(
     question: str, provider, api_key: str, source_ids: list[str] | None, cfg
-) -> str | list[dict]:
-    """Ejecuta Adaptive RAG: devuelve un saludo (str) o los chunks de contexto."""
+) -> str | tuple[list[dict], float | None]:
+    """Ejecuta Adaptive RAG: devuelve un saludo (str) o (chunks, context_relevance_ratio)."""
     return await run_adaptive_rag(
         question=question,
         provider=provider,
@@ -231,7 +282,6 @@ async def retrieve_context(
         source_ids=source_ids,
         top_k=cfg.top_k,
         score_threshold=cfg.score_threshold,
-        use_reranker=cfg.use_reranker,
         use_corrective_rag=cfg.use_corrective_rag,
         greeting_response=cfg.greeting_response,
     )
@@ -261,7 +311,7 @@ def context_for_llm(chunks: list[dict]) -> list[dict]:
     result = []
     for c in chunks:
         enriched = c.copy()
-        if "parent_text" in c and c["parent_text"]:
+        if c.get("parent_text"):
             enriched["text"] = c["parent_text"]
         result.append(enriched)
     return result
@@ -286,12 +336,28 @@ def budget_context(
     )
 
 
-def apply_output_guardrails(text: str) -> str:
-    """Escanea la salida en busca de PII y detecta fugas del system prompt."""
-    text = scan_output(text)
+_SYSTEM_PROMPT_LEAK_MESSAGE = (
+    "No puedo mostrar esa información. ¿Le ayudo con alguna otra consulta "
+    "sobre la universidad?"
+)
+
+
+def apply_output_guardrails(text: str, *, pii_entities: list[str] | None = None) -> str:
+    """Detecta fugas del system prompt y BLOQUEA la respuesta si el canario
+    aparece; además redacta PII que el LLM pueda haber repetido del contexto
+    recuperado (documentos indexados nunca pasan por validate_input, a
+    diferencia del input del usuario).
+
+    Antes solo logueaba `guardrails.system_prompt_leak_detected` y devolvía
+    el texto sin tocar - el canario (y potencialmente el system prompt
+    completo, si el modelo lo repitió) se enviaba igual al usuario. El
+    "guardrail" no guardaba nada, solo dejaba una entrada de log para
+    revisión posterior.
+    """
     if check_system_prompt_leak(text):
         log.warning("guardrails.system_prompt_leak_detected")
-    return text
+        return _SYSTEM_PROMPT_LEAK_MESSAGE
+    return scan_output(text, entities=pii_entities)
 
 
 async def _feedback_negative_ratio(db: AsyncSession, conversation_id) -> float | None:
@@ -318,6 +384,37 @@ async def _feedback_negative_ratio(db: AsyncSession, conversation_id) -> float |
     return negative / total
 
 
+async def _recent_assistant_rag_scores(db: AsyncSession, conversation_id, *, limit: int = 5) -> list[float]:
+    """Score de confianza (máximo entre sus fuentes) de los últimos N turnos
+    del asistente en esta conversación, en orden cronológico.
+
+    `confidence_below` necesita "N respuestas consecutivas con baja
+    confianza" - eso solo tiene sentido mirando el historial real de turnos,
+    no los chunks recuperados para la pregunta actual (que son N fragmentos
+    de UNA sola respuesta, una señal distinta y no lo que la regla promete).
+
+    Turnos sin `sources` (saludos, respuestas de caché sin retrieval) se
+    excluyen en vez de contar como score 0.0: 0.0 no es "confianza baja
+    medida", es "no hubo retrieval que medir".
+    """
+    from app.models.chat_message import ChatMessage
+
+    result = await db.execute(
+        select(ChatMessage.sources_json)
+        .where(ChatMessage.conversation_id == conversation_id)
+        .where(ChatMessage.role == MessageRole.assistant)
+        .order_by(ChatMessage.created_at.desc())
+        .limit(limit)
+    )
+    rows = result.scalars().all()
+    scores = [
+        max(s.get("score", 0.0) for s in sources)
+        for sources in rows
+        if sources
+    ]
+    return list(reversed(scores))  # cronológico: más antiguo primero
+
+
 async def detect_escalation(
     db: AsyncSession,
     conv,
@@ -325,7 +422,6 @@ async def detect_escalation(
     question: str,
     history: list[dict],
     final_text: str,
-    context_chunks: list[dict],
     latency_ms: int | None = None,
 ) -> bool:
     """Evalúa las reglas de escalación activas y marca la conversación si alguna dispara."""
@@ -344,7 +440,8 @@ async def detect_escalation(
             bot_answers_ctx = [
                 m["content"] for m in history if m.get("role") == "assistant"
             ] + [final_text]
-            rag_scores_ctx = [c.get("score", 0.0) for c in context_chunks]
+            # El turno actual ya está persistido, es parte del historial leído.
+            rag_scores_ctx = await _recent_assistant_rag_scores(db, conv.id, limit=5)
 
             escalation_ctx = {
                 "user_message": question,
@@ -367,7 +464,7 @@ async def detect_escalation(
                     return True
     except Exception as _esc_exc:
         await db.rollback()
-        log.warning("chat.escalation_eval_failed", error=str(_esc_exc))
+        log.warning("chat.escalation_eval_failed", error=str(_esc_exc), degraded=True)
     return False
 
 
@@ -375,7 +472,6 @@ async def persist_turn(
     db: AsyncSession,
     *,
     session_id: str,
-    device: str | None,
     browser: str | None,
     origin_url: str | None,
     question: str,
@@ -384,7 +480,8 @@ async def persist_turn(
     latency_ms: int,
     is_playground: bool,
     history: list[dict],
-    context_chunks: list[dict],
+    context_relevance_ratio: float | None = None,
+    rag_route: str | None = None,
 ) -> tuple[str | None, str | None, bool]:
     """Persiste conversación y mensajes, evalúa escalación; devuelve (msg_id, conv_id, escalar)."""
     assistant_message_id: str | None = None
@@ -394,7 +491,6 @@ async def persist_turn(
         conv = await history_svc.get_or_create_conversation(
             db,
             session_id=session_id,
-            device=device,
             browser=browser,
             origin_url=origin_url,
         )
@@ -408,6 +504,8 @@ async def persist_turn(
             content=final_text,
             sources=sources,
             latency_ms=latency_ms,
+            context_relevance_ratio=context_relevance_ratio,
+            rag_route=rag_route,
         )
         await db.commit()
         assistant_message_id = str(assistant_msg.id)
@@ -422,7 +520,6 @@ async def persist_turn(
                         question=question,
                         history=history,
                         final_text=final_text,
-                        context_chunks=context_chunks,
                         latency_ms=latency_ms,
                     ),
                     timeout=3.0,
@@ -433,3 +530,46 @@ async def persist_turn(
         log.warning("chat.history_save_failed", error=str(_hist_exc))
 
     return assistant_message_id, conversation_id, escalation_prompt
+
+
+async def evaluate_response_quality(
+    message_id: str,
+    question: str,
+    final_text: str,
+    llm_chunks: list[dict],
+    provider,
+    api_key: str | None,
+) -> None:
+    """Evalúa faithfulness y answer relevance en background (fire-and-forget,
+    llamada desde el router tras persist_turn) y persiste el resultado sobre
+    el ChatMessage ya creado, en una sesión de BD nueva. Nunca levanta
+    excepción hacia el caller.
+    """
+    from app.services.ai.llm_gateway import grade_faithfulness
+    from app.services.rag.quality import compute_answer_relevance
+
+    faithfulness = await grade_faithfulness(final_text, llm_chunks, provider, api_key)
+    relevance = await compute_answer_relevance(question, final_text)
+
+    values: dict = {}
+    if faithfulness is not None:
+        values["faithfulness_score"] = faithfulness
+    if relevance is not None:
+        values["answer_relevance_score"] = relevance
+    if not values:
+        return
+
+    try:
+        from app.db.session import AsyncSessionLocal
+        from app.models.chat_message import ChatMessage
+        import uuid as _uuid
+
+        async with AsyncSessionLocal() as db:
+            await db.execute(
+                ChatMessage.__table__.update()
+                .where(ChatMessage.id == _uuid.UUID(message_id))
+                .values(**values)
+            )
+            await db.commit()
+    except Exception as exc:
+        log.warning("chat.quality_eval_persist_failed", error=str(exc), message_id=message_id)

@@ -13,7 +13,7 @@ from app.models.enums import NotificationChannel, NotificationEvent
 
 class NotificationRule(Base):
     __tablename__ = "notification_rules"
-    # 1 regla por (evento, canal) — el frontend asume esta cardinalidad.
+    # 1 regla por (evento, canal) - el frontend asume esta cardinalidad.
     __table_args__ = (
         UniqueConstraint("event", "channel", name="uq_notification_rules_event_channel"),
     )

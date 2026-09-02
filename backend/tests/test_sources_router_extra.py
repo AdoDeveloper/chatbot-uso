@@ -10,7 +10,7 @@ bulk_reingest, preview_source, quality_report_endpoint.
 upload_source dispara la ingestión real en background (background_tasks),
 pero la respuesta HTTP se devuelve antes de que corra; el parseo de un
 PDF "falso" simplemente falla dentro del job de background y marca la
-fuente como error — sin bloquear ni afectar el status code de la
+fuente como error - sin bloquear ni afectar el status code de la
 petición. Por eso estos tests no necesitan mockear Qdrant/embeddings.
 """
 from __future__ import annotations
@@ -21,11 +21,17 @@ import uuid
 import pytest
 
 from app.models.enums import ReviewStatus, SourceStatus, SourceType
+from app.models.enums import UserRole
 from app.models.source import Source
 
 
+@pytest.fixture
+async def viewer_user(make_user):
+    return await make_user(role=UserRole.viewer)
+
+
 def _fake_pdf_bytes(marker: str = "x") -> bytes:
-    # No es un PDF válido — el parseo real fallará en background (esperado,
+    # No es un PDF válido - el parseo real fallará en background (esperado,
     # no lo estamos probando aquí), pero el content-type/extension bastan
     # para pasar la detección de tipo y el flujo de subida.
     return f"%PDF-1.4 fake content {marker}".encode()
@@ -42,6 +48,19 @@ async def seeded_source(db_session):
     await db_session.commit()
     await db_session.refresh(s)
     return s
+
+
+class TestUploadLimits:
+    async def test_returns_configured_max_source_mb(self, client, admin_user, auth_headers):
+        from app.core.config import get_settings
+
+        r = await client.get("/api/v1/sources/upload-limits", headers=auth_headers(admin_user))
+        assert r.status_code == 200
+        assert r.json() == {"source_mb": get_settings().MAX_SOURCE_UPLOAD_MB}
+
+    async def test_requires_auth(self, client):
+        r = await client.get("/api/v1/sources/upload-limits")
+        assert r.status_code == 401
 
 
 class TestUploadSource:
@@ -61,7 +80,7 @@ class TestUploadSource:
         assert body["status"] in ("pending", "processing", "error")
 
     async def test_upload_unsupported_type_returns_415(self, client, admin_user, auth_headers):
-        files = {"file": ("archivo.txt", io.BytesIO(b"hola"), "text/plain")}
+        files = {"file": ("archivo.xlsx", io.BytesIO(b"hola"), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
         r = await client.post(
             "/api/v1/sources/upload", files=files, headers=auth_headers(admin_user),
         )
@@ -287,3 +306,110 @@ class TestQualityReport:
         r = await client.get(f"/api/v1/sources/{seeded_source.id}/quality", headers=auth_headers(admin_user))
         assert r.status_code == 200
         assert "total_chunks" in r.json()
+
+
+class TestReplaceSourceFile:
+    async def test_requires_perm(self, client, viewer_user, auth_headers, seeded_source):
+        files = {"file": ("nuevo.pdf", io.BytesIO(_fake_pdf_bytes("v2")), "application/pdf")}
+        r = await client.post(
+            f"/api/v1/sources/{seeded_source.id}/replace-file", files=files, headers=auth_headers(viewer_user),
+        )
+        assert r.status_code == 403
+
+    async def test_not_found_returns_404(self, client, admin_user, auth_headers):
+        files = {"file": ("nuevo.pdf", io.BytesIO(_fake_pdf_bytes("v2")), "application/pdf")}
+        r = await client.post(
+            f"/api/v1/sources/{uuid.uuid4()}/replace-file", files=files, headers=auth_headers(admin_user),
+        )
+        assert r.status_code == 404
+
+    async def test_replaces_file_and_resets_review_status(self, client, admin_user, auth_headers, db_session):
+        s = Source(
+            id=uuid.uuid4(), name="Rechazada", type=SourceType.pdf,
+            status=SourceStatus.ready, review_status=ReviewStatus.rechazada,
+            rejection_reason="Contenido desactualizado",
+            content_hash="old-hash-123", file_path=None,
+        )
+        db_session.add(s)
+        await db_session.commit()
+
+        files = {"file": ("corregido.pdf", io.BytesIO(_fake_pdf_bytes("v2")), "application/pdf")}
+        r = await client.post(
+            f"/api/v1/sources/{s.id}/replace-file", files=files, headers=auth_headers(admin_user),
+        )
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["review_status"] == "pendiente_revision"
+        assert body["rejection_reason"] is None
+        assert body["status"] in ("pending", "processing", "error")
+
+    async def test_rejects_while_processing(self, client, admin_user, auth_headers, db_session):
+        s = Source(
+            id=uuid.uuid4(), name="En proceso", type=SourceType.pdf,
+            status=SourceStatus.processing, review_status=ReviewStatus.procesando,
+        )
+        db_session.add(s)
+        await db_session.commit()
+
+        files = {"file": ("nuevo.pdf", io.BytesIO(_fake_pdf_bytes("v2")), "application/pdf")}
+        r = await client.post(
+            f"/api/v1/sources/{s.id}/replace-file", files=files, headers=auth_headers(admin_user),
+        )
+        assert r.status_code == 409
+
+    async def test_rejects_duplicate_of_other_source(self, client, admin_user, auth_headers):
+        content = _fake_pdf_bytes("shared")
+        files1 = {"file": ("original.pdf", io.BytesIO(content), "application/pdf")}
+        r1 = await client.post("/api/v1/sources/upload", files=files1, headers=auth_headers(admin_user))
+        assert r1.status_code == 201
+
+        files2 = {"file": ("target.pdf", io.BytesIO(_fake_pdf_bytes("target")), "application/pdf")}
+        r2 = await client.post("/api/v1/sources/upload", files=files2, headers=auth_headers(admin_user))
+        assert r2.status_code == 201
+        target_id = r2.json()["id"]
+
+        files3 = {"file": ("reemplazo.pdf", io.BytesIO(content), "application/pdf")}
+        r3 = await client.post(
+            f"/api/v1/sources/{target_id}/replace-file", files=files3, headers=auth_headers(admin_user),
+        )
+        assert r3.status_code == 409
+        assert r3.json()["detail"]["code"] == "DUPLICATE_CONTENT"
+
+    async def test_allows_replacing_with_same_content_it_already_had(self, client, admin_user, auth_headers):
+        content = _fake_pdf_bytes("self")
+        files1 = {"file": ("doc.pdf", io.BytesIO(content), "application/pdf")}
+        r1 = await client.post("/api/v1/sources/upload", files=files1, headers=auth_headers(admin_user))
+        assert r1.status_code == 201
+        source_id = r1.json()["id"]
+
+        files2 = {"file": ("doc-again.pdf", io.BytesIO(content), "application/pdf")}
+        r2 = await client.post(
+            f"/api/v1/sources/{source_id}/replace-file", files=files2, headers=auth_headers(admin_user),
+        )
+        assert r2.status_code == 200, r2.text
+
+    async def test_empty_file_rejected(self, client, admin_user, auth_headers, seeded_source):
+        files = {"file": ("vacio.pdf", io.BytesIO(b""), "application/pdf")}
+        r = await client.post(
+            f"/api/v1/sources/{seeded_source.id}/replace-file", files=files, headers=auth_headers(admin_user),
+        )
+        assert r.status_code == 400
+
+    async def test_old_file_deleted_from_disk(self, client, admin_user, auth_headers, db_session, tmp_path):
+        old_file = tmp_path / "old.pdf"
+        old_file.write_bytes(_fake_pdf_bytes("old"))
+        s = Source(
+            id=uuid.uuid4(), name="Con archivo viejo", type=SourceType.pdf,
+            status=SourceStatus.ready, review_status=ReviewStatus.rechazada,
+            file_path=str(old_file), content_hash="old-file-hash",
+        )
+        db_session.add(s)
+        await db_session.commit()
+        assert old_file.exists()
+
+        files = {"file": ("nuevo.pdf", io.BytesIO(_fake_pdf_bytes("brand-new")), "application/pdf")}
+        r = await client.post(
+            f"/api/v1/sources/{s.id}/replace-file", files=files, headers=auth_headers(admin_user),
+        )
+        assert r.status_code == 200, r.text
+        assert not old_file.exists()

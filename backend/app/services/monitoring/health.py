@@ -8,7 +8,7 @@ import structlog
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.session import AsyncSessionLocal
+from app.db import session as db_session
 from app.models.health_snapshot import HealthSnapshot
 
 log = structlog.get_logger()
@@ -29,7 +29,7 @@ async def _check_database():
     from sqlalchemy import text
     t0 = time.monotonic()
     try:
-        async with AsyncSessionLocal() as db:
+        async with db_session.AsyncSessionLocal() as db:
             await db.execute(text("SELECT 1"))
         return True, int((time.monotonic() - t0) * 1000), None
     except Exception as exc:
@@ -61,6 +61,47 @@ _CHECKS = {
     "Redis": _check_redis,
     "Qdrant": _check_qdrant,
 }
+
+
+async def check_index_sync(db: AsyncSession) -> dict:
+    """Compara los chunks declarados en MySQL contra los puntos reales en Qdrant.
+    """
+    from sqlalchemy import select
+    from app.models.enums import SourceStatus
+    from app.models.source import Source
+    from app.services.ingestion.vector_store import _get_client, COLLECTION
+
+    result = await db.execute(
+        select(Source.id, Source.name, Source.chunk_count).where(
+            Source.status == SourceStatus.ready,
+            Source.deleted_at.is_(None),
+        )
+    )
+    rows = result.all()
+    declared = sum(int(r[2] or 0) for r in rows)
+
+    try:
+        info = await _get_client().get_collection(COLLECTION)
+        indexed = int(info.points_count or 0)
+    except Exception as exc:
+        return {
+            "ok": False,
+            "error": str(exc)[:200],
+            "declared_chunks": declared,
+            "indexed_points": None,
+            "sources": len(rows),
+        }
+
+    # Qdrant puede tener puntos de más (FAQs sueltas, fuentes borradas cuyos
+    # vectores aún no se purgaron); lo preocupante es que falten.
+    missing = max(0, declared - indexed)
+    return {
+        "ok": missing == 0,
+        "declared_chunks": declared,
+        "indexed_points": indexed,
+        "missing": missing,
+        "sources": len(rows),
+    }
 
 
 def _read_resource_utilization() -> tuple[float | None, float | None, float | None]:

@@ -1,7 +1,7 @@
 """Tests de caracterización para app/api/v1/guardrails/router.py.
 
 test_guardrails.py cubre el motor de guardrails (validate_input) como
-función pura, pero ningún endpoint HTTP de este router — en particular
+función pura, pero ningún endpoint HTTP de este router - en particular
 el CRUD de patrones custom (_load_custom_list/_save_custom_list) no
 tenía ninguna prueba. Se fijan aquí antes de mover ese CRUD a servicio.
 """
@@ -106,11 +106,6 @@ class TestPatternImpact:
         )
         assert r.status_code == 404
 
-    @pytest.mark.skip(
-        reason="pattern_impact usa func.json_unquote(), especifico de MySQL; "
-        "el entorno de test corre sobre SQLite (ver conftest.py DATABASE_URL) "
-        "y no soporta esa funcion. No cubre el 200 real contra MySQL/produccion."
-    )
     async def test_pattern_impact_zero_blocks(self, client, admin_user, auth_headers):
         r = await client.post(
             "/api/v1/guardrails/patterns",

@@ -14,7 +14,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.config import get_settings
 from app.core.exceptions import NotFoundError
-from app.models.enums import SourceStatus, SourceType
+from app.models.enums import ReviewStatus, SourceStatus, SourceType
 from app.models.source import Source
 from app.models.user import User
 from app.schemas.common import BulkUploadResult
@@ -26,18 +26,41 @@ log = structlog.get_logger()
 _MIME_MAP: dict[str, SourceType] = {
     "application/pdf": SourceType.pdf,
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": SourceType.docx,
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": SourceType.xlsx,
+    "text/plain": SourceType.txt,
 }
 
 _EXT_MAP: dict[str, SourceType] = {
     ".pdf": SourceType.pdf,
     ".docx": SourceType.docx,
-    ".xlsx": SourceType.xlsx,
+    ".txt": SourceType.txt,
 }
 
 
+class _ContentHashLock:
+    def __init__(self, content_hash: str):
+        self._key = f"upload_hash_lock:{content_hash}"
+        self._acquired = False
+
+    async def __aenter__(self) -> bool:
+        from app.core import redis as _redis_mod
+        try:
+            ok = await _redis_mod.get_redis().set(self._key, "1", ex=30, nx=True)
+            self._acquired = bool(ok)
+        except Exception:
+            self._acquired = None  # Redis no disponible: no bloquear el upload
+        return self._acquired is not False
+
+    async def __aexit__(self, *exc) -> None:
+        if self._acquired:
+            from app.core import redis as _redis_mod
+            try:
+                await _redis_mod.get_redis().delete(self._key)
+            except Exception:
+                pass
+
+
 def with_user_options():
-    # Load creator + reviewer eagerly so SourceResponse.from_source can read both
+    # Carga creator + reviewer de forma eager para que SourceResponse.from_source pueda leer ambos
     return (selectinload(Source.created_by), selectinload(Source.reviewed_by))
 
 
@@ -55,7 +78,7 @@ def detect_type(filename: str, content_type: str) -> SourceType:
         return _EXT_MAP[ext]
     raise HTTPException(
         status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-        detail=f"Formato no soportado: {filename}. Tipos permitidos: PDF, DOCX, XLSX.",
+        detail=f"Formato no soportado: {filename}. Tipos permitidos: PDF, DOCX, TXT.",
     )
 
 
@@ -74,7 +97,7 @@ async def upload_source(
     db: AsyncSession, *, req: Request, background_tasks: BackgroundTasks,
     file: UploadFile, name: str, description: str, tags: str, current_user: User,
 ) -> Source:
-    """Sube un archivo (PDF/DOCX/XLSX) y dispara la ingestión en background.
+    """Sube un archivo (PDF/DOCX/TXT) y dispara la ingestión en background.
 
     El status comienza como `pending` y avanza a `processing` → `ready`/`error`
     conforme el job de fondo (chunking + embedding + upsert Qdrant) progresa.
@@ -103,50 +126,136 @@ async def upload_source(
 
     from app.services.ingestion.source_quality import file_hash, find_duplicate
     chash = file_hash(content)
-    dup = await find_duplicate(db, chash)
-    if dup:
+    async with _ContentHashLock(chash):
+        dup = await find_duplicate(db, chash)
+        if dup:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "DUPLICATE_CONTENT",
+                    "message": f"Este archivo ya existe como '{dup.name}'.",
+                    "existing_id": str(dup.id),
+                    "existing_name": dup.name,
+                },
+            )
+
+        async with aiofiles.open(dest, "wb") as f:
+            await f.write(content)
+
+        meta: dict = {"tags": tags_list}
+        if description.strip():
+            meta["description"] = description.strip()
+
+        source = Source(
+            name=source_name,
+            type=source_type,
+            status=SourceStatus.pending,
+            file_path=str(dest),
+            file_size=len(content),
+            content_hash=chash,
+            meta=meta,
+            created_by_id=current_user.id,
+        )
+        db.add(source)
+        await db.flush()
+        await db.refresh(source)
+
+        await audit_svc.log_action(
+            db,
+            action="source.upload",
+            resource_type="source",
+            actor_id=current_user.id,
+            resource_id=str(source.id),
+            meta={"name": source.name, "type": source.type.value, "size": source.file_size},
+            ip=req.client.host if req.client else None,
+            user_agent=req.headers.get("user-agent"),
+        )
+        await db.commit()
+
+    background_tasks.add_task(run_ingestion, source.id)
+
+    result = await db.execute(
+        select(Source).where(Source.id == source.id).options(*with_user_options())
+    )
+    return result.scalar_one()
+
+
+async def replace_source_file(
+    db: AsyncSession, *, source_id: uuid.UUID, req: Request,
+    background_tasks: BackgroundTasks, file: UploadFile, current_user: User,
+) -> Source:
+    """Reemplaza el archivo físico de una fuente existente (ej. tras un
+    rechazo por contenido incorrecto) y dispara una nueva ingestión.
+    """
+    source = await get_or_404(db, source_id)
+    if source.status == SourceStatus.processing:
         raise HTTPException(
             status_code=409,
-            detail={
-                "code": "DUPLICATE_CONTENT",
-                "message": f"Este archivo ya existe como '{dup.name}'.",
-                "existing_id": str(dup.id),
-                "existing_name": dup.name,
-            },
+            detail="Esta fuente ya se está procesando. Espera a que termine antes de reemplazar el archivo.",
         )
 
-    async with aiofiles.open(dest, "wb") as f:
-        await f.write(content)
+    source_type = detect_type(file.filename or "", file.content_type or "")
+    max_mb = get_settings().MAX_SOURCE_UPLOAD_MB
+    if file.size is not None and file.size > max_mb * 1024 * 1024:
+        raise HTTPException(status_code=413, detail=f"El archivo excede el límite de {max_mb} MB.")
 
-    meta: dict = {"tags": tags_list}
-    if description.strip():
-        meta["description"] = description.strip()
+    content = await file.read()
+    if len(content) == 0:
+        raise HTTPException(status_code=400, detail="El archivo está vacío.")
+    if len(content) > max_mb * 1024 * 1024:
+        raise HTTPException(status_code=413, detail=f"El archivo excede el límite de {max_mb} MB.")
 
-    source = Source(
-        name=source_name,
-        type=source_type,
-        status=SourceStatus.pending,
-        file_path=str(dest),
-        file_size=len(content),
-        content_hash=chash,
-        meta=meta,
-        created_by_id=current_user.id,
-    )
-    db.add(source)
-    await db.flush()
-    await db.refresh(source)
+    from app.services.ingestion.source_quality import file_hash, find_duplicate
+    chash = file_hash(content)
+    async with _ContentHashLock(chash):
+        dup = await find_duplicate(db, chash, exclude_id=source.id)
+        if dup:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "DUPLICATE_CONTENT",
+                    "message": f"Este archivo ya existe como '{dup.name}'.",
+                    "existing_id": str(dup.id),
+                    "existing_name": dup.name,
+                },
+            )
 
-    await audit_svc.log_action(
-        db,
-        action="source.upload",
-        resource_type="source",
-        actor_id=current_user.id,
-        resource_id=str(source.id),
-        meta={"name": source.name, "type": source.type.value, "size": source.file_size},
-        ip=req.client.host if req.client else None,
-        user_agent=req.headers.get("user-agent"),
-    )
-    await db.commit()
+        old_path = source.file_path
+        file_id = uuid.uuid4()
+        suffix = Path(file.filename or "").suffix or f".{source_type.value}"
+        dest = uploads_dir() / f"{file_id}{suffix}"
+        async with aiofiles.open(dest, "wb") as f:
+            await f.write(content)
+
+        source.type = source_type
+        source.file_path = str(dest)
+        source.file_size = len(content)
+        source.content_hash = chash
+        source.status = SourceStatus.pending
+        source.error_message = None
+        source.error_code = None
+        source.error_hint = None
+        source.review_status = ReviewStatus.pendiente_revision
+        source.rejection_reason = None
+
+        await audit_svc.log_action(
+            db,
+            action="source.replace_file",
+            resource_type="source",
+            actor_id=current_user.id,
+            resource_id=str(source.id),
+            meta={"name": source.name, "new_size": source.file_size},
+            ip=req.client.host if req.client else None,
+            user_agent=req.headers.get("user-agent"),
+        )
+        await db.commit()
+        await db.refresh(source)
+
+    if old_path:
+        try:
+            Path(old_path).unlink(missing_ok=True)
+        except Exception:
+            pass
 
     background_tasks.add_task(run_ingestion, source.id)
 
@@ -186,42 +295,43 @@ async def bulk_upload_sources(
                 continue
 
             chash = file_hash(content)
-            dup = await find_duplicate(db, chash)
-            if dup:
-                errors.append({"name": file.filename, "error": f"Contenido duplicado: '{dup.name}'."})
-                continue
+            async with _ContentHashLock(chash):
+                dup = await find_duplicate(db, chash)
+                if dup:
+                    errors.append({"name": file.filename, "error": f"Contenido duplicado: '{dup.name}'."})
+                    continue
 
-            file_id = uuid.uuid4()
-            suffix = Path(file.filename or "").suffix or f".{source_type.value}"
-            dest = uploads_dir() / f"{file_id}{suffix}"
-            async with aiofiles.open(dest, "wb") as f:
-                await f.write(content)
+                file_id = uuid.uuid4()
+                suffix = Path(file.filename or "").suffix or f".{source_type.value}"
+                dest = uploads_dir() / f"{file_id}{suffix}"
+                async with aiofiles.open(dest, "wb") as f:
+                    await f.write(content)
 
-            source = Source(
-                name=source_name,
-                type=source_type,
-                status=SourceStatus.pending,
-                file_path=str(dest),
-                file_size=len(content),
-                content_hash=chash,
-                meta={"tags": tags_list},
-                created_by_id=current_user.id,
-            )
-            db.add(source)
-            await db.flush()  # assigns source.id without committing
+                source = Source(
+                    name=source_name,
+                    type=source_type,
+                    status=SourceStatus.pending,
+                    file_path=str(dest),
+                    file_size=len(content),
+                    content_hash=chash,
+                    meta={"tags": tags_list},
+                    created_by_id=current_user.id,
+                )
+                db.add(source)
+                await db.flush()  # assigns source.id without committing
 
-            await audit_svc.log_action(
-                db,
-                action="source.upload",
-                resource_type="source",
-                actor_id=current_user.id,
-                resource_id=str(source.id),
-                meta={"name": source.name, "type": source.type.value, "size": source.file_size},
-                ip=req.client.host if req.client else None,
-                user_agent=req.headers.get("user-agent"),
-            )
-            await db.commit()
-            await db.refresh(source)
+                await audit_svc.log_action(
+                    db,
+                    action="source.upload",
+                    resource_type="source",
+                    actor_id=current_user.id,
+                    resource_id=str(source.id),
+                    meta={"name": source.name, "type": source.type.value, "size": source.file_size},
+                    ip=req.client.host if req.client else None,
+                    user_agent=req.headers.get("user-agent"),
+                )
+                await db.commit()
+                await db.refresh(source)
 
             background_tasks.add_task(run_ingestion, source.id)
             created.append({"id": str(source.id), "name": source.name})
@@ -349,7 +459,7 @@ async def run_ingestion(source_id: uuid.UUID) -> None:
                     await ingestion.ingest(db, source)
             except Exception as exc:
                 _log.error("ingestion.background_failed", source_id=str(source_id), error=str(exc))
-                # Mark the source as error so the UI shows failure instead of hanging.
+                # Marca la fuente como error para que el UI muestre el fallo en vez de quedarse colgado.
                 try:
                     result2 = await db.execute(select(Source).where(Source.id == source_id))
                     src = result2.scalar_one_or_none()

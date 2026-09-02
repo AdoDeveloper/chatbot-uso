@@ -1,6 +1,6 @@
 """
-Versioning middleware — auto-captures system snapshots after mutations.
-Fire-and-forget asyncio task, zero added latency to the response.
+Middleware de versionado: captura automáticamente snapshots del sistema tras mutaciones.
+Tarea asyncio fire-and-forget, sin latencia adicional para la respuesta.
 """
 from __future__ import annotations
 
@@ -18,7 +18,11 @@ from app.core.security import decode_token
 
 log = structlog.get_logger()
 
-# Maps (HTTP method, path prefix) → trigger_source label
+# Retiene las tareas de create_task (referencia débil del event loop, si no
+# se recolectan a mitad de ejecución); discard() en done_callback las limpia.
+_background_tasks: set[asyncio.Task] = set()
+
+# Mapea (método HTTP, prefijo de path) → etiqueta trigger_source
 _VERSIONED_ROUTES: list[tuple[str, str, str]] = [
     ("PUT",    "/api/v1/settings",                      "settings"),
     ("POST",   "/api/v1/providers",                     "providers"),
@@ -83,11 +87,11 @@ async def _capture_background(user_id: uuid.UUID, trigger_source: str) -> None:
 
 class VersioningMiddleware:
     """
-    Pure ASGI middleware — captures system snapshots after successful mutations.
+    Middleware ASGI puro: captura snapshots del sistema tras mutaciones exitosas.
 
-    Does NOT inherit BaseHTTPMiddleware intentionally: avoids anyio TaskGroup
-    wrapping that causes nested ExceptionGroups when exceptions propagate from
-    inner middleware/endpoint layers.
+    No hereda de BaseHTTPMiddleware a propósito: evita el wrapping con anyio
+    TaskGroup, que genera ExceptionGroups anidados cuando las excepciones
+    se propagan desde capas internas de middleware/endpoint.
     """
 
     def __init__(self, app: ASGIApp) -> None:
@@ -99,23 +103,25 @@ class VersioningMiddleware:
             return
 
         request = Request(scope, receive)
-        response_status: list[int] = []  # mutable container for closure
+        response_status: list[int] = []  # contenedor mutable para el closure
 
         async def capture_send(message: MutableMapping[str, Any]) -> None:
             if message["type"] == "http.response.start":
                 response_status.append(message["status"])
             await send(message)
 
-        # Let the request pass through normally — exceptions propagate without wrapping
+        # Deja pasar la petición con normalidad: las excepciones se propagan sin envoltura
         await self.app(scope, receive, capture_send)
 
-        # Fire-and-forget snapshot only after a successful mutation response
+        # Snapshot fire-and-forget solo tras una respuesta de mutación exitosa
         if response_status and 200 <= response_status[0] < 300:
             trigger_source = _match_route(request.method, request.url.path)
             if trigger_source is not None:
                 user_id = _extract_user_id(request)
                 if user_id:
-                    asyncio.create_task(_capture_background(user_id, trigger_source))
+                    task = asyncio.create_task(_capture_background(user_id, trigger_source))
+                    _background_tasks.add(task)
+                    task.add_done_callback(_background_tasks.discard)
                 else:
                     log.warning("versioning.no_user_id", path=request.url.path,
                                 method=request.method, trigger=trigger_source)

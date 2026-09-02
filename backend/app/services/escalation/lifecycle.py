@@ -1,4 +1,4 @@
-"""Lifecycle de conversaciones escaladas — funciones esenciales."""
+"""Lifecycle de conversaciones escaladas - funciones esenciales."""
 from __future__ import annotations
 
 import uuid
@@ -57,6 +57,7 @@ async def record_csat(
     conversation_id: uuid.UUID,
     score: int,
     comment: str | None = None,
+    reasons: list[str] | None = None,
     actor_user_id: uuid.UUID | None = None,
 ) -> ChatConversation:
     if not (1 <= score <= 5):
@@ -64,11 +65,16 @@ async def record_csat(
     conv = await _load(db, conversation_id)
     conv.csat_score = score
     conv.csat_comment = comment or None
+    conv.csat_reasons = reasons or []
     ev = EscalationEvent(
         conversation_id=conv.id,
         event_type=EscalationEventType.csat_recorded,
         actor_user_id=actor_user_id,
-        meta_json={"score": score, **({"comment": comment} if comment else {})},
+        meta_json={
+            "score": score,
+            **({"comment": comment} if comment else {}),
+            **({"reasons": reasons} if reasons else {}),
+        },
     )
     db.add(ev)
     await db.commit()

@@ -55,11 +55,17 @@ async def get_current_user(
 
 
 def require_permission(module: str, action: str):
-    """Dependencia RBAC: verifica el permiso (módulo, acción) contra la BD."""
+    """Dependencia RBAC: verifica el permiso (módulo, acción) contra la BD.
+    """
     async def checker(
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db),
     ) -> User:
+        if current_user.must_change_password:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Debe cambiar su contraseña antes de continuar",
+            )
         from app.services.system.rbac import has_permission
         allowed = await has_permission(db, current_user.role, module, action)
         if not allowed:
@@ -72,7 +78,7 @@ def require_permission(module: str, action: str):
 
 
 def require_perm(permission: str):
-    """Shorthand: require_perm("knowledge.update") — parses 'module.action'."""
+    """Shorthand: require_perm("knowledge.update") - parses 'module.action'."""
     if "." not in permission:
         raise ValueError(f"Invalid permission string (expected 'module.action'): {permission!r}")
     module, action = permission.rsplit(".", 1)
@@ -83,7 +89,7 @@ def get_client_ip(request: Request) -> str:
     """Extrae la IP real del cliente, priorizando headers de proxy reverso.
 
     Orden de precedencia:
-      1. CF-Connecting-IP (Cloudflare — confiable, no spoofeable tras CF)
+      1. CF-Connecting-IP (Cloudflare - confiable, no spoofeable tras CF)
       2. X-Real-IP (Nginx de confianza)
       3. X-Forwarded-For: se toma la ÚLTIMA IP de la cadena (la del cliente
          real detrás de proxies legítimos), no la primera, que es la que el

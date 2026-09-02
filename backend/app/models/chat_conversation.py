@@ -33,8 +33,8 @@ class ChatConversation(Base):
         SAEnum(ConversationStatus, name="conversationstatus", create_type=True),
         nullable=False,
         default=ConversationStatus.active,
+        server_default="active",
     )
-    device: Mapped[str | None] = mapped_column(String(64), nullable=True)
     browser: Mapped[str | None] = mapped_column(String(64), nullable=True)
     origin_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
@@ -53,20 +53,17 @@ class ChatConversation(Base):
     escalated_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True).with_variant(mysql.DATETIME(fsp=6), "mysql"), nullable=True
     )
-    assigned_to_user_id: Mapped[uuid.UUID | None] = mapped_column(
-        Uuid(native_uuid=False), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True,
-    )
-    assigned_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True).with_variant(mysql.DATETIME(fsp=6), "mysql"), nullable=True
-    )
     resolved_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True).with_variant(mysql.DATETIME(fsp=6), "mysql"), nullable=True
     )
     resolved_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
-        Uuid(native_uuid=False), ForeignKey("users.id", ondelete="SET NULL"), nullable=True,
+        Uuid(native_uuid=False), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True,
     )
     csat_score: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 1..5
     csat_comment: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # Motivos predefinidos seleccionados junto a la estrella (ver CSAT_REASONS
+    # en app/schemas/widget.py). Lista vacía si el usuario no marcó ninguno.
+    csat_reasons: Mapped[list[str]] = mapped_column(JSONList, default=list, server_default=sa_text("('[]')"), nullable=False)
 
     # Escalamiento pendiente de consentimiento del usuario
     escalation_pending: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=false())
@@ -75,10 +72,10 @@ class ChatConversation(Base):
     tags: Mapped[list[str]] = mapped_column(JSONList, default=list, server_default=sa_text("('[]')"), nullable=False)
 
     user: Mapped["User | None"] = relationship("User", foreign_keys=[user_id])  # noqa: F821
-    assignee: Mapped["User | None"] = relationship("User", foreign_keys=[assigned_to_user_id])  # noqa: F821
     resolver: Mapped["User | None"] = relationship("User", foreign_keys=[resolved_by_user_id])  # noqa: F821
     messages: Mapped[list["ChatMessage"]] = relationship(  # noqa: F821
-        "ChatMessage", back_populates="conversation", order_by="ChatMessage.created_at"
+        "ChatMessage", back_populates="conversation", order_by="ChatMessage.created_at",
+        passive_deletes=True,
     )
     escalation_events: Mapped[list["EscalationEvent"]] = relationship(  # noqa: F821
         "EscalationEvent", back_populates="conversation",

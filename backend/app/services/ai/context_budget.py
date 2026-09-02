@@ -24,8 +24,36 @@ MODEL_CONTEXT_OVERRIDES: dict[str, int] = {
     "gpt-4-32k": 32_768,
     "gpt-4.1-nano": 1_000_000,
     "gpt-4.1-mini": 1_000_000,
+    "gpt-4.1": 1_000_000,
     "gpt-4o-mini": 128_000,
+    "gpt-4o": 128_000,
+    "gpt-5-nano": 400_000,
+    "gpt-5-mini": 400_000,
+    "gpt-5": 400_000,
+    "o3-mini": 200_000,
+    "o3": 200_000,
+    "o4-mini": 200_000,
     "claude-3-haiku": 200_000,
+    "claude-3.5": 200_000,
+    "claude-3.7": 200_000,
+    "claude-4": 200_000,
+    "claude-5": 200_000,
+    "gemini-2.0": 1_000_000,
+    "gemini-2.5": 1_000_000,
+    "gemini-3": 1_000_000,
+    "llama-3.1": 128_000,
+    "llama-3.3": 128_000,
+    "llama-4": 1_000_000,
+    "llama3-70b-8192": 8_192,
+    "llama3-8b-8192": 8_192,
+    "gemma2-9b-it": 8_192,
+    "gemma-3": 128_000,
+    "mixtral-8x7b": 32_768,
+    "deepseek-v3": 128_000,
+    "deepseek-r1": 128_000,
+    "qwen3": 128_000,
+    "grok-3": 128_000,
+    "grok-4": 256_000,
 }
 
 DEFAULT_CONTEXT_WINDOW = 32_768
@@ -34,10 +62,15 @@ MAX_CONTEXT_FRACTION = 0.6  # tope de la ventana dedicado al contexto recuperado
 
 
 
+# Caracteres por token (medido: ratio 3.95-4.52, media 4.36); 4.0 deja margen conservador.
+CHARS_PER_TOKEN = 4.0
+
+
 def estimate_tokens(text: str | None) -> int:
+    """Estimación de tokens por longitud de texto (heurística, sin tokenizador externo)."""
     if not text:
         return 0
-    return max(1, len(text) // 4)
+    return max(1, int(len(text) / CHARS_PER_TOKEN))
 
 
 def get_context_window(provider) -> int:
@@ -89,24 +122,44 @@ def truncate_context_chunks(
     if budget <= 0:
         keep_idx = ordered_by_score[:1]
         keep_idx.sort()
-        kept = [chunks[i] for i in keep_idx]
+        min_chars = max(1, int(SAFETY_MARGIN_TOKENS * CHARS_PER_TOKEN * 0.1))
+        kept = [
+            {**chunks[i], "text": chunks[i].get("text", "")[:min_chars]}
+            for i in keep_idx
+        ]
         info.update(truncated=True, kept=len(kept), dropped=len(chunks) - len(kept))
         log.warning("context.budget_exhausted", context_window=context_window, base_tokens=base_tokens)
         return kept, info
 
     keep_idx: list[int] = []
     used = 0
+    truncated_first_chunk = False
     for i in ordered_by_score:
         t = estimate_tokens(chunks[i].get("text"))
+        if not keep_idx and t > budget:
+            max_chars = max(1, int(budget * CHARS_PER_TOKEN))
+            chunks[i] = {**chunks[i], "text": chunks[i].get("text", "")[:max_chars]}
+            t = budget
+            truncated_first_chunk = True
         if keep_idx and used + t > budget:
             continue
         keep_idx.append(i)
         used += t
 
-    keep_idx.sort()  # preservar orden original de los chunks
+    keep_idx.sort()
     kept = [chunks[i] for i in keep_idx]
     dropped = len(chunks) - len(kept)
+    if truncated_first_chunk:
+        info["truncated"] = True
+        log.warning("context.first_chunk_truncated", budget=budget)
+
+    src_after = {}
+    for c in kept:
+        sid = c.get("source_id", "?")
+        src_after[sid] = src_after.get(sid, 0) + 1
     if dropped:
         info.update(truncated=True, kept=len(kept), dropped=dropped)
-        log.warning("context.truncated", kept=len(kept), dropped=dropped, budget=budget, used=used)
+        log.warning("context.truncated", kept=len(kept), dropped=dropped, budget=budget, used=used, sources=src_after)
+    else:
+        log.debug("context.no_truncation", kept=len(kept), sources=src_after)
     return kept, info

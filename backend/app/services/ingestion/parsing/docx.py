@@ -1,10 +1,32 @@
 from __future__ import annotations
 
+import zipfile
+
 import structlog
 
 log = structlog.get_logger()
 
-# Word style names (EN + ES variants) mapped to markdown heading level
+# Mitigación zip bomb: valida el tamaño descomprimido antes de invocar Document().
+_MAX_DECOMPRESSED_RATIO = 100
+_MAX_DECOMPRESSED_BYTES = 500 * 1024 * 1024  # 500MB, techo absoluto
+
+
+def _check_zip_bomb(file_path: str) -> None:
+    with zipfile.ZipFile(file_path) as zf:
+        total_compressed = sum(info.compress_size for info in zf.infolist())
+        total_uncompressed = sum(info.file_size for info in zf.infolist())
+        if total_uncompressed > _MAX_DECOMPRESSED_BYTES:
+            raise ValueError(
+                f"El documento se expande a {total_uncompressed / 1024 / 1024:.0f}MB "
+                f"descomprimido, por encima del límite permitido."
+            )
+        if total_compressed > 0 and total_uncompressed / total_compressed > _MAX_DECOMPRESSED_RATIO:
+            raise ValueError(
+                "El documento tiene una tasa de compresión anormalmente alta "
+                "(posible archivo corrupto o malicioso)."
+            )
+
+# Nombres de estilos de Word (variantes EN + ES) mapeados a nivel de encabezado markdown
 _HEADING_STYLES: dict[str, str] = {
     "title":       "#",
     "título":      "#",
@@ -37,6 +59,7 @@ async def parse_docx(file_path: str) -> str:
         from docx.table import Table
         from docx.text.paragraph import Paragraph
 
+        _check_zip_bomb(file_path)
         doc = Document(file_path)
         parts: list[str] = []
 

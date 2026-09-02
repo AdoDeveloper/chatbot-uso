@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import uuid
+
 import structlog
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,21 +26,21 @@ _DEFAULTS_LOCK_NAME = "chatbot_seed_defaults"
 
 
 async def _db_lock(db: AsyncSession, name: str) -> None:
-    """Serializa workers en el startup usando un lock a nivel de base de datos.
-
-    MySQL  → GET_LOCK(name, 30)     — lock de sesión, liberado en RELEASE_LOCK o al cerrar la conexión
-    SQLite → sin lock (conexión única en tests)
-    """
     from app.core.config import get_settings
     url = get_settings().DATABASE_URL
     if url.startswith("mysql"):
         await db.execute(text("SELECT GET_LOCK(:n, 30)"), {"n": name})
 
-async def seed_first_admin(db: AsyncSession) -> None:
-    """Crea el primer admin si la tabla de usuarios está vacía.
 
-    Usa un lock de base de datos para serializar entre workers de Gunicorn.
-    """
+async def _db_unlock(db: AsyncSession, name: str) -> None:
+    from app.core.config import get_settings
+    url = get_settings().DATABASE_URL
+    if url.startswith("mysql"):
+        await db.execute(text("SELECT RELEASE_LOCK(:n)"), {"n": name})
+
+
+async def seed_first_admin(db: AsyncSession) -> None:
+    """Crea el primer admin si la tabla de usuarios está vacía."""
     try:
         await _db_lock(db, _SEED_LOCK_NAME)
 
@@ -81,14 +83,16 @@ async def seed_first_admin(db: AsyncSession) -> None:
         await db.commit()
 
         logger.warning(
-            "seed.admin_created — cambia la contraseña en el primer login",
+            "seed.admin_created - cambia la contraseña en el primer login",
             email=settings.FIRST_ADMIN_EMAIL,
         )
 
     except Exception:
         await db.rollback()
-        logger.exception("seed.admin_failed — el admin inicial NO fue creado")
+        logger.exception("seed.admin_failed - el admin inicial NO fue creado")
         raise
+    finally:
+        await _db_unlock(db, _SEED_LOCK_NAME)
 
 
 async def seed_defaults(db: AsyncSession) -> None:
@@ -96,68 +100,58 @@ async def seed_defaults(db: AsyncSession) -> None:
 
     Idempotente: puede llamarse en cada arranque del servidor sin efectos
     secundarios si los registros ya existen.
-
-    Serializado con _db_lock: con WORKERS>1 todos los workers ejecutan el
-    lifespan a la vez; sin el lock, ambos veían las tablas vacías e insertaban
-    a la vez (choque contra uq_escalation_channels_type y duplicados silenciosos
-    en widget_config). El lock se libera al cerrar la conexión (MySQL) o en
-    COMMIT (PG); el worker que espera ve los counts > 0 y no inserta nada.
     """
-    import uuid as _uuid
-    from sqlalchemy import select as _sel
-
     await _db_lock(db, _DEFAULTS_LOCK_NAME)
+    try:
+        wc_count = await db.scalar(select(func.count()).select_from(WidgetConfig))
+        if not wc_count:
+            db.add(WidgetConfig())
 
-    # Widget config
-    wc_count = await db.scalar(_sel(func.count()).select_from(WidgetConfig))
-    if not wc_count:
-        db.add(WidgetConfig())
-
-    # Reglas de notificación por evento (correo + in-app).
-    for event in NotificationEvent:
-        email_exists = await db.scalar(
-            _sel(NotificationRule.id).where(
-                NotificationRule.event == event,
-                NotificationRule.channel == NotificationChannel.email,
+        for event in NotificationEvent:
+            email_exists = await db.scalar(
+                select(NotificationRule.id).where(
+                    NotificationRule.event == event,
+                    NotificationRule.channel == NotificationChannel.email,
+                )
             )
-        )
-        if not email_exists:
-            db.add(NotificationRule(
-                id=_uuid.uuid4(),
-                event=event,
-                channel=NotificationChannel.email,
-                enabled=False,
+            if not email_exists:
+                db.add(NotificationRule(
+                    id=uuid.uuid4(),
+                    event=event,
+                    channel=NotificationChannel.email,
+                    enabled=False,
+                ))
+            inapp_exists = await db.scalar(
+                select(NotificationRule.id).where(
+                    NotificationRule.event == event,
+                    NotificationRule.channel == NotificationChannel.in_app,
+                )
+            )
+            if not inapp_exists:
+                db.add(NotificationRule(
+                    id=uuid.uuid4(),
+                    event=event,
+                    channel=NotificationChannel.in_app,
+                    enabled=True,
+                ))
+
+        er_count = await db.scalar(select(func.count()).select_from(EscalationRule))
+        if not er_count:
+            db.add(EscalationRule(
+                id=uuid.uuid4(),
+                name="Sin respuesta tras 2 intentos",
+                description="Si el chatbot no encuentra respuesta en 2 turnos consecutivos",
+                trigger_type=EscalationTrigger.no_answer,
+                enabled=True,
             ))
-        inapp_exists = await db.scalar(
-            _sel(NotificationRule.id).where(
-                NotificationRule.event == event,
-                NotificationRule.channel == NotificationChannel.in_app,
-            )
-        )
-        if not inapp_exists:
-            db.add(NotificationRule(
-                id=_uuid.uuid4(),
-                event=event,
-                channel=NotificationChannel.in_app,
+            db.add(EscalationRule(
+                id=uuid.uuid4(),
+                name="Usuario solicita agente",
+                description='Detecta frases como "quiero hablar con alguien"',
+                trigger_type=EscalationTrigger.user_request,
                 enabled=True,
             ))
 
-    # Escalation rules por defecto
-    er_count = await db.scalar(_sel(func.count()).select_from(EscalationRule))
-    if not er_count:
-        db.add(EscalationRule(
-            id=_uuid.uuid4(),
-            name="Sin respuesta tras 2 intentos",
-            description="Si el chatbot no encuentra respuesta en 2 turnos consecutivos",
-            trigger_type=EscalationTrigger.no_answer,
-            enabled=True,
-        ))
-        db.add(EscalationRule(
-            id=_uuid.uuid4(),
-            name="Usuario solicita agente",
-            description='Detecta frases como "quiero hablar con alguien"',
-            trigger_type=EscalationTrigger.user_request,
-            enabled=True,
-        ))
-
-    await db.commit()
+        await db.commit()
+    finally:
+        await _db_unlock(db, _DEFAULTS_LOCK_NAME)

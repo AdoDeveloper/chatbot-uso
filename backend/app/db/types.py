@@ -7,7 +7,7 @@ from sqlalchemy.types import TypeDecorator
 
 
 class JSONList(TypeDecorator):
-    """Stores a Python list as a JSON string in a TEXT column.
+    """Guarda una lista de Python como un string JSON en una columna TEXT.
     """
 
     impl = Text

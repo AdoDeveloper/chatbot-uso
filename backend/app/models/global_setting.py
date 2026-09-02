@@ -13,8 +13,8 @@ from app.db.session import Base
 class GlobalSetting(Base):
     """
     Almacén key-value para configuración del chatbot.
-    Claves predefinidas: system_prompt, welcome_message, chatbot_name,
-    top_k, score_threshold, temperature, max_tokens, use_corrective_rag.
+    Claves predefinidas: system_prompt, top_k, score_threshold, temperature,
+    max_tokens, use_corrective_rag.
     """
     __tablename__ = "global_settings"
 

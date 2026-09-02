@@ -3,6 +3,7 @@ from __future__ import annotations
 import secrets
 from datetime import datetime, timedelta, timezone
 
+from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -22,7 +23,11 @@ async def create_invitation(
     created_by: User,
     expires_in_days: int = 7,
 ) -> Invitation:
-    from fastapi import HTTPException
+    if role == UserRole.admin and created_by.role != UserRole.admin:
+        raise HTTPException(
+            status_code=403,
+            detail="Solo un administrador puede invitar",
+        )
     active_count = await db.scalar(
         select(func.count()).where(
             Invitation.email == email,
@@ -78,6 +83,31 @@ async def list_invitations(
 async def revoke_invitation(db: AsyncSession, invitation: Invitation) -> Invitation:
     invitation.is_active = False
     await db.flush()
+    return invitation
+
+
+async def delete_invitation(db: AsyncSession, invitation: Invitation) -> None:
+    if invitation.is_active and not invitation.is_expired and invitation.accepted_at is None:
+        raise HTTPException(
+            status_code=409,
+            detail="Solo se pueden eliminar invitaciones revocadas o expiradas; use Revocar para una invitación activa.",
+        )
+    await db.delete(invitation)
+
+
+async def resend_invitation(
+    db: AsyncSession,
+    invitation: Invitation,
+    *,
+    expires_in_days: int = 7,
+) -> Invitation:
+    if invitation.accepted_at is not None:
+        raise HTTPException(status_code=409, detail="La invitación ya fue aceptada.")
+    invitation.token = secrets.token_urlsafe(48)
+    invitation.expires_at = datetime.now(timezone.utc) + timedelta(days=expires_in_days)
+    invitation.is_active = True
+    await db.flush()
+    await db.refresh(invitation, ["created_by"])
     return invitation
 
 

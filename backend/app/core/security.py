@@ -9,19 +9,19 @@ from datetime import datetime, timedelta, timezone
 
 import bcrypt
 import jwt as pyjwt
-from cryptography.fernet import Fernet, InvalidToken
+from cryptography.fernet import Fernet
 
 from app.core.config import get_settings
 from app.core.exceptions import ValidationError
 
-# Patterns for common weak passwords (CVE-2019-1000007 list)
+# Contraseñas débiles comunes (lista CVE-2019-1000007)
 _COMMON_WEAK_PASSWORDS = {
     "password", "123456", "12345678", "qwerty", "abc123", "monkey", "master",
     "admin", "letmein", "welcome", "login", "password1", "password123",
     "admin123", "root", "toor", "pass", "test", "guest", "user", "qwerty123"
 }
 
-# Pattern for common weak patterns
+# Patrones débiles comunes (sin variedad de caracteres, repeticiones, secuencias)
 _WEAK_PASSWORD_PATTERN = re.compile(
     r"^(?!.*[a-z])(?!.*[A-Z])(?!.*\d)(?!.*[^a-zA-Z0-9]).{1,12}$|^(\w)\1{2,}$|"
     r"^(\w)\2(\w)\3(\w)\4$|^1234567890$|^qwertyuiop$|^asdfghjkl$"
@@ -29,17 +29,17 @@ _WEAK_PASSWORD_PATTERN = re.compile(
 
 
 def _is_common_password(password: str) -> bool:
-    """Check if password is in common weak passwords list."""
+    """Verifica si la contraseña está en la lista de contraseñas débiles comunes."""
     return password.lower() in _COMMON_WEAK_PASSWORDS
 
 
 def _has_weak_pattern(password: str) -> bool:
-    """Check if password has weak pattern."""
+    """Verifica si la contraseña tiene un patrón débil."""
     return bool(_WEAK_PASSWORD_PATTERN.match(password))
 
 
 def hash_password(password: str) -> str:
-    """Hash password with bcrypt, enforcing minimum security requirements."""
+    """Genera el hash de la contraseña con bcrypt, validando requisitos mínimos de seguridad."""
     if len(password) < 8:
         raise ValidationError("La contraseña debe tener al menos 8 caracteres.")
     if len(password) > 512:
@@ -102,35 +102,25 @@ def create_refresh_token(subject: str) -> str:
 def decode_token(token: str) -> dict:
     """Decodifica y verifica un JWT.
 
-    Lanza pyjwt.PyJWTError si el token es inválido/expirado/falsificado.
-    Antes devolvía {} en error, lo que impedía a get_current_user distinguir
-    "token inválido" de "sin sujeto". Ahora propaga la excepción para que el
-    caller diferencie claramente ambos casos y responda 401.
+    Lanza pyjwt.PyJWTError si el token es inválido/expirado/falsificado, para que el caller distinga ese caso de "sin sujeto" y responda 401.
     """
     settings = get_settings()
     return pyjwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
 
 
 _FERNET_CACHE: dict[str, Fernet] = {}
-_FERNET_LEGACY_CACHE: dict[str, Fernet] = {}
 
 
 def _derive_fernet_key(source: str) -> bytes:
-    """Derive a 32-byte Fernet key using PBKDF2-HMAC-SHA256 (480k iterations)."""
+    """Deriva una clave Fernet de 32 bytes usando PBKDF2-HMAC-SHA256 (480k iteraciones)."""
     salt = hashlib.sha256(b"chatbot-uso-fernet-salt:" + source.encode()).digest()
     raw = hashlib.pbkdf2_hmac("sha256", source.encode(), salt, iterations=480_000)
     return base64.urlsafe_b64encode(raw)
 
 
-def _legacy_fernet_key(source: str) -> bytes:
-    """Legacy key derivation (SHA256 only) for migrating existing data."""
-    raw = hashlib.sha256(source.encode()).digest()
-    return base64.urlsafe_b64encode(raw)
-
-
 def _fernet() -> Fernet:
-    """Derive a Fernet instance from ENCRYPTION_KEY (preferred) or SECRET_KEY.
-    Cached so PBKDF2 (480k iterations) runs once per process lifetime.
+    """Deriva una instancia de Fernet a partir de ENCRYPTION_KEY (preferida) o SECRET_KEY.
+    Se cachea para que PBKDF2 (480k iteraciones) corra una sola vez por proceso.
     """
     settings = get_settings()
     source = settings.ENCRYPTION_KEY or settings.SECRET_KEY
@@ -141,47 +131,31 @@ def _fernet() -> Fernet:
     return cached
 
 
-def _fernet_legacy() -> Fernet:
-    """Legacy Fernet instance (SHA256 only, no PBKDF2) for migrating data.
-    Cached per source to avoid recomputation.
-    """
-    settings = get_settings()
-    source = settings.ENCRYPTION_KEY or settings.SECRET_KEY
-    cached = _FERNET_LEGACY_CACHE.get(source)
-    if cached is None:
-        cached = Fernet(_legacy_fernet_key(source))
-        _FERNET_LEGACY_CACHE[source] = cached
-    return cached
-
-
 def encrypt_secret(value: str) -> str:
-    """Encrypt a plaintext string (e.g. API key) for storage in the DB.
+    """Cifra una cadena en texto plano (p. ej. una API key) para guardarla en BD.
 
-    Síncrono — útil para seeds / scripts. En endpoints async, prefiere
+    Síncrono - útil para seeds / scripts. En endpoints async, prefiere
     `await encrypt_secret_async(value)` para no bloquear el event loop.
     """
     return _fernet().encrypt(value.encode()).decode()
 
 
 def decrypt_secret(token: str) -> str:
-    """Decrypt a Fernet-encrypted string. Falls back to legacy key for pre-PBKDF2 data.
+    """Descifra una cadena cifrada con Fernet.
 
-    Síncrono — útil para seeds / scripts. En endpoints async, prefiere
+    Síncrono - útil para seeds / scripts. En endpoints async, prefiere
     `await decrypt_secret_async(token)` para no bloquear el event loop.
     """
-    try:
-        return _fernet().decrypt(token.encode()).decode()
-    except InvalidToken:
-        return _fernet_legacy().decrypt(token.encode()).decode()
+    return _fernet().decrypt(token.encode()).decode()
 
 
 async def encrypt_secret_async(value: str) -> str:
-    """Async version — ejecuta PBKDF2 en thread pool para no bloquear el event loop."""
+    """Versión async - ejecuta PBKDF2 en thread pool para no bloquear el event loop."""
     loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, encrypt_secret, value)
 
 
 async def decrypt_secret_async(token: str) -> str:
-    """Async version — ejecuta PBKDF2 en thread pool para no bloquear el event loop."""
+    """Versión async - ejecuta PBKDF2 en thread pool para no bloquear el event loop."""
     loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, decrypt_secret, token)

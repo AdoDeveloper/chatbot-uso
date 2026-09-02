@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import uuid
+from datetime import datetime, timezone
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import structlog
 from sqlalchemy import select
@@ -12,15 +15,35 @@ from app.models.notification_rule import NotificationRule
 from app.models.user import User
 from app.services.notifications import smtp
 from app.services.notifications import templates as tpl
+from app.services.notifications.audience import role_sees_event
 
 log = structlog.get_logger()
 
 
-async def _email_recipients(db: AsyncSession) -> list[str]:
+async def _email_recipients(db: AsyncSession, target: str | None = None) -> list[str]:
+    if target and target.strip():
+        return [addr.strip() for addr in target.split(",") if addr.strip()]
     result = await db.execute(
         select(User.email).where(User.is_active.is_(True), User.role == UserRole.admin)
     )
-    return [email for (email,) in result.all()]
+    return [email for (email,) in result.all() if email]
+
+
+async def _inapp_recipients(db: AsyncSession, event: NotificationEvent) -> list:
+    roles_result = await db.execute(
+        select(User.role).where(User.is_active.is_(True)).distinct()
+    )
+    active_roles = [r for (r,) in roles_result.all()]
+    allowed_roles = [
+        role for role in active_roles
+        if await role_sees_event(db, role, event)
+    ]
+    if not allowed_roles:
+        return []
+    result = await db.execute(
+        select(User.id).where(User.is_active.is_(True), User.role.in_(allowed_roles))
+    )
+    return [uid for (uid,) in result.all()]
 
 
 async def send_notification(
@@ -46,27 +69,42 @@ async def send_notification(
     body_html = _html_body(event, payload)
     body_text = _text_body(event, payload)
 
+    # Comparten este id todas las filas de este disparo (agrupadas en el historial).
+    trigger_id = uuid.uuid4()
+
     if email_rule:
-        for to in await _email_recipients(db):
-            ok = await smtp.send_email(to=to, subject=subject, body_html=body_html, body_text=body_text)
+        for to in await _email_recipients(db, email_rule.target):
+            try:
+                ok = await smtp.send_email(to=to, subject=subject, body_html=body_html, body_text=body_text)
+                error_message = None if ok else "No se pudo enviar el correo (ver logs del servidor para el detalle)."
+            except Exception as exc:
+                ok = False
+                error_message = str(exc)[:500]
+                log.warning("notifications.email_send_failed", notif_event=event.value, target=to, error=str(exc))
             db.add(NotificationLog(
+                trigger_id=trigger_id,
                 event=event.value,
                 channel=NotificationChannel.email.value,
                 target=to,
                 status="sent" if ok else "failed",
-                error_message=None if ok else "No se pudo enviar el correo (ver logs del servidor para el detalle).",
+                error_message=error_message,
                 payload_json=payload,
             ))
 
+    inapp_recipients = 0
     if inapp_rule:
-        db.add(NotificationLog(
-            event=event.value,
-            channel=NotificationChannel.in_app.value,
-            target="in_app",
-            status="sent",
-            error_message=None,
-            payload_json=payload,
-        ))
+        for user_id in await _inapp_recipients(db, event):
+            db.add(NotificationLog(
+                trigger_id=trigger_id,
+                event=event.value,
+                channel=NotificationChannel.in_app.value,
+                target="in_app",
+                status="sent",
+                error_message=None,
+                payload_json=payload,
+                user_id=user_id,
+            ))
+            inapp_recipients += 1
 
     await db.commit()
     log.info(
@@ -74,6 +112,7 @@ async def send_notification(
         notif_event=event.value,
         email=bool(email_rule),
         in_app=bool(inapp_rule),
+        inapp_recipients=inapp_recipients,
     )
 
 
@@ -129,21 +168,25 @@ _EVENT_META = {
     },
 }
 
-# Etiquetas legibles para las claves técnicas del payload.
 _FIELD_LABELS = {
     "open_questions": "Preguntas sin responder",
     "date": "Fecha",
     "document": "Documento",
+    "source_id": "Identificador del documento",
     "source_name": "Documento",
+    "chunks": "Fragmentos generados",
     "error": "Detalle del error",
     "conversation_id": "Identificador de conversación",
     "question": "Pregunta",
     "reason": "Motivo",
-    "provider": "Proveedor",
     "service": "Servicio",
-    "count": "Cantidad",
-    "current": "Valor actual",
-    "limit": "Límite",
+    "providers": "Proveedores intentados",
+    "since": "Sin responder desde",
+    "current_requests_last_hour": "Solicitudes en la última hora",
+    "limit_per_hour": "Límite por hora",
+    "percent": "Porcentaje del límite",
+    "contact_email": "Contacto por correo electrónico",
+    "contact_whatsapp": "Contacto por WhatsApp",
 }
 
 
@@ -165,11 +208,48 @@ def _labeled_rows(payload: dict[str, Any]) -> dict[str, Any]:
     return {_FIELD_LABELS.get(k, k.replace("_", " ").capitalize()): v for k, v in payload.items()}
 
 
+# Misma zona horaria que frontend/src/lib/datetime.ts::PROJECT_TIMEZONE.
+_PROJECT_TZ = ZoneInfo("America/El_Salvador")
+
+
+def _humanize_since(iso_str: str) -> tuple[str, str]:
+    """Convierte un ISO 8601 UTC a (fecha legible en hora local, hace cuánto)."""
+    try:
+        dt = datetime.fromisoformat(iso_str)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+    except (ValueError, TypeError):
+        return iso_str, ""
+
+    local = dt.astimezone(_PROJECT_TZ)
+    months = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
+    readable = f"{local.day} de {months[local.month - 1]} de {local.year}, {local.strftime('%I:%M %p').lstrip('0')}"
+
+    elapsed = datetime.now(timezone.utc) - dt
+    total_seconds = int(elapsed.total_seconds())
+    if total_seconds < 60:
+        ago = "hace un momento"
+    elif total_seconds < 3600:
+        mins = total_seconds // 60
+        ago = f"hace {mins} minuto{'s' if mins != 1 else ''}"
+    elif total_seconds < 86400:
+        hours = total_seconds // 3600
+        ago = f"hace {hours} hora{'s' if hours != 1 else ''}"
+    else:
+        days = total_seconds // 86400
+        ago = f"hace {days} día{'s' if days != 1 else ''}"
+
+    return readable, ago
+
+
 def _html_body(event: NotificationEvent, payload: dict[str, Any]) -> str:
     m = _meta(event)
 
     if event is NotificationEvent.unanswered_digest and "total_open" in payload:
         return _daily_digest_body(m, payload)
+
+    if event is NotificationEvent.provider_down and "providers" in payload:
+        return _provider_down_body(m, payload)
 
     content = ""
     if m["intro"]:
@@ -226,11 +306,51 @@ def _daily_digest_body(m: dict[str, str], p: dict[str, Any]) -> str:
     return tpl.render_email(title=m["subject"], content=content, preheader=intro)
 
 
+def _provider_down_body(m: dict[str, str], p: dict[str, Any]) -> str:
+    """Cuerpo enriquecido de la alerta de proveedor caído: tabla propia por
+    proveedor, tabla de fecha/tiempo transcurrido, y tabla de error."""
+    content = tpl.paragraph(m["intro"])
+
+    providers = [s.strip() for s in str(p.get("providers", "")).split(",") if s.strip()]
+    if providers:
+        content += tpl.heading(
+            "Proveedor intentado" if len(providers) == 1 else "Proveedores intentados"
+        )
+        for provider_name in providers:
+            content += tpl.detail_table(
+                {"Proveedor": provider_name, "Estado": "Sin respuesta"}
+            )
+
+    since = p.get("since")
+    if since:
+        readable, ago = _humanize_since(str(since))
+        rows: dict[str, object] = {"Sin responder desde": readable}
+        if ago:
+            rows["Tiempo transcurrido"] = ago
+        content += tpl.heading("Duración de la incidencia")
+        content += tpl.detail_table(rows)
+
+    error = p.get("error")
+    if error and error != "(sin detalle)":
+        content += tpl.heading("Detalle del error")
+        content += tpl.detail_table({"Mensaje": str(error)})
+
+    if m["action"]:
+        content += tpl.paragraph(m["action"])
+
+    return tpl.render_email(title=m["subject"], content=content, preheader=m["intro"])
+
+
 def _text_body(event: NotificationEvent, payload: dict[str, Any]) -> str:
     m = _meta(event)
     lines = [m["subject"], ""]
     if m["intro"]:
         lines += [m["intro"], ""]
+
+    if event is NotificationEvent.provider_down and "since" in payload:
+        readable, ago = _humanize_since(str(payload["since"]))
+        payload = {**payload, "since": f"{readable} ({ago})" if ago else readable}
+
     for k, v in _labeled_rows(payload).items():
         lines.append(f"{k}: {v}")
     if m["action"]:

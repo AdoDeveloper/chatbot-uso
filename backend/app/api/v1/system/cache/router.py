@@ -1,8 +1,8 @@
-"""Cache management endpoints — view stats, list entries, clear, configure."""
+"""Cache management endpoints - view stats, list entries, clear, configure."""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import require_perm
@@ -30,8 +30,8 @@ class CacheEntry(BaseModel):
 
 class CacheConfigUpdate(BaseModel):
     enabled: bool | None = None
-    ttl_seconds: int | None = None
-    similarity_threshold: float | None = None
+    ttl_seconds: int | None = Field(None, ge=60, le=604800)  # 1 min .. 7 días
+    similarity_threshold: float | None = Field(None, ge=0.0, le=1.0)
 
 
 @router.get("/stats", response_model=CacheStats)

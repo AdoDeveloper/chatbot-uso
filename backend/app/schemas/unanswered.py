@@ -14,6 +14,9 @@ class UnansweredQuestionOut(BaseModel):
     question: str
     detected_topic: str | None
     status: UnansweredStatus
+    # Se llenan al resolver (ver resolve_question).
+    resolved_by_id: uuid.UUID | None = None
+    resolved_at: datetime | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

@@ -12,18 +12,19 @@ from app.db.session import Base
 
 class ChunkEdit(Base):
     """
-    Audit trail for chunk content edits.
+    Registro de auditoría para ediciones de contenido de chunks.
 
-    Chunks live in Qdrant (not a SQL table), so this audit lives independently
-    and references the point by its string UUID. Every edit stores the previous
-    and new content so the admin can see the history or roll back if needed.
+    Los chunks viven en Qdrant (no en una tabla SQL), así que esta auditoría
+    existe de forma independiente y referencia el punto por su UUID en texto.
+    Cada edición guarda el contenido anterior y el nuevo para poder ver el
+    historial o revertir si hace falta.
     """
     __tablename__ = "chunk_edits"
 
     id: Mapped[uuid.UUID] = mapped_column(
         Uuid(native_uuid=False), primary_key=True, default=uuid.uuid4
     )
-    # Qdrant point id (UUID string). No FK — we can't constrain against a vector DB.
+    # Id del punto en Qdrant (UUID en texto). Sin FK: no se puede restringir contra una BD vectorial.
     chunk_point_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     source_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(native_uuid=False),

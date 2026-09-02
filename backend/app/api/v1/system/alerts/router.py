@@ -30,7 +30,7 @@ async def run_proactive_checks(
     db: AsyncSession = Depends(get_db),
     _=Depends(_admin),
 ) -> AlertsCheckResult:
-    """Ejecuta los checks proactivos (service_down, rate_limit, sla, lab_score)."""
+    """Ejecuta los checks proactivos (service_down, rate_limit_threshold)."""
     counters = await run_all_checks(db)
     return AlertsCheckResult(
         fired_by_check=counters,

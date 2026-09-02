@@ -29,6 +29,7 @@ class UnansweredQuestion(Base):
         SAEnum(UnansweredStatus, name="unansweredstatus", create_type=True),
         nullable=False,
         default=UnansweredStatus.open,
+        server_default="open",
         index=True,
     )
     resolved_by_id: Mapped[uuid.UUID | None] = mapped_column(

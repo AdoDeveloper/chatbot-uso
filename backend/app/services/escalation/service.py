@@ -4,15 +4,11 @@ import uuid
 from typing import Any
 
 import structlog
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.enums import NotificationChannel, UserRole
-from app.models.notification_log import NotificationLog
-from app.models.user import User
+from app.models.enums import NotificationEvent
 from app.services.escalation import lifecycle as escalation_lifecycle
-from app.services.notifications import smtp
-from app.services.notifications import templates as tpl
+from app.services.notifications.service import send_notification
 
 log = structlog.get_logger()
 
@@ -34,93 +30,19 @@ async def dispatch_escalation(
                 trigger_type=trigger_type,
                 meta={"reason": reason, "question": question[:500] if question else None},
             )
-        except (ValueError, Exception) as e:
+        except Exception as e:
             log.warning("escalation.lifecycle_mark_failed", error=str(e), conversation_id=conversation_id)
 
-    result = await db.execute(
-        select(User).where(User.is_active.is_(True), User.role == UserRole.admin)
-    )
-    admins = result.scalars().all()
-
-    payload = {
+    payload: dict[str, Any] = {
         "conversation_id": conversation_id,
         "question": question,
         "reason": reason,
-        **(extra or {}),
+        **{k: v for k, v in (extra or {}).items() if k != "contact_info"},
     }
-    body = _build_html(payload)
-    subject = f"Conversación escalada: {reason}"
+    contact_info = (extra or {}).get("contact_info")
+    if isinstance(contact_info, dict):
+        key = "contact_email" if contact_info.get("type") == "email" else "contact_whatsapp"
+        payload = {key: str(contact_info.get("value", "")), **payload}
 
-    sent = 0
-    for admin in admins:
-        if not admin.email:
-            continue
-        ok = False
-        error_message = None
-        try:
-            ok = await smtp.send_email(to=admin.email, subject=subject, body_html=body)
-            if ok:
-                sent += 1
-            else:
-                error_message = "No se pudo enviar el correo (ver logs del servidor para el detalle)."
-        except Exception as exc:
-            log.warning("escalation.email_failed", user_id=str(admin.id), error=str(exc))
-            error_message = str(exc)[:500]
-        db.add(NotificationLog(
-            event="escalation",
-            channel=NotificationChannel.email.value,
-            target=admin.email,
-            status="sent" if ok else "failed",
-            error_message=error_message,
-            payload_json=payload,
-        ))
-
-    db.add(NotificationLog(
-        event="escalation",
-        channel=NotificationChannel.in_app.value,
-        target="in_app",
-        status="sent",
-        error_message=None,
-        payload_json=payload,
-    ))
-
-    await db.commit()
-    log.info("escalation.dispatched", recipients=sent, total_admins=len(admins), reason=reason)
-
-
-_ESC_FIELD_LABELS = {
-    "conversation_id": "Identificador de conversación",
-    "question": "Pregunta del usuario",
-    "reason": "Motivo del escalamiento",
-}
-
-
-def _build_html(payload: dict[str, Any]) -> str:
-    title = "Conversación escalada"
-    intro = (
-        "Un usuario solicitó ser contactado por una persona del equipo. "
-        "A continuación se incluyen sus datos y el contexto de la conversación."
-    )
-
-    content = tpl.paragraph(intro)
-
-    rows = {
-        _ESC_FIELD_LABELS.get(k, k.replace("_", " ").capitalize()): v
-        for k, v in payload.items()
-        if k != "contact_info"
-    }
-
-    contact_info = payload.get("contact_info")
-    if contact_info and isinstance(contact_info, dict):
-        is_email = contact_info.get("type") == "email"
-        label = "Contacto por correo electrónico" if is_email else "Contacto por WhatsApp"
-        rows = {label: str(contact_info.get("value", "")), **rows}
-
-    if rows:
-        content += tpl.detail_table(rows, heading_text="Detalle de la conversación")
-
-    content += tpl.paragraph(
-        "Le solicitamos comunicarse con el usuario a la brevedad utilizando los datos de contacto proporcionados."
-    )
-
-    return tpl.render_email(title=title, content=content, preheader=intro)
+    await send_notification(db, event=NotificationEvent.escalation, payload=payload)
+    log.info("escalation.dispatched", reason=reason)

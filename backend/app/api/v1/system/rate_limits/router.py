@@ -82,7 +82,7 @@ async def list_throttled(
 
 @router.delete("/reset/{ip}", response_model=OperationStatus)
 async def unblock_ip(ip: str, _=Depends(_admin)) -> OperationStatus:
-    """Limpia los contadores de rate-limit para una IP — la desbloquea de inmediato."""
+    """Limpia los contadores de rate-limit para una IP - la desbloquea de inmediato."""
     await reset_ip(ip)
     return OperationStatus()
 

@@ -67,11 +67,17 @@ def generate_embed_code(cfg: WidgetConfig) -> EmbedCodeOut:
 async def enforce_widget_caps(widget: WidgetConfig, session_id: str) -> None:
     """Apply per-widget abuse caps (max_chats_per_session / per_day).
 
-    Both are independent of the global IP rate limit — they let the admin
+    Both are independent of the global IP rate limit - they let the admin
     cap THIS widget's usage regardless of whether the limits in
     core.rate_limit kick in (límite de chats por sesión / por día).
     """
-    if widget.max_chats_per_session and session_id:
+    if widget.max_chats_per_session:
+        if not session_id:
+            # El límite es por sesión individual; sin session_id no hay identificador que limitar.
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="session_id es requerido para este widget.",
+            )
         try:
             await check_rate_limit(
                 f"widget:{widget.api_key}:session", session_id,
@@ -104,9 +110,9 @@ async def handle_escalation_consent(
 ) -> None:
     """Registra el consentimiento del usuario para ser contactado.
 
-    Solo procede si la conversación tiene un escalamiento pendiente de
-    confirmación (escalation_pending=True). Almacena el contacto, despacha
-    la notificación al área responsable y limpia el flag pending.
+    Aplica tanto si el bot marcó `escalation_pending=True` como si el
+    usuario pide contacto por su cuenta (botón manual del widget); en
+    ambos casos el consentimiento explícito basta por sí solo.
     """
     from sqlalchemy import select as sa_select
     from app.models.chat_conversation import ChatConversation
@@ -122,12 +128,6 @@ async def handle_escalation_consent(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Conversación no encontrada.",
-            )
-
-        if not conv.escalation_pending:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="No hay un escalamiento pendiente para esta conversación.",
             )
 
         # Obtener el último mensaje del usuario para incluirlo en la notificación
@@ -151,10 +151,11 @@ async def handle_escalation_consent(
             extra={"contact_info": contact_info},
         )
 
-        conv.escalation_pending = False
+        if conv.escalation_pending:
+            conv.escalation_pending = False
         await db.commit()
     else:
-        # Sin conversación activa — solicitud manual antes de iniciar chat
+        # Sin conversación activa - solicitud manual antes de iniciar chat
         await dispatch_escalation(
             db,
             conversation_id="",

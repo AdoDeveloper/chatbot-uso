@@ -114,6 +114,11 @@ async def test_root_cause_analysis_below_threshold_not_recurring(db_session):
 
 @pytest.mark.asyncio
 async def test_root_cause_analysis_no_coverage(db_session):
+    """rag_route en este proyecto solo vale greeting/factual/complex/cache
+    (ver chat/router.py) - nunca 'no_context' ni 'no_match'. La señal real
+    de que no se encontró contexto es sources_json vacío, que es justo lo
+    que persist_turn guarda cuando corrective.py::_maybe_flag_unanswered()
+    se dispara (docs vacío tras la búsqueda)."""
     conv = await _make_conversation(db_session)
     await _make_message(
         db_session, conversation_id=conv.id, role=MessageRole.user, content="hola"
@@ -123,7 +128,8 @@ async def test_root_cause_analysis_no_coverage(db_session):
         conversation_id=conv.id,
         role=MessageRole.assistant,
         content="No tengo informacion suficiente para responder.",
-        rag_route="no_context",
+        rag_route="factual",
+        sources_json=[],
     )
     q = await _make_unanswered(
         db_session, question="Pregunta sin cobertura", conversation_id=conv.id, detected_topic="facturacion"
@@ -134,26 +140,27 @@ async def test_root_cause_analysis_no_coverage(db_session):
     codes = [c["code"] for c in result["causes"]]
     assert "no_coverage" in codes
     no_cov = next(c for c in result["causes"] if c["code"] == "no_coverage")
-    assert "no_context" in no_cov["detail"]
+    assert "no recuperó ningún chunk" in no_cov["detail"]
     assert any("facturacion" in s for s in result["suggestions"])
 
 
 @pytest.mark.asyncio
-async def test_root_cause_analysis_no_match_route_also_counts_as_no_coverage(db_session):
+async def test_root_cause_analysis_with_sources_does_not_count_as_no_coverage(db_session):
     conv = await _make_conversation(db_session)
     await _make_message(
         db_session,
         conversation_id=conv.id,
         role=MessageRole.assistant,
-        content="respuesta generica",
-        rag_route="NO_MATCH",
+        content="respuesta con fuentes",
+        rag_route="factual",
+        sources_json=[{"score": 0.8}],
     )
     q = await _make_unanswered(db_session, question="otra pregunta", conversation_id=conv.id)
 
     result = await root_cause_analysis(db_session, question_id=q.id)
 
     codes = [c["code"] for c in result["causes"]]
-    assert "no_coverage" in codes
+    assert "no_coverage" not in codes
 
 
 @pytest.mark.asyncio
@@ -280,14 +287,14 @@ async def test_root_cause_analysis_multiple_causes_combined(db_session):
         conversation_id=conv.id,
         role=MessageRole.assistant,
         content="No encontre informacion.",
-        rag_route="no_context",
+        rag_route="factual",
     )
     await _make_message(
         db_session,
         conversation_id=conv.id,
         role=MessageRole.assistant,
         content="No encontre informacion.",
-        rag_route="no_context",
+        rag_route="factual",
     )
     target = await _make_unanswered(db_session, question=text, conversation_id=conv.id)
 

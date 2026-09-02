@@ -1,16 +1,6 @@
 """
 Semantic cache for chat responses using Redis + embedding similarity.
-
-University chatbots have highly repetitive queries ("¿cuándo es la matrícula?",
-"requisitos de admisión", etc.). A semantic cache with cosine similarity
-threshold 0.93 can hit 30-60% of queries post-warmup, saving LLM costs.
-
-Architecture:
-  - Embeddings are computed with the same model used for RAG (e5-large)
-  - Cached as Redis hashes with an embedding vector for ANN lookup
-  - TTL 12h by default, invalidated on document re-index via doc_version bump
-
-Falls back gracefully if Redis is unavailable — cache miss, not error.
+Falls back gracefully if Redis is unavailable - cache miss, not error.
 """
 from __future__ import annotations
 
@@ -29,8 +19,30 @@ log = structlog.get_logger()
 CACHE_PREFIX = "semcache:v2:"
 DEFAULT_TTL = 43200  # 12 hours
 SIMILARITY_THRESHOLD = 0.93
-MAX_CACHED_EMBEDDINGS = 10000
 SCAN_BATCH_HARD_LIMIT = 2000
+_GENERATION_KEY = "semcache:generation"
+
+
+async def get_cache_generation() -> int:
+    """Contador global, incrementado en cada invalidate_by_source().
+
+    Usado para cerrar una race TOCTOU: retrieve_context() lee los chunks al
+    inicio del turno, pero store_cache() escribe la respuesta recién al
+    terminar el streaming del LLM (varios segundos después). Si un admin
+    edita/descarta el chunk usado en ese intervalo, invalidate_by_source()
+    limpia el caché - pero store_cache() lo volvía a poblar de todas formas
+    con la respuesta ya generada (basada en el texto viejo), revirtiendo la
+    invalidación y sirviendo información obsoleta hasta el próximo edit o
+    el TTL de 12h. Comparando la generación capturada al leer el contexto
+    contra la generación actual al escribir, una escritura "vencida" por una
+    invalidación intermedia se descarta en vez de re-cachearse.
+    """
+    try:
+        redis = get_redis()
+        val = await redis.get(_GENERATION_KEY)
+        return int(val) if val else 0
+    except Exception:
+        return 0
 
 
 def _threshold() -> float:
@@ -43,7 +55,7 @@ def _sids_token(source_ids: list[str] | None) -> str:
     return json.dumps(sorted(source_ids or []))
 
 
-def _cosine_similarity(a: list[float], b: list[float]) -> float:
+def cosine_similarity(a: list[float], b: list[float]) -> float:
     va = np.array(a, dtype=np.float32)
     vb = np.array(b, dtype=np.float32)
     dot = np.dot(va, vb)
@@ -96,7 +108,7 @@ async def get_cached_response(
                     if entry.get("source_ids", "__missing__") != want_sids:
                         continue
                     cached_emb = json.loads(entry["embedding"])
-                    sim = _cosine_similarity(query_emb, cached_emb)
+                    sim = cosine_similarity(query_emb, cached_emb)
                     if sim > best_score:
                         best_score = sim
                         best_entry = entry
@@ -129,21 +141,40 @@ async def store_cached_response(
     content: str,
     ttl: int = DEFAULT_TTL,
     use_draft: bool = False,
+    min_generation: int | None = None,
 ) -> None:
-    """Store a response in the semantic cache."""
+    """Guarda una respuesta en el caché semántico.
+
+    `min_generation`: generación de caché capturada (get_cache_generation())
+    al momento de leer el contexto, ANTES de generar la respuesta con el
+    LLM. Si al momento de escribir la generación actual ya avanzó (una
+    edición/descarte de fuente invalidó el caché mientras el LLM generaba),
+    la escritura se descarta - ver docstring de get_cache_generation().
+    """
     try:
+        if min_generation is not None:
+            current_gen = await get_cache_generation()
+            if current_gen != min_generation:
+                log.info(
+                    "semantic_cache.store_skipped_stale_generation",
+                    min_generation=min_generation, current_generation=current_gen,
+                )
+                return
+
         redis = get_redis()
         emb = (await embed_texts_async([question], prefix="query: "))[0]["dense"]
         key = _cache_key(question, source_ids, use_draft)
 
-        await redis.hset(key, mapping={
+        pipe = redis.pipeline()
+        pipe.hset(key, mapping={
             "question": question,
             "embedding": json.dumps(emb),
             "sources": json.dumps(sources, ensure_ascii=False),
             "content": content,
             "source_ids": _sids_token(source_ids),
         })
-        await redis.expire(key, ttl)
+        pipe.expire(key, ttl)
+        await pipe.execute()
         log.info("semantic_cache.stored", key=key[:24])
     except Exception as exc:
         log.debug("semantic_cache.store_error", error=str(exc))
@@ -153,6 +184,7 @@ async def invalidate_by_source(source_id: str) -> int:
     """Invalida el caché completo (tanto semántico como exacto)."""
     try:
         redis = get_redis()
+        await redis.incr(_GENERATION_KEY)
         keys: list[str] = []
         for pattern in (f"{CACHE_PREFIX}*", "chat:v1:*"):
             cursor = 0

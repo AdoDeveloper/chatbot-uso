@@ -12,21 +12,15 @@ class TopicStat(BaseModel):
 
 
 class HeatmapCell(BaseModel):
-    # Populated for window='day' and 'week' (0-23)
+    # Se llena para window='day' y 'week' (0-23)
     hour: int | None = None
-    # Populated for window='week' (0=Sun..6=Sat, vía MySQL DAYOFWEEK()-1)
+    # Se llena para window='week' (0=Dom..6=Sáb, vía MySQL DAYOFWEEK()-1)
     day: int | None = None
-    # Populated for window='month' and 'year' (YYYY-MM-DD)
+    # Se llena para window='month' y 'year' (YYYY-MM-DD)
     date: str | None = None
     count: int
 
 HeatmapWindow = Literal["day", "week", "month", "year"]
-
-
-class DeviceStat(BaseModel):
-    device: str
-    count: int
-    percentage: float
 
 
 class TimeSeriesPoint(BaseModel):
@@ -59,10 +53,6 @@ class AnalyticsHeatmap(BaseModel):
     window: HeatmapWindow = "week"
     range_start: str | None = None
     range_end: str | None = None
-
-
-class AnalyticsDevices(BaseModel):
-    devices: list[DeviceStat]
 
 
 class AnalyticsTimeSeries(BaseModel):
@@ -104,6 +94,16 @@ class AnalyticsSourceQuality(BaseModel):
     days: int
 
 
+class AnalyticsResponseQuality(BaseModel):
+    avg_context_relevance_ratio: float | None
+    avg_faithfulness_score: float | None
+    avg_answer_relevance_score: float | None
+    context_relevance_sample_size: int
+    faithfulness_sample_size: int
+    answer_relevance_sample_size: int
+    days: int
+
+
 TimelineEventType = Literal[
     "source_ingested",
     "source_promoted",
@@ -119,13 +119,13 @@ TimelineEventType = Literal[
 
 
 class TimelineEvent(BaseModel):
-    id: str                          # source-uniqued id (eg. audit:xxx, escalation:xxx)
+    id: str                          # id único por origen (ej. audit:xxx, escalation:xxx)
     type: TimelineEventType
     title: str                       # "Fuente aprobada: admisiones-2026"
-    detail: str | None = None        # optional extra context
+    detail: str | None = None        # contexto adicional opcional
     created_at: datetime
-    actor_name: str | None = None    # who triggered it (if applicable)
-    href: str | None = None          # optional link to inspect
+    actor_name: str | None = None    # quién lo disparó (si aplica)
+    href: str | None = None          # enlace opcional para inspeccionar
 
 
 class AnalyticsTimeline(BaseModel):
@@ -170,7 +170,7 @@ class CacheStats(BaseModel):
 
 
 class PageStat(BaseModel):
-    page: str          # domain + path, without query string
+    page: str          # dominio + path, sin query string
     count: int
     percentage: float
 
@@ -197,3 +197,24 @@ class FeedbackTrend(BaseModel):
 class AnalyticsFeedback(BaseModel):
     summary: FeedbackStat
     trend: list[FeedbackTrend]
+
+
+class CsatReasonCount(BaseModel):
+    id: str
+    label: str
+    count: int
+
+
+class CsatTrendPoint(BaseModel):
+    date: str
+    avg_score: float
+    total: int
+
+
+class AnalyticsCsat(BaseModel):
+    total: int                             # conversaciones con score en el periodo
+    avg_score: float | None                # promedio 1-5, None si total=0
+    distribution: dict[str, int]           # "1".."5" -> cantidad
+    trend: list[CsatTrendPoint]
+    top_reasons: list[CsatReasonCount]
+    days: int

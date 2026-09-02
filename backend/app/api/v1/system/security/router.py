@@ -30,13 +30,13 @@ from app.services.ai.guardrails import get_injection_pattern_defs
 
 log = structlog.get_logger()
 router = APIRouter(prefix="/security", tags=["system:security"])
-_admin = require_perm(P.AUDIT_READ)
+_audit_read = require_perm(P.AUDIT_READ)
 
 
 
 class SecuritySummary(BaseModel):
     days: int
-    # Failed auth
+    # Autenticación fallida
     failed_logins: int
     failed_logins_prev: int
     distinct_ips_failing: int
@@ -45,7 +45,7 @@ class SecuritySummary(BaseModel):
     injections_blocked_prev: int
     # Rate limiting
     throttled_ips_now: int
-    # Changes of privilege
+    # Cambios de privilegio
     admin_actions: int
 
 
@@ -74,7 +74,7 @@ class InjectionSample(BaseModel):
 def _period_bounds(
     days: int, date_from: datetime | None = None, date_to: datetime | None = None
 ) -> tuple[datetime, datetime, datetime, datetime]:
-    """Return (since, until, prev_since, prev_until) for comparisons.
+    """Devuelve (since, until, prev_since, prev_until) para comparaciones.
 
     Si se pasa `date_from`, la ventana es [since, until] y el período previo
     tiene la misma duración inmediatamente anterior. Si no, se deriva de `days`
@@ -108,7 +108,7 @@ async def security_summary(
     date_from: datetime | None = Query(None),
     date_to: datetime | None = Query(None),
     db: AsyncSession = Depends(get_db),
-    _=Depends(_admin),
+    _=Depends(_audit_read),
 ):
     since, until, prev_since, prev_until = _period_bounds(days, date_from, date_to)
 
@@ -118,7 +118,7 @@ async def security_summary(
     injections = await _count(db, "guardrails.injection_detected", since, until)
     injections_prev = await _count(db, "guardrails.injection_detected", prev_since, prev_until)
 
-    # Distinct IPs failing in current window
+    # IPs distintas con fallos en la ventana actual
     distinct_ips_q = await db.execute(
         select(func.count(AuditLog.ip.distinct()))
         .where(AuditLog.action == "auth.login_failed")
@@ -127,7 +127,7 @@ async def security_summary(
     )
     distinct_ips = distinct_ips_q.scalar_one() or 0
 
-    # Admin actions in window (anything starting with admin. or user.)
+    # Acciones administrativas en la ventana (acciones que empiezan con admin. o user.)
     admin_q = await db.execute(
         select(func.count(AuditLog.id))
         .where(AuditLog.created_at >= since, AuditLog.created_at < until)
@@ -135,7 +135,7 @@ async def security_summary(
     )
     admin_actions = admin_q.scalar_one() or 0
 
-    # Throttled IPs across all envs (live Redis snapshot)
+    # IPs con throttle en todos los entornos (snapshot en vivo de Redis)
     throttled = 0
     try:
         throttled = len(await get_throttled_ips())
@@ -162,9 +162,9 @@ async def login_failures(
     date_to: datetime | None = Query(None),
     limit: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    _=Depends(_admin),
+    _=Depends(_audit_read),
 ):
-    """Group failed logins by IP, ordered by attempt count desc."""
+    """Agrupa los logins fallidos por IP, ordenados por cantidad de intentos desc."""
     since, until, _, _ = _period_bounds(days, date_from, date_to)
 
     # MySQL JSON path via SQLAlchemy: json_unquote sobre meta_json['attempted_email']
@@ -199,17 +199,11 @@ async def injections_by_category(
     date_from: datetime | None = Query(None),
     date_to: datetime | None = Query(None),
     db: AsyncSession = Depends(get_db),
-    _=Depends(_admin),
+    _=Depends(_audit_read),
 ):
-    """Group blocked injections by pattern category.
-
-    The audit log stores the matched pattern string in `meta_json.pattern`.
-    We resolve it to its human-readable category using the guardrails catalog.
-    """
     since, until, _, _ = _period_bounds(days, date_from, date_to)
 
-    # Raw SQL because JSON field references + GROUP BY get tangled in
-    # SQLAlchemy's compiled output (duplicate-expression grouping errors).
+    # Raw SQL: JSON field references + GROUP BY generan errores de agrupación en el SQL compilado de SQLAlchemy.
     result = await db.execute(
         text(
             """
@@ -232,7 +226,7 @@ async def injections_by_category(
     category_sample: dict[str, str] = {}
     for row in result.all():
         pat = row.pattern or "unknown"
-        category, label = regex_to_meta.get(pat, ("Otro / desconocido", pat[:40] if pat else "—"))
+        category, label = regex_to_meta.get(pat, ("Otro / desconocido", pat[:40] if pat else "-"))
         category_counts[category] = category_counts.get(category, 0) + int(row.cnt)
         if category not in category_sample:
             category_sample[category] = label
@@ -255,9 +249,9 @@ async def injection_samples(
     date_to: datetime | None = Query(None),
     limit: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    _=Depends(_admin),
+    _=Depends(_audit_read),
 ):
-    """Recent injection attempts with full context (pattern + question preview)."""
+    """Intentos de inyección recientes con contexto completo (patrón + vista previa de la pregunta)."""
     since, until, _, _ = _period_bounds(days, date_from, date_to)
 
     result = await db.execute(

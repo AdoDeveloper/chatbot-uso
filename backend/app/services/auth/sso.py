@@ -35,8 +35,6 @@ async def handle_microsoft_callback(
 ) -> TokenResponse:
     """Recibe el authorization code de Microsoft, lo intercambia por tokens,
     obtiene el email del id_token y devuelve un par JWT propio del sistema.
-
-    Crea el usuario automáticamente si no existe y su dominio está permitido.
     """
     # Credenciales vienen del .env; is_active y allowed_domains de la DB
     settings = get_settings()
@@ -71,7 +69,7 @@ async def handle_microsoft_callback(
         await db.commit()
         raise _GENERIC
 
-    # Exchange authorization code for tokens
+    # Intercambia el authorization code por los tokens
     token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
     try:
         async with httpx.AsyncClient(timeout=15) as http:

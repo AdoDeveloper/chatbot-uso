@@ -13,10 +13,10 @@ class ChunkOut(BaseModel):
     section: str | None = None
     parent_id: str | None = None
     parent_text: str | None = None
-    # Review flags — live in Qdrant payload, populated at ingest
+    # Flags de revisión - viven en el payload de Qdrant, se llenan en la ingesta
     warnings: list[str] = []
     is_discarded: bool = False
-    was_edited: bool = False  # true if there is any row in chunk_edits
+    was_edited: bool = False  # true si existe alguna fila en chunk_edits
 
 
 class ChunkListOut(BaseModel):
@@ -43,10 +43,9 @@ class ChunkEditOut(BaseModel):
 
 
 class ChunkTestRequest(BaseModel):
-    query: str
+    query: str = Field(..., min_length=1, max_length=2000)
     source_ids: list[str] | None = None
-    top_k: int = 5
-    use_reranker: bool = False
+    top_k: int = Field(5, ge=1, le=50)
 
 
 class ChunkTestResult(BaseModel):

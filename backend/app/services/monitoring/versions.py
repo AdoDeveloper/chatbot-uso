@@ -8,7 +8,7 @@ from __future__ import annotations
 import uuid
 
 import structlog
-from sqlalchemy import func as sa_func, select
+from sqlalchemy import delete, func as sa_func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.config_version import ConfigVersion
@@ -24,23 +24,20 @@ log = structlog.get_logger()
 
 SCHEMA_VERSION = 2
 
-# Settings keys that contain secrets — masked in snapshots
+# Claves de configuración que contienen secretos - se enmascaran en los snapshots
 _SECRET_KEYS = frozenset({
     "smtp_password",
     "oauth_client_id", "oauth_client_secret",
 })
 
-# Human-readable labels for notable settings (Spanish)
+# Etiquetas legibles para settings relevantes (en español)
 _SETTING_LABELS = {
     "system_prompt": "system prompt",
-    "chatbot_name": "nombre del chatbot",
-    "welcome_message": "mensaje de bienvenida",
     "temperature": "temperature",
     "top_k": "top_k",
     "max_tokens": "max_tokens",
     "score_threshold": "umbral de relevancia",
     "use_corrective_rag": "RAG correctivo",
-    "use_reranker": "reranker",
     "chunk_parent_size": "tamaño chunk padre",
     "chunk_child_size": "tamaño chunk hijo",
     "guardrails_enabled": "guardrails",
@@ -330,6 +327,42 @@ async def _get_active_version(db: AsyncSession) -> ConfigVersion | None:
     return result.scalar_one_or_none()
 
 
+class _VersioningLock:
+    """Mutex distribuido para toda la sección crítica de capture_snapshot
+    """
+
+    _KEY = "versioning:capture_lock"
+
+    async def __aenter__(self) -> bool:
+        from app.core import redis as _redis_mod
+        try:
+            ok = await _redis_mod.get_redis().set(self._KEY, "1", ex=30, nx=True)
+            self._acquired = bool(ok)
+        except Exception:
+            self._acquired = None  # Redis no disponible: no bloquear el versionado
+        if self._acquired is False:
+            import asyncio
+            for _ in range(20):  # hasta ~2s
+                await asyncio.sleep(0.1)
+                try:
+                    ok = await _redis_mod.get_redis().set(self._KEY, "1", ex=30, nx=True)
+                except Exception:
+                    self._acquired = None
+                    break
+                if ok:
+                    self._acquired = True
+                    break
+        return self._acquired is not False
+
+    async def __aexit__(self, *exc) -> None:
+        if self._acquired:
+            from app.core import redis as _redis_mod
+            try:
+                await _redis_mod.get_redis().delete(self._KEY)
+            except Exception:
+                pass
+
+
 async def capture_snapshot(
     db: AsyncSession,
     *,
@@ -338,64 +371,83 @@ async def capture_snapshot(
     trigger_source: str = "manual",
     force: bool = False,
 ) -> ConfigVersion | None:
+    async with _VersioningLock():
+        snapshot = await _collect_all(db)
+
+        parent = await _get_active_version(db)
+        parent_snapshot = parent.config_snapshot if parent else None
+
+        diff = compute_diff(parent_snapshot, snapshot)
+        has_changes = any(changes for changes in diff.values())
+        if not has_changes and not force:
+            log.debug("versioning.no_changes", trigger_source=trigger_source)
+            return None
+
+        summary = generate_change_summary(diff)
+        if not description:
+            description = summary
+
+        # Desactiva la versión activa anterior
+        if parent:
+            parent.is_active = False
+
+        version = ConfigVersion(
+            version_number=await _next_version(db),
+            description=description,
+            config_snapshot=snapshot,
+            is_active=True,
+            snapshot_schema_version=SCHEMA_VERSION,
+            change_summary=summary,
+            trigger_source=trigger_source,
+            parent_version_id=parent.id if parent else None,
+            created_by_id=user_id,
+        )
+        db.add(version)
+        await db.flush()
+
+        log.info("versioning.snapshot_created",
+                 version=version.version_number, trigger=trigger_source, summary=summary[:100])
+
+        await _prune_auto_snapshots(db)
+        return version
+
+
+# Snapshots automáticos a conservar; deploys y la versión activa quedan fuera de la poda.
+MAX_AUTO_SNAPSHOTS = 50
+
+
+async def _prune_auto_snapshots(db: AsyncSession) -> int:
+    """Elimina los snapshots automáticos más antiguos que excedan el límite.
     """
-    Capture the entire system state. Returns None if no changes detected.
+    candidates = list(await db.scalars(
+        select(ConfigVersion.id)
+        .where(ConfigVersion.trigger_source != "deploy")
+        .where(ConfigVersion.is_active.is_(False))
+        .order_by(ConfigVersion.created_at.desc())
+    ))
+    stale_ids = set(candidates[MAX_AUTO_SNAPSHOTS:])
+    if not stale_ids:
+        return 0
 
-    force=True skips the dedup check against the latest active snapshot so
-    a deploy-tagged version is always created when there are changes vs the
-    last deployed version (even if an old auto-snapshot already matches).
-    """
-    snapshot = await _collect_all(db)
+    referenced_as_parent = set(await db.scalars(
+        select(ConfigVersion.parent_version_id)
+        .where(ConfigVersion.id.not_in(stale_ids))
+        .where(ConfigVersion.parent_version_id.is_not(None))
+    ))
+    stale_ids -= referenced_as_parent
+    if not stale_ids:
+        return 0
 
-    parent = await _get_active_version(db)
-    parent_snapshot = parent.config_snapshot if parent else None
-
-    diff = compute_diff(parent_snapshot, snapshot)
-    has_changes = any(changes for changes in diff.values())
-    if not has_changes and not force:
-        log.debug("versioning.no_changes", trigger_source=trigger_source)
-        return None
-
-    summary = generate_change_summary(diff)
-    if not description:
-        description = summary
-
-    # Deactivate previous active
-    if parent:
-        parent.is_active = False
-
-    version = ConfigVersion(
-        version_number=await _next_version(db),
-        description=description,
-        config_snapshot=snapshot,
-        is_active=True,
-        snapshot_schema_version=SCHEMA_VERSION,
-        change_summary=summary,
-        trigger_source=trigger_source,
-        parent_version_id=parent.id if parent else None,
-        created_by_id=user_id,
-    )
-    db.add(version)
-    await db.flush()
-
-    log.info("versioning.snapshot_created",
-             version=version.version_number, trigger=trigger_source, summary=summary[:100])
-    return version
+    await db.execute(delete(ConfigVersion).where(ConfigVersion.id.in_(stale_ids)))
+    log.info("versioning.pruned", removed=len(stale_ids), kept=MAX_AUTO_SNAPSHOTS)
+    return len(stale_ids)
 
 
 async def get_published_widget_config(db: AsyncSession) -> dict | None:
-    """Returns the widget_config section from the last deploy snapshot.
-
-    Returns None if no deploy has happened yet — callers should fall back
-    to the live WidgetConfig table in that case.
+    """Devuelve la configuración del widget publicada en el último deploy.
     """
-    result = await db.execute(
-        select(ConfigVersion)
-        .where(ConfigVersion.trigger_source == "deploy")
-        .order_by(ConfigVersion.created_at.desc())
-        .limit(1)
-    )
-    version = result.scalar_one_or_none()
+    from app.services.system.settings import _latest_deploy_version
+    version = await _latest_deploy_version(db)
     if version is None:
         return None
     snapshot = version.config_snapshot or {}
@@ -404,7 +456,7 @@ async def get_published_widget_config(db: AsyncSession) -> dict | None:
 
 
 async def has_config_changed_since(db: AsyncSession, deployed_snapshot: dict) -> bool:
-    """Compare current live config against a deployed snapshot (content-based, not row-count)."""
+    """Compara la configuración actual con un snapshot desplegado."""
     current = await _collect_all(db)
     diff = compute_diff(deployed_snapshot, current)
     return any(changes for changes in diff.values())
@@ -417,7 +469,7 @@ async def restore_snapshot(
     user_id: uuid.UUID,
 ) -> tuple[ConfigVersion, list[str]]:
     """
-    Restore system state from a snapshot. Returns (new_version, warnings).
+    Restaura el estado del sistema a partir de un snapshot. Devuelve (nueva_version, advertencias).
     """
     target = await db.get(ConfigVersion, version_id)
     if not target:
@@ -426,7 +478,7 @@ async def restore_snapshot(
     warnings: list[str] = []
     snapshot = target.config_snapshot
 
-    # Handle v1 snapshots (flat key-value only)
+    # Maneja snapshots v1 (solo clave-valor plano)
     if snapshot.get("schema_version") != SCHEMA_VERSION:
         warnings.append("Versión antigua (v1): solo se restaura configuración básica")
         for key, value in snapshot.items():
@@ -441,10 +493,10 @@ async def restore_snapshot(
     else:
         sections = snapshot["sections"]
 
-        # Restore global_settings
+        # Restaura global_settings
         for key, value in sections.get("global_settings", {}).items():
             if value == "[CONFIGURED]":
-                continue  # Don't overwrite secrets with mask
+                continue  # No sobrescribir secretos con la máscara
             existing = await db.get(GlobalSetting, key)
             if existing:
                 existing.value = value
@@ -452,7 +504,7 @@ async def restore_snapshot(
             else:
                 db.add(GlobalSetting(key=key, value=value, updated_by_id=user_id))
 
-        # Restore widget_config
+        # Restaura widget_config
         wc_data = sections.get("widget_config", {})
         if wc_data:
             wc_result = await db.execute(select(WidgetConfig).limit(1))
@@ -460,11 +512,15 @@ async def restore_snapshot(
             if wc:
                 for field in ("chatbot_name", "welcome_message", "primary_color", "position",
                               "logo_url", "domain_allowlist", "show_sources",
-                              "enable_copy_action", "enable_feedback_icons"):
+                              "enable_copy_action", "enable_feedback_icons",
+                              "show_bot_icon", "suggestions", "proactive_message",
+                              "max_chats_per_session", "max_chats_per_day",
+                              "show_end_chat_button", "show_new_chat_button",
+                              "enable_csat", "csat_question", "launcher_label"):
                     if field in wc_data:
                         setattr(wc, field, wc_data[field])
 
-        # Restore llm_providers (metadata only, not API keys)
+        # Restaura llm_providers (solo metadata, no las API keys)
         snap_providers = {p["id"]: p for p in sections.get("llm_providers", [])}
         db_result = await db.execute(select(LLMProvider))
         db_providers = {str(p.id): p for p in db_result.scalars().all()}
@@ -479,7 +535,7 @@ async def restore_snapshot(
                 p.is_active = pdata["is_active"]
                 p.priority = pdata.get("priority")
             else:
-                warnings.append(f"Proveedor '{pdata['name']}' restaurado sin API key — configurar manualmente")
+                warnings.append(f"Proveedor '{pdata['name']}' restaurado sin API key - configurar manualmente")
                 db.add(LLMProvider(
                     id=uuid.UUID(pid),
                     name=pdata["name"],
@@ -495,7 +551,7 @@ async def restore_snapshot(
                 p.is_active = False
                 p.priority = None
 
-        # Restore notification_rules
+        # Restaura notification_rules
         for nr_data in sections.get("notification_rules", []):
             nr_result = await db.execute(
                 select(NotificationRule).where(NotificationRule.id == uuid.UUID(nr_data["id"]))
@@ -504,8 +560,24 @@ async def restore_snapshot(
             if nr:
                 nr.enabled = nr_data["enabled"]
                 nr.target = nr_data.get("target")
+                nr.config_json = nr_data.get("config_json") or {}
+            else:
+                db.add(NotificationRule(
+                    id=uuid.UUID(nr_data["id"]),
+                    event=nr_data["event"],
+                    channel=nr_data["channel"],
+                    enabled=nr_data["enabled"],
+                    target=nr_data.get("target"),
+                    config_json=nr_data.get("config_json") or {},
+                ))
+        if sections.get("escalation_rules"):
+            warnings.append("Las reglas de escalamiento no se revierten - solo configuración, widget, proveedores y notificaciones")
+        if sections.get("sources"):
+            warnings.append("Las fuentes de conocimiento no se revierten - el rollback no elimina ni restaura documentos")
+        if sections.get("faq_entries"):
+            warnings.append("Las preguntas frecuentes (FAQ) no se revierten")
 
-    # Create rollback version
+    # Crea la versión de rollback
     new_snapshot = await _collect_all(db)
     parent = await _get_active_version(db)
     if parent:

@@ -1,14 +1,14 @@
 """
-Embedding service — multilingual-e5-large via fastembed.
+Embedding service - multilingual-e5-large via fastembed.
 
 Model: intfloat/multilingual-e5-large
   - Dense:  1024 dims (vs 384 of MiniLM)
   - Sparse: Qdrant/bm25 (statistical BM25 for hybrid search)
-  - Max tokens: 512 (vs 128 of MiniLM — 4× more context per chunk)
+  - Max tokens: 512 (vs 128 of MiniLM - 4× more context per chunk)
   - Languages: 100+ including Spanish, SOTA on MIRACL multilingual benchmark
-  - Inference: ONNX Runtime — auto-detect GPU (CUDA), fallback CPU
+  - Inference: ONNX Runtime - auto-detect GPU (CUDA), fallback CPU
 
-Important — e5 prefix convention:
+Important - e5 prefix convention:
   embed_texts(texts, prefix="passage: ")  →  at ingestion time (documents)
   embed_texts(texts, prefix="query: ")    →  at search time (user questions)
   Omitting the prefix works but reduces retrieval accuracy.
@@ -27,9 +27,6 @@ _ONNX_SEM: list[asyncio.Semaphore] = []
 
 def _get_onnx_sem() -> asyncio.Semaphore:
     if not _ONNX_SEM:
-        # Two coroutines reaching here simultaneously in the same event loop
-        # will both append, but asyncio is single-threaded — only one runs at
-        # a time, so at most one Semaphore is ever created.
         _ONNX_SEM.append(asyncio.Semaphore(1))
     return _ONNX_SEM[0]
 
@@ -49,7 +46,7 @@ def _onnx_providers() -> list[str]:
 _DENSE_MODEL_NAME = "intfloat/multilingual-e5-large"
 _SPARSE_MODEL_NAME = "Qdrant/bm25"
 
-# Mapped to model_cache volume in docker-compose
+# Mapeado al volumen model_cache en docker-compose
 _CACHE_DIR = os.path.join(os.path.expanduser("~"), ".cache", "fastembed")
 
 
@@ -77,7 +74,7 @@ def embed_texts(texts: list[str], prefix: str = "") -> list[dict]:
 
     prefix: e5 models require "query: " for search queries and "passage: "
             for documents at ingestion time. Omitting degrades performance.
-    NOTA: función síncrona — usar embed_texts_async desde contextos async.
+    NOTA: función síncrona - usar embed_texts_async desde contextos async.
     """
     dense_model = _get_dense_model()
     sparse_model = _get_sparse_model()
@@ -100,7 +97,7 @@ def embed_texts(texts: list[str], prefix: str = "") -> list[dict]:
 
 async def embed_texts_async(texts: list[str], prefix: str = "") -> list[dict]:
     """
-    Async wrapper — ejecuta la inferencia ONNX en un thread pool para no
+    Async wrapper - ejecuta la inferencia ONNX en un thread pool para no
     bloquear el event loop.
 
     El semáforo _ONNX_SEM(1) garantiza que solo un worker corre inferencia

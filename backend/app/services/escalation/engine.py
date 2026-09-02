@@ -12,7 +12,7 @@ from app.models.enums import EscalationTrigger
 #   "bot_answers": list[str],            # últimas respuestas del bot (orden cronológico)
 #   "rag_scores": list[float],           # confianza de las últimas respuestas (mismo orden)
 #   "no_answer_seconds": int | None,     # segundos sin respuesta del bot a una pregunta
-#   "feedback_negative_ratio": float|None, # 0..1 — proporción de 👎 en la sesión
+#   "feedback_negative_ratio": float|None, # 0..1 - proporción de 👎 en la sesión
 # }
 
 
@@ -128,8 +128,9 @@ def schema_for_trigger(trigger_type: EscalationTrigger) -> dict[str, Any]:
     """
     schemas = {
         EscalationTrigger.no_answer: {
-            "wait_seconds": {"type": "int", "default": 120, "min": 10, "max": 3600,
-                             "label": "Tiempo de espera (segundos)"},
+            # `no_answer_seconds` es la latencia del turno, no espera del usuario.
+            "wait_seconds": {"type": "int", "default": 8, "min": 3, "max": 70,
+                             "label": "Latencia de respuesta lenta (segundos)"},
         },
         EscalationTrigger.user_request: {
             "keywords": {"type": "list[str]", "default": [],

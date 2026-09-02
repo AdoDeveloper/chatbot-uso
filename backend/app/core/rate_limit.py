@@ -33,9 +33,10 @@ async def check_rate_limit(
     """
     Check and increment a sliding window counter.
     Returns True if within limit, raises RateLimitExceeded if over.
-    Falls open (returns True) if Redis is unavailable — callers that need
+    Falls open (returns True) if Redis is unavailable - callers that need
     a hard guarantee under Redis failure should check `redis_available` separately.
     """
+    global _LOCAL_FALLBACK_WARNED
     try:
         redis = redis_mod.get_redis()
         key = f"rl:{key_prefix}:{identifier}:{window_seconds}"
@@ -45,11 +46,14 @@ async def check_rate_limit(
         if count > max_requests:
             ttl = await redis.ttl(key)
             raise RateLimitExceeded(retry_after=max(ttl, 1))
+        # Resetea el flag de degradado para que una caída futura vuelva a loguearse.
+        if _LOCAL_FALLBACK_WARNED:
+            log.info("ratelimit.redis_recovered")
+            _LOCAL_FALLBACK_WARNED = False
         return True
     except RateLimitExceeded:
         raise
     except Exception as exc:
-        global _LOCAL_FALLBACK_WARNED
         if not _LOCAL_FALLBACK_WARNED:
             log.warning("ratelimit.local_fallback_active", error=str(exc))
             _LOCAL_FALLBACK_WARNED = True
@@ -147,9 +151,9 @@ async def get_throttled_ips(
     limit_per_min: int | None = None,
     limit_per_hour: int | None = None,
 ) -> list[dict]:
-    """Scan Redis for IPs currently near or over rate limits.
+    """Escanea Redis en busca de IPs cerca o por encima de los rate limits.
 
-    Key shape: `rl:chat:<window_label>:<ip>:<window_seconds>`
+    Forma de la clave: `rl:chat:<window_label>:<ip>:<window_seconds>`
     Acepta los límites efectivos del panel; si no se pasan usa los defaults.
     """
     from app.services.system.settings import RUNTIME_DEFAULTS
@@ -169,9 +173,12 @@ async def get_throttled_ips(
             for key in keys:
                 parts = key.split(":")
                 # rl:chat:<label>:<ip>:<window_seconds>
-                # IPv6 addresses contain ":" so ip = everything between index 3
-                # and the last segment (the numeric window).
+                # Las direcciones IPv6 contienen ":", así que ip = todo entre el
+                # índice 3 y el último segmento (la ventana numérica).
                 if len(parts) < 5:
+                    continue
+                # "chat:session" identifica sesiones, no IPs - excluir de este reporte.
+                if parts[2] == "session":
                     continue
                 window = parts[-1]
                 ip = ":".join(parts[3:-1])
@@ -202,7 +209,7 @@ async def get_throttled_ips(
 
 
 async def reset_ip(ip: str) -> None:
-    """Remove rate limit keys for a specific IP.
+    """Elimina las claves de rate limit de una IP específica.
 
     No se puede usar el glob `rl:*:{ip}:*` porque las direcciones IPv6 contienen
     ':' y romperían el patrón. En su lugar escaneamos todas las claves `rl:*` y

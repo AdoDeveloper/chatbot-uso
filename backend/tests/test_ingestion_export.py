@@ -160,7 +160,7 @@ class TestBuildPdf:
 
 
 # ---------------------------------------------------------------------------
-# _chart_series — foco en líneas 291-301 y 279-289
+# _chart_series - foco en líneas 291-301 y 279-289
 # ---------------------------------------------------------------------------
 
 class TestChartSeries:
@@ -211,7 +211,7 @@ class TestChartSeries:
 
 
 # ---------------------------------------------------------------------------
-# _chart_drawing — foco principal: líneas 320-384
+# _chart_drawing - foco principal: líneas 320-384
 # ---------------------------------------------------------------------------
 
 class TestChartDrawing:
@@ -239,10 +239,6 @@ class TestChartDrawing:
         assert any(isinstance(c, Pie) for c in d.contents)
 
     def test_bar_chart_is_added_to_drawing(self):
-        # Regresión del bug donde VerticalBarChart se configuraba por completo
-        # (datos, ejes, barras, etiquetas) pero nunca se agregaba al Drawing
-        # via d.add(chart) — el reporte exportado se veía en blanco. Corregido
-        # en export.py: ahora sí se agrega, igual que la rama pie (d.add(pie)).
         rows = [
             {"Tema": "Matriculas", "Consultas": 10},
             {"Tema": "Becas", "Consultas": 20},
@@ -280,7 +276,7 @@ class TestChartDrawing:
 
 
 # ---------------------------------------------------------------------------
-# build_pdf_report — foco 291-301/320-384 integrados + 412-413, 502-504
+# build_pdf_report - foco 291-301/320-384 integrados + 412-413, 502-504
 # ---------------------------------------------------------------------------
 
 class TestBuildPdfReport:
@@ -364,7 +360,7 @@ class TestBuildPdfReport:
 
 
 # ---------------------------------------------------------------------------
-# Response wrappers (streaming) — sanity de integración liviana
+# Response wrappers (streaming) - sanity de integración liviana
 # ---------------------------------------------------------------------------
 
 class TestResponseWrappers:

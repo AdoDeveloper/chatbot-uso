@@ -37,15 +37,13 @@ _ERROR_PATTERNS: list[tuple[str, str, str, str]] = [
      "Sube un documento más corto o aumenta `max_chars` por chunk."),
     ("encoding", "ENCODING_ERROR", "Codificación de archivo no soportada.",
      "Guarda el archivo en UTF-8 antes de subirlo."),
-    ("xlsx", "XLSX_PARSE_ERROR", "El archivo Excel tiene un formato no estándar.",
-     "Re-exporta el Excel desde la fuente original."),
 ]
 
 
 def classify_error(message: str | None) -> tuple[str | None, str | None, str | None]:
     """Dado un mensaje de error crudo, retorna (code, friendly_message, hint).
 
-    Si no hay patrón, devuelve (None, message, None) — la UI mostrará el
+    Si no hay patrón, devuelve (None, message, None) - la UI mostrará el
     mensaje crudo, pero al menos no lanza "error" sin más.
     """
     if not message:

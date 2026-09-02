@@ -1,10 +1,10 @@
 """Tests del parsing real de cada LLMAdapter contra respuestas HTTP simuladas.
 
-Ningún test previo ejercitaba el parsing SSE/JSON real de los adaptadores —
+Ningún test previo ejercitaba el parsing SSE/JSON real de los adaptadores -
 todos mockeaban `stream_chat` completo (ver test_chat_smoke.py), saltando el
 código que realmente interpreta la respuesta de cada proveedor. Un modelo
 "custom" (cualquier provider_type sin adaptador dedicado) siempre cae en
-OpenAICompatAdapter (ver docstring de llm_gateway.py) — estos tests
+OpenAICompatAdapter (ver docstring de llm_gateway.py) - estos tests
 verifican que ese adaptador parsea correctamente el formato estándar y
 tolera variaciones/ruido sin romperse silenciosamente.
 """
@@ -305,7 +305,7 @@ class TestCohereAdapter:
 
 
 class TestBedrockAdapter:
-    """BedrockAdapter usa boto3 (sync) en un executor — se mockea el cliente boto3."""
+    """BedrockAdapter usa boto3 (sync) en un executor - se mockea el cliente boto3."""
 
     class _FakeBotoClient:
         def __init__(self, stream_events=None, converse_response=None):

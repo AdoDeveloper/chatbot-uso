@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, String, Uuid, func, text as sa_text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, JSON, String, Uuid, func, text as sa_text
 from sqlalchemy.dialects import mysql
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -11,8 +11,13 @@ from app.db.session import Base
 
 
 class ConfigVersion(Base):
-    """Whole-system snapshot for versioning and rollback."""
+    """Snapshot completo del sistema para versionado y rollback."""
     __tablename__ = "config_versions"
+
+    __table_args__ = (
+        Index("ix_config_versions_parent_version_id", "parent_version_id"),
+        Index("ix_config_versions_trigger_created", "trigger_source", "created_at"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         Uuid(native_uuid=False), primary_key=True, default=uuid.uuid4

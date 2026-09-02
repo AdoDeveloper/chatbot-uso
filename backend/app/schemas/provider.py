@@ -11,7 +11,7 @@ class ProviderCreate(BaseModel):
     # Texto libre: "openai", "anthropic", "groq", "gemini", "bedrock", "ollama", etc.
     provider_type: str = Field(..., min_length=1, max_length=50)
     model_name: str = Field(..., min_length=1, max_length=120)
-    api_key: str | None = Field(None, description="Plaintext — will be encrypted before storage")
+    api_key: str | None = Field(None, description="Plaintext - will be encrypted before storage")
     api_base: str | None = Field(None, max_length=512)
     dashboard_url: str | None = Field(None, max_length=512)
     is_active: bool = True
@@ -24,8 +24,8 @@ class ProviderUpdate(BaseModel):
     provider_type: str | None = Field(None, min_length=1, max_length=50)
     model_name: str | None = Field(None, min_length=1, max_length=120)
     api_key: str | None = None    # None = sin cambio; "" = borrar clave
-    api_base: str | None = None
-    dashboard_url: str | None = None
+    api_base: str | None = Field(None, max_length=512)
+    dashboard_url: str | None = Field(None, max_length=512)
     is_active: bool | None = None
     priority: int | None = Field(None, ge=1)  # None = quitar de la cadena
 

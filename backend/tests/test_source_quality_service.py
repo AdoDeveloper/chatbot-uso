@@ -140,10 +140,6 @@ class TestClassifyError:
         code, _, _ = classify_error("invalid encoding detected")
         assert code == "ENCODING_ERROR"
 
-    def test_xlsx_pattern_matches(self):
-        code, _, _ = classify_error("bad xlsx structure")
-        assert code == "XLSX_PARSE_ERROR"
-
     def test_unrecognized_message_returns_raw_message_only(self):
         code, friendly, hint = classify_error("un error totalmente desconocido")
         assert code is None
@@ -198,7 +194,7 @@ class TestFindDuplicate:
 
 
 # ---------------------------------------------------------------------------
-# quality_report — foco principal: bloque 76-122
+# quality_report - foco principal: bloque 76-122
 # ---------------------------------------------------------------------------
 
 class TestQualityReport:
@@ -264,7 +260,7 @@ class TestQualityReport:
         db_session.add(s)
         await db_session.commit()
         conv = await _make_conversation(db_session)
-        # Lista con elementos que no son dict — debe ignorarlos sin lanzar.
+        # Lista con elementos que no son dict - debe ignorarlos sin lanzar.
         await _make_message(db_session, conv, sources_json=["no-es-un-dict", 123, None])
 
         result = await quality_report(db_session, s.id)

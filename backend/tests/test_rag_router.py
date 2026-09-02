@@ -2,10 +2,10 @@
 
 Valida que `classify_query` decide la ruta correcta para cada tipo de consulta:
   - greeting → respuesta directa sin retrieval
-  - factual  → retrieval + rerank
+  - factual  → retrieval simple
   - complex  → CRAG (expand + grade + rewrite)
 
-Estos tests son puros (no tocan BD/Redis/Qdrant) — corren en milisegundos.
+Estos tests son puros (no tocan BD/Redis/Qdrant) - corren en milisegundos.
 """
 from __future__ import annotations
 
@@ -41,7 +41,7 @@ class TestGreetingDetection:
         "cómo estás",
         "qué tal",
         "¿qué tal?",
-        # Saludos encadenados — antes del fix, solo una alternativa cubría
+        # Saludos encadenados - antes del fix, solo una alternativa cubría
         # todo el mensaje y "hola buenos días" caía a la ruta factual.
         "hola buenos días",
         "hola, buenos días",

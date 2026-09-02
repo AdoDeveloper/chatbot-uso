@@ -1,14 +1,3 @@
-"""Tests del endpoint /analytics/timeline ("Actividad reciente").
-
-No existía ningún test para este endpoint — un bug real llegó a producción
-sin que nada lo detectara: los `href` generados apuntaban a rutas que no
-existen en el frontend (`/dashboard/history/{id}`, `/dashboard/sources/{id}`)
-en vez de las rutas reales (`/dashboard/conversaciones?id={id}`,
-`/dashboard/conocimiento/documentos/{id}/chunks`). Estos tests fijan el
-contrato exacto de esas URLs para que un cambio de rutas en el frontend sin
-actualizar el backend (o viceversa) rompa el test en vez de solo el enlace
-del usuario en producción.
-"""
 from __future__ import annotations
 
 import uuid

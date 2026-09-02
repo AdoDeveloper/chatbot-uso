@@ -1,11 +1,11 @@
-"""Tests para app/api/v1/system/alerts/router.py — no tenía ningún test.
+"""Tests para app/api/v1/system/alerts/router.py - no tenía ningún test.
 
 Cubre POST /api/v1/alerts/run: auth, permiso system.manage, caso sin nada que
 disparar, y los dos checks reales (service_down, rate_limit_threshold)
 disparando de punta a punta contra la BD (sin mockear run_all_checks).
 
 app/services/monitoring/alerts.py hace `from app.core.redis import get_redis`
-(import directo) igual que semantic_cache.py — el fixture `client` parchea
+(import directo) igual que semantic_cache.py - el fixture `client` parchea
 `app.core.redis.get_redis`, pero ese binding ya quedó resuelto al importar el
 módulo. Reapuntamos alerts.get_redis al mismo get_redis ya parcheado para que
 el cooldown use el mismo FakeRedis que el resto del test.

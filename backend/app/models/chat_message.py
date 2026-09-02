@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum as SAEnum, ForeignKey, Index, Integer, JSON, String, Text, Uuid, func
+from sqlalchemy import DateTime, Enum as SAEnum, Float, ForeignKey, Index, Integer, JSON, String, Text, Uuid, func, text as sa_text
 from sqlalchemy.dialects import mysql
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -27,14 +27,15 @@ class ChatMessage(Base):
         SAEnum(MessageRole, name="messagerole", create_type=True), nullable=False
     )
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    sources_json: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    sources_json: Mapped[list] = mapped_column(JSON, default=list, nullable=False, server_default=sa_text("('[]')"))
     latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     rag_route: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    context_relevance_ratio: Mapped[float | None] = mapped_column(Float, nullable=True)
+    faithfulness_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    answer_relevance_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     feedback: Mapped[MessageFeedback | None] = mapped_column(
         SAEnum(MessageFeedback, name="messagefeedback", create_type=True), nullable=True
     )
-    annotation: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    annotation_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True).with_variant(mysql.DATETIME(fsp=6), "mysql"),
         server_default=func.now(), nullable=False

@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum as SAEnum, ForeignKey, JSON, String, Text, Uuid, func
+from sqlalchemy import DateTime, Enum as SAEnum, ForeignKey, JSON, String, Uuid, func, text as sa_text
 from sqlalchemy.dialects import mysql
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -12,10 +12,10 @@ from app.models.enums import EscalationEventType
 
 
 class EscalationEvent(Base):
-    """Audit trail for the lifecycle of an escalated conversation.
+    """Registro de auditoría del ciclo de vida de una conversación escalada.
 
-    Each row records a single transition (escalated, assigned, resolved, etc.).
-    Querying this table gives the full timeline for a case.
+    Cada fila registra una transición (escalado, resuelto, etc.).
+    Consultar esta tabla da la línea de tiempo completa de un caso.
     """
 
     __tablename__ = "escalation_events"
@@ -33,11 +33,7 @@ class EscalationEvent(Base):
     actor_user_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid(native_uuid=False), ForeignKey("users.id", ondelete="SET NULL"), nullable=True,
     )
-    target_user_id: Mapped[uuid.UUID | None] = mapped_column(
-        Uuid(native_uuid=False), ForeignKey("users.id", ondelete="SET NULL"), nullable=True,
-    )
-    note: Mapped[str | None] = mapped_column(Text, nullable=True)
-    meta_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    meta_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False, server_default=sa_text("('{}')"))
     trigger_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True).with_variant(mysql.DATETIME(fsp=6), "mysql"),
@@ -48,7 +44,6 @@ class EscalationEvent(Base):
         "ChatConversation", back_populates="escalation_events",
     )
     actor: Mapped["User | None"] = relationship("User", foreign_keys=[actor_user_id])  # noqa: F821
-    target: Mapped["User | None"] = relationship("User", foreign_keys=[target_user_id])  # noqa: F821
 
     def __repr__(self) -> str:
         return f"<EscalationEvent {self.event_type} conv={self.conversation_id}>"

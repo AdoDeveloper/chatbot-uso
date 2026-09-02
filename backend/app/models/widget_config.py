@@ -17,7 +17,7 @@ def _generate_widget_key() -> str:
 
 
 class WidgetConfig(Base):
-    """Singleton — sólo hay una fila; se crea en el seed."""
+    """Singleton - sólo hay una fila; se crea en el seed."""
 
     __tablename__ = "widget_config"
 

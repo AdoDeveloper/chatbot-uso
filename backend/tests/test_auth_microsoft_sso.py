@@ -9,7 +9,7 @@ extracción a servicio.
 El intercambio de código por tokens con Microsoft (httpx) se sustituye
 por un stub. La verificación del id_token NO mockea jwt.decode: firma un
 id_token real con una clave RSA de test y solo reemplaza PyJWKClient
-para que devuelva la clave pública correspondiente — así jwt.decode()
+para que devuelva la clave pública correspondiente - así jwt.decode()
 real (el mismo módulo que usa core/security.py para los JWT propios del
 sistema) sigue haciendo la verificación de firma de verdad, sin arriesgar
 que un mock global rompa la emisión de tokens tras un login exitoso.
@@ -52,7 +52,7 @@ def reset_local_rate_limit_fallback():
     rate_limit.py usa `redis_mod.get_redis()` (import del módulo, no del
     símbolo), por lo que el `monkeypatch.setattr(redis_mod, "get_redis", ...)`
     de conftest.py sí lo intercepta, y cada test recibe un FakeRedis nuevo
-    vía el fixture `client` — el rate limit se resetea solo entre tests."""
+    vía el fixture `client` - el rate limit se resetea solo entre tests."""
     from app.core.rate_limit import _LOCAL_LIMITS
     _LOCAL_LIMITS.clear()
     yield
@@ -80,7 +80,7 @@ def rsa_keypair():
 
 @pytest.fixture(scope="module")
 def other_rsa_keypair():
-    """Segunda clave, distinta de rsa_keypair — usada para simular un
+    """Segunda clave, distinta de rsa_keypair - usada para simular un
     id_token con firma inválida (PyJWKClient devuelve la pública de
     rsa_keypair, pero el token viene firmado con esta otra)."""
     return _new_rsa_key()
@@ -101,7 +101,7 @@ def _sign_id_token(claims: dict, private_key, audience="test-client-id") -> str:
 @pytest.fixture
 def patch_jwks_verify(monkeypatch, rsa_keypair):
     """PyJWKClient.get_signing_key_from_jwt siempre devuelve la clave
-    pública de rsa_keypair — jwt.decode() real verifica la firma de verdad
+    pública de rsa_keypair - jwt.decode() real verifica la firma de verdad
     contra esa clave. Ningún golpe de red al JWKS real de Microsoft."""
     import jwt as jwt_module
 
@@ -115,7 +115,7 @@ def patch_jwks_verify(monkeypatch, rsa_keypair):
         def get_signing_key_from_jwt(self, token):
             return _FakeSigningKey(rsa_keypair.public_key())
 
-    # El código hace `from jwt import PyJWKClient` dentro de la función —
+    # El código hace `from jwt import PyJWKClient` dentro de la función -
     # el nombre se resuelve en el módulo jwt en el momento de la llamada.
     monkeypatch.setattr(jwt_module, "PyJWKClient", _FakeJWKClient)
 
@@ -127,7 +127,7 @@ def patch_ms_token_exchange(monkeypatch, rsa_keypair):
     un id_token real firmado con rsa_keypair.
 
     Importante: NO se puede monkeypatchear httpx.AsyncClient.post a nivel
-    de clase — el propio test client (fixture `client` en conftest.py)
+    de clase - el propio test client (fixture `client` en conftest.py)
     también es un httpx.AsyncClient (con ASGITransport), así que un patch
     de clase intercepta la petición del test contra el servidor de
     pruebas, no solo la llamada real a Microsoft. En su lugar se reemplaza

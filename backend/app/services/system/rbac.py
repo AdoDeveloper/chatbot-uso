@@ -1,4 +1,4 @@
-"""Servicio RBAC — roles dinámicos en DB. seed_rbac es idempotente."""
+"""Servicio RBAC - roles dinámicos en DB. seed_rbac es idempotente."""
 from __future__ import annotations
 
 import structlog
@@ -146,14 +146,14 @@ SYSTEM_ROLES: list[dict] = [
 async def seed_rbac(db: AsyncSession) -> dict[str, int]:
     """Crea módulos, permisos, roles del sistema y permisos por defecto.
 
-    Superadmin recibe todos los permisos. Los demás roles reciben
+    Admin recibe todos los permisos. Los demás roles reciben
     sus permisos predeterminados definidos en SYSTEM_ROLES. Idempotente.
     """
     try:
         await db.execute(text("SELECT 1 FROM modules LIMIT 1"))
     except (ProgrammingError, IntegrityError):
         await db.rollback()
-        log.warning("rbac.seed_skipped", reason="tables_not_exist — run: alembic upgrade head")
+        log.warning("rbac.seed_skipped", reason="tables_not_exist - run: alembic upgrade head")
         return {"modules": 0, "permissions": 0, "grants": 0, "roles": 0}
 
     modules_created = perms_created = grants_created = roles_created = 0

@@ -301,8 +301,6 @@ class TestSendEmailErrorHandling:
         assert ok is False
 
     async def test_unexpected_exception_is_caught_and_returns_false(self, monkeypatch):
-        """Cualquier excepción no anticipada (ej. un bug en una librería de
-        terceros) no debe tumbar el proceso ni propagarse al llamador."""
         monkeypatch.setattr(
             aiosmtplib,
             "send",

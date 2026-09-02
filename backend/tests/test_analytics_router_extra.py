@@ -4,18 +4,20 @@
 dedicados (test_analytics_api.py, test_analytics_timeline.py). Este archivo
 cubre el resto: son capas finas (auth + query params -> svc.get_*), así que
 se verifican con un smoke test paramétrico (401 sin auth, 200 con estructura
-esperada) en vez de un test dedicado por endpoint — la lógica de agregación
+esperada) en vez de un test dedicado por endpoint - la lógica de agregación
 real vive en app/services/monitoring/analytics.py, no en el router.
 """
 from __future__ import annotations
 
 import pytest
 
-from app.models.enums import UserRole
+import uuid
+
+from app.models.chat_conversation import ChatConversation
+from app.models.enums import ConversationStatus, UserRole
 
 # (ruta, campo esperado en la respuesta) para cada endpoint GET simple.
 _SIMPLE_ENDPOINTS = [
-    ("/api/v1/analytics/devices", "devices"),
     ("/api/v1/analytics/routes", "routes"),
     ("/api/v1/analytics/latency/timeseries", "points"),
     ("/api/v1/analytics/sources/quality", "sources"),
@@ -24,6 +26,7 @@ _SIMPLE_ENDPOINTS = [
     ("/api/v1/analytics/pages", "pages"),
     ("/api/v1/analytics/feedback", "summary"),
     ("/api/v1/analytics/cache", "hit_rate"),
+    ("/api/v1/analytics/csat", "distribution"),
 ]
 
 
@@ -45,6 +48,46 @@ class TestAnalyticsSimpleEndpointsReturnData:
         r = await client.get(path, headers=auth_headers(admin_user))
         assert r.status_code == 200, (path, r.text)
         assert field in r.json(), (path, r.json())
+
+
+class TestCsatAggregation:
+
+    async def test_aggregates_real_csat_scores(self, client, admin_user, auth_headers, db_session):
+        from datetime import datetime, timezone
+
+        now = datetime.now(timezone.utc)
+        convs = [
+            ChatConversation(
+                id=uuid.uuid4(), session_id=str(uuid.uuid4()),
+                status=ConversationStatus.resolved, csat_score=score, created_at=now,
+            )
+            for score in (4, 4, 2)
+        ]
+        db_session.add_all(convs)
+        await db_session.commit()
+
+        r = await client.get("/api/v1/analytics/csat?days=30", headers=auth_headers(admin_user))
+        assert r.status_code == 200
+        body = r.json()
+        assert body["total"] == 3
+        assert body["distribution"]["4"] == 2
+        assert body["distribution"]["2"] == 1
+        assert body["avg_score"] == round((4 + 4 + 2) / 3, 2)
+
+    async def test_excludes_conversations_outside_date_range(self, client, admin_user, auth_headers, db_session):
+        from datetime import datetime, timedelta, timezone
+
+        old = datetime.now(timezone.utc) - timedelta(days=60)
+        conv = ChatConversation(
+            id=uuid.uuid4(), session_id=str(uuid.uuid4()),
+            status=ConversationStatus.resolved, csat_score=5, created_at=old,
+        )
+        db_session.add(conv)
+        await db_session.commit()
+
+        r = await client.get("/api/v1/analytics/csat?days=30", headers=auth_headers(admin_user))
+        assert r.status_code == 200
+        assert r.json()["total"] == 0
 
 
 class TestEffectiveDaysDateRange:

@@ -10,7 +10,8 @@ import structlog
 from sqlalchemy import select
 
 from app.core.timezone import now_sv
-from app.db.session import AsyncSessionLocal
+from app.db import session as db_session_mod
+from app.db.session import _probe_connection
 from app.models.global_setting import GlobalSetting
 from app.schemas.report_schedule import ReportSchedule
 
@@ -19,7 +20,8 @@ log = structlog.get_logger()
 _HEALTH_INTERVAL = 300      # seconds between health snapshots (5 min)
 _WARMUP_INTERVAL = 240      # seconds between embedding warm-up pings (4 min)
 _STALE_CONV_INTERVAL = 600  # seconds between stale-conversation sweeps (10 min)
-_STALE_CONV_MINUTES = 120  # inactivity threshold before auto-resolving (2h — Zendesk-style default)
+_STALE_CONV_MINUTES = 120  # inactivity threshold before auto-resolving (2h - Zendesk-style default)
+_QDRANT_SYNC_INTERVAL = 3600  # seconds between orphan-vector sweeps (1h)
 # Identificador estable de este proceso, usado para marcar la adquisición del
 # lock en BD (ayuda a depurar, no es estrictamente necesario para el claim).
 _OWNER_ID = uuid.uuid4().hex
@@ -27,6 +29,13 @@ _health_task: asyncio.Task | None = None
 _digest_task: asyncio.Task | None = None
 _warmup_task: asyncio.Task | None = None
 _stale_conv_task: asyncio.Task | None = None
+_qdrant_sync_task: asyncio.Task | None = None
+
+
+def AsyncSessionLocal(*args, **kwargs):
+    """Indirección a app.db.session.AsyncSessionLocal, resuelta en cada llamada.
+    """
+    return db_session_mod.AsyncSessionLocal(*args, **kwargs)
 
 
 async def _acquire_once(key: str, ttl: int) -> bool:
@@ -39,13 +48,10 @@ async def _acquire_once(key: str, ttl: int) -> bool:
 
     Devuelve True si este worker adquirió el lock (debe correr el job);
     False si otro worker ya lo tiene o si la BD falla.
-
-    A diferencia de la versión anterior (Redis SET NX), no depende de Redis
-    ni falla cerrado si Redis no está disponible: la base de datos ya es un
-    requisito del sistema, así que el scheduler sigue funcionando sin Redis.
     """
     try:
         async with AsyncSessionLocal() as db:
+            await _probe_connection(db)
             now = datetime.now(timezone.utc)
             expires_at = now + timedelta(seconds=ttl)
             try:
@@ -66,40 +72,46 @@ async def _acquire_once(key: str, ttl: int) -> bool:
                     )
                 ).scalar_one_or_none()
 
-            if row is None:
-                db.add(
-                    GlobalSetting(
-                        key=key,
-                        value={"owner": "", "expires_at": (now - timedelta(seconds=1)).isoformat()},
-                    )
-                )
-                await db.commit()
-                row = (
-                    await db.execute(
-                        select(GlobalSetting)
-                        .where(GlobalSetting.key == key)
-                        .with_for_update()
-                    )
-                ).scalar_one_or_none()
+            try:
                 if row is None:
-                    # Rara condición de carrera en la creación inicial: otro
-                    # worker ganó el INSERT. Este ciclo no corre; reintenta luego.
-                    return False
+                    db.add(
+                        GlobalSetting(
+                            key=key,
+                            value={"owner": "", "expires_at": (now - timedelta(seconds=1)).isoformat()},
+                        )
+                    )
+                    await db.commit()
+                    row = (
+                        await db.execute(
+                            select(GlobalSetting)
+                            .where(GlobalSetting.key == key)
+                            .with_for_update()
+                        )
+                    ).scalar_one_or_none()
+                    if row is None:
+                        # Carrera en la creación inicial: otro worker ganó el INSERT.
+                        return False
 
-            cur = datetime.fromisoformat(row.value.get("expires_at", "2000-01-01T00:00:00+00:00"))
-            if cur > now:
-                return False  # otro worker ya adquirió el lock vigente
+                cur = datetime.fromisoformat(row.value.get("expires_at", "2000-01-01T00:00:00+00:00"))
+                if cur > now:
+                    return False  # otro worker ya adquirió el lock vigente
 
-            row.value = {"owner": _OWNER_ID, "expires_at": expires_at.isoformat()}
-            await db.commit()
-            return True
+                row.value = {"owner": _OWNER_ID, "expires_at": expires_at.isoformat()}
+                await db.commit()
+                return True
+            finally:
+                try:
+                    await db.rollback()
+                    await db.close()
+                except Exception:
+                    pass
     except Exception:
         log.warning("scheduler.lock_acquire_failed", key=key)
         return False
 
 async def _warmup_loop() -> None:
-    """Runs a dummy embedding every _WARMUP_INTERVAL seconds to keep the ONNX
-    Runtime inference thread pool alive.
+    """Ejecuta un embedding de prueba cada _WARMUP_INTERVAL segundos para mantener
+    activo el thread pool de inferencia de ONNX Runtime.
     """
     await asyncio.sleep(30)
     log.info("scheduler.warmup_loop_started", interval=_WARMUP_INTERVAL)
@@ -116,9 +128,9 @@ async def _warmup_loop() -> None:
 async def _health_loop() -> None:
     """Toma un snapshot de salud y ejecuta chequeos de alertas cada _HEALTH_INTERVAL segundos.
 
-    Usa un mutex en BD (FOR UPDATE) para que solo un worker por ventana de 5
-    minutos ejecute el snapshot, evitando snapshots y notificaciones duplicadas
-    con WORKERS>1.
+    Usa un mutex en BD (FOR UPDATE) para que solo una instancia del backend
+    por ventana de 5 minutos ejecute el snapshot, evitando snapshots y
+    notificaciones duplicadas si llega a correr más de una a la vez.
     """
     log.info("scheduler.health_loop_started", interval=_HEALTH_INTERVAL)
     while True:
@@ -127,10 +139,10 @@ async def _health_loop() -> None:
             lock_key = f"scheduler:health:{bucket}"
             if await _acquire_once(lock_key, ttl=270):
                 from app.services.monitoring.health import collect_snapshot
-                from app.services.monitoring.alerts import check_rate_limit_threshold
+                from app.services.monitoring.alerts import run_all_checks
                 async with AsyncSessionLocal() as db:
                     await collect_snapshot(db)
-                    await check_rate_limit_threshold(db)
+                    await run_all_checks(db)
                 log.debug("scheduler.health_snapshot_recorded")
             else:
                 log.debug("scheduler.health_snapshot_skipped_by_lock")
@@ -141,9 +153,6 @@ async def _health_loop() -> None:
 
 def _cumple_agenda(now: datetime, schedule: ReportSchedule) -> bool:
     """Indica si el instante `now` (UTC) coincide con la cadencia del reporte.
-
-    `hour`/`minute` se interpretan en la zona de El Salvador (UTC-6): se
-    convierte `now` a esa zona antes de comparar la hora y la fecha.
     """
     local = now.astimezone(now_sv().tzinfo)
     if schedule.hour != local.hour or schedule.minute != local.minute:
@@ -161,16 +170,6 @@ def _cumple_agenda(now: datetime, schedule: ReportSchedule) -> bool:
 
 async def _digest_loop() -> None:
     """Envía el reporte unanswered_digest según la cadencia configurada.
-
-    Usa un mutex en BD (FOR UPDATE) con TTL de 23h para que solo un worker
-    envíe el digest por día, independientemente de cuántos workers estén
-    corriendo (WORKERS>1), incluso si la cadencia se edita a mitad de día.
-
-    Se chequea cada minuto (no cada hora): el loop anterior dormía 3600s desde
-    un arranque arbitrario, así que los chequeos caían en minutos como :05, :05…
-    y casi nunca coincidían con el minuto exacto configurado en el schedule,
-    por lo que el correo programado rara vez se disparaba. Al evaluar cada 60s
-    el minuto configurado sí se alcanza; el lock en BD ya evita el envío doble.
     """
     log.info("scheduler.digest_loop_started")
     while True:
@@ -184,7 +183,7 @@ async def _digest_loop() -> None:
                     continue
                 today = now.astimezone(now_sv().tzinfo).strftime("%Y-%m-%d")
                 lock_key = f"scheduler:digest:{today}"
-                if await _acquire_once(lock_key, ttl=82800):  # 23h — libera antes del próximo día
+                if await _acquire_once(lock_key, ttl=82800):  # 23h - libera antes del próximo día
                     from app.models.enums import NotificationEvent
                     from app.services.notifications.digest import collect_digest_stats
                     from app.services.notifications.service import send_notification
@@ -221,9 +220,31 @@ async def _stale_conversations_loop() -> None:
         await asyncio.sleep(_STALE_CONV_INTERVAL)
 
 
+async def _qdrant_sync_loop() -> None:
+    """Purga periódicamente vectores huérfanos en Qdrant (source_id sin
+    fuente activa en MySQL).
+    """
+    log.info("scheduler.qdrant_sync_loop_started", interval=_QDRANT_SYNC_INTERVAL)
+    while True:
+        try:
+            bucket = int(time.time() / _QDRANT_SYNC_INTERVAL)
+            lock_key = f"scheduler:qdrant_sync:{bucket}"
+            if await _acquire_once(lock_key, ttl=_QDRANT_SYNC_INTERVAL - 60):
+                from app.services.ingestion.qdrant_sync import sync_qdrant
+                async with AsyncSessionLocal() as db:
+                    result = await sync_qdrant(db)
+                    if result.get("orphan_chunks_deleted"):
+                        log.info("scheduler.qdrant_sync_cleaned", **result)
+            else:
+                log.debug("scheduler.qdrant_sync_skipped_by_lock")
+        except Exception:
+            log.exception("scheduler.qdrant_sync_failed")
+        await asyncio.sleep(_QDRANT_SYNC_INTERVAL)
+
+
 def start() -> None:
-    """Start the health monitor, daily digest, embedding warm-up and stale-conversation sweep as background asyncio tasks."""
-    global _health_task, _digest_task, _warmup_task, _stale_conv_task
+    """Inicia el monitor de salud, el digest diario, el warm-up de embeddings, el barrido de conversaciones inactivas y el barrido de huérfanos de Qdrant como tareas asyncio en segundo plano."""
+    global _health_task, _digest_task, _warmup_task, _stale_conv_task, _qdrant_sync_task
     if _health_task is None or _health_task.done():
         _health_task = asyncio.create_task(_health_loop())
         log.info("scheduler.health_task_created")
@@ -236,11 +257,14 @@ def start() -> None:
     if _stale_conv_task is None or _stale_conv_task.done():
         _stale_conv_task = asyncio.create_task(_stale_conversations_loop())
         log.info("scheduler.stale_conversations_task_created")
+    if _qdrant_sync_task is None or _qdrant_sync_task.done():
+        _qdrant_sync_task = asyncio.create_task(_qdrant_sync_loop())
+        log.info("scheduler.qdrant_sync_task_created")
 
 
 def stop() -> None:
-    """Cancel the scheduler tasks."""
-    global _health_task, _digest_task, _warmup_task, _stale_conv_task
+    """Cancela las tareas del scheduler."""
+    global _health_task, _digest_task, _warmup_task, _stale_conv_task, _qdrant_sync_task
     if _health_task and not _health_task.done():
         _health_task.cancel()
         log.info("scheduler.health_stopped")
@@ -257,3 +281,7 @@ def stop() -> None:
         _stale_conv_task.cancel()
         log.info("scheduler.stale_conversations_stopped")
     _stale_conv_task = None
+    if _qdrant_sync_task and not _qdrant_sync_task.done():
+        _qdrant_sync_task.cancel()
+        log.info("scheduler.qdrant_sync_stopped")
+    _qdrant_sync_task = None

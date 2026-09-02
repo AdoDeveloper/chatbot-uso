@@ -1,4 +1,4 @@
-"""Tests para app/api/v1/versions/router.py — no tenía ningún test.
+"""Tests para app/api/v1/versions/router.py - no tenía ningún test.
 
 Cubre listado paginado, creación de snapshot manual (incl. 409 sin cambios),
 detalle, diff contra la versión padre, deploy (incl. 409 sin cambios desde el
@@ -95,6 +95,34 @@ class TestListVersions:
     async def test_rejects_page_below_minimum(self, client, admin_user, auth_headers):
         r = await client.get("/api/v1/versions?page=0", headers=auth_headers(admin_user))
         assert r.status_code == 422
+
+    async def test_does_not_load_config_snapshot_column(self, client, admin_user, auth_headers, db_session):
+        from sqlalchemy import inspect as sa_inspect, select
+        from sqlalchemy.orm import load_only, selectinload
+        from app.models.config_version import ConfigVersion
+
+        await _add_setting(db_session, "chatbot_name", "Bot A")
+        r = await client.post("/api/v1/versions", json={"description": "v1"}, headers=auth_headers(admin_user))
+        assert r.status_code == 201
+
+        result = await db_session.execute(
+            select(ConfigVersion)
+            .options(
+                load_only(
+                    ConfigVersion.id, ConfigVersion.version_number, ConfigVersion.description,
+                    ConfigVersion.change_summary, ConfigVersion.trigger_source,
+                    ConfigVersion.snapshot_schema_version, ConfigVersion.is_active,
+                    ConfigVersion.created_at, ConfigVersion.created_by_id,
+                ),
+                selectinload(ConfigVersion.created_by),
+            )
+            .order_by(ConfigVersion.version_number.desc())
+        )
+        row = result.scalars().first()
+        state = sa_inspect(row)
+        assert "config_snapshot" in state.unloaded, (
+            "config_snapshot se cargó pese a load_only - el fix se rompió"
+        )
 
 
 class TestCreateVersion:
@@ -323,11 +351,11 @@ class TestRollback:
     async def test_rollback_restores_previous_setting_and_creates_new_version(
         self, client, admin_user, auth_headers, db_session,
     ):
-        await _add_setting(db_session, "chatbot_name", "Bot Original")
+        await _add_setting(db_session, "system_prompt", "Prompt original")
         v1 = await client.post("/api/v1/versions", json={"description": "v1"}, headers=auth_headers(admin_user))
         v1_id = v1.json()["id"]
 
-        await _add_setting(db_session, "chatbot_name", "Bot Modificado")
+        await _add_setting(db_session, "system_prompt", "Prompt modificado")
         v2 = await client.post("/api/v1/versions", json={"description": "v2"}, headers=auth_headers(admin_user))
         assert v2.status_code == 201
 
@@ -338,4 +366,4 @@ class TestRollback:
         assert body["version"]["version_number"] > v2.json()["version_number"]
 
         settings = await client.get("/api/v1/settings", headers=auth_headers(admin_user))
-        assert settings.json()["chatbot_name"] == "Bot Original"
+        assert settings.json()["system_prompt"] == "Prompt original"

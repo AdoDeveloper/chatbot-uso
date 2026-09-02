@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, JSON, String, Text, Uuid, func
+from sqlalchemy import DateTime, ForeignKey, JSON, String, Text, Uuid, func, text as sa_text
 from sqlalchemy.dialects import mysql
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -16,12 +16,19 @@ class NotificationLog(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         Uuid(native_uuid=False), primary_key=True, default=uuid.uuid4
     )
+    # Agrupa las filas (una por canal/destinatario) de un mismo send_notification().
+    trigger_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(native_uuid=False), nullable=False, default=uuid.uuid4, index=True
+    )
     event: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     channel: Mapped[str] = mapped_column(String(20), nullable=False)
     target: Mapped[str] = mapped_column(String(255), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False)  # sent, failed
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
-    payload_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    payload_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False, server_default=sa_text("('{}')"))
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(native_uuid=False), ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True).with_variant(mysql.DATETIME(fsp=6), "mysql"),
         server_default=func.now(), nullable=False, index=True

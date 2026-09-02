@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import Field as _Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,12 +22,8 @@ from app.schemas.chat_history import ChatConversationDetail, ChatConversationOut
 from app.services.chat import history as svc
 from app.services.escalation import lifecycle as lifecycle_svc
 from app.services.ingestion.export import excel_response, pdf_response
+from app.services.system import audit as audit_svc
 from pydantic import BaseModel as _BM
-
-
-class AnnotateRequest(_BM):
-    annotation: str  # correct, incorrect, hallucination, partial
-    note: str | None = None
 
 
 class _TagsBody(_BM):
@@ -88,6 +84,15 @@ async def list_conversations(
     return {"items": items, "total": total, "page": page, "page_size": page_size}
 
 
+@router.get("/csat-reason-labels", response_model=dict[str, str])
+async def get_csat_reason_labels(
+    db: AsyncSession = Depends(get_db),
+    _: object = Depends(require_perm(P.CONVERSATIONS_READ)),
+):
+    from app.services.widget import csat_reasons as csat_reasons_svc
+    return await csat_reasons_svc.labels_map(db)
+
+
 @router.get("/export")
 async def export_conversations(
     format: str = Query("xlsx", pattern="^(xlsx|pdf)$"),
@@ -131,7 +136,6 @@ async def export_conversations(
             rows.append({
                 "Conversación ID": str(conv.id),
                 "Sesión": conv.session_id,
-                "Dispositivo": conv.device or "",
                 "Inicio": str(conv.started_at)[:19],
                 "Rol": msg.role.value if hasattr(msg.role, "value") else str(msg.role),
                 "Contenido": msg.content,
@@ -168,14 +172,48 @@ async def list_known_tags(
 @router.post("/bulk", response_model=dict)
 async def bulk_action(
     body: _BulkBody,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_perm(P.CONVERSATIONS_UPDATE)),
 ):
     """Aplica una acción a múltiples conversaciones de una sola vez."""
     if not body.conversation_ids:
         return {"affected": 0, "errors": []}
-    if body.action not in {"resolve", "add_tag", "remove_tag", "set_tags"}:
+    if body.action not in {"resolve", "add_tag", "remove_tag", "set_tags", "delete"}:
         raise HTTPException(status_code=400, detail=f"Acción no soportada: {body.action}")
+
+    if body.action == "delete":
+        from app.services.system.rbac import has_permission
+        if not await has_permission(db, current_user.role, "conversations", "delete"):
+            raise HTTPException(status_code=403, detail="Sin permiso para conversations.delete")
+        result = await db.execute(
+            select(ChatConversation).where(ChatConversation.id.in_(body.conversation_ids))
+        )
+        convs_by_id = {conv.id: conv for conv in result.scalars().all()}
+        affected = 0
+        errors: list[dict] = []
+        for cid in body.conversation_ids:
+            conv = convs_by_id.get(cid)
+            if not conv:
+                errors.append({"id": str(cid), "error": "no encontrada"})
+                continue
+            try:
+                await audit_svc.log_action(
+                    db,
+                    action="conversation.delete",
+                    resource_type="conversation",
+                    actor_id=current_user.id,
+                    resource_id=str(cid),
+                    meta={"session_id": conv.session_id, "status": conv.status.value, "bulk": True},
+                    ip=request.client.host if request.client else None,
+                    user_agent=request.headers.get("user-agent"),
+                )
+                await db.delete(conv)
+                affected += 1
+            except Exception as e:
+                errors.append({"id": str(cid), "error": str(e)[:120]})
+        await db.commit()
+        return {"affected": affected, "errors": errors, "action": "delete"}
 
     result = await db.execute(
         select(ChatConversation).where(ChatConversation.id.in_(body.conversation_ids))
@@ -213,6 +251,31 @@ async def bulk_action(
             errors.append({"id": str(cid), "error": str(e)[:120]})
     await db.commit()
     return {"affected": affected, "errors": errors, "action": body.action}
+
+
+@router.delete("/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_conversation(
+    conversation_id: uuid.UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_perm(P.CONVERSATIONS_DELETE)),
+):
+    conv = await db.get(ChatConversation, conversation_id)
+    if not conv:
+        raise NotFoundError("Conversación no encontrada")
+
+    await audit_svc.log_action(
+        db,
+        action="conversation.delete",
+        resource_type="conversation",
+        actor_id=current_user.id,
+        resource_id=str(conversation_id),
+        meta={"session_id": conv.session_id, "status": conv.status.value},
+        ip=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+    )
+    await db.delete(conv)
+    await db.commit()
 
 
 @router.get("/{conversation_id}", response_model=ChatConversationDetail)
@@ -279,22 +342,6 @@ async def set_feedback(
     if not msg:
         raise NotFoundError("Mensaje no encontrado")
     msg.feedback = body.feedback
-    await db.commit()
-
-
-@router.patch("/messages/{message_id}/annotate", status_code=status.HTTP_204_NO_CONTENT)
-async def annotate_message(
-    message_id: uuid.UUID,
-    body: AnnotateRequest,
-    db: AsyncSession = Depends(get_db),
-    _: object = Depends(require_perm(P.CONVERSATIONS_UPDATE)),
-):
-    result = await db.execute(select(ChatMessage).where(ChatMessage.id == message_id))
-    msg = result.scalar_one_or_none()
-    if not msg:
-        raise NotFoundError("Mensaje no encontrado")
-    msg.annotation = body.annotation
-    msg.annotation_note = body.note
     await db.commit()
 
 

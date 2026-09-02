@@ -1,4 +1,4 @@
-"""Initial schema — full database creation from scratch
+"""Initial schema
 
 Migración única consolidada para MySQL 8.0.
 Tipos utilizados:
@@ -6,30 +6,13 @@ Tipos utilizados:
   - JSONB → sa.JSON                     → JSON (nativo MySQL 8.0)
   - ARRAY → sa.Text                     → TEXT (JSONList serializa como JSON string)
   - ENUM  → sa.Enum(*values)            → ENUM nativo MySQL
-
-Incluye: esquema completo + users.tokens_valid_after (JWT mass-revocation)
-+ columnas de widget_config: enable_escalation, enable_tts,
-enable_accessibility + índice compuesto (status, last_message_at) en
-chat_conversations + evento notificationevent.unanswered_digest
-(unificadas desde las migraciones 0002-0006, que se fusionaron aquí en
-desarrollo con BD regenerable — no se usa en bases de datos que ya
-tuvieran esas migraciones aplicadas por separado).
-
-Revision ID: 0001
-Revises: —
-Create Date: 2026-06-12
-Updated 2026-07-03: consolidada — ya no crea escalation_channels (nunca se
-conectó al despacho real de escalamientos, siempre usó SMTP directo).
-Updated 2026-07-19: unificadas las migraciones 0002-0006 en esta única
-(widget_config.enable_escalation/enable_tts/enable_accessibility, índice
-de chat_conversations, y el nombre unanswered_digest del evento).
 """
 from typing import Sequence, Union
 
-import sqlalchemy as sa
-from sqlalchemy import inspect as sa_inspect
-from sqlalchemy.dialects import mysql
-from alembic import op
+import sqlalchemy as sa  # type: ignore[import-not-found]
+from sqlalchemy import inspect as sa_inspect  # type: ignore[import-not-found]
+from sqlalchemy.dialects import mysql  # type: ignore[import-not-found]
+from alembic import op  # type: ignore[import-not-found]
 
 revision: str = "0001"
 down_revision: Union[str, None] = None
@@ -41,7 +24,7 @@ _E = {
     "conversationstatus": ("active", "escalated", "resolved"),
     "messagerole":        ("user", "assistant"),
     "messagefeedback":    ("positive", "negative"),
-    "sourcetype":         ("pdf", "docx", "xlsx", "csv", "txt", "faq"),
+    "sourcetype":         ("pdf", "docx", "txt", "faq"),
     "sourcestatus":       ("pending", "processing", "ready", "error"),
     "reviewstatus":       ("procesando", "pendiente_revision", "aprobada", "rechazada"),
     "unansweredstatus":   ("open", "in_progress", "resolved"),
@@ -55,14 +38,14 @@ _E = {
         "keyword_detected", "confidence_below", "loop_detected",
     ),
     "escalationeventtype":   (
-        "escalated", "assigned", "unassigned", "resolved", "abandoned", "csat_recorded",
+        "escalated", "resolved", "csat_recorded",
     ),
     "permissionaction": ("create", "read", "update", "delete", "manage"),
 }
 
 
 def _e(name: str) -> sa.Enum:
-    """Enum inline para columna — sin nombre de tipo (MySQL lo ignora)."""
+    """Enum inline para columna - sin nombre de tipo (MySQL lo ignora)."""
     return sa.Enum(*_E[name])
 
 
@@ -78,21 +61,22 @@ def _ct(name: str, *cols, **kw) -> None:
     op.create_table(name, *cols, **kw)
 
 
-def _ci(index_name: str, table_name: str, columns: list, *, unique: bool = False) -> None:
+def _ci(index_name: str, table_name: str, columns: list, *, unique: bool = False, mysql_prefix: str | None = None) -> None:
     """CREATE INDEX seguro para MySQL: salta si el índice ya existe."""
     try:
         existing = {i["name"] for i in sa_inspect(op.get_bind()).get_indexes(table_name)}
     except Exception:
         existing = set()
     if index_name not in existing:
-        op.create_index(index_name, table_name, columns, unique=unique)
+        kw = {"mysql_prefix": mysql_prefix} if mysql_prefix else {}
+        op.create_index(index_name, table_name, columns, unique=unique, **kw)
 
 
 def upgrade() -> None:
     # MySQL 8.0: no existen tipos ENUM nombrados a nivel servidor;
-    # el ENUM se define inline en cada columna — no hay paso previo de creación.
+    # el ENUM se define inline en cada columna - no hay paso previo de creación.
 
-    # roles — no dependencies
+    # roles - no dependencies
     _ct(
         "roles",
         sa.Column("id",           sa.Uuid(native_uuid=False), primary_key=True),
@@ -104,7 +88,7 @@ def upgrade() -> None:
     )
     _ci("ix_roles_name", "roles", ["name"], unique=True)
 
-    # modules — no dependencies
+    # modules - no dependencies
     _ct(
         "modules",
         sa.Column("id",           sa.Uuid(native_uuid=False), primary_key=True),
@@ -123,7 +107,7 @@ def upgrade() -> None:
         sa.Column("email",                sa.String(255), nullable=False),
         sa.Column("full_name",            sa.String(255), nullable=False),
         sa.Column("hashed_password",      sa.String(255), nullable=False),
-        sa.Column("role",                 sa.String(100), nullable=False),
+        sa.Column("role",                 sa.String(100), sa.ForeignKey("roles.name", onupdate="CASCADE", ondelete="RESTRICT"), nullable=False, server_default="viewer"),
         sa.Column("is_active",            sa.Boolean, nullable=False, server_default=sa.true()),
         sa.Column("must_change_password", sa.Boolean, nullable=False, server_default=sa.false()),
         sa.Column("onboarding_dismissed", sa.Boolean, nullable=False, server_default=sa.false()),
@@ -134,7 +118,7 @@ def upgrade() -> None:
     )
     _ci("ix_users_email", "users", ["email"], unique=True)
 
-    # permissions — depends on modules
+    # permissions - depends on modules
     _ct(
         "permissions",
         sa.Column("id",          sa.Uuid(native_uuid=False), primary_key=True),
@@ -147,7 +131,7 @@ def upgrade() -> None:
     )
     _ci("ix_permissions_name", "permissions", ["name"], unique=True)
 
-    # role_permissions — depends on roles, permissions
+    # role_permissions - depends on roles, permissions
     _ct(
         "role_permissions",
         sa.Column("id",            sa.Uuid(native_uuid=False), primary_key=True),
@@ -158,7 +142,7 @@ def upgrade() -> None:
     )
     _ci("ix_role_permissions_role", "role_permissions", ["role"])
 
-    # invitations — depends on roles, users
+    # invitations - depends on roles, users
     _ct(
         "invitations",
         sa.Column("id",             sa.Uuid(native_uuid=False), primary_key=True),
@@ -174,7 +158,7 @@ def upgrade() -> None:
     _ci("ix_invitations_email", "invitations", ["email"])
     _ci("ix_invitations_token", "invitations", ["token"], unique=True)
 
-    # global_settings — depends on users
+    # global_settings - depends on users
     _ct(
         "global_settings",
         sa.Column("key",            sa.String(100), primary_key=True),
@@ -183,7 +167,7 @@ def upgrade() -> None:
         sa.Column("updated_by_id",  sa.Uuid(native_uuid=False), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
     )
 
-    # widget_config — no FK dependencies
+    # widget_config - no FK dependencies
     # domain_allowlist / suggestions usan sa.Text (JSONList → JSON string en TEXT)
     _ct(
         "widget_config",
@@ -215,7 +199,7 @@ def upgrade() -> None:
     )
     _ci("ix_widget_config_api_key", "widget_config", ["api_key"], unique=True)
 
-    # llm_providers — no FK dependencies
+    # llm_providers - no FK dependencies
     _ct(
         "llm_providers",
         sa.Column("id",                    sa.Uuid(native_uuid=False), primary_key=True),
@@ -235,7 +219,7 @@ def upgrade() -> None:
         sa.Column("last_test_error",       sa.Text,        nullable=True),
     )
 
-    # sources — depends on users
+    # sources - depends on users
     _ct(
         "sources",
         sa.Column("id",               sa.Uuid(native_uuid=False), primary_key=True),
@@ -262,8 +246,9 @@ def upgrade() -> None:
     )
     _ci("ix_sources_review_status", "sources", ["review_status"])
     _ci("ix_sources_content_hash",  "sources", ["content_hash"])
+    _ci("ix_sources_name_fulltext", "sources", ["name"], mysql_prefix="FULLTEXT")
 
-    # faq_entries — depends on sources, users
+    # faq_entries - depends on sources, users
     # tags usa sa.Text (JSONList → JSON string)
     _ct(
         "faq_entries",
@@ -278,9 +263,10 @@ def upgrade() -> None:
         sa.Column("updated_at",     mysql.DATETIME(fsp=6), server_default=sa.text("now()"), nullable=False),
         sa.Column("deleted_at",     mysql.DATETIME(fsp=6), nullable=True),
     )
-    _ci("ix_faq_entries_is_active", "faq_entries", ["is_active"])
+    _ci("ix_faq_question_fulltext", "faq_entries", ["question"], mysql_prefix="FULLTEXT")
+    _ci("ix_faq_answer_fulltext",   "faq_entries", ["answer"],   mysql_prefix="FULLTEXT")
 
-    # chunk_edits — depends on sources, users
+    # chunk_edits - depends on sources, users
     _ct(
         "chunk_edits",
         sa.Column("id",               sa.Uuid(native_uuid=False), primary_key=True),
@@ -296,7 +282,7 @@ def upgrade() -> None:
     _ci("ix_chunk_edits_source_id",      "chunk_edits", ["source_id"])
     _ci("ix_chunk_edits_edited_at",      "chunk_edits", ["edited_at"])
 
-    # chat_conversations — depends on users
+    # chat_conversations - depends on users
     # tags usa sa.Text (JSONList)
     _ct(
         "chat_conversations",
@@ -304,30 +290,28 @@ def upgrade() -> None:
         sa.Column("session_id",                  sa.String(128), nullable=False),
         sa.Column("user_id",                     sa.Uuid(native_uuid=False), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
         sa.Column("status",                      _e("conversationstatus"), nullable=False, server_default="active"),
-        sa.Column("device",                      sa.String(64), nullable=True),
         sa.Column("browser",                     sa.String(64), nullable=True),
         sa.Column("origin_url",                  sa.Text,       nullable=True),
         sa.Column("created_at",                  mysql.DATETIME(fsp=6), server_default=sa.text("now()"), nullable=False),
         sa.Column("started_at",                  mysql.DATETIME(fsp=6), server_default=sa.text("now()"), nullable=False),
         sa.Column("last_message_at",             mysql.DATETIME(fsp=6), server_default=sa.text("now()"), nullable=False),
         sa.Column("escalated_at",                mysql.DATETIME(fsp=6), nullable=True),
-        sa.Column("assigned_to_user_id",         sa.Uuid(native_uuid=False), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("assigned_at",                 mysql.DATETIME(fsp=6), nullable=True),
         sa.Column("resolved_at",                 mysql.DATETIME(fsp=6), nullable=True),
         sa.Column("resolved_by_user_id",         sa.Uuid(native_uuid=False), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
         sa.Column("csat_score",                  sa.Integer,    nullable=True),
         sa.Column("csat_comment",                sa.String(500), nullable=True),
+        sa.Column("csat_reasons",                sa.Text,       nullable=False, server_default=sa.text("('[]')")),
         sa.Column("escalation_pending",          sa.Boolean,    nullable=False, server_default=sa.false()),
         sa.Column("escalation_trigger_reason",   sa.Text,       nullable=True),
         sa.Column("tags",                        sa.Text,       nullable=False, server_default=sa.text("('[]')")),
     )
     _ci("ix_chat_conversations_session_id",           "chat_conversations", ["session_id"])
     _ci("ix_chat_conversations_user_id",              "chat_conversations", ["user_id"])
-    _ci("ix_chat_conversations_assigned_to_user_id",  "chat_conversations", ["assigned_to_user_id"])
+    _ci("ix_chat_conversations_resolved_by_user_id",  "chat_conversations", ["resolved_by_user_id"])
     _ci("ix_chat_conversations_status_last_message_at", "chat_conversations", ["status", "last_message_at"])
 
-    # chat_messages — depends on chat_conversations
-    # sources_json usa sa.JSON (JSONList — lista de dicts con source_name, score, etc.)
+    # chat_messages - depends on chat_conversations
+    # sources_json usa sa.JSON (JSONList - lista de dicts con source_name, score, etc.)
     _ct(
         "chat_messages",
         sa.Column("id",              sa.Uuid(native_uuid=False), primary_key=True),
@@ -337,30 +321,29 @@ def upgrade() -> None:
         sa.Column("sources_json",    sa.JSON,              nullable=False, server_default=sa.text("('[]')")),
         sa.Column("latency_ms",      sa.Integer,           nullable=True),
         sa.Column("rag_route",       sa.String(32),        nullable=True),
+        sa.Column("context_relevance_ratio", sa.Float,     nullable=True),
+        sa.Column("faithfulness_score",      sa.Float,     nullable=True),
+        sa.Column("answer_relevance_score",  sa.Float,     nullable=True),
         sa.Column("feedback",        _e("messagefeedback"), nullable=True),
-        sa.Column("annotation",      sa.String(32),        nullable=True),
-        sa.Column("annotation_note", sa.Text,              nullable=True),
         sa.Column("created_at",      mysql.DATETIME(fsp=6), server_default=sa.text("now()"), nullable=False),
     )
     _ci("ix_chat_messages_conversation_id",       "chat_messages", ["conversation_id"])
     _ci("ix_chat_messages_conversation_created",  "chat_messages", ["conversation_id", "created_at"])
 
-    # escalation_events — depends on chat_conversations, users
+    # escalation_events - depends on chat_conversations, users
     _ct(
         "escalation_events",
         sa.Column("id",              sa.Uuid(native_uuid=False), primary_key=True),
         sa.Column("conversation_id", sa.Uuid(native_uuid=False), sa.ForeignKey("chat_conversations.id", ondelete="CASCADE"),  nullable=False),
         sa.Column("event_type",      _e("escalationeventtype"), nullable=False),
         sa.Column("actor_user_id",   sa.Uuid(native_uuid=False), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("target_user_id",  sa.Uuid(native_uuid=False), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("note",            sa.Text, nullable=True),
         sa.Column("meta_json",       sa.JSON, nullable=False, server_default=sa.text("('{}')") ),
         sa.Column("trigger_type",    sa.String(64), nullable=True),
         sa.Column("created_at",      mysql.DATETIME(fsp=6), server_default=sa.text("now()"), nullable=False),
     )
     _ci("ix_escalation_events_conversation_id", "escalation_events", ["conversation_id"])
 
-    # unanswered_questions — depends on chat_conversations, users
+    # unanswered_questions - depends on chat_conversations, users
     _ct(
         "unanswered_questions",
         sa.Column("id",              sa.Uuid(native_uuid=False), primary_key=True),
@@ -376,7 +359,7 @@ def upgrade() -> None:
     _ci("ix_unanswered_questions_detected_topic",  "unanswered_questions", ["detected_topic"])
     _ci("ix_unanswered_questions_status",          "unanswered_questions", ["status"])
 
-    # notification_rules — no FK dependencies
+    # notification_rules - no FK dependencies
     _ct(
         "notification_rules",
         sa.Column("id",          sa.Uuid(native_uuid=False), primary_key=True),
@@ -390,23 +373,32 @@ def upgrade() -> None:
     )
     _ci("ix_notification_rules_event", "notification_rules", ["event"])
 
-    # notification_logs — no FK dependencies
+    # notification_logs - FK a users nullable: las notificaciones in-app se
+    # escriben una fila por destinatario (user_id); las de canal email o los
+    # eventos de sistema sin destinatario individual (p. ej. antes del fan-out)
+    # dejan user_id NULL.
     _ct(
         "notification_logs",
         sa.Column("id",            sa.Uuid(native_uuid=False), primary_key=True),
+        # Agrupa todas las filas nacidas de un mismo send_notification() -
+        # el historial las muestra como un único disparo con sus canales.
+        sa.Column("trigger_id",    sa.Uuid(native_uuid=False), nullable=False),
         sa.Column("event",         sa.String(50),  nullable=False),
         sa.Column("channel",       sa.String(20),  nullable=False),
         sa.Column("target",        sa.String(255), nullable=False),
         sa.Column("status",        sa.String(20),  nullable=False),
         sa.Column("error_message", sa.Text,        nullable=True),
         sa.Column("payload_json",  sa.JSON,        nullable=False, server_default=sa.text("('{}')") ),
+        sa.Column("user_id",       sa.Uuid(native_uuid=False), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=True),
         sa.Column("created_at",    mysql.DATETIME(fsp=6), server_default=sa.text("now()"), nullable=False),
         sa.Column("read_at",       mysql.DATETIME(fsp=6), nullable=True),
     )
+    _ci("ix_notification_logs_trigger_id", "notification_logs", ["trigger_id"])
     _ci("ix_notification_logs_event",      "notification_logs", ["event"])
     _ci("ix_notification_logs_created_at", "notification_logs", ["created_at"])
+    _ci("ix_notification_logs_user_id",    "notification_logs", ["user_id"])
 
-    # escalation_rules — no FK dependencies
+    # escalation_rules - no FK dependencies
     _ct(
         "escalation_rules",
         sa.Column("id",             sa.Uuid(native_uuid=False), primary_key=True),
@@ -419,7 +411,7 @@ def upgrade() -> None:
         sa.Column("updated_at",     mysql.DATETIME(fsp=6), server_default=sa.text("now()"), nullable=False),
     )
 
-    # audit_logs — depends on users
+    # audit_logs - depends on users
     _ct(
         "audit_logs",
         sa.Column("id",            sa.Uuid(native_uuid=False), primary_key=True),
@@ -430,10 +422,6 @@ def upgrade() -> None:
         sa.Column("meta_json",     sa.JSON,        nullable=False, server_default=sa.text("('{}')") ),
         sa.Column("ip",            sa.String(64),  nullable=True),
         sa.Column("user_agent",    sa.Text,        nullable=True),
-        # fsp=6: MySQL redondea DATETIME sin fsp al segundo mas cercano al
-        # guardar, lo que puede empujar una fila recien insertada fuera de
-        # una ventana "< now()" calculada milisegundos despues (conteos
-        # intermitentes de menos en /security/summary y reportes similares).
         sa.Column("created_at",    mysql.DATETIME(fsp=6), server_default=sa.text("now()"), nullable=False),
     )
     _ci("ix_audit_logs_actor_id",      "audit_logs", ["actor_id"])
@@ -442,7 +430,7 @@ def upgrade() -> None:
     _ci("ix_audit_logs_created_at",    "audit_logs", ["created_at"])
     op.create_index("ix_audit_logs_actor_created", "audit_logs", ["actor_id", "created_at"])
 
-    # rate_limit_events — no FK dependencies
+    # rate_limit_events - no FK dependencies
     _ct(
         "rate_limit_events",
         sa.Column("id",                    sa.Uuid(native_uuid=False), primary_key=True),
@@ -457,7 +445,7 @@ def upgrade() -> None:
     _ci("ix_rate_limit_events_identifier", "rate_limit_events", ["identifier"])
     _ci("ix_rate_limit_events_created_at", "rate_limit_events", ["created_at"])
 
-    # health_snapshots — no FK dependencies
+    # health_snapshots - no FK dependencies
     _ct(
         "health_snapshots",
         sa.Column("id",           sa.Uuid(native_uuid=False), primary_key=True),
@@ -473,7 +461,7 @@ def upgrade() -> None:
     _ci("ix_health_snapshots_service_name", "health_snapshots", ["service_name"])
     _ci("ix_health_snapshots_recorded_at",  "health_snapshots", ["recorded_at"])
 
-    # config_versions — depends on users, self-referential FK
+    # config_versions - depends on users, self-referential FK
     _ct(
         "config_versions",
         sa.Column("id",                      sa.Uuid(native_uuid=False), primary_key=True),
@@ -489,9 +477,11 @@ def upgrade() -> None:
         sa.Column("created_at",              mysql.DATETIME(fsp=6), server_default=sa.text("now()"), nullable=False),
     )
     _ci("ix_config_versions_parent_version_id", "config_versions", ["parent_version_id"])
+    _ci("ix_config_versions_trigger_created", "config_versions", ["trigger_source", "created_at"])
 
 
 def downgrade() -> None:
+    op.drop_index("ix_config_versions_trigger_created", table_name="config_versions")
     op.drop_table("config_versions")
     op.drop_table("health_snapshots")
     op.drop_table("rate_limit_events")
@@ -516,4 +506,3 @@ def downgrade() -> None:
     op.drop_table("users")
     op.drop_table("modules")
     op.drop_table("roles")
-    # MySQL: no hay tipos ENUM nombrados a nivel servidor — nada que limpiar aquí.
