@@ -151,7 +151,7 @@ export default function InvitePage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <div className="bg-card rounded-2xl shadow-sm border border-border p-8 max-w-md w-full space-y-6">
-        {/* Header */}
+        {/* Encabezado */}
         <div className="text-center space-y-3">
           <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
             <Bot className="w-7 h-7 text-primary" />
@@ -162,7 +162,7 @@ export default function InvitePage() {
           </div>
         </div>
 
-        {/* Invite info */}
+        {/* Información de la invitación */}
         <div className="bg-muted/50 rounded-xl p-4 space-y-2">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-primary shrink-0" />
@@ -186,7 +186,7 @@ export default function InvitePage() {
           </div>
         </div>
 
-        {/* Form */}
+        {/* Formulario */}
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           {serverError && (
             <Alert variant="destructive">

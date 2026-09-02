@@ -14,7 +14,7 @@ import { PERM } from "@/lib/permissions";
 import { useToast } from "@/components/ui/toast";
 import {
   Users, UserPlus, Pencil, Trash2, ShieldCheck, CheckCircle, Clock,
-  Copy, XCircle, AlertCircle, Check, X, Save, Loader2, Send,
+  Copy, XCircle, AlertCircle, Check, X, Save, Loader2, Send, KeyRound, RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -22,11 +22,13 @@ import { Modal } from "@/components/composed/modal";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Select, SelectOption } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { StatCard } from "@/components/composed/stat-card";
+import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/composed/data-table";
 import { formatInProjectTz } from "@/lib/datetime";
 
@@ -53,6 +55,22 @@ function buildInviteUrl(token: string) {
   return `${window.location.origin}/invite/${token}`;
 }
 
+type InviteStatus = "active" | "expired" | "accepted" | "revoked";
+
+function inviteStatus(inv: Invitation): InviteStatus {
+  if (inv.accepted_at) return "accepted";
+  if (!inv.is_active) return "revoked";
+  if (new Date(inv.expires_at) < new Date()) return "expired";
+  return "active";
+}
+
+const INVITE_STATUS_META: Record<InviteStatus, { label: string; className: string }> = {
+  active: { label: "Activa", className: "bg-success/10 text-success" },
+  expired: { label: "Expirada", className: "bg-warning/10 text-warning" },
+  accepted: { label: "Aceptada", className: "bg-primary/10 text-primary" },
+  revoked: { label: "Revocada", className: "bg-muted text-muted-foreground" },
+};
+
 function UserAvatar({ name, email }: { name: string; email: string }) {
   const initials = name.split(" ").slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
   const colors = [
@@ -69,7 +87,7 @@ function UserAvatar({ name, email }: { name: string; email: string }) {
 const editUserSchema = z.object({
   fullName: z.string().min(1, "El nombre no puede estar vacío"),
   role: z.string(),
-  isActive: z.string(),
+  isActive: z.boolean(),
 });
 
 function EditUserPanel({ user, meId, availableRoles, onClose, onSaved }: {
@@ -78,18 +96,19 @@ function EditUserPanel({ user, meId, availableRoles, onClose, onSaved }: {
 }) {
   const [error, setError] = useState<string | null>(null);
   const isSelf = !!user && user.id === meId;
+  const { toast } = useToast();
 
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<z.infer<typeof editUserSchema>>({
+  const { register, handleSubmit, reset, watch, setValue, formState: { errors, isSubmitting } } = useForm<z.infer<typeof editUserSchema>>({
     resolver: zodResolver(editUserSchema),
     defaultValues: {
       fullName: user?.full_name ?? "",
       role: user?.role ?? "viewer",
-      isActive: user?.is_active ? "active" : "inactive",
+      isActive: user?.is_active ?? true,
     },
   });
 
   useEffect(() => {
-    if (user) reset({ fullName: user.full_name, role: user.role, isActive: user.is_active ? "active" : "inactive" });
+    if (user) reset({ fullName: user.full_name, role: user.role, isActive: user.is_active });
   }, [user?.id, reset]);
 
   const onSubmit = handleSubmit(async (data) => {
@@ -97,8 +116,9 @@ function EditUserPanel({ user, meId, availableRoles, onClose, onSaved }: {
     setError(null);
     try {
       const body: Record<string, unknown> = { full_name: data.fullName.trim() };
-      if (!isSelf) { body.role = data.role; body.is_active = data.isActive === "active"; }
+      if (!isSelf) { body.role = data.role; body.is_active = data.isActive; }
       await api.patch(`/users/${user.id}`, body);
+      toast({ type: "success", message: "Usuario actualizado." });
       onSaved(); onClose();
     } catch (err: unknown) {
       setError(getErrorMessage(err, "No se pudo actualizar"));
@@ -149,12 +169,12 @@ function EditUserPanel({ user, meId, availableRoles, onClose, onSaved }: {
                   ))}
                 </Select>
               </div>
-              <div>
-                <label className="text-13 font-medium text-foreground mb-1.5 block">Estado de acceso</label>
-                <Select {...register("isActive")}>
-                  <SelectOption value="active">Activo</SelectOption>
-                  <SelectOption value="inactive">Inactivo</SelectOption>
-                </Select>
+              <div className="flex items-center gap-3 rounded-lg border px-3 py-2.5 bg-muted/30">
+                <Switch checked={watch("isActive")} onCheckedChange={(checked) => setValue("isActive", checked, { shouldDirty: true })} />
+                <div>
+                  <p className="text-13 font-medium">Estado de acceso</p>
+                  <p className="text-2xs text-muted-foreground">{watch("isActive") ? "Activo" : "Inactivo"}</p>
+                </div>
               </div>
             </>
           )}
@@ -177,6 +197,7 @@ function InvitePanel({ open, availableRoles, onClose, onCreated }: {
 }) {
   const [error, setError] = useState<string | null>(null);
   const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
+  const [emailSent, setEmailSent] = useState(true);
   const [copied, setCopied] = useState(false);
 
   const { register, handleSubmit, control, reset, watch, formState: { errors, isSubmitting } } = useForm<z.infer<typeof inviteSchema>>({
@@ -185,7 +206,7 @@ function InvitePanel({ open, availableRoles, onClose, onCreated }: {
   });
 
   useEffect(() => {
-    if (!open) { reset({ email: "", role: "viewer", days: 7 }); setError(null); setGeneratedUrl(null); setCopied(false); }
+    if (!open) { reset({ email: "", role: "viewer", days: 7 }); setError(null); setGeneratedUrl(null); setEmailSent(true); setCopied(false); }
   }, [open, reset]);
 
   const days = watch("days");
@@ -196,7 +217,9 @@ function InvitePanel({ open, availableRoles, onClose, onCreated }: {
       const { data: result } = await api.post<Invitation>("/users/invitations", {
         email: data.email.trim(), role: data.role, expires_in_days: data.days,
       });
-      setGeneratedUrl(buildInviteUrl(result.token)); onCreated();
+      setGeneratedUrl(buildInviteUrl(result.token));
+      setEmailSent(result.email_sent ?? false);
+      onCreated();
     } catch (err: unknown) {
       setError(getErrorMessage(err, "No se pudo generar la invitación"));
     }
@@ -233,12 +256,16 @@ function InvitePanel({ open, availableRoles, onClose, onCreated }: {
     >
       {generatedUrl ? (
         <div className="flex flex-col items-center justify-center py-8 gap-5 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-success/10 flex items-center justify-center">
-            <CheckCircle className="w-7 h-7 text-success" />
+          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${emailSent ? "bg-success/10" : "bg-warning/10"}`}>
+            <CheckCircle className={`w-7 h-7 ${emailSent ? "text-success" : "text-warning"}`} />
           </div>
           <div>
-            <p className="font-semibold text-foreground">Invitación enviada</p>
-            <p className="text-sm text-muted-foreground mt-1">Se envió un correo a <strong>{watch("email")}</strong> con el enlace de acceso.</p>
+            <p className="font-semibold text-foreground">{emailSent ? "Invitación enviada" : "Invitación creada"}</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {emailSent
+                ? <>Se envió un correo a <strong>{watch("email")}</strong> con el enlace de acceso.</>
+                : <>No se pudo enviar el correo a <strong>{watch("email")}</strong>. Comparte el enlace manualmente.</>}
+            </p>
           </div>
           <div className="w-full bg-card border border-border rounded-xl p-4 text-left">
             <p className="text-2xs text-muted-foreground mb-1.5 font-medium uppercase tracking-wide">Enlace de acceso (respaldo)</p>
@@ -285,6 +312,53 @@ function InvitePanel({ open, availableRoles, onClose, onCreated }: {
   );
 }
 
+function ResetPasswordResultModal({ result, onClose }: {
+  result: { user: User; tempPassword: string } | null; onClose: () => void;
+}) {
+  const { toast } = useToast();
+
+  const handleCopy = () => {
+    if (!result) return;
+    navigator.clipboard.writeText(result.tempPassword).then(() =>
+      toast({ type: "success", message: "Contraseña copiada.", duration: 1500 })
+    );
+  };
+
+  return (
+    <Modal
+      open={!!result}
+      onClose={onClose}
+      title="Contraseña temporal generada"
+      size="md"
+      footer={
+        <Button className="flex-1 gap-1.5" onClick={onClose}>
+          <Check className="w-3.5 h-3.5" /> Entendido
+        </Button>
+      }
+    >
+      {result && (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Comparta esta contraseña con <span className="font-semibold text-foreground">{result.user.full_name}</span> por
+            un canal seguro. Deberá cambiarla en su próximo inicio de sesión.
+          </p>
+          <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2.5">
+            <code className="flex-1 font-mono text-sm text-foreground tracking-wide select-all">{result.tempPassword}</code>
+            <Button variant="ghost" size="icon-xs" onClick={handleCopy} title="Copiar">
+              <Copy className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+          <Alert variant="warning">
+            <AlertDescription className="text-2xs">
+              Esta contraseña no volverá a mostrarse. Si la pierde, deberá generar una nueva.
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
 function UsuariosTab() {
   const { user: me } = useAuth();
   const can = usePermission();
@@ -294,6 +368,7 @@ function UsuariosTab() {
   const { toast, confirm } = useToast();
   const [editUser, setEditUser] = useState<User | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [resetResult, setResetResult] = useState<{ user: User; tempPassword: string } | null>(null);
   const [usersPage, setUsersPage] = useState(1);
   const [usersPageSize, setUsersPageSize] = useState(20);
   const [invitesPage, setInvitesPage] = useState(1);
@@ -302,7 +377,7 @@ function UsuariosTab() {
   const { data: usersData, loading, error: usersError, refetch: loadUsers } =
     useApi<{ items: User[]; total: number }>(`/users?page=${usersPage}&page_size=${usersPageSize}`);
   const { data: invitationsData, refetch: loadInvitations } =
-    useApi<{ items: Invitation[]; total: number }>(`/users/invitations?active_only=true&page=${invitesPage}&page_size=${invitesPageSize}`);
+    useApi<{ items: Invitation[]; total: number }>(`/users/invitations?page=${invitesPage}&page_size=${invitesPageSize}`);
   const { data: summaryData } = useApi<{ total_members: number; active: number; no_access_yet: number; admins: number }>("/users/summary");
   const { data: rolesData } = useApi<Role[]>("/rbac/roles");
   const users = usersData?.items ?? [];
@@ -318,8 +393,25 @@ function UsuariosTab() {
   const handleDelete = async (u: User) => {
     const ok = await confirm({ title: `¿Eliminar a ${u.full_name}?`, message: "Esta acción no se puede deshacer", confirmText: "Eliminar", variant: "danger" });
     if (ok) {
-      try { await api.delete(`/users/${u.id}`); loadUsers(); }
+      try { await api.delete(`/users/${u.id}`); loadUsers(); toast({ type: "success", message: "Usuario eliminado." }); }
       catch (err: unknown) { toast({ type: "error", message: getErrorMessage(err, "No se pudo eliminar") }); }
+    }
+  };
+
+  const handleResetPassword = async (u: User) => {
+    const ok = await confirm({
+      title: `¿Resetear contraseña de ${u.full_name}?`,
+      message: "Se generará una contraseña temporal y el usuario deberá cambiarla en su próximo inicio de sesión. Su sesión actual se cerrará.",
+      confirmText: "Resetear",
+      variant: "danger",
+    });
+    if (!ok) return;
+    try {
+      const { data } = await api.post<{ temp_password: string; user: User }>(`/users/${u.id}/reset-password`);
+      setResetResult({ user: data.user, tempPassword: data.temp_password });
+      loadUsers();
+    } catch (err: unknown) {
+      toast({ type: "error", message: getErrorMessage(err, "No se pudo resetear la contraseña.") });
     }
   };
 
@@ -335,15 +427,49 @@ function UsuariosTab() {
     }
   };
 
+  const handleDeleteInvite = async (inv: Invitation) => {
+    const ok = await confirm({
+      title: "¿Eliminar esta invitación?",
+      message: "Se eliminará permanentemente de la lista. Esta acción no se puede deshacer.",
+      confirmText: "Eliminar",
+      variant: "danger",
+    });
+    if (!ok) return;
+    try {
+      await api.delete(`/users/invitations/${inv.id}/permanent`);
+      toast({ type: "success", message: "Invitación eliminada.", duration: 1500 });
+      loadInvitations();
+    } catch (err) {
+      toast({ type: "error", message: getErrorMessage(err, "No se pudo eliminar la invitación.") });
+    }
+  };
+
+  const handleResendInvite = async (inv: Invitation) => {
+    const ok = await confirm({
+      title: "¿Reenviar invitación?",
+      message: `Se generará un nuevo enlace para ${inv.email} y el anterior dejará de funcionar.`,
+      confirmText: "Reenviar",
+    });
+    if (!ok) return;
+    try {
+      await api.post(`/users/invitations/${inv.id}/resend`);
+      toast({ type: "success", message: "Invitación reenviada." });
+      loadInvitations();
+    } catch (err) {
+      toast({ type: "error", message: getErrorMessage(err, "No se pudo reenviar la invitación.") });
+    }
+  };
+
   const pendingInvites = invitations;
 
   return (
     <div className="space-y-6">
       <EditUserPanel key={editUser?.id} user={editUser} meId={me?.id} availableRoles={availableRoles} onClose={() => setEditUser(null)} onSaved={loadUsers} />
       <InvitePanel key={inviteOpen ? "open" : "closed"} open={inviteOpen} availableRoles={availableRoles} onClose={() => setInviteOpen(false)} onCreated={loadInvitations} />
+      <ResetPasswordResultModal result={resetResult} onClose={() => setResetResult(null)} />
 
       {/* Stats: conteos agregados del equipo completo, independientes de la
-          paginación de la tabla — ver GET /users/summary. */}
+          paginación de la tabla - ver GET /users/summary. */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard title="Total miembros" value={summaryData?.total_members ?? 0} icon={Users} loading={loading} />
         <StatCard title="Activos" value={summaryData?.active ?? 0} icon={CheckCircle} accent="green" loading={loading} />
@@ -380,7 +506,7 @@ function UsuariosTab() {
             { id: "rol", header: "Rol", className: "w-36", hideBelow: "sm" },
             { id: "estado", header: "Estado", className: "w-24", hideBelow: "sm" },
             { id: "ultimo_acceso", header: "Último acceso", hideBelow: "lg" },
-            { id: "acciones", header: "Acciones", className: "w-24", sticky: true },
+            { id: "acciones", header: "Acciones", className: "whitespace-nowrap", sticky: true },
           ]}
           data={users}
           rowKey={(u) => u.id}
@@ -401,18 +527,21 @@ function UsuariosTab() {
                 </span>
               </TableCell>
               <TableCell className="hidden sm:table-cell">
-                <span className={`inline-flex items-center gap-1.5 text-[12px] font-medium ${u.is_active ? "text-success" : "text-muted-foreground"}`}>
+                <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${u.is_active ? "text-success" : "text-muted-foreground"}`}>
                   <span className={`w-1.5 h-1.5 rounded-full ${u.is_active ? "bg-success" : "bg-muted-foreground"}`} />
                   {u.is_active ? "Activo" : "Inactivo"}
                 </span>
               </TableCell>
               <TableCell className="hidden lg:table-cell">
-                <span className="text-[12px] text-muted-foreground tabular-nums">{timeAgo(u.last_login_at)}</span>
+                <span className="text-xs text-muted-foreground tabular-nums">{timeAgo(u.last_login_at)}</span>
               </TableCell>
-              <TableCell sticky>
-                <div className="flex items-center gap-1 justify-end">
+              <TableCell sticky className="whitespace-nowrap">
+                <div className="flex w-full items-center gap-1 justify-end">
                   {(canUpdateUsers || u.id === me?.id) && (
                     <Button variant="ghost" size="icon-xs" onClick={() => setEditUser(u)} title="Editar"><Pencil className="h-3.5 w-3.5" /></Button>
+                  )}
+                  {canManageUsers && u.id !== me?.id && (
+                    <Button variant="ghost" size="icon-xs" onClick={() => handleResetPassword(u)} title="Resetear contraseña"><KeyRound className="h-3.5 w-3.5" /></Button>
                   )}
                   {canDeleteUsers && (
                     <Button variant="ghost" size="icon-xs" onClick={() => handleDelete(u)} disabled={u.id === me?.id} title="Eliminar" className="hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></Button>
@@ -429,7 +558,7 @@ function UsuariosTab() {
         <div className="flex items-center gap-2 px-5 py-4 border-b border-border/60">
           <h3 className="text-sm font-semibold text-foreground">Invitaciones pendientes</h3>
           {invitationsTotal > 0 && (
-            <span className="text-2xs px-1.5 py-0.5 rounded-full font-semibold text-warning">{invitationsTotal}</span>
+            <Badge variant="warning" size="xs">{invitationsTotal}</Badge>
           )}
         </div>
         <DataTable
@@ -439,12 +568,16 @@ function UsuariosTab() {
           columns={[
             { id: "destinatario", header: "Destinatario" },
             { id: "rol", header: "Rol", className: "w-36", hideBelow: "sm" },
+            { id: "estado", header: "Estado", className: "w-28", hideBelow: "sm" },
             { id: "expira", header: "Expira", className: "w-32", hideBelow: "sm" },
-            { id: "acciones", header: "Acciones", className: "w-24", sticky: true },
+            { id: "acciones", header: "Acciones", className: "whitespace-nowrap", sticky: true },
           ]}
           data={pendingInvites}
           rowKey={(inv) => inv.id}
-          renderRow={(inv) => (
+          renderRow={(inv) => {
+            const status = inviteStatus(inv);
+            const statusMeta = INVITE_STATUS_META[status];
+            return (
             <TableRow>
               <TableCell className="truncate max-w-40" title={inv.email}>{inv.email}</TableCell>
               <TableCell className="hidden sm:table-cell">
@@ -452,19 +585,33 @@ function UsuariosTab() {
                   {availableRoles.find((r) => r.name === inv.role)?.display_name ?? inv.role}
                 </span>
               </TableCell>
-              <TableCell className="hidden sm:table-cell text-[12px] text-muted-foreground">
+              <TableCell className="hidden sm:table-cell">
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-semibold ${statusMeta.className}`}>
+                  {statusMeta.label}
+                </span>
+              </TableCell>
+              <TableCell className="hidden sm:table-cell text-xs text-muted-foreground">
                 {new Date(inv.expires_at).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })}
               </TableCell>
-              <TableCell sticky>
-                <div className="flex items-center gap-1 justify-end">
-                  <Button variant="ghost" size="icon-xs" onClick={() => handleCopyInvite(inv.token)} title="Copiar enlace"><Copy className="w-3.5 h-3.5" /></Button>
-                  {canManageUsers && (
+              <TableCell sticky className="whitespace-nowrap">
+                <div className="flex w-full items-center gap-1 justify-end">
+                  {status === "active" && (
+                    <Button variant="ghost" size="icon-xs" onClick={() => handleCopyInvite(inv.token)} title="Copiar enlace"><Copy className="w-3.5 h-3.5" /></Button>
+                  )}
+                  {canManageUsers && status !== "accepted" && (
+                    <Button variant="ghost" size="icon-xs" onClick={() => handleResendInvite(inv)} title="Reenviar"><RefreshCw className="w-3.5 h-3.5" /></Button>
+                  )}
+                  {canManageUsers && status === "active" && (
                     <Button variant="ghost" size="icon-xs" onClick={() => handleRevokeInvite(inv)} className="hover:text-destructive" title="Revocar"><XCircle className="w-3.5 h-3.5" /></Button>
+                  )}
+                  {canManageUsers && status !== "active" && (
+                    <Button variant="ghost" size="icon-xs" onClick={() => handleDeleteInvite(inv)} className="hover:text-destructive" title="Eliminar"><Trash2 className="w-3.5 h-3.5" /></Button>
                   )}
                 </div>
               </TableCell>
             </TableRow>
-          )}
+            );
+          }}
         />
       </Card>
     </div>

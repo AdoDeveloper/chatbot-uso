@@ -17,12 +17,16 @@ export function useOnboardingStatus() {
   const [status, setStatus] = useState<OnboardingStatus | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const refresh = useCallback(() => {
+  const refresh = useCallback(async () => {
     setLoading(true);
-    api.get<OnboardingStatus>("/auth/onboarding-status")
-      .then(({ data }) => setStatus(data))
-      .catch(() => setStatus(null))
-      .finally(() => setLoading(false));
+    try {
+      const { data } = await api.get<OnboardingStatus>("/auth/onboarding-status");
+      setStatus(data);
+    } catch {
+      setStatus(null);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { refresh(); }, [refresh]);
@@ -37,7 +41,17 @@ export function useOnboardingStatus() {
     }
   }
 
+  async function reset() {
+    const snapshot = status;
+    setStatus((s) => (s ? { ...s, dismissed: false } : s));
+    try {
+      await api.post("/auth/onboarding-reset");
+    } catch {
+      setStatus(snapshot);
+    }
+  }
+
   const shouldShow = !!status && !status.dismissed && status.step !== "done";
 
-  return { status, loading, shouldShow, refresh, dismiss };
+  return { status, loading, shouldShow, refresh, dismiss, reset };
 }

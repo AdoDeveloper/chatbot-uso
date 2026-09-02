@@ -6,18 +6,17 @@ import {
   CheckCheck, Ban, Clock, X,
 } from "lucide-react";
 import api from "@/lib/api";
+import { invalidateApiCache } from "@/hooks/use-api";
 import type { Source } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 export const TYPE_ICON: Record<string, React.ElementType> = {
-  pdf: FileText, docx: FileText, xlsx: FileText,
-  csv: FileText, txt: FileText, faq: BookOpen,
+  pdf: FileText, docx: FileText, txt: FileText, faq: BookOpen,
 };
 
 export const TYPE_LABEL: Record<string, string> = {
-  pdf: "PDF", docx: "Word", xlsx: "Excel",
-  csv: "CSV", txt: "TXT", faq: "FAQ",
+  pdf: "PDF", docx: "Word", txt: "TXT", faq: "FAQ",
 };
 
 export const STATUS_BADGE: Record<string, string> = {
@@ -41,7 +40,7 @@ export const REVIEW_BADGE: Record<string, ReviewBadge> = {
 };
 
 export function fmtSize(bytes: number | null) {
-  if (!bytes) return "—";
+  if (!bytes) return "N/A";
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
@@ -54,8 +53,7 @@ export function parseStage(stage: string | null, sourceType: string): StageInfo 
   if (stage === "parsing") {
     const typeLabel: Record<string, string> = {
       pdf: "Extrayendo texto del PDF...",
-      docx: "Leyendo documento Word...", xlsx: "Procesando hoja de cálculo...",
-      csv: "Leyendo archivo CSV...", txt: "Leyendo archivo de texto...",
+      docx: "Leyendo documento Word...", txt: "Leyendo archivo de texto...",
     };
     return { icon: FileSearch, label: typeLabel[sourceType] ?? "Extrayendo contenido...", percent: null };
   }
@@ -118,5 +116,6 @@ export function TagInput({ value, onChange }: { value: string[]; onChange: (v: s
 }
 
 export async function patchSourceTags(sourceId: string, tags: string[]) {
+  invalidateApiCache("/sources");
   await api.patch(`/sources/${sourceId}`, { tags });
 }

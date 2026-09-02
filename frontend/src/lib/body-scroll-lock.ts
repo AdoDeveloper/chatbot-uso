@@ -1,6 +1,4 @@
-// Contador de referencias compartido entre Dialog y Sheet: al cerrar uno de
-// varios overlays abiertos simultáneamente, el scroll del body solo debe
-// restaurarse cuando el último overlay se cierra, no con cualquier cleanup.
+// Contador compartido entre Dialog y Sheet: el scroll solo se restaura cuando se cierra el último overlay abierto.
 let lockCount = 0
 
 export function lockBodyScroll() {

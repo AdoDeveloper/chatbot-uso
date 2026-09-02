@@ -12,6 +12,8 @@ interface DialogContextValue {
 }
 const DialogCtx = React.createContext<DialogContextValue>({ open: false, onOpenChange: () => {} })
 
+const openDialogStack: Array<() => void> = []
+
 /* ── Root ── */
 function Dialog({
   open,
@@ -59,11 +61,19 @@ function DialogContent({
 
   React.useEffect(() => {
     if (!open) return
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onOpenChangeRef.current(false) }
+    const close = () => onOpenChangeRef.current(false)
+    openDialogStack.push(close)
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return
+      // Solo se cierra el diálogo superior (el abierto más recientemente).
+      if (openDialogStack[openDialogStack.length - 1] === close) close()
+    }
     document.addEventListener("keydown", handler)
     lockBodyScroll()
     return () => {
       document.removeEventListener("keydown", handler)
+      const idx = openDialogStack.lastIndexOf(close)
+      if (idx !== -1) openDialogStack.splice(idx, 1)
       unlockBodyScroll()
       triggerRef.current?.focus?.()
     }

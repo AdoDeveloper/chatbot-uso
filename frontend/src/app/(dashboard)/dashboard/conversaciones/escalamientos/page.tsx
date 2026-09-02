@@ -2,14 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  Loader2, CheckCircle2, MessageSquare,
+  Loader2, CheckCircle2, MessageSquare, TrendingUp, Timer, Star,
   ExternalLink, Tag, X as XIcon,
 } from "lucide-react";
 import Link from "next/link";
 import api from "@/lib/api";
 import { useApi, getErrorMessage } from "@/hooks/use-api";
 import { useToast } from "@/components/ui/toast";
-import type { ChatConversationOut, ConversationStatus, ConversationTag } from "@/types";
+import type { ChatConversationOut, ConversationStatus, ConversationTag, EscalationTrigger } from "@/types";
 import { Input } from "@/components/ui/input";
 import { Select, SelectOption } from "@/components/ui/select";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -20,12 +20,100 @@ import { Card } from "@/components/ui/card";
 import { ConversacionesTabs } from "../_components/ConversacionesTabs";
 import { SegmentedControl } from "@/components/composed/segmented-control";
 import { TablePagination } from "@/components/composed/table-pagination";
+import { StatCard } from "@/components/composed/stat-card";
 import { PageHeader } from "@/components/ui/page-header";
 import { formatInProjectTz } from "@/lib/datetime";
+import { TRIGGER_LABEL_SHORT } from "@/lib/escalation-labels";
 
-function deviceLabel(device: string | null, browser: string | null) {
-  const parts = [device, browser].filter(Boolean);
-  return parts.length ? parts.join(" · ") : "Desconocido";
+interface EscalationMetrics {
+  days: number;
+  total: number;
+  by_status: Record<string, number>;
+  by_trigger: Record<string, number>;
+  avg_resolution_seconds: number | null;
+  resolved_count: number;
+  resolution_rate: number | null;
+  csat_avg: number | null;
+}
+
+function formatDuration(seconds: number | null) {
+  if (seconds == null) return "-";
+  const h = Math.floor(seconds / 3600);
+  const m = Math.round((seconds % 3600) / 60);
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+function MetricsPanel({ metrics, loading }: { metrics: EscalationMetrics | null; loading: boolean }) {
+  const triggerEntries = Object.entries(metrics?.by_trigger ?? {}).sort((a, b) => b[1] - a[1]);
+  const triggerTotal = triggerEntries.reduce((sum, [, n]) => sum + n, 0);
+
+  return (
+    <div className="mb-4 space-y-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <StatCard
+          title="Escalamientos"
+          value={metrics ? String(metrics.total) : "-"}
+          description="Últimos 30 días"
+          icon={MessageSquare}
+          loading={loading}
+        />
+        <StatCard
+          title="Tasa de resolución"
+          value={metrics?.resolution_rate != null ? `${Math.round(metrics.resolution_rate * 100)}%` : "-"}
+          description={metrics ? `${metrics.resolved_count} resueltos` : undefined}
+          icon={TrendingUp}
+          accent="green"
+          loading={loading}
+        />
+        <StatCard
+          title="Tiempo de resolución"
+          value={formatDuration(metrics?.avg_resolution_seconds ?? null)}
+          description="Promedio"
+          icon={Timer}
+          accent="teal"
+          loading={loading}
+        />
+        <StatCard
+          title="CSAT promedio"
+          value={metrics?.csat_avg != null ? `${metrics.csat_avg.toFixed(1)}/5` : "-"}
+          description="De quienes valoraron"
+          icon={Star}
+          accent="amber"
+          loading={loading}
+        />
+      </div>
+
+      {!loading && triggerEntries.length > 0 && (
+        <Card className="p-4">
+          <p className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+            Motivos de escalamiento
+          </p>
+          <div className="space-y-2">
+            {triggerEntries.map(([trigger, count]) => {
+              const pct = triggerTotal > 0 ? Math.round((count / triggerTotal) * 100) : 0;
+              const label = TRIGGER_LABEL_SHORT[trigger as EscalationTrigger | "manual"] ?? trigger;
+              return (
+                <div key={trigger} className="flex items-center gap-3">
+                  <span className="text-13 text-foreground w-40 shrink-0 truncate">{label}</span>
+                  <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                    <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
+                  </div>
+                  <span className="text-2xs text-muted-foreground tabular-nums w-14 text-right shrink-0">
+                    {count} ({pct}%)
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+function deviceLabel(browser: string | null) {
+  return browser || "Desconocido";
 }
 
 type BadgeVariant = "secondary" | "warning" | "info" | "success" | "muted";
@@ -42,15 +130,7 @@ const FILTER_LABELS: Record<FilterState, string> = {
   resolved:     "Resueltos",
 };
 
-const TRIGGER_DISPLAY: Record<string, string> = {
-  no_answer:         "Sin respuesta",
-  user_request:      "Solicitud del usuario",
-  negative_feedback: "Valoración negativa",
-  keyword_detected:  "Palabra crítica",
-  confidence_below:  "Confianza baja",
-  loop_detected:     "Bucle de respuestas",
-  manual:            "Manual",
-};
+const TRIGGER_DISPLAY = TRIGGER_LABEL_SHORT;
 
 function CaseCard({
   conv,
@@ -58,12 +138,14 @@ function CaseCard({
   onToggleSelect,
   onResolve,
   resolving,
+  csatReasonLabels,
 }: {
   conv: ChatConversationOut;
   selected: boolean;
   onToggleSelect: (id: string) => void;
   onResolve: (id: string) => void;
   resolving: boolean;
+  csatReasonLabels: Record<string, string>;
 }) {
   const badge = STATUS_BADGE[conv.status];
 
@@ -81,13 +163,13 @@ function CaseCard({
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             <Badge variant={badge.variant} size="xs">{badge.label}</Badge>
             <span className="text-2xs text-muted-foreground font-mono">#{conv.id.slice(0, 8)}</span>
-            <span className="text-2xs text-muted-foreground">{deviceLabel(conv.device, conv.browser)}</span>
+            <span className="text-2xs text-muted-foreground">{deviceLabel(conv.browser)}</span>
             {conv.csat_score != null && (
               <Badge variant="success" size="xs">CSAT {conv.csat_score}/5</Badge>
             )}
             {conv.escalation_trigger_reason && (
               <Badge variant="warning" size="xs" className="max-w-40 sm:max-w-56 truncate" title={conv.escalation_trigger_reason}>
-                {TRIGGER_DISPLAY[conv.escalation_trigger_reason.split(":")[0]?.trim()] ?? conv.escalation_trigger_reason}
+                {TRIGGER_DISPLAY[conv.escalation_trigger_reason.split(":")[0]?.trim() as keyof typeof TRIGGER_DISPLAY] ?? conv.escalation_trigger_reason}
               </Badge>
             )}
             {(conv.tags ?? []).slice(0, 4).map((t) => (
@@ -101,6 +183,25 @@ function CaseCard({
           <p className="text-13 text-foreground leading-snug line-clamp-2">
             {conv.first_user_message ?? "(sin mensaje)"}
           </p>
+
+          {(conv.csat_reasons?.length > 0 || conv.csat_comment) && (
+            <div className="mt-1.5 flex flex-col gap-1">
+              {conv.csat_reasons?.length > 0 && (
+                <div className="flex items-center gap-1 flex-wrap">
+                  {conv.csat_reasons.map((r) => (
+                    <Badge key={r} variant="muted" size="xs">
+                      {csatReasonLabels[r] ?? r}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+              {conv.csat_comment && (
+                <p className="text-2xs text-muted-foreground italic leading-snug line-clamp-2">
+                  &quot;{conv.csat_comment}&quot;
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="flex items-center gap-3 mt-2 text-2xs text-muted-foreground flex-wrap">
             <span className="flex items-center gap-1">
@@ -153,7 +254,7 @@ interface ConversationPage {
 }
 
 export default function EscalamientosPage() {
-  const { toast } = useToast();
+  const { toast, confirm } = useToast();
   const [filter, setFilter] = useState<FilterState>("escalated");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
@@ -163,10 +264,14 @@ export default function EscalamientosPage() {
   const [bulkTagInput, setBulkTagInput] = useState("");
   const [tagFilter, setTagFilter] = useState<string>("");
   const [resolvingIds, setResolvingIds] = useState<Set<string>>(new Set());
-  const [, setRefreshing] = useState(false);
 
   const { data: knownTagsData, refetch: refetchTags } = useApi<ConversationTag[]>("/conversations/tags");
   const knownTags = knownTagsData ?? [];
+
+  const { data: metrics, loading: metricsLoading, error: metricsError, refetch: refetchMetrics } = useApi<EscalationMetrics>("/escalation/metrics?days=30");
+
+  const { data: csatReasonLabelsData } = useApi<Record<string, string>>("/conversations/csat-reason-labels");
+  const csatReasonLabels = csatReasonLabelsData ?? {};
 
   const baseQuery = useMemo(() => {
     const tagParam = tagFilter ? `&tag=${encodeURIComponent(tagFilter)}` : "";
@@ -191,14 +296,14 @@ export default function EscalamientosPage() {
     if (loadError) toast({ type: "error", message: "Error al cargar los escalamientos." });
   }, [loadError, toast]);
 
+  // Limpia la selección al cambiar de filtro: evita bulk actions sobre IDs ya no visibles.
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [filter, tagFilter]);
+
   async function load() {
-    setRefreshing(true);
-    try {
-      await Promise.all([primaryQ.refetch()]);
-      toast({ type: "success", message: "Escalamientos actualizados.", duration: 2000 });
-    } finally {
-      setRefreshing(false);
-    }
+    await Promise.all([primaryQ.refetch(), refetchMetrics()]);
+    toast({ type: "success", message: "Escalamientos actualizados.", duration: 2000 });
   }
 
   function toggleSelect(id: string) {
@@ -240,6 +345,12 @@ export default function EscalamientosPage() {
   }
 
   async function resolveOne(id: string) {
+    const ok = await confirm({
+      title: "¿Marcar como resuelta?",
+      message: "La conversación pasará a la pestaña de resueltos.",
+      confirmText: "Marcar resuelta",
+    });
+    if (!ok) return;
     setResolvingIds((prev) => new Set(prev).add(id));
     try {
       const { data } = await api.post<{ affected: number; errors: { id: string; error: string }[] }>("/conversations/bulk", {
@@ -265,6 +376,12 @@ export default function EscalamientosPage() {
 
   async function bulkResolve() {
     if (selectedIds.size === 0) return;
+    const ok = await confirm({
+      title: "¿Marcar como resueltas?",
+      message: `${selectedIds.size} conversación${selectedIds.size !== 1 ? "es" : ""} seleccionada${selectedIds.size !== 1 ? "s" : ""} pasará${selectedIds.size !== 1 ? "n" : ""} a la pestaña de resueltos.`,
+      confirmText: "Marcar resueltas",
+    });
+    if (!ok) return;
     setBulkBusy(true);
     try {
       const { data } = await api.post<{ affected: number; errors: { id: string; error: string }[] }>("/conversations/bulk", {
@@ -295,8 +412,10 @@ export default function EscalamientosPage() {
 
       <ConversacionesTabs />
 
+      {!metricsError && <MetricsPanel metrics={metrics} loading={metricsLoading} />}
+
       <Card className="overflow-hidden">
-        {/* Header: contador + filtros */}
+        {/* Encabezado: contador + filtros */}
         <div className="flex flex-col gap-3 px-5 py-4 border-b border-border/60">
           <div className="flex items-center gap-2">
             <h2 className="text-base font-semibold flex-1 min-w-0 truncate">{FILTER_LABELS[filter]}</h2>
@@ -352,6 +471,7 @@ export default function EscalamientosPage() {
                 selected={selectedIds.has(conv.id)}
                 onToggleSelect={toggleSelect}
                 onResolve={resolveOne}
+                csatReasonLabels={csatReasonLabels}
                 resolving={resolvingIds.has(conv.id)}
               />
             ))}

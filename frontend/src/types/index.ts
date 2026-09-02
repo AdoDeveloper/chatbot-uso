@@ -1,5 +1,3 @@
-// UserRole ya no es un enum fijo — los roles son dinámicos.
-// Se mantiene el alias para compatibilidad con el código existente.
 export type UserRole = string;
 
 export interface User {
@@ -20,7 +18,7 @@ export interface TokenResponse {
   user: User;
 }
 
-export type SourceType = "pdf" | "docx" | "xlsx" | "csv" | "txt" | "faq";
+export type SourceType = "pdf" | "docx" | "txt" | "faq";
 export type SourceStatus = "pending" | "processing" | "ready" | "error";
 export type ReviewStatus = "procesando" | "pendiente_revision" | "aprobada" | "rechazada";
 
@@ -81,15 +79,12 @@ export interface LLMProvider {
 }
 
 export interface ChatbotSettings {
-  chatbot_name: string;
-  welcome_message: string;
   system_prompt: string;
   top_k: number;
   score_threshold: number;
   temperature: number;
   max_tokens: number;
   use_corrective_rag: boolean;
-  use_reranker: boolean;
   greeting_response: string;
   no_providers_message: string;
   guardrail_blocked_message: string;
@@ -106,6 +101,7 @@ export interface Invitation {
   is_active: boolean;
   created_at: string;
   invite_url: string | null;
+  email_sent: boolean | null;
 }
 
 export type ConversationStatus = "active" | "escalated" | "resolved";
@@ -129,17 +125,16 @@ export interface ChatConversationOut {
   session_id: string;
   user_id: string | null;
   status: ConversationStatus;
-  device: string | null;
   browser: string | null;
   origin_url: string | null;
   started_at: string;
   last_message_at: string;
   escalated_at: string | null;
-  assigned_to_user_id: string | null;
-  assigned_at: string | null;
   resolved_at: string | null;
   resolved_by_user_id: string | null;
   csat_score: number | null;
+  csat_comment: string | null;
+  csat_reasons: string[];
   escalation_trigger_reason: string | null;
   tags: string[];
   message_count: number;
@@ -312,6 +307,21 @@ export interface RuleTestResult {
   payload_preview: Record<string, unknown>;
 }
 
+export interface TriggerFieldSchema {
+  type: "int" | "float" | "list[str]";
+  default: number | string[];
+  label: string;
+  min?: number;
+  max?: number;
+  step?: number;
+  required?: boolean;
+}
+
+export interface TriggerSchemaOut {
+  trigger_type: EscalationTrigger;
+  fields: Record<string, TriggerFieldSchema>;
+}
+
 export interface EscalationRule {
   id: string;
   name: string;
@@ -370,7 +380,6 @@ export interface ServiceStatus {
 
 export interface ComputeDevice {
   embedding: string;
-  reranker: string;
   gpu_available: boolean;
 }
 

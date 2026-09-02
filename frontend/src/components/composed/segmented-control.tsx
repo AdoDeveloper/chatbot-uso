@@ -14,9 +14,9 @@ interface SegmentedControlProps<T extends string> {
   options: SegmentedOption<T>[];
   ariaLabel: string;
   /**
-   * "thumb": 2-4 opciones excluyentes tipo ambiente/rango de fecha —
+   * "thumb": 2-4 opciones excluyentes tipo ambiente/rango de fecha -
    * contenedor con padding y el activo resaltado con fondo + sombra.
-   * "chip": filtros de tags/estado — pills independientes, activo en color primary.
+   * "chip": filtros de tags/estado - pills independientes, activo en color primary.
    */
   variant?: "thumb" | "chip";
   className?: string;

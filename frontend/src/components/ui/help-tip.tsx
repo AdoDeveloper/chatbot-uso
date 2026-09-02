@@ -17,9 +17,9 @@ interface HelpTipProps {
 }
 
 /**
- * Rich contextual help popover. Click the ⓘ icon to open.
- * Supports title + description + optional example + optional "learn more" link.
- * Closes on outside click, Escape key, or when opening another HelpTip.
+ * Popover de ayuda contextual enriquecido. Clic en el ícono ⓘ para abrir.
+ * Soporta título + descripción + ejemplo opcional + enlace opcional "ver más".
+ * Se cierra con clic afuera, tecla Escape, o al abrir otro HelpTip.
  */
 export function HelpTip({
   title,
@@ -56,7 +56,7 @@ export function HelpTip({
   }, [open]);
 
   // El popover se posiciona con CSS puro (left-0/right-0) relativo al botón
-  // ⓘ — si el trigger está cerca de un borde de pantalla, un panel de w-72
+  // ⓘ - si el trigger está cerca de un borde de pantalla, un panel de w-72
   // (288px) fácilmente se sale del viewport en mobile. Corregimos midiendo
   // el overflow real tras montar y aplicando un translateX de vuelta a
   // pantalla, igual que en el dropdown de notificaciones.

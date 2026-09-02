@@ -5,12 +5,12 @@ import Link from "next/link";
 import { useApi } from "@/hooks/use-api";
 import type { AnalyticsDashboard, LLMProvider, Source, ChatConversationOut, HealthDetailed } from "@/types";
 import {
- MessageSquare, Clock, TrendingUp, Users,
- Cpu, ArrowUpRight, Database,
-    CheckCircle2, ShieldAlert, ShieldCheck,
-   Upload, Play, AlertTriangle,
-     KeyRound, UserRound, Inbox,
-   ChevronRight,
+  MessageSquare, Clock, TrendingUp, Users,
+  Cpu, ArrowUpRight, Database, LayoutDashboard,
+     CheckCircle2, ShieldAlert, ShieldCheck,
+    Upload, Play, AlertTriangle,
+      KeyRound, UserRound, Inbox,
+    ChevronRight, Loader2,
 } from "lucide-react";
 
 import { useAuth } from "@/contexts/auth-context";
@@ -48,7 +48,7 @@ export default function DashboardPage() {
    useApi<Source[]>("/sources");
  const { data: escalationsData, loading: loadingEscalations, error: escalationsError } =
    useApi<{ items: ChatConversationOut[] }>("/conversations?status=escalated&page_size=4");
- // Sección admin — solo se consulta con el permiso adecuado (path null la pospone)
+ // Sección admin - solo se consulta con el permiso adecuado (path null la pospone)
  const { data: providersData, loading: loadingProviders } =
    useApi<LLMProvider[]>(isAdmin ? "/providers" : null, [isAdmin]);
  const { data: security, loading: loadingSecurity } =
@@ -66,7 +66,7 @@ export default function DashboardPage() {
  const providers = providersData ?? [];
  const sources = sourcesData ?? [];
  const escalations = escalationsData?.items ?? [];
- // Granular loading per section — each reveals independently as its calls settle
+ // Carga granular por sección - cada una se revela de forma independiente al resolverse sus llamadas
  const loadingContent = loadingSources || loadingEscalations;
  const loadingAdmin = loadingProviders || loadingSecurity || loadingHealth || loadingDeploy;
 
@@ -86,21 +86,22 @@ export default function DashboardPage() {
 
  return (
   <div>
-   {/* Wizard de bienvenida — solo visible si el sistema no está completamente
+   {/* Wizard de bienvenida - solo visible si el sistema no está completamente
        configurado y el admin no ha hecho dismiss. Carga su estado del backend. */}
    <OnboardingWizard />
 
    <PageHeader
+    icon={LayoutDashboard}
     title={`Hola, ${user?.full_name?.split(" ")[0] ?? "Administrador"}`}
     tip={`Resumen del sistema · ${today}`}
    />
 
    {/* KPIs */}
    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-    <StatCard title="Consultas hoy" value={metrics ? String(metrics.queries_today) : "—"} delta={metrics?.queries_today_delta} deltaLabel="vs. ayer" icon={MessageSquare} loading={loadingMetrics} />
-    <StatCard title="Tasa de resolución" value={metrics ? `${metrics.resolution_rate}%` : "—"} delta={metrics?.resolution_rate_delta} deltaLabel="vs. semana anterior" icon={TrendingUp} loading={loadingMetrics} />
-    <StatCard title="Sesiones hoy" value={metrics ? String(metrics.unique_users_today) : "—"} icon={Users} loading={loadingMetrics} />
-    <StatCard title="Latencia promedio" value={metrics ? `${(metrics.avg_latency_ms / 1000).toFixed(1)}s` : "—"} delta={metrics?.avg_latency_delta} deltaLabel="vs. semana anterior" icon={Clock} loading={loadingMetrics} />
+    <StatCard title="Consultas hoy" value={metrics ? String(metrics.queries_today) : "-"} delta={metrics?.queries_today_delta} deltaLabel="vs. ayer" icon={MessageSquare} loading={loadingMetrics} />
+    <StatCard title="Tasa de resolución" value={metrics ? `${metrics.resolution_rate}%` : "-"} delta={metrics?.resolution_rate_delta} deltaLabel="vs. semana anterior" icon={TrendingUp} loading={loadingMetrics} />
+    <StatCard title="Sesiones hoy" value={metrics ? String(metrics.unique_users_today) : "-"} icon={Users} loading={loadingMetrics} />
+    <StatCard title="Latencia promedio" value={metrics ? `${(metrics.avg_latency_ms / 1000).toFixed(1)}s` : "-"} delta={metrics?.avg_latency_delta} deltaLabel="vs. semana anterior" icon={Clock} loading={loadingMetrics} />
    </div>
 
    {/* Banner de salud: solo si hay servicios degradados */}
@@ -126,7 +127,7 @@ export default function DashboardPage() {
     />
    )}
 
-   {/* Quick actions strip */}
+   {/* Franja de acciones rápidas */}
    {can(PERM.KNOWLEDGE_UPDATE) && (
     <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-6">
      <QuickAction href="/dashboard/conocimiento/documentos" icon={Upload} label="Subir fuente" hint="Añade a la base de conocimiento" />
@@ -138,10 +139,10 @@ export default function DashboardPage() {
 
 
 
-   {/* Security + health snapshot row */}
+   {/* Fila de snapshot de seguridad + salud */}
    {can(PERM.SYSTEM_MANAGE) && (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-     {/* Security snapshot — 1 col (admin only) */}
+     {/* Snapshot de seguridad - 1 col (solo admin) */}
      <Card>
       <CardHeader className="flex-row items-center justify-between pb-4 border-b">
        <div>
@@ -188,7 +189,7 @@ export default function DashboardPage() {
       </CardContent>
       </Card>
 
-     {/* Salud de servicios — semáforo simple */}
+     {/* Salud de servicios - semáforo simple */}
      <Card>
       <CardHeader className="flex-row items-center justify-between pb-4 border-b">
        <div>
@@ -227,9 +228,9 @@ export default function DashboardPage() {
     </div>
    )}
 
-   {/* Content row: sources + escalamientos pendientes */}
+   {/* Fila de contenido: fuentes + escalamientos pendientes */}
    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-    {/* Recent sources */}
+    {/* Fuentes recientes */}
     <Card>
      <CardHeader className="flex-row items-center justify-between pb-4 border-b">
       <div>
@@ -347,7 +348,7 @@ export default function DashboardPage() {
     </Card>
    </div>
 
-   {/* Provider status */}
+   {/* Estado del proveedor */}
    {can(PERM.SYSTEM_MANAGE) ? (
     <Card>
      <CardHeader className="flex-row items-center justify-between pb-4 border-b">
@@ -565,7 +566,7 @@ function WorkflowCycle({
         }`} />
        </div>
        <p className="text-3xs text-muted-foreground leading-tight pl-5.5">
-        {loading ? "—" : isOk ? phase.hintOk : phase.hintPending}
+        {loading ? <Loader2 className="w-3 h-3 animate-spin inline-block" aria-label="Cargando" /> : isOk ? phase.hintOk : phase.hintPending}
        </p>
       </Link>
      );

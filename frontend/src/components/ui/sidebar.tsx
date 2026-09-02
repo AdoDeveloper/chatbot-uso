@@ -16,14 +16,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Tooltip as BaseTooltip } from "@base-ui/react/tooltip";
 import { cn as cnTooltip } from "@/lib/utils";
 
-// Patrón oficial de Base UI para tooltips en listas/sidebars ("detached
-// triggers", ver https://base-ui.com/react/components/tooltip): un único
-// Tooltip.Root compartido para todo el árbol del sidebar, en vez de que cada
-// ítem monte su propio Tooltip.Root independiente. Con ~20+ triggers
-// independientes, mover el mouse rápido entre ellos podía dejar más de un
-// tooltip "abierto" a la vez (cada Root maneja su propio estado sin
-// coordinarse con los demás) — con un solo Root compartido eso es
-// estructuralmente imposible: solo puede haber un trigger activo.
+// Patrón "detached triggers" de Base UI: un único Tooltip.Root compartido evita que, con ~20+ triggers independientes, quede más de un tooltip abierto a la vez.
 type SidebarTooltipPayload = { label: React.ReactNode };
 const sidebarTooltipHandle = BaseTooltip.createHandle<SidebarTooltipPayload>();
 
@@ -128,7 +121,7 @@ function SidebarProvider({
           {children}
         </div>
         {/* Único Tooltip.Root compartido por todos los ítems del sidebar
-            (ver sidebarTooltipHandle arriba) — solo puede haber un trigger
+            (ver sidebarTooltipHandle arriba) - solo puede haber un trigger
             activo a la vez, eliminando la posibilidad de tooltips apilados. */}
         <BaseTooltip.Root handle={sidebarTooltipHandle}>
           {({ payload }) => (
@@ -206,7 +199,7 @@ function Sidebar({
       data-side={side}
       data-slot="sidebar"
     >
-      {/* Sidebar gap on desktop */}
+      {/* Espacio del sidebar en escritorio */}
       <div
         data-slot="sidebar-gap"
         className={cn(
@@ -354,11 +347,7 @@ function SidebarContent({ className, ...props }: React.ComponentProps<"div">) {
       data-sidebar="content"
       className={cn(
         // El scroll sigue funcionando (rueda del mouse / trackpad) pero la
-        // barra visual queda oculta — mismo patrón que usan VS Code, Slack o
-        // Linear en paneles angostos, donde una scrollbar del navegador se
-        // ve desproporcionadamente gruesa para el ancho disponible (~3rem
-        // colapsado). Cubre Firefox (scrollbar-width), legacy Edge/IE
-        // (-ms-overflow-style) y Chrome/Safari/Edge modernos (::-webkit-scrollbar).
+        // Scrollbar oculta en un panel angosto; cubre Firefox, legacy Edge/IE y navegadores modernos.
         "flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden",
         className
       )}
@@ -504,7 +493,7 @@ function SidebarMenuButton({
   // El tooltip solo se activa en modo colapsado (en modo expandido el label
   // ya es visible junto al ícono, y en móvil el sidebar es un Sheet propio).
   // Usa el handle compartido del sidebar (detached trigger) en vez de un
-  // Tooltip.Root independiente por botón — ver sidebarTooltipHandle arriba.
+  // Tooltip.Root independiente por botón - ver sidebarTooltipHandle arriba.
   const tooltipDisabled = state !== "collapsed" || isMobile;
 
   return (

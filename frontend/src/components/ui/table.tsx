@@ -4,15 +4,11 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 import { ScrollShadow } from "@/components/composed/scroll-shadow"
 
-// `w-full` (no `w-max`): la tabla respeta el ancho del contenedor para que
-// `truncate` funcione en celdas con texto largo (nombres de archivo, títulos
-// de FAQ, etc.) — con w-max, una celda con contenido largo podía expandir la
-// tabla entera más allá del viewport y forzar scroll horizontal aunque las
-// columnas secundarias estuvieran ocultas por breakpoint.
+// `min-w-full` deja que la tabla crezca y active el scroll horizontal del ScrollShadow; las columnas ocultas en mobile no fuerzan ese scroll.
 function Table({ className, ...props }: React.HTMLAttributes<HTMLTableElement>) {
   return (
     <ScrollShadow className="w-full">
-      <table data-slot="table" className={cn("w-full caption-bottom text-sm", className)} {...props} />
+      <table data-slot="table" className={cn("min-w-full caption-bottom text-sm", className)} {...props} />
     </ScrollShadow>
   )
 }
@@ -39,18 +35,15 @@ function TableRow({ className, ...props }: React.HTMLAttributes<HTMLTableRowElem
   )
 }
 
-// `sticky` fija la columna (típicamente "Acciones") al borde derecho durante
-// el scroll horizontal de la tabla — evita que en mobile, con muchas
-// columnas, el usuario tenga que desplazarse hasta el final para tocar el
-// menú de acciones de una fila. El fondo sólido evita que el contenido
-// scrolleado se transparente debajo; el borde izquierdo marca la división.
+// `sticky` fija la columna "Acciones" al borde derecho para que sea alcanzable sin desplazarse hasta el final en mobile.
 function TableHead({ className, sticky, ...props }: React.ThHTMLAttributes<HTMLTableCellElement> & { sticky?: boolean }) {
   return (
     <th
       data-slot="table-head"
       className={cn(
         "h-9 px-3 text-left align-middle text-2xs font-semibold uppercase tracking-wider text-muted-foreground bg-muted [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
-        sticky && "sticky right-0 z-10 border-l border-border/60 shadow-[-4px_0_6px_-4px_rgb(0_0_0/0.12)]",
+        // max-w-* no basta en table-layout auto (una columna sin `width` absorbe el espacio sobrante); w-28 es el ancho medido que sí lo restringe.
+        sticky && "sticky right-0 z-10 w-28 border-l border-border/60 shadow-[-4px_0_6px_-4px_rgb(0_0_0/0.12)]",
         className
       )}
       {...props}
@@ -64,7 +57,7 @@ function TableCell({ className, sticky, ...props }: React.TdHTMLAttributes<HTMLT
       data-slot="table-cell"
       className={cn(
         "px-3 py-2 align-middle text-13 [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
-        sticky && "sticky right-0 z-10 bg-card border-l border-border/60 shadow-[-4px_0_6px_-4px_rgb(0_0_0/0.12)] group-hover:bg-muted/40",
+        sticky && "sticky right-0 z-10 w-28 bg-card border-l border-border/60 shadow-[-4px_0_6px_-4px_rgb(0_0_0/0.12)] group-hover:bg-muted/40",
         className
       )}
       {...props}

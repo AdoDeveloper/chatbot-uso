@@ -83,8 +83,8 @@ export default function SourceChunksPage() {
  const [busyChunk, setBusyChunk] = useState<string | null>(null);
  const [historyChunk, setHistoryChunk] = useState<ChunkOut | null>(null);
  const [previewChunk, setPreviewChunk] = useState<ChunkOut | null>(null);
- // Local full-text filter over the current page. For search across the
- // whole knowledge base use /dashboard/conocimiento/consulta (semantic retrieval).
+ // Filtro de texto local sobre la página actual. Para buscar en toda la
+ // base de conocimiento usar /dashboard/conocimiento/consulta (recuperación semántica).
  const [search, setSearch] = useState("");
 
  async function copyId(id: string) {
@@ -133,9 +133,9 @@ export default function SourceChunksPage() {
 
  const totalWarnings = Object.values(data?.warning_counts ?? {}).reduce((a, b) => a + b, 0);
 
- // Local text filter over the current page only. Matches against the chunk
- // body, the section header, and the chunk id (so admins can paste a Qdrant
- // point id and locate it). Case-insensitive.
+ // Filtro de texto local, solo sobre la página actual. Compara contra el
+ // cuerpo del chunk, el encabezado de sección y el id del chunk (para que
+ // el admin pueda pegar un point id de Qdrant y ubicarlo). No distingue mayúsculas/minúsculas.
  const filteredChunks = data?.chunks
   ? data.chunks.filter((c) => {
      if (!search.trim()) return true;
@@ -153,8 +153,8 @@ export default function SourceChunksPage() {
    icon={Layers}
    title="Chunks indexados"
    description={
-     (data ? `${data.total} chunks en esta fuente` : "Cargando...") +
-     (data?.chunks?.[0]?.source_name ? ` — ${data.chunks[0].source_name}` : "")
+      (data ? `${data.total} chunks en esta fuente` : "Cargando...") +
+      (data?.chunks?.[0]?.source_name ? ` · ${data.chunks[0].source_name}` : "")
    }
    before={
      <Link
@@ -206,7 +206,7 @@ export default function SourceChunksPage() {
       )}
      </div>
 
-     {/* Warnings summary banner */}
+     {/* Banner resumen de warnings */}
      {totalWarnings > 0 && (
       <div className="flex flex-wrap items-center gap-2 px-5 pt-4">
        <AlertTriangle className="h-4 w-4 text-warning shrink-0" />
@@ -256,7 +256,7 @@ export default function SourceChunksPage() {
           <TableHead>Texto</TableHead>
           <TableHead className="w-28 hidden sm:table-cell">Estado</TableHead>
           <TableHead className="w-36 hidden sm:table-cell">Alertas</TableHead>
-          <TableHead className="w-14 text-right" sticky>Acciones</TableHead>
+          <TableHead className="whitespace-nowrap text-right" sticky>Acciones</TableHead>
          </TableRow>
         </TableHeader>
        <TableBody>
@@ -270,9 +270,9 @@ export default function SourceChunksPage() {
          const isExpanded = expanded === chunk.id;
          const isBusy = busyChunk === chunk.id;
          const charCount = chunk.text.length;
-         // Truncate the Qdrant point id for compact display. Full id is
-         // available via the copy button — useful when an admin needs to
-         // reference a specific chunk in logs or tickets.
+         // Trunca el point id de Qdrant para mostrarlo compacto. El id completo
+         // está disponible vía el botón de copiar - útil cuando el admin necesita
+         // referenciar un chunk específico en logs o tickets.
          const shortId = chunk.id.length > 12 ? `${chunk.id.slice(0, 6)}…${chunk.id.slice(-4)}` : chunk.id;
          return (
           <TableRow key={chunk.id} className={`group ${chunk.is_discarded ? "opacity-60" : ""}`}>
@@ -292,7 +292,7 @@ export default function SourceChunksPage() {
             </button>
            </TableCell>
            <TableCell className="text-2xs text-muted-foreground truncate max-w-40 align-top hidden md:table-cell">
-            {chunk.section || "—"}
+            {chunk.section || "N/A"}
            </TableCell>
            <TableCell className="align-top">
             <p
@@ -326,7 +326,7 @@ export default function SourceChunksPage() {
                <Edit3 className="w-3 h-3 mr-1" /> editado
               </Badge>
              ) : (
-              <span className="text-3xs text-muted-foreground">—</span>
+              <span className="text-3xs text-muted-foreground">N/A</span>
              )}
             </TableCell>
             <TableCell className="hidden sm:table-cell">
@@ -347,10 +347,10 @@ export default function SourceChunksPage() {
                })}
               </div>
              ) : (
-              <span className="text-3xs text-muted-foreground">—</span>
+              <span className="text-3xs text-muted-foreground">N/A</span>
              )}
             </TableCell>
-            <TableCell sticky className="text-right">
+            <TableCell sticky className="whitespace-nowrap text-right">
              <DropdownMenu>
               <DropdownMenuTrigger asChild>
                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground">
@@ -403,20 +403,20 @@ export default function SourceChunksPage() {
     </Card>
    )}
 
-   {/* Edit dialog */}
+   {/* Diálogo de edición */}
    <ChunkEditDialog
     chunk={editingChunk}
     onClose={() => setEditingChunk(null)}
     onSaved={() => { setEditingChunk(null); load(); }}
    />
 
-   {/* History drawer */}
+   {/* Panel de historial */}
    <ChunkHistorySheet
     chunk={historyChunk}
     onClose={() => setHistoryChunk(null)}
    />
 
-   {/* Preview modal */}
+   {/* Modal de vista previa */}
    <Modal
     open={!!previewChunk}
     onClose={() => setPreviewChunk(null)}

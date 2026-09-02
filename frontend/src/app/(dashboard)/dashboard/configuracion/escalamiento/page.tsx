@@ -9,7 +9,8 @@ import api from "@/lib/api";
 import { useApi, getErrorMessage } from "@/hooks/use-api";
 import { useToast } from "@/components/ui/toast";
 import { UnpublishedBanner } from "../_lib/tabs";
-import type { EscalationRule, EscalationTrigger, RuleTestResult } from "@/types";
+import type { EscalationRule, EscalationTrigger, RuleTestResult, TriggerSchemaOut } from "@/types";
+import { TRIGGER_LABEL_LONG } from "@/lib/escalation-labels";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,23 +24,12 @@ import { Switch } from "@/components/ui/switch";
 import { Modal } from "@/components/composed/modal";
 import { Select, SelectOption } from "@/components/ui/select";
 
-const TRIGGER_LABELS: Record<EscalationTrigger, string> = {
-  no_answer: "Sin respuesta tras N segundos",
-  user_request: "Usuario solicita hablar con agente",
-  negative_feedback: "Proporción de valoraciones negativas alta",
-  keyword_detected: "Palabra crítica detectada (urgente, denuncia…)",
-  confidence_below: "Confianza RAG baja N veces seguidas",
-  loop_detected: "Bot repite la misma respuesta",
-};
+const TRIGGER_LABELS = TRIGGER_LABEL_LONG;
 
 
-interface TriggerConfig {
-  wait_seconds?: number;
-  keywords?: string;       // CSV en UI; backend recibe lista
-  threshold?: number;
-  consecutive?: number;
-  repetitions?: number;
-}
+// Los campos vienen del schema que expone el backend (GET /escalation/triggers/schemas), no de un shape fijo.
+type TriggerConfig = Record<string, number | string>;
+
 interface RuleForm {
   name: string;
   description: string;
@@ -53,31 +43,48 @@ const escalationRuleSchema = z.object({
   description: z.string(),
   trigger_type: z.enum(["no_answer", "user_request", "negative_feedback", "keyword_detected", "confidence_below", "loop_detected"]),
   enabled: z.boolean(),
-  trigger_config: z.object({
-    wait_seconds: z.number().optional(),
-    keywords: z.string().optional(),
-    threshold: z.number().optional(),
-    consecutive: z.number().optional(),
-    repetitions: z.number().optional(),
-  }),
+  trigger_config: z.record(z.string(), z.union([z.number(), z.string()])),
 });
 
 type RuleFormValues = z.infer<typeof escalationRuleSchema>;
 
-function defaultsForTrigger(t: EscalationTrigger): TriggerConfig {
-  switch (t) {
-    case "no_answer": return { wait_seconds: 120 };
-    case "user_request": return { keywords: "" };
-    case "negative_feedback": return { threshold: 0.5 };
-    case "keyword_detected": return { keywords: "urgente, denuncia, queja formal" };
-    case "confidence_below": return { threshold: 0.5, consecutive: 2 };
-    case "loop_detected": return { repetitions: 2 };
+function defaultsFromSchema(schema: TriggerSchemaOut | undefined): TriggerConfig {
+  if (!schema) return {};
+  const out: TriggerConfig = {};
+  for (const [key, field] of Object.entries(schema.fields)) {
+    out[key] = field.type === "list[str]"
+      ? (field.default as string[]).join(", ")
+      : (field.default as number);
   }
+  return out;
 }
 
 const EMPTY_RULE: RuleForm = {
   name: "", description: "", trigger_type: "no_answer", enabled: true,
-  trigger_config: { wait_seconds: 120 },
+  trigger_config: {},
+};
+
+// Texto de ayuda contextual por campo - no viene del schema del backend, es contenido pedagógico propio de este panel.
+const TRIGGER_FIELD_HINTS: Partial<Record<EscalationTrigger, Record<string, string>>> = {
+  no_answer: {
+    wait_seconds: "Si el bot tarda más de N segundos en responder, se activa el escalamiento.",
+  },
+  user_request: {
+    keywords: "Dejar vacío para escalar ante cualquier solicitud explícita.",
+  },
+  negative_feedback: {
+    threshold: "Escala si la proporción de 👎 en la sesión supera este valor.",
+  },
+  keyword_detected: {
+    keywords: "Si el mensaje del usuario contiene cualquiera de estas palabras, se escala inmediatamente.",
+  },
+  confidence_below: {
+    threshold: "La búsqueda combina texto y significado (RRF); sus puntajes son bajos, no de 0 a 1. Típico: 0.015–0.033.",
+    consecutive: "Escala si las últimas N respuestas tuvieron confianza menor al umbral.",
+  },
+  loop_detected: {
+    repetitions: "Escala si el bot repite la misma respuesta esta cantidad de veces consecutivas.",
+  },
 };
 
 export default function EscalamientoConfigPage() {
@@ -85,6 +92,11 @@ export default function EscalamientoConfigPage() {
   const { data: rulesData, loading, error: rulesError, setData: setRules } =
     useApi<EscalationRule[]>("/escalation/rules");
   const rules = rulesData ?? [];
+  const { data: schemasData, error: schemasError } =
+    useApi<TriggerSchemaOut[]>("/escalation/triggers/schemas");
+  const schemas = schemasData ?? [];
+  const schemaFor = (t: EscalationTrigger): TriggerSchemaOut | undefined =>
+    schemas.find((s) => s.trigger_type === t);
   const [showRuleModal, setShowRuleModal] = useState(false);
   const [editingRule, setEditingRule] = useState<EscalationRule | null>(null);
   const { register: registerRule, handleSubmit: handleRuleSubmit, watch: watchRule, reset: resetRule, setValue: setRuleValue, formState: { errors: ruleErrors, isSubmitting: saving } } = useForm<RuleFormValues>({
@@ -110,6 +122,10 @@ export default function EscalamientoConfigPage() {
     if (rulesError) toast({ type: "error", message: "No se pudo cargar la configuración de escalamiento." });
   }, [rulesError, toast]);
 
+  useEffect(() => {
+    if (schemasError) toast({ type: "error", message: "No se pudo cargar el esquema de tipos de activación." });
+  }, [schemasError, toast]);
+
   async function handleToggleRule(rule: EscalationRule) {
     setToggling(rule.id);
     try {
@@ -128,7 +144,7 @@ export default function EscalamientoConfigPage() {
         "/escalation/smtp-ping",
       );
       if (data.ok) {
-        toast({ type: "success", message: data.latency_ms != null ? `Email enviado (${data.latency_ms}ms) — revise su bandeja.` : "Email de prueba enviado." });
+        toast({ type: "success", message: data.latency_ms != null ? `Email enviado (${data.latency_ms}ms) · revise su bandeja.` : "Email de prueba enviado." });
       } else {
         toast({ type: "error", message: data.error ?? "Error al enviar el email de prueba." });
       }
@@ -138,17 +154,20 @@ export default function EscalamientoConfigPage() {
   }
 
   function serializeTriggerConfig(form: RuleForm): Record<string, unknown> {
-    const { trigger_type, trigger_config: tc } = form;
-    const splitCsv = (s?: string) => s ? s.split(",").map((k) => k.trim()).filter(Boolean) : [];
-    switch (trigger_type) {
-      case "no_answer":         return { wait_seconds: tc.wait_seconds ?? 120 };
-      case "user_request":      return { keywords: splitCsv(tc.keywords) };
-      case "negative_feedback": return { threshold: tc.threshold ?? 0.5 };
-      case "keyword_detected":  return { keywords: splitCsv(tc.keywords) };
-      case "confidence_below":  return { threshold: tc.threshold ?? 0.5, consecutive: tc.consecutive ?? 2 };
-      case "loop_detected":     return { repetitions: tc.repetitions ?? 2 };
-      default:                  return {};
+    const schema = schemaFor(form.trigger_type);
+    const tc = form.trigger_config;
+    const splitCsv = (s: string) => s.split(",").map((k) => k.trim()).filter(Boolean);
+    if (!schema) return {};
+    const out: Record<string, unknown> = {};
+    for (const [key, field] of Object.entries(schema.fields)) {
+      const raw = tc[key];
+      if (field.type === "list[str]") {
+        out[key] = typeof raw === "string" ? splitCsv(raw) : (field.default as string[]);
+      } else {
+        out[key] = typeof raw === "number" ? raw : (field.default as number);
+      }
     }
+    return out;
   }
 
   const onSaveRule = handleRuleSubmit(async (data) => {
@@ -238,7 +257,7 @@ export default function EscalamientoConfigPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Rules */}
+          {/* Reglas */}
           <Card>
             <CardHeader className="pb-4 border-b">
               <div className="flex flex-col gap-3">
@@ -285,29 +304,31 @@ export default function EscalamientoConfigPage() {
                           {rule.description && (
                             <p className="text-2xs text-muted-foreground mt-1 leading-snug break-words">{rule.description}</p>
                           )}
-                          {/* Mostrar config relevante */}
+                          {/* Mostrar config relevante, según el schema del trigger */}
                           {rule.trigger_config && Object.keys(rule.trigger_config).length > 0 && (() => {
+                            const schema = schemaFor(rule.trigger_type);
+                            if (!schema) return null;
                             const tc = rule.trigger_config as Record<string, unknown>;
-                            const waitSec = typeof tc.wait_seconds === "number" ? tc.wait_seconds : null;
-                            const threshold = typeof tc.threshold === "number" ? tc.threshold : null;
-                            const kwArr = Array.isArray(tc.keywords) ? (tc.keywords as string[]) : null;
                             return (
                               <div className="mt-1.5 flex flex-wrap gap-1">
-                                {rule.trigger_type === "no_answer" && waitSec !== null && (
-                                  <span className="text-3xs px-1.5 py-0.5 bg-muted rounded font-mono">
-                                    {waitSec}s espera
-                                  </span>
-                                )}
-                                {rule.trigger_type === "negative_feedback" && threshold !== null && (
-                                  <span className="text-3xs px-1.5 py-0.5 bg-muted rounded font-mono">
-                                    umbral {threshold}
-                                  </span>
-                                )}
-                                {rule.trigger_type === "user_request" && kwArr && kwArr.length > 0 && (
-                                  <span className="text-3xs px-1.5 py-0.5 bg-muted rounded font-mono">
-                                    {kwArr.length} keywords
-                                  </span>
-                                )}
+                                {Object.entries(schema.fields).map(([key, field]) => {
+                                  const val = tc[key];
+                                  if (field.type === "list[str]") {
+                                    const arr = Array.isArray(val) ? (val as string[]) : [];
+                                    if (arr.length === 0) return null;
+                                    return (
+                                      <span key={key} className="text-3xs px-1.5 py-0.5 bg-muted rounded font-mono">
+                                        {arr.length} {field.label.toLowerCase()}
+                                      </span>
+                                    );
+                                  }
+                                  if (typeof val !== "number") return null;
+                                  return (
+                                    <span key={key} className="text-3xs px-1.5 py-0.5 bg-muted rounded font-mono">
+                                      {field.label}: {val}
+                                    </span>
+                                  );
+                                })}
                               </div>
                             );
                           })()}
@@ -316,23 +337,26 @@ export default function EscalamientoConfigPage() {
                           <Button
                             variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground"
                             onClick={() => {
+                              const schema = schemaFor(rule.trigger_type);
                               const tc = rule.trigger_config as Record<string, unknown>;
-                              const num = (k: string, def: number): number =>
-                                typeof tc[k] === "number" ? (tc[k] as number) : def;
-                              const kws = Array.isArray(tc.keywords)
-                                ? (tc.keywords as string[]).join(", ")
-                                : typeof tc.keywords === "string" ? (tc.keywords as string) : "";
+                              const config: TriggerConfig = {};
+                              if (schema) {
+                                for (const [key, field] of Object.entries(schema.fields)) {
+                                  const val = tc[key];
+                                  if (field.type === "list[str]") {
+                                    config[key] = Array.isArray(val)
+                                      ? (val as string[]).join(", ")
+                                      : typeof val === "string" ? val : (field.default as string[]).join(", ");
+                                  } else {
+                                    config[key] = typeof val === "number" ? val : (field.default as number);
+                                  }
+                                }
+                              }
                               setEditingRule(rule);
                               resetRule({
                                 name: rule.name, description: rule.description,
                                 trigger_type: rule.trigger_type, enabled: rule.enabled,
-                                trigger_config: {
-                                  wait_seconds: num("wait_seconds", 120),
-                                  keywords: kws,
-                                  threshold: num("threshold", 0.5),
-                                  consecutive: num("consecutive", 2),
-                                  repetitions: num("repetitions", 2),
-                                },
+                                trigger_config: config,
                               });
                               setShowRuleModal(true);
                             }}
@@ -355,7 +379,7 @@ export default function EscalamientoConfigPage() {
             </CardContent>
           </Card>
 
-          {/* Recipients */}
+          {/* Destinatarios */}
           <Card>
             <CardHeader className="pb-4 border-b">
               <CardTitle className="text-15 font-semibold">Destinatarios</CardTitle>
@@ -400,7 +424,7 @@ export default function EscalamientoConfigPage() {
         </div>
       )}
 
-      {/* Rule Dialog */}
+      {/* Diálogo de regla */}
       <Modal
         open={showRuleModal}
         onClose={() => setShowRuleModal(false)}
@@ -442,7 +466,7 @@ export default function EscalamientoConfigPage() {
                 onChange={(e) => {
                   const t = e.target.value as EscalationTrigger;
                   setRuleValue("trigger_type", t);
-                  setRuleValue("trigger_config", defaultsForTrigger(t), { shouldDirty: true });
+                  setRuleValue("trigger_config", defaultsFromSchema(schemaFor(t)), { shouldDirty: true });
                 }}
               >
                 {(Object.entries(TRIGGER_LABELS) as [EscalationTrigger, string][]).map(([v, l]) => (
@@ -451,82 +475,30 @@ export default function EscalamientoConfigPage() {
               </Select>
             </div>
 
-            {watchRule("trigger_type") === "no_answer" && (
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tiempo de espera (segundos)</Label>
-                <Input
-                  type="number" min={10} max={3600}
-                  value={watchRule("trigger_config.wait_seconds") ?? 120}
-                  onChange={(e) => setRuleValue("trigger_config.wait_seconds", Number(e.target.value), { shouldDirty: true })}
-                />
-                <p className="text-2xs text-muted-foreground">Después de N segundos sin respuesta se activa el escalamiento.</p>
-              </div>
-            )}
-            {watchRule("trigger_type") === "user_request" && (
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Palabras clave (separadas por coma)</Label>
-                <Input
-                  value={watchRule("trigger_config.keywords") ?? ""}
-                  onChange={(e) => setRuleValue("trigger_config.keywords", e.target.value, { shouldDirty: true })}
-                  placeholder="hablar con agente, soporte humano"
-                />
-                <p className="text-2xs text-muted-foreground">Dejar vacío para escalar ante cualquier solicitud explícita.</p>
-              </div>
-            )}
-            {watchRule("trigger_type") === "negative_feedback" && (
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Umbral (0–1)</Label>
-                <Input
-                  type="number" min={0} max={1} step={0.05}
-                  value={watchRule("trigger_config.threshold") ?? 0.5}
-                  onChange={(e) => setRuleValue("trigger_config.threshold", Number(e.target.value), { shouldDirty: true })}
-                />
-                <p className="text-2xs text-muted-foreground">Escala si la proporción de 👎 en la sesión supera este valor.</p>
-              </div>
-            )}
-            {watchRule("trigger_type") === "keyword_detected" && (
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Palabras críticas (separadas por coma)</Label>
-                <Input
-                  value={watchRule("trigger_config.keywords") ?? ""}
-                  onChange={(e) => setRuleValue("trigger_config.keywords", e.target.value, { shouldDirty: true })}
-                  placeholder="urgente, denuncia, queja formal, demanda"
-                />
-                <p className="text-2xs text-muted-foreground">Si el mensaje del usuario contiene cualquiera de estas palabras, se escala inmediatamente.</p>
-              </div>
-            )}
-            {watchRule("trigger_type") === "confidence_below" && (
-              <>
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Confianza RAG mínima (0–1)</Label>
-                  <Input
-                    type="number" min={0} max={1} step={0.05}
-                    value={watchRule("trigger_config.threshold") ?? 0.5}
-                    onChange={(e) => setRuleValue("trigger_config.threshold", Number(e.target.value), { shouldDirty: true })}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">N respuestas consecutivas</Label>
-                  <Input
-                    type="number" min={1} max={10}
-                    value={watchRule("trigger_config.consecutive") ?? 2}
-                    onChange={(e) => setRuleValue("trigger_config.consecutive", Number(e.target.value), { shouldDirty: true })}
-                  />
-                  <p className="text-2xs text-muted-foreground">Escala si las últimas N respuestas tuvieron confianza menor al umbral.</p>
-                </div>
-              </>
-            )}
-            {watchRule("trigger_type") === "loop_detected" && (
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Repeticiones para detectar bucle</Label>
-                <Input
-                  type="number" min={2} max={5}
-                  value={watchRule("trigger_config.repetitions") ?? 2}
-                  onChange={(e) => setRuleValue("trigger_config.repetitions", Number(e.target.value), { shouldDirty: true })}
-                />
-                <p className="text-2xs text-muted-foreground">Escala si el bot repite la misma respuesta esta cantidad de veces consecutivas.</p>
-              </div>
-            )}
+            {schemaFor(watchRule("trigger_type")) &&
+              Object.entries(schemaFor(watchRule("trigger_type"))!.fields).map(([key, field]) => {
+                const hint = TRIGGER_FIELD_HINTS[watchRule("trigger_type")]?.[key];
+                const currentVal = watchRule(`trigger_config.${key}`);
+                return (
+                  <div key={key} className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{field.label}</Label>
+                    {field.type === "list[str]" ? (
+                      <Input
+                        value={typeof currentVal === "string" ? currentVal : ""}
+                        onChange={(e) => setRuleValue(`trigger_config.${key}`, e.target.value, { shouldDirty: true })}
+                        placeholder={(field.default as string[]).join(", ")}
+                      />
+                    ) : (
+                      <Input
+                        type="number" min={field.min} max={field.max} step={field.step ?? 1}
+                        value={typeof currentVal === "number" ? currentVal : (field.default as number)}
+                        onChange={(e) => setRuleValue(`trigger_config.${key}`, Number(e.target.value), { shouldDirty: true })}
+                      />
+                    )}
+                    {hint && <p className="text-2xs text-muted-foreground">{hint}</p>}
+                  </div>
+                );
+              })}
 
             <div className="flex items-center gap-3 rounded-lg border px-3 py-2.5 bg-muted/30">
               <Switch checked={watchRule("enabled")} onCheckedChange={(checked) => setRuleValue("enabled", checked, { shouldDirty: true })} />
@@ -538,7 +510,7 @@ export default function EscalamientoConfigPage() {
           </div>
         </Modal>
 
-      {/* Delete confirmation */}
+      {/* Confirmación de eliminación */}
       <Modal
         open={!!confirmDeleteRule}
         onClose={() => setConfirmDeleteRule(null)}
@@ -569,7 +541,7 @@ export default function EscalamientoConfigPage() {
         title={
           <span className="flex items-center gap-2">
             <Beaker className="w-4 h-4 text-primary" />
-            Probar regla — {TRIGGER_LABELS[ruleTestForm.trigger_type]}
+            Probar regla: {TRIGGER_LABELS[ruleTestForm.trigger_type]}
           </span>
         }
         footer={
@@ -623,8 +595,9 @@ export default function EscalamientoConfigPage() {
                   <Input
                     value={ruleTestRagScores}
                     onChange={(e) => setRuleTestRagScores(e.target.value)}
-                    placeholder="0.42, 0.38, 0.45"
+                    placeholder="0.015, 0.012, 0.018"
                   />
+                  <p className="text-2xs text-muted-foreground">Escala típica del sistema: 0–0.033 (RRF), no 0–1.</p>
                 </div>
               )}
 

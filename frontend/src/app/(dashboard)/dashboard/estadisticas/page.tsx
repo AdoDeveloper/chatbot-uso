@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   BarChart3, TrendingUp, Users, MessageSquare, Clock,
   Rocket, Circle,
   Download, AlertTriangle, ArrowUp, ArrowDown, Minus, Globe, Code, Play, Zap, MapPin,
-  ThumbsUp, ThumbsDown, Loader2,
+  ThumbsUp, ThumbsDown, Loader2, Star, ShieldCheck,
 } from "lucide-react";
 import {
  BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -54,12 +55,11 @@ import { ActivityChart } from "@/components/ui/activity-chart";
 import { PageHeader } from "@/components/ui/page-header";
 
 import { StatCard } from "@/components/composed/stat-card";
-import { RefetchProgressBar } from "@/components/composed/refetch-progress-bar";
 import { SegmentedControl } from "@/components/composed/segmented-control";
 import { PeriodFilter } from "@/components/composed/period-filter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { TableCell } from "@/components/ui/table";
+import { TableCell, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -75,9 +75,10 @@ import {
 } from "@/components/ui/chart";
 
 // ── Colors ── (palette v2: institutional blues + forest green accent)
-const CHART_NAVY = "#0F2F6E";  // brand mid-deep
-const CHART_TEAL = "#0369A1";  // teal sub-acento
-const CHART_GREEN = "#1FB107";  // forest green
+const CHART_NAVY = "hsl(var(--color-brand-navy))";
+const CHART_TEAL = "hsl(var(--color-brand-teal))";
+const CHART_GREEN = "hsl(var(--color-brand-green))";
+const CHART_GOLD = "hsl(var(--color-warning))";
 const rateColor = (r: number) => r >= 90 ? "text-success" : r >= 70 ? "text-warning" : "text-destructive";
 
 const topicsChartConfig = {
@@ -90,7 +91,7 @@ const volumeChartConfig = {
 
 const latencyChartConfig = {
  avg_ms: { label: "Promedio", color: CHART_NAVY },
- p95_ms: { label: "P95", color: "#EF4444" },
+ p95_ms: { label: "P95", color: "hsl(var(--color-destructive))" },
 } satisfies ChartConfig;
 
 interface RouteStat { route: string; count: number; percentage: number }
@@ -98,6 +99,21 @@ interface LatencyPoint { date: string; avg_ms: number; p95_ms: number }
 interface FeedbackSummary { positive: number; negative: number; total: number; positive_rate: number; days: number }
 interface FeedbackTrend { date: string; positive: number; negative: number }
 interface AnalyticsFeedback { summary: FeedbackSummary; trend: FeedbackTrend[] }
+interface CsatReasonCount { id: string; label: string; count: number }
+interface CsatTrendPoint { date: string; avg_score: number; total: number }
+interface AnalyticsCsat {
+ total: number; avg_score: number | null; distribution: Record<string, number>;
+ trend: CsatTrendPoint[]; top_reasons: CsatReasonCount[]; days: number;
+}
+interface AnalyticsResponseQuality {
+ avg_context_relevance_ratio: number | null;
+ avg_faithfulness_score: number | null;
+ avg_answer_relevance_score: number | null;
+ context_relevance_sample_size: number;
+ faithfulness_sample_size: number;
+ answer_relevance_sample_size: number;
+ days: number;
+}
 interface ActivityCell { hour?: number | null; day?: number | null; date?: string | null; count: number }
 interface ActivityData {
  cells: ActivityCell[];
@@ -108,10 +124,11 @@ interface ActivityData {
 
 
 
-const PIE_COLORS = [CHART_NAVY, CHART_TEAL, CHART_GREEN, "#F59E0B", "#EF4444", "#5BAFD4"];
+const PIE_COLORS = [CHART_NAVY, CHART_TEAL, CHART_GREEN, "hsl(var(--color-warning))", "hsl(var(--color-destructive))", "hsl(var(--color-brand-cornflower))"];
 const ROUTE_LABELS: Record<string, string> = { greeting: "Saludo", factual: "Factual", complex: "Complejo" };
 
 function MetricasTab() {
+ const router = useRouter();
  const { toast } = useToast();
  const today = isoDay(new Date());
  const [dateFrom, setDateFrom] = useState(isoDay(new Date(Date.now() - 6 * 86400000)));
@@ -136,25 +153,26 @@ function MetricasTab() {
 
  const src = `source=${source}`;
 
- // Un useApi por endpoint: cada sección refetchea solo cuando cambia SU query
- // (cambiar la ventana del heatmap ya no re-pide los otros 11 endpoints) y los
+ // Un useApi por endpoint: cada sección refetchea solo cuando cambia SU query, y los
  // datos viejos siguen visibles durante recargas en vez de saltar a skeleton.
  const qMetrics = useApi<AnalyticsDashboard>(periodReady ? `/analytics/dashboard?${src}` : null);
  const qTopics = useApi<{ topics: TopicStat[]; days: number }>(periodReady ? `/analytics/topics?${periodQuery}&${src}` : null);
- const qActivity = useApi<ActivityData>(periodReady ? `/analytics/heatmap?window=${activityWindow}` : null);
+ const qActivity = useApi<ActivityData>(periodReady ? `/analytics/heatmap?window=${activityWindow}&${src}` : null);
  const qTimeseries = useApi<{ points: TimeSeriesPoint[] }>(periodReady ? `/analytics/timeseries?${periodQuery}&${src}` : null);
  const qRoutes = useApi<{ routes: RouteStat[] }>(periodReady ? `/analytics/routes?${periodQuery}&${src}` : null);
- const qLatency = useApi<{ points: LatencyPoint[] }>(periodReady ? `/analytics/latency/timeseries?${periodQuery}` : null);
-  const qTimeline = useApi<{ events: ActivityEvent[]; days: number }>(periodReady ? `/analytics/timeline?days=${timelineDays}&limit=40` : null);
+ const qLatency = useApi<{ points: LatencyPoint[] }>(periodReady ? `/analytics/latency/timeseries?${periodQuery}&${src}` : null);
+  const qTimeline = useApi<{ events: ActivityEvent[]; days: number }>(periodReady ? `/analytics/timeline?days=${timelineDays}&limit=40&${src}` : null);
  const qComparison = useApi<PeriodComparison>(periodReady ? `/analytics/comparison?days=${compDays}&${src}` : null);
  const qChannels = useApi<{ channels: ChannelStat[]; days: number }>(periodReady ? `/analytics/channels?days=${compDays}` : null);
- const qCache = useApi<CacheStats>(periodReady ? `/analytics/cache?days=${compDays}` : null);
+ const qCache = useApi<CacheStats>(periodReady ? `/analytics/cache?days=${compDays}&${src}` : null);
  const qPages = useApi<{ pages: PageStat[]; days: number }>(periodReady ? `/analytics/pages?days=${compDays}&${src}` : null);
  const qFeedback = useApi<AnalyticsFeedback>(periodReady ? `/analytics/feedback?days=${compDays}&${src}` : null);
+ const qCsat = useApi<AnalyticsCsat>(periodReady ? `/analytics/csat?days=${compDays}&${src}` : null);
+ const qQuality = useApi<AnalyticsResponseQuality>(periodReady ? `/analytics/quality?${periodQuery}` : null);
 
  const queries = [
   qMetrics, qTopics, qActivity, qTimeseries, qRoutes, qLatency,
-  qTimeline, qComparison, qChannels, qCache, qPages, qFeedback,
+  qTimeline, qComparison, qChannels, qCache, qPages, qFeedback, qCsat,
  ];
  const loading = queries.some((q) => q.loading);
  const refetching = queries.some((q) => q.refetching);
@@ -174,6 +192,8 @@ function MetricasTab() {
  const cache = qCache.data;
  const pages = qPages.data?.pages ?? [];
   const feedback = qFeedback.data;
+  const csat = qCsat.data;
+  const quality = qQuality.data;
 
   const showActor = true;
   const activityColumns: Column[] = [
@@ -184,7 +204,7 @@ function MetricasTab() {
   ];
 
 
- // Topics bar chart: dynamic height, no cap
+ // Gráfico de barras de tópicos: altura dinámica, sin tope
  const chartHeight = Math.max(220, topics.length * 32);
  const chartData = topics.map((t) => ({
   name: t.topic.length > 22 ? t.topic.slice(0, 22) + "…" : t.topic,
@@ -225,12 +245,10 @@ function MetricasTab() {
 
  return (
   <div className="space-y-6">
-   <RefetchProgressBar active={refetching} />
-
-   {/* Source toggle + Period selector + export */}
+   {/* Toggle de fuente + selector de periodo + exportar */}
    <div className="flex flex-wrap items-center justify-between gap-3">
     <div className="flex flex-wrap items-center gap-3">
-     {/* Source toggle */}
+     {/* Toggle de fuente */}
      <SegmentedControl
       ariaLabel="Fuente de datos"
       value={source}
@@ -249,9 +267,17 @@ function MetricasTab() {
       onDateToChange={setDateTo}
       maxDate={today}
      />
+     {refetching && (
+      <Loader2
+       className="w-3.5 h-3.5 animate-spin text-muted-foreground shrink-0"
+       aria-hidden="true"
+      >
+       <title>Actualizando datos…</title>
+      </Loader2>
+     )}
     </div>
 
-    {/* Export button */}
+    {/* Botón de exportar */}
     <DropdownMenu>
      <DropdownMenuTrigger asChild>
       <Button variant="outline" size="sm" disabled={loading || !metrics || exporting} className="gap-1.5">
@@ -265,7 +291,7 @@ function MetricasTab() {
     </DropdownMenu>
    </div>
 
-   {/* Fetch error banner */}
+   {/* Banner de error al cargar */}
    {fetchError && (
     <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl border border-destructive/30 bg-destructive/5 text-sm text-destructive">
      <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -273,7 +299,7 @@ function MetricasTab() {
     </div>
    )}
 
-   {/* Source indicator */}
+   {/* Indicador de fuente */}
    {source === "playground" && (
     <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-lg border-l-4 border-warning bg-warning/10 text-warning-foreground">
      <Play className="w-3.5 h-3.5 shrink-0 text-warning" />
@@ -293,13 +319,13 @@ function MetricasTab() {
 
    {/* KPIs */}
    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-    <StatCard title="Consultas hoy" value={metrics ? String(metrics.queries_today) : "—"} delta={metrics?.queries_today_delta} deltaLabel="vs. ayer" icon={MessageSquare} loading={loading} />
-    <StatCard title="Tasa de resolución" value={metrics ? `${metrics.resolution_rate}%` : "—"} delta={metrics?.resolution_rate_delta} deltaLabel="vs. semana anterior" icon={TrendingUp} loading={loading} />
-    <StatCard title="Sesiones hoy" value={metrics ? String(metrics.unique_users_today) : "—"} icon={Users} loading={loading} />
-    <StatCard title="Latencia promedio" value={metrics ? `${(metrics.avg_latency_ms / 1000).toFixed(1)}s` : "—"} delta={metrics?.avg_latency_delta} deltaLabel="vs. semana anterior" icon={Clock} loading={loading} />
+    <StatCard title="Consultas hoy" value={metrics ? String(metrics.queries_today) : "-"} delta={metrics?.queries_today_delta} deltaLabel="vs. ayer" icon={MessageSquare} loading={loading} />
+    <StatCard title="Tasa de resolución" value={metrics ? `${metrics.resolution_rate}%` : "-"} delta={metrics?.resolution_rate_delta} deltaLabel="vs. semana anterior" icon={TrendingUp} loading={loading} />
+    <StatCard title="Sesiones hoy" value={metrics ? String(metrics.unique_users_today) : "-"} icon={Users} loading={loading} />
+    <StatCard title="Latencia promedio" value={metrics ? `${(metrics.avg_latency_ms / 1000).toFixed(1)}s` : "-"} delta={metrics?.avg_latency_delta} deltaLabel="vs. semana anterior" icon={Clock} loading={loading} />
    </div>
 
-   {/* Fase 5 — Comparativa entre períodos + canal + cache */}
+   {/* Fase 5 - Comparativa entre períodos + canal + cache */}
    <PeriodComparisonPanel comparison={comparison} loading={loading} />
 
    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -311,8 +337,12 @@ function MetricasTab() {
 
    <FeedbackPanel feedback={feedback} loading={loading} />
 
+   <CsatPanel csat={csat} loading={loading} />
+
+   <ResponseQualityPanel quality={quality} loading={loading} />
+
    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-    {/* Top topics — Recharts bar chart (no cap, scrollable) */}
+    {/* Tópicos principales - gráfico de barras Recharts (sin tope, con scroll) */}
     <Card>
      <CardHeader>
       <div className="flex items-center justify-between">
@@ -344,7 +374,7 @@ function MetricasTab() {
      </CardContent>
     </Card>
 
-    {/* Resolution rate by topic */}
+    {/* Tasa de resolución por tópico */}
     <Card>
      <CardHeader>
       <CardTitle className="text-15">Tasa de resolución por tema</CardTitle>
@@ -380,7 +410,7 @@ function MetricasTab() {
     </Card>
    </div>
 
-   {/* Volume Timeseries + Route Distribution */}
+   {/* Serie temporal de volumen + distribución de rutas */}
    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
     <Card className="lg:col-span-2">
      <CardHeader>
@@ -436,7 +466,7 @@ function MetricasTab() {
     </Card>
    </div>
 
-   {/* Latency Trend */}
+   {/* Tendencia de latencia */}
    <Card>
     <CardHeader>
      <CardTitle className="text-15">Tendencia de latencia</CardTitle>
@@ -463,7 +493,7 @@ function MetricasTab() {
     </CardContent>
    </Card>
 
-      {/* Activity chart */}
+      {/* Gráfico de actividad */}
    <Card>
     <CardHeader>
      <div className="flex flex-wrap items-start justify-between gap-3">
@@ -476,7 +506,7 @@ function MetricasTab() {
         {activityWindow === "year" && "Consultas por mes en el último año"}
        </CardDescription>
       </div>
-      {/* Window selector */}
+      {/* Selector de ventana */}
       <SegmentedControl
        ariaLabel="Rango del mapa"
        value={activityWindow}
@@ -530,44 +560,34 @@ function MetricasTab() {
           data={timeline}
           rowKey={(e) => e.id}
           noCard
-          renderRow={(e) => {
-            const dt = new Date(e.created_at);
-            const time = dt.toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
-            const day = dt.toLocaleDateString("es", { day: "2-digit", month: "short" });
-            const row = (
-              <>
-                <TableCell className="whitespace-nowrap text-13 tabular-nums text-muted-foreground w-28">
-                  <div className="flex flex-col leading-tight">
-                    <span className="text-foreground">{time}</span>
-                    <span className="text-3xs">{day}</span>
-                  </div>
-                </TableCell>
-                <TableCell className="w-28">
-                  <Badge variant="muted" size="xs">{ACTIVITY_LABEL[e.type]}</Badge>
-                </TableCell>
-                <TableCell>
-                  <p className="text-13 font-medium text-foreground leading-snug">{e.title}</p>
-                  {e.detail && <p className="text-2xs text-muted-foreground mt-0.5 leading-snug">{e.detail}</p>}
-                </TableCell>
-                <TableCell className="hidden md:table-cell w-36 text-2xs text-muted-foreground truncate">
-                  {showActor && e.actor_name ? e.actor_name : "—"}
-                </TableCell>
-              </>
-            );
-            return e.href ? (
-              <tr className="group hover:bg-muted/40 transition-colors">
-                <TableCell className="p-0">
-                  <Link href={e.href} className="block px-3 py-2.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
-                    {row}
-                  </Link>
-                </TableCell>
-              </tr>
-            ) : (
-              <tr className="group hover:bg-muted/40 transition-colors">
-                <TableCell className="px-3 py-2.5">{row}</TableCell>
-              </tr>
-            );
-          }}
+           renderRow={(e) => {
+             const dt = new Date(e.created_at);
+             const time = dt.toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" });
+             const day = dt.toLocaleDateString("es", { day: "2-digit", month: "short" });
+             return (
+               <TableRow
+                 className={e.href ? "cursor-pointer" : undefined}
+                 onClick={e.href ? () => router.push(e.href!) : undefined}
+               >
+                 <TableCell className="whitespace-nowrap text-13 tabular-nums text-muted-foreground w-28">
+                   <div className="flex flex-col leading-tight">
+                     <span className="text-foreground">{time}</span>
+                     <span className="text-3xs">{day}</span>
+                   </div>
+                 </TableCell>
+                 <TableCell className="w-28">
+                   <Badge variant="muted" size="xs">{ACTIVITY_LABEL[e.type]}</Badge>
+                 </TableCell>
+                 <TableCell>
+                   <p className="text-13 font-medium text-foreground leading-snug">{e.title}</p>
+                   {e.detail && <p className="text-2xs text-muted-foreground mt-0.5 leading-snug">{e.detail}</p>}
+                 </TableCell>
+                 <TableCell className="hidden md:table-cell w-36 text-2xs text-muted-foreground truncate">
+                   {showActor && e.actor_name ? e.actor_name : "N/A"}
+                 </TableCell>
+               </TableRow>
+             );
+           }}
         />
        </div>
       )}
@@ -780,7 +800,7 @@ function CacheStatsPanel({ cache, loading }: { cache: CacheStats | null; loading
 
 const feedbackChartConfig = {
  positive: { label: "Positivo", color: CHART_GREEN },
- negative: { label: "Negativo", color: "#EF4444" },
+ negative: { label: "Negativo", color: "hsl(var(--color-destructive))" },
 } satisfies ChartConfig;
 
 function FeedbackPanel({ feedback, loading }: { feedback: AnalyticsFeedback | null; loading: boolean }) {
@@ -813,7 +833,7 @@ function FeedbackPanel({ feedback, loading }: { feedback: AnalyticsFeedback | nu
      />
     ) : (
      <div className="space-y-6">
-      {/* Summary row */}
+      {/* Fila de resumen */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
        <div className="flex flex-col items-center justify-center gap-1 rounded-xl border border-border bg-muted/30 py-3">
         <span className="text-2xl font-bold tabular-nums">{s!.total}</span>
@@ -833,7 +853,7 @@ function FeedbackPanel({ feedback, loading }: { feedback: AnalyticsFeedback | nu
        </div>
       </div>
 
-      {/* Positive rate bar */}
+      {/* Barra de tasa positiva */}
       <div className="space-y-1.5">
        <div className="flex justify-between text-2xs text-muted-foreground">
         <span>Tasa de satisfacción</span>
@@ -849,7 +869,7 @@ function FeedbackPanel({ feedback, loading }: { feedback: AnalyticsFeedback | nu
        </div>
       </div>
 
-      {/* Trend chart */}
+      {/* Gráfico de tendencia */}
       {trend.length > 1 && (
        <ChartContainer config={feedbackChartConfig} className="h-36 w-full">
         <AreaChart data={trend} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
@@ -858,8 +878,181 @@ function FeedbackPanel({ feedback, loading }: { feedback: AnalyticsFeedback | nu
          <YAxis tick={{ fontSize: 10 }} />
          <ChartTooltip content={<ChartTooltipContent />} />
          <Area type="monotone" dataKey="positive" stackId="1" stroke={CHART_GREEN} fill={CHART_GREEN} fillOpacity={0.3} />
-         <Area type="monotone" dataKey="negative" stackId="1" stroke="#EF4444" fill="#EF4444" fillOpacity={0.3} />
+         <Area type="monotone" dataKey="negative" stackId="1" stroke="hsl(var(--color-destructive))" fill="hsl(var(--color-destructive))" fillOpacity={0.3} />
         </AreaChart>
+       </ChartContainer>
+      )}
+     </div>
+    )}
+   </CardContent>
+  </Card>
+ );
+}
+
+function ResponseQualityPanel({ quality, loading }: { quality: AnalyticsResponseQuality | null; loading: boolean }) {
+ const hasData = (
+  (quality?.context_relevance_sample_size ?? 0) +
+  (quality?.faithfulness_sample_size ?? 0) +
+  (quality?.answer_relevance_sample_size ?? 0)
+ ) > 0;
+ const pct = (v: number | null) => v == null ? "N/A" : `${(v * 100).toFixed(0)}%`;
+ const n = (count: number) => `${count} muestra${count === 1 ? "" : "s"}`;
+
+ return (
+  <Card>
+   <CardHeader>
+    <div className="flex items-center justify-between">
+     <div>
+      <CardTitle className="text-15">Calidad de las respuestas del asistente</CardTitle>
+      <CardDescription>Qué tan bien fundamentadas están las respuestas en el contenido cargado (muestra evaluada automáticamente)</CardDescription>
+     </div>
+     <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+    </div>
+   </CardHeader>
+   <CardContent>
+    {loading ? (
+     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      {[1, 2, 3].map((i) => <Skeleton key={i} className="h-20 rounded-xl" />)}
+     </div>
+    ) : !hasData ? (
+     <EmptyState
+      icon={ShieldCheck}
+      title="Sin evaluaciones aún"
+      description="A medida que el chatbot responda, una muestra de las respuestas se evaluará automáticamente y las métricas aparecerán aquí"
+     />
+    ) : (
+     <div className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+       <div className="flex flex-col gap-2 rounded-xl border border-border bg-muted/30 p-3">
+        <div className="flex items-center gap-1">
+         <span className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">Contexto relevante</span>
+         <HelpTip description="De los fragmentos que el sistema recuperó para responder, qué porción resultó realmente relevante para la pregunta." side="bottom" align="start" />
+        </div>
+        <span className="text-2xl font-bold tabular-nums">{pct(quality!.avg_context_relevance_ratio)}</span>
+        <Progress value={(quality!.avg_context_relevance_ratio ?? 0) * 100} className="h-1.5" />
+        <span className="text-3xs text-muted-foreground">{n(quality!.context_relevance_sample_size)}</span>
+       </div>
+       <div className="flex flex-col gap-2 rounded-xl border border-border bg-muted/30 p-3">
+        <div className="flex items-center gap-1">
+         <span className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">Fidelidad al contenido</span>
+         <HelpTip description="Qué proporción de las afirmaciones de la respuesta están respaldadas por el contenido cargado, en vez de inventadas por el modelo." side="bottom" align="start" />
+        </div>
+        <span className="text-2xl font-bold tabular-nums">{pct(quality!.avg_faithfulness_score)}</span>
+        <Progress value={(quality!.avg_faithfulness_score ?? 0) * 100} className="h-1.5" />
+        <span className="text-3xs text-muted-foreground">{n(quality!.faithfulness_sample_size)}</span>
+       </div>
+       <div className="flex flex-col gap-2 rounded-xl border border-border bg-muted/30 p-3">
+        <div className="flex items-center gap-1">
+         <span className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">Relevancia de la respuesta</span>
+         <HelpTip description="Qué tan directamente la respuesta aborda lo que la persona preguntó." side="bottom" align="start" />
+        </div>
+        <span className="text-2xl font-bold tabular-nums">{pct(quality!.avg_answer_relevance_score)}</span>
+        <Progress value={(quality!.avg_answer_relevance_score ?? 0) * 100} className="h-1.5" />
+        <span className="text-3xs text-muted-foreground">{n(quality!.answer_relevance_sample_size)}</span>
+       </div>
+      </div>
+      <p className="text-2xs text-muted-foreground">Cada métrica se evalúa sobre una muestra propia de respuestas en los últimos {quality!.days} días.</p>
+     </div>
+    )}
+   </CardContent>
+  </Card>
+ );
+}
+
+
+const csatChartConfig = {
+ avg_score: { label: "Promedio", color: CHART_GOLD },
+} satisfies ChartConfig;
+
+function CsatPanel({ csat, loading }: { csat: AnalyticsCsat | null; loading: boolean }) {
+ const trend = csat?.trend ?? [];
+ const distribution = csat?.distribution ?? {};
+ const hasData = (csat?.total ?? 0) > 0;
+ const maxBucket = Math.max(1, ...Object.values(distribution));
+
+ return (
+  <Card>
+   <CardHeader>
+    <div className="flex items-center justify-between">
+     <div>
+      <CardTitle className="text-15">Satisfacción del cliente (CSAT)</CardTitle>
+      <CardDescription>Calificación de 1 a 5 estrellas al finalizar la conversación</CardDescription>
+     </div>
+     <Star className="h-4 w-4 text-muted-foreground" />
+    </div>
+   </CardHeader>
+   <CardContent>
+    {loading ? (
+     <div className="space-y-3">
+      <div className="flex gap-4">{[1, 2, 3].map((i) => <Skeleton key={i} className="h-16 flex-1 rounded-xl" />)}</div>
+      <Skeleton className="h-40 w-full" />
+     </div>
+    ) : !hasData ? (
+     <EmptyState
+      icon={Star}
+      title="Sin valoraciones CSAT aún"
+      description="Cuando los usuarios respondan la encuesta de satisfacción, las métricas aparecerán aquí"
+     />
+    ) : (
+     <div className="space-y-6">
+      {/* Fila de resumen */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+       <div className="flex flex-col items-center justify-center gap-1 rounded-xl border border-border bg-muted/30 py-3">
+        <span className="text-2xl font-bold tabular-nums">{csat!.total}</span>
+        <span className="text-2xs text-muted-foreground">Valoraciones recibidas</span>
+       </div>
+       <div className="flex flex-col items-center justify-center gap-1 rounded-xl border border-warning/30 bg-warning/5 py-3">
+        <span className="flex items-center gap-1 text-2xl font-bold tabular-nums text-warning">
+         <Star className="w-4 h-4 fill-current" />{csat!.avg_score?.toFixed(2) ?? "N/A"}
+        </span>
+        <span className="text-2xs text-muted-foreground">Promedio sobre 5</span>
+       </div>
+      </div>
+
+      {/* Distribución 1-5 */}
+      <div className="space-y-1.5">
+       <span className="text-2xs text-muted-foreground">Distribución de estrellas</span>
+       {[5, 4, 3, 2, 1].map((n) => {
+        const count = distribution[String(n)] ?? 0;
+        return (
+         <div key={n} className="flex items-center gap-2">
+          <span className="flex items-center gap-0.5 text-2xs text-muted-foreground w-6 shrink-0">
+           {n}<Star className="w-3 h-3 fill-current text-warning" />
+          </span>
+          <div className="relative h-2 flex-1 rounded-full bg-muted overflow-hidden">
+           <div
+            className="absolute left-0 top-0 h-full rounded-full transition-all duration-700"
+            style={{ width: `${(count / maxBucket) * 100}%`, background: CHART_GOLD }}
+           />
+          </div>
+          <span className="text-2xs text-muted-foreground tabular-nums w-6 text-right shrink-0">{count}</span>
+         </div>
+        );
+       })}
+      </div>
+
+      {/* Motivos principales */}
+      {csat!.top_reasons.length > 0 && (
+       <div className="space-y-1.5">
+        <span className="text-2xs text-muted-foreground">Motivos más marcados</span>
+        <div className="flex flex-wrap gap-1.5">
+         {csat!.top_reasons.map((r) => (
+          <Badge key={r.id} variant="muted" size="xs">{r.label} · {r.count}</Badge>
+         ))}
+        </div>
+       </div>
+      )}
+
+      {/* Gráfico de tendencia */}
+      {trend.length > 1 && (
+       <ChartContainer config={csatChartConfig} className="h-36 w-full">
+        <LineChart data={trend} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
+         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+         <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(v: string) => v.slice(5)} />
+         <YAxis tick={{ fontSize: 10 }} domain={[1, 5]} />
+         <ChartTooltip content={<ChartTooltipContent />} />
+         <Line type="monotone" dataKey="avg_score" stroke={CHART_GOLD} strokeWidth={2} dot={false} />
+        </LineChart>
        </ChartContainer>
       )}
      </div>
@@ -898,7 +1091,7 @@ function PagesPanel({ pages, loading }: { pages: PageStat[]; loading: boolean })
        try {
         const u = new URL(p.page);
         displayLabel = u.pathname === "/" ? u.hostname : `${u.hostname}${u.pathname}`;
-       } catch { /* keep raw if not parseable */ }
+       } catch { /* deja el valor original si no se puede parsear */ }
        return (
         <div key={p.page} className="flex items-center gap-3">
          <Globe className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />

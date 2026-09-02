@@ -5,27 +5,22 @@ import type { TokenResponse } from "@/types";
 
 const API_PREFIX = "/api/v1";
 
-/** Build an absolute URL to an API endpoint. Useful for raw downloads
- * (CSV/JSON exports, file streams) where the axios instance can't be used
- * because the browser handles the response directly via window.open or <a>.
+/** Construye una URL absoluta a un endpoint de la API. Útil para descargas
+ * directas (exports CSV/JSON, streams de archivos) donde no se puede usar
+ * la instancia de axios porque el navegador maneja la respuesta directamente vía window.open o <a>.
  *
- * Pass the path WITHOUT the /api/v1 prefix, e.g. apiUrl("/audit/logs/export").
+ * Pasar el path SIN el prefijo /api/v1, ej. apiUrl("/audit/logs/export").
  */
 export function apiUrl(path: string): string {
   const clean = path.startsWith("/") ? path : `/${path}`;
   return `${BASE_URL}${API_PREFIX}${clean}`;
 }
 
-/** Upload size limits — kept in sync with backend MAX_*_UPLOAD_MB settings. */
-export const UPLOAD_LIMITS = {
-  source_mb: 50,
-} as const;
-
 const ACCESS_TOKEN_KEY = "chatbot_access";
 const REFRESH_TOKEN_KEY = "chatbot_refresh";
 
-// Tokens stored in JS-readable cookies (Bearer mode).
-// Secure flag is set automatically when served over HTTPS.
+// Tokens guardados en cookies legibles por JS (modo Bearer).
+// El flag secure se activa automáticamente cuando se sirve por HTTPS.
 export const tokenStore = {
   getAccess: () => Cookies.get(ACCESS_TOKEN_KEY) ?? null,
   getRefresh: () => Cookies.get(REFRESH_TOKEN_KEY) ?? null,
@@ -45,15 +40,15 @@ const api: AxiosInstance = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-// Attach Bearer token to every request (solo en modo header).
+// Adjunta el token Bearer a cada petición (solo en modo header).
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   config.headers = config.headers ?? {};
   const token = tokenStore.getAccess();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
-  // For FormData, remove the default JSON Content-Type so the browser sets
-  // multipart/form-data with the correct boundary automatically.
+  // Para FormData, quita el Content-Type JSON por defecto para que el navegador
+  // configure multipart/form-data con el boundary correcto automáticamente.
   if (config.data instanceof FormData) {
     delete config.headers["Content-Type"];
   }
@@ -75,7 +70,7 @@ api.interceptors.response.use(
     const original = error.config;
 
     // No intentar refresh en endpoints de auth (un 401 ahí significa credenciales
-    // incorrectas, no token expirado — sin este check entra en bucle de reload)
+    // incorrectas, no token expirado - sin este check entra en bucle de reload)
     const isAuthEndpoint = original.url?.includes("/auth/login") ||
                            original.url?.includes("/auth/refresh") ||
                            original.url?.includes("/auth/invite");

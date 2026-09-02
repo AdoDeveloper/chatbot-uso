@@ -12,9 +12,8 @@ import {
   useDropdownMenu,
 } from "@/components/ui/dropdown-menu";
 
-// Bell del header con dropdown de notificaciones reales (antes era un dot
-// estático). Polling cada 30s, marca como leída al click, link al historial
-// completo en /sistema/notificaciones.
+// Bell del header con dropdown de notificaciones reales. Polling cada 30s,
+// marca como leída al click, link al historial completo en /sistema/notificaciones.
 
 interface InboxItem {
   id: string;
@@ -25,6 +24,7 @@ interface InboxItem {
   error_message: string | null;
   created_at: string;
   read_at: string | null;
+  summary: string | null;
 }
 
 interface InboxResponse {
@@ -39,7 +39,7 @@ const EVENT_META: Record<string, { label: string; icon: typeof FileText; href?: 
   provider_down: { label: "Proveedor IA caído", icon: Plug, href: "/dashboard/configuracion/proveedores" },
   service_down: { label: "Servicio degradado", icon: Plug, href: "/dashboard/configuracion/proveedores" },
   rate_limit_threshold: { label: "Cerca del límite de cuotas", icon: AlertCircle, href: "/dashboard/configuracion/cuotas" },
-  unanswered_daily: { label: "Resumen diario", icon: Inbox, href: "/dashboard/conversaciones/pendientes" },
+  unanswered_digest: { label: "Resumen diario", icon: Inbox, href: "/dashboard/conversaciones/pendientes" },
 };
 
 function timeAgo(iso: string): string {
@@ -59,18 +59,36 @@ export function NotificationsBell() {
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+    let inFlight = false;
+
     async function load() {
+      if (inFlight) return;
+      inFlight = true;
       try {
         const { data } = await api.get<InboxResponse>("/notifications/inbox?limit=10");
-        setData(data);
+        if (!cancelled) setData(data);
       } catch {
-        // 401/403/network — silently ignore. Bell shows no badge.
+        // 401/403/network - silently ignore. Bell shows no badge.
+      } finally {
+        inFlight = false;
       }
     }
 
     load();
-    pollingRef.current = setInterval(load, 30000);
+    pollingRef.current = setInterval(() => {
+      // Pausa el polling en pestañas ocultas.
+      if (document.visibilityState === "visible") load();
+    }, 30000);
+
+    function onVisibilityChange() {
+      if (document.visibilityState === "visible") load();
+    }
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
     return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       if (pollingRef.current) clearInterval(pollingRef.current);
     };
   }, []);
@@ -164,25 +182,33 @@ function NotificationsPanel({
               const itemUnread = !item.read_at;
               const failed = item.status === "failed";
               const content = (
-                <div className="flex items-start gap-2 px-3 py-2.5 hover:bg-muted/50 transition-colors">
-                  <div className={`mt-0.5 p-1 rounded ${failed ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"}`}>
+                <div className="group flex items-start gap-2 px-3 py-2.5 hover:bg-muted/50 transition-colors">
+                  <div className={`mt-0.5 p-1 rounded ${failed ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"}`} title={meta.label}>
                     <Icon className="w-3 h-3" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
                       <p className={`text-xs ${itemUnread ? "font-semibold" : "font-normal"} truncate`}>
-                        {meta.label}
+                        {item.summary || meta.label}
                       </p>
                       {itemUnread && <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />}
                     </div>
-                    <p className="text-3xs text-muted-foreground truncate mt-0.5">
-                      {item.channel === "in_app" ? "Notificación en la app" : `Email → ${item.target}`}
-                    </p>
                     {failed && item.error_message && (
                       <p className="text-3xs text-destructive truncate mt-0.5">{item.error_message}</p>
                     )}
                     <p className="text-3xs text-muted-foreground mt-0.5">{timeAgo(item.created_at)}</p>
                   </div>
+                  {itemUnread && (
+                    <button
+                      type="button"
+                      title="Marcar como leída"
+                      aria-label="Marcar como leída"
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); markRead(item.id); }}
+                      className="mt-0.5 p-1 rounded text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-primary hover:bg-primary/10 transition-opacity shrink-0"
+                    >
+                      <Check className="w-3 h-3" />
+                    </button>
+                  )}
                 </div>
               );
 

@@ -61,7 +61,7 @@ export function DataTable<T>({
       {/* pt-1: cuando la Card tiene una barra de filtros/búsqueda propia con
           border-b justo arriba (patrón usado en varias páginas), el header
           de la tabla quedaba pegado directo a esa línea divisoria sin aire
-          entre ambos — un pequeño respiro sin alterar la altura del header
+          entre ambos - un pequeño respiro sin alterar la altura del header
           de columnas (h-9) ni el resto del layout. */}
       <div className="overflow-x-auto pt-1">
         <Table>

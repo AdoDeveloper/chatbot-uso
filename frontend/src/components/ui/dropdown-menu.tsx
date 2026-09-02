@@ -80,11 +80,23 @@ function DropdownMenuContent({ children, className, align = "end", side = "botto
     const top = effectiveSide === "bottom" ? r.bottom + gap : undefined
     const bottom = effectiveSide === "top" ? window.innerHeight - r.top + gap : undefined
 
+    const menuWidth = portalRef.current?.offsetWidth || 220
+    const margin = 8
+
     let left: number | undefined
     let right: number | undefined
-    if (align === "end") { left = undefined; right = window.innerWidth - r.right }
-    else if (align === "start") { left = r.left; right = undefined }
-    else { left = r.left + r.width / 2; right = undefined }
+    if (align === "end") {
+      const fromRight = r.right - menuWidth
+      left = Math.max(margin, fromRight)
+      right = undefined
+    } else if (align === "start") {
+      left = Math.min(r.left, window.innerWidth - menuWidth - margin)
+      right = undefined
+    } else {
+      const center = r.left + r.width / 2 - menuWidth / 2
+      left = Math.max(margin, Math.min(center, window.innerWidth - menuWidth - margin))
+      right = undefined
+    }
 
     setPos({ top, bottom, left, right })
   }, [align, side, wrapperRef])

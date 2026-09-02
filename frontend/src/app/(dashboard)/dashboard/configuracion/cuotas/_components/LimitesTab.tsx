@@ -22,20 +22,22 @@ export interface LimitesTabHandle {
 
 export const LimitesTab = forwardRef<LimitesTabHandle>(function LimitesTab(_props, ref) {
   const { toast, confirm } = useToast();
-  const { data: config, loading: loadingConfig, error: configError, refetch: refetchConfig, setData: setConfig } =
+  const { data: configData, loading: loadingConfig, error: configError, refetch: refetchConfig } =
     useApi<RateLimitConfig>("/rate-limits/config");
   const { data: throttledData, loading: loadingThrottled, error: throttledError, refetch: refetchThrottled, setData: setThrottled } =
     useApi<ThrottledIP[]>("/rate-limits/throttled");
   const throttled = throttledData ?? [];
   const loading = loadingConfig || loadingThrottled;
   const [saving, setSaving] = useState(false);
+  // Borrador local editable, separado del fetch crudo (para que `dirty` funcione).
+  const [config, setConfig] = useState<RateLimitConfig | null>(null);
   const [savedConfig, setSavedConfig] = useState<RateLimitConfig | null>(null);
 
   useEffect(() => {
-    if (config) setSavedConfig(config);
-  }, [config]);
+    if (configData) { setConfig(configData); setSavedConfig(configData); }
+  }, [configData]);
 
-  const dirty = !!savedConfig && JSON.stringify(config) !== JSON.stringify(savedConfig);
+  const dirty = !!savedConfig && !!config && JSON.stringify(config) !== JSON.stringify(savedConfig);
 
   function load() {
     refetchConfig();
@@ -51,6 +53,10 @@ export const LimitesTab = forwardRef<LimitesTabHandle>(function LimitesTab(_prop
 
   async function saveConfig() {
     if (!config) return;
+    if (config.chat_per_min < 1 || config.chat_per_hour < 1 || !Number.isFinite(config.chat_per_min) || !Number.isFinite(config.chat_per_hour)) {
+      toast({ type: "error", message: "Los límites deben ser números mayores a 0." });
+      return;
+    }
     setSaving(true);
     try {
       await api.patch("/rate-limits/config", config);
@@ -86,13 +92,13 @@ export const LimitesTab = forwardRef<LimitesTabHandle>(function LimitesTab(_prop
         <CardContent className="space-y-4">
           <div>
             <label className="text-xs font-medium block mb-1">Chat por minuto / IP</label>
-            <Input type="number" value={config.chat_per_min}
+            <Input type="number" min={1} value={config.chat_per_min}
               onChange={(e) => setConfig({ ...config, chat_per_min: Number(e.target.value) })}
               className="max-w-32" />
           </div>
           <div>
             <label className="text-xs font-medium block mb-1">Chat por hora / IP</label>
-            <Input type="number" value={config.chat_per_hour}
+            <Input type="number" min={1} value={config.chat_per_hour}
               onChange={(e) => setConfig({ ...config, chat_per_hour: Number(e.target.value) })}
               className="max-w-32" />
           </div>

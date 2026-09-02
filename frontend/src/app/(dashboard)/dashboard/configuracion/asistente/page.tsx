@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Bot, Shield, ChevronRight, Download, Upload, Eye, Palette, Code2, Gauge } from "lucide-react";
 import api from "@/lib/api";
-import { useApi, getErrorMessage } from "@/hooks/use-api";
+import { useApi, getErrorMessage, invalidateApiCache } from "@/hooks/use-api";
 import { useToast } from "@/components/ui/toast";
 import type { ChatbotSettings, WidgetConfig } from "@/types";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,10 +16,6 @@ import {
  PromptTab, ParamsTab, PlaygroundTab, WidgetTab, FloatingSaveBar, SETTINGS_DEFAULTS, UnpublishedBanner,
 } from "../_lib/tabs";
 
-// Asistente reúne todo lo que define al chatbot: cómo piensa (prompt/RAG) y
-// cómo se ve/comporta (apariencia/integración/límites, antes "Widget" era una
-// sección aparte con su propio preview estático desactualizado). Una sola
-// fila de tabs y un único preview funcional compartido.
 const TABS = [
  { value: "apariencia",  label: "Apariencia",   icon: Palette },
  { value: "prompt",      label: "Prompt",       icon: Bot },
@@ -41,7 +37,7 @@ export default function AsistentePage() {
  const initialTab = searchParams.get("tab");
  const [tab, setTab] = useState<TabId>(isTabId(initialTab) ? initialTab : "apariencia");
 
-  const { data: settings, loading: loadingSettings } = useApi<ChatbotSettings>("/settings");
+  const { data: settings, loading: loadingSettings, refetch: refetchSettings } = useApi<ChatbotSettings>("/settings");
   const { data: widgetConfig, loading: loadingWidget } = useApi<WidgetConfig>("/widget/config");
   const { data: deployedData, loading: loadingDeployed } = useApi<WidgetConfig>("/versions/deploy/config");
   const deployedWidgetConfig = deployedData && Object.keys(deployedData).length > 0 ? deployedData : null;
@@ -52,9 +48,6 @@ export default function AsistentePage() {
  const [importing, setImporting] = useState(false);
  const fileInputRef = useRef<HTMLInputElement>(null);
 
- // Estado editable del config del widget, elevado aquí para que el formulario
- // de Apariencia (WidgetTab) y el preview funcional (PlaygroundTab) compartan
- // el MISMO objeto: así los cambios de apariencia se ven en vivo en el preview.
  const [widgetForm, setWidgetForm] = useState<WidgetConfig | null>(null);
  useEffect(() => { if (widgetConfig) setWidgetForm(widgetConfig); }, [widgetConfig]);
 
@@ -94,9 +87,11 @@ export default function AsistentePage() {
   try {
    const fd = new FormData();
    fd.append("file", file);
-   const { data } = await api.post<ChatbotSettings & { warnings?: string[] }>("/settings/import", fd);
-   setForm(data);
-   setSavedForm(data);
+    invalidateApiCache("/settings");
+    const { data } = await api.post<ChatbotSettings & { warnings?: string[] }>("/settings/import", fd);
+    setForm(data);
+    setSavedForm(data);
+    refetchSettings();
    if (data.warnings?.length) {
     toast({ type: "warning", title: "Importado con advertencias", message: data.warnings.join(" | ") });
    } else {
@@ -120,16 +115,14 @@ export default function AsistentePage() {
 
  function handleDiscard() { if (savedForm) setForm(savedForm); }
 
- async function handleSave() {
-  if (!form.chatbot_name?.trim()) {
-   toast({ type: "error", message: "El nombre del chatbot no puede estar vacío." });
-   return;
-  }
-  setSaving(true);
-  try {
-   const { data } = await api.put<ChatbotSettings & { warnings?: string[] }>("/settings", form);
-   setSavedForm(form);
-   if (data.warnings?.length) {
+  async function handleSave() {
+   setSaving(true);
+   try {
+    invalidateApiCache("/settings");
+    const { data } = await api.put<ChatbotSettings & { warnings?: string[] }>("/settings", form);
+    setSavedForm(form);
+    refetchSettings();
+    if (data.warnings?.length) {
     toast({ type: "warning", title: "Guardado con advertencias", message: data.warnings.join(" | ") });
    } else {
     toast({ type: "success", title: "Guardado", message: "Configuración actualizada correctamente." });

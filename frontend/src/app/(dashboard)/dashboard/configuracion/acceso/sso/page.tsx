@@ -146,7 +146,7 @@ export default function SsoPage() {
   return (
     <div className="space-y-4">
 
-      {/* Credentials */}
+      {/* Credenciales */}
       {loadingMethods ? (
         <Card>
           <CardHeader>
@@ -185,7 +185,7 @@ export default function SsoPage() {
       </Card>
       )}
 
-      {/* Microsoft SSO */}
+      {/* SSO de Microsoft */}
       {loadingOauth ? (
         <Card>
           <CardHeader>
@@ -217,7 +217,7 @@ export default function SsoPage() {
         </CardHeader>
         <CardContent className="space-y-4">
 
-          {/* Credential status — read-only, comes from .env */}
+          {/* Estado de credenciales - solo lectura */}
           <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-1.5">
             <p className="text-2xs font-medium text-muted-foreground">Estado de credenciales del servidor</p>
             <div className="flex flex-wrap gap-3">
@@ -248,7 +248,7 @@ export default function SsoPage() {
             )}
           </div>
 
-          {/* Active toggle */}
+          {/* Toggle de activo */}
           <div className="flex items-center justify-between">
             <div>
               <p className="text-13 font-medium">Activar Microsoft SSO</p>
@@ -265,7 +265,7 @@ export default function SsoPage() {
             />
           </div>
 
-          {/* Allowed domains */}
+          {/* Dominios permitidos */}
           <div className="space-y-1">
             <label className="block text-2xs font-medium text-foreground">
               Dominios permitidos <span className="font-normal text-muted-foreground">(opcional, separados por coma)</span>
@@ -273,13 +273,13 @@ export default function SsoPage() {
             <Input
               value={allowedDomains}
               onChange={(e) => setAllowedDomains(e.target.value)}
-              placeholder="empresa.com, filial.com — vacío = cualquier cuenta Microsoft"
+              placeholder="empresa.com, filial.com · vacío = cualquier cuenta Microsoft"
               disabled={!canManage}
             />
             <p className="text-2xs text-muted-foreground">Si se define, solo se aceptarán cuentas de esos dominios.</p>
           </div>
 
-          {/* Redirect URI (read-only, for Azure app registration) */}
+          {/* Redirect URI (solo lectura, para el registro de la app en Azure) */}
           <div className="space-y-1">
             <label className="block text-2xs font-medium text-muted-foreground">
               Redirect URI <span className="font-normal">(copie esta URL en su app de Azure)</span>

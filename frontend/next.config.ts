@@ -1,12 +1,8 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 import { PHASE_DEVELOPMENT_SERVER } from "next/constants";
 
-// CSP: el panel solo carga recursos propios. `connect-src` incluye el backend
-// (NEXT_PUBLIC_API_URL) para las llamadas XHR/fetch y SSE del playground.
-// 'unsafe-inline' en script-src es necesario por la hidratación de Next.js sin
-// nonce; aun así se bloquea la carga de <script src> de terceros — el vector
-// XSS más común. El markdown del chatbot se sanitiza con DOMPurify antes de
-// renderizar, por lo que no se requiere relajar la política para ello.
+// CSP propia del panel: 'unsafe-inline' en script-src es por la hidratación de Next.js sin nonce, pero bloquea <script src> de terceros (el vector XSS más común); el markdown del chatbot igual se sanitiza con DOMPurify.
 const apiOrigin = (() => {
   try {
     return process.env.NEXT_PUBLIC_API_URL
@@ -17,15 +13,12 @@ const apiOrigin = (() => {
   }
 })();
 
-// `unsafe-eval` solo se agrega en `next dev`: React Fast Refresh evalúa
-// código como string para aplicar hot-reload, y el build de producción
-// (`next build && next start`) no lo necesita ni lo usa.
 function buildCsp(isDevelopment: boolean): string {
   return [
     "default-src 'self'",
     `script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ""}`,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob:",
+    "img-src 'self' data: blob: http: https:",
     "font-src 'self' data:",
     `connect-src 'self' ${apiOrigin}`.trim(),
     "frame-ancestors 'none'",
@@ -35,7 +28,7 @@ function buildCsp(isDevelopment: boolean): string {
   ].join("; ");
 }
 
-const BACKEND_INTERNAL = process.env.BACKEND_INTERNAL_URL ?? "http://127.0.0.1:8000";
+const BACKEND_INTERNAL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
 const APP_ORIGIN = (() => {
   try {
     return new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000");
@@ -50,6 +43,7 @@ export default (phase: string): NextConfig => {
 
   return {
     output: "standalone",
+    outputFileTracingRoot: path.join(__dirname),
     allowedDevOrigins: isDevelopment ? [APP_ORIGIN.hostname] : undefined,
     async rewrites() {
       return [

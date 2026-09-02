@@ -7,6 +7,7 @@ import Link from "next/link";
 import api from "@/lib/api";
 import { useApi, getErrorMessage } from "@/hooks/use-api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/composed/modal";
@@ -30,11 +31,12 @@ interface FAQDraftModal {
 }
 
 export default function PendientesPage() {
-  const { toast } = useToast();
+  const { toast, confirm } = useToast();
   const { data, loading, refetch: load } = useApi<UnansweredResponse>("/unanswered");
   const [faqModal, setFaqModal] = useState<FAQDraftModal | null>(null);
   const [rootCauseByQid, setRootCauseByQid] = useState<Record<string, RootCause | null>>({});
   const [rootCauseLoading, setRootCauseLoading] = useState<string | null>(null);
+  const [resolving, setResolving] = useState<string | null>(null);
 
   async function loadRootCause(qid: string) {
     if (rootCauseByQid[qid]) {
@@ -57,9 +59,22 @@ export default function PendientesPage() {
   }
 
   async function handleResolve(questionId: string) {
-    await api.post(`/unanswered/${questionId}/resolve`);
-    toast({ type: "success", message: "Marcada como resuelta." });
-    load();
+    const ok = await confirm({
+      title: "¿Marcar como resuelta?",
+      message: "La pregunta se marcará como resuelta y dejará de aparecer en pendientes.",
+      confirmText: "Marcar resuelta",
+    });
+    if (!ok) return;
+    setResolving(questionId);
+    try {
+      await api.post(`/unanswered/${questionId}/resolve`);
+      toast({ type: "success", message: "Marcada como resuelta." });
+      load();
+    } catch (err) {
+      toast({ type: "error", message: getErrorMessage(err, "No se pudo marcar como resuelta.") });
+    } finally {
+      setResolving(null);
+    }
   }
 
   function openFaqModal(question: UnansweredQuestion) {
@@ -130,11 +145,11 @@ export default function PendientesPage() {
         </div>
       ) : !data || data.total === 0 ? (
         <Card>
-          <CardContent className="py-16 text-center">
-            <CheckCircle className="w-8 h-8 mx-auto mb-3 text-brand-green/60" />
-            <p className="text-13 font-medium text-foreground">¡Todo al día!</p>
-            <p className="text-2xs text-muted-foreground mt-1">No hay preguntas sin respuesta en este momento.</p>
-          </CardContent>
+          <EmptyState
+            icon={CheckCircle}
+            title="¡Todo al día!"
+            description="No hay preguntas sin respuesta en este momento."
+          />
         </Card>
       ) : (
         <>
@@ -214,10 +229,13 @@ export default function PendientesPage() {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleResolve(q.id)}
+                                disabled={resolving === q.id}
                                 className="gap-1.5 text-xs"
                                 title="Marcar como resuelta sin crear FAQ"
                               >
-                                <CheckCircle className="w-3.5 h-3.5" />
+                                {resolving === q.id
+                                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  : <CheckCircle className="w-3.5 h-3.5" />}
                               </Button>
                             </div>
                           </div>
@@ -251,7 +269,7 @@ export default function PendientesPage() {
         </>
       )}
 
-      {/* FAQ creation dialog */}
+      {/* Diálogo de creación de FAQ */}
       <Modal
         open={!!faqModal}
         onClose={() => setFaqModal(null)}

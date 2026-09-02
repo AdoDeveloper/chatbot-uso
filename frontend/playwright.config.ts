@@ -17,8 +17,9 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 2 : undefined,
+  workers: process.env.CI ? 2 : 2,
   reporter: [["list"], ["html", { open: "never" }]],
+  globalSetup: "./e2e/global-setup.ts",
   use: {
     baseURL,
     trace: "on-first-retry",

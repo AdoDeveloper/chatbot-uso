@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils"
 
 /* ── Tabs ── navegación por secciones, patrón `underline`.
  *
- * Bajo peso visual, escalable, jerárquicamente neutro — el patrón dominante en
+ * Bajo peso visual, escalable, jerárquicamente neutro - el patrón dominante en
  * dashboards modernos (Vercel, GitHub, Stripe, Linear).
  *
  * Para toggles mutuamente excluyentes (ambiente, rango de fecha) o filtros de
@@ -52,7 +52,7 @@ function TabsList({ className, ...props }: React.HTMLAttributes<HTMLDivElement>)
       role="tablist"
       data-slot="tabs-list"
       className={cn(
-        "flex items-center gap-0 border-b border-border w-full overflow-x-auto overflow-y-hidden",
+        "flex items-center gap-0 border-b border-border w-full overflow-x-auto overflow-y-hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden",
         className
       )}
       {...props}

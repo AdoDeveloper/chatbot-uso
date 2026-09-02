@@ -23,9 +23,7 @@ interface StatCardProps {
   compact?: boolean
 }
 
-// Stripe / Linear pattern: subtle icon chip, no heavy left-border. Border
-// stays canonical so the card sits in the same visual rhythm as everything
-// else on the page.
+// Patrón Stripe/Linear: chip de ícono sutil, sin borde izquierdo pesado.
 const ACCENT_MAP = {
   primary: { bg: "bg-primary/10", text: "text-primary" },
   teal:    { bg: "bg-brand-teal/10", text: "text-brand-teal" },

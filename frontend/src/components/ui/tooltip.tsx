@@ -65,8 +65,8 @@ function TooltipContent({
   );
 }
 
-// Existing call sites use <Tooltip content="..." side="..."><trigger/></Tooltip>.
-// Keep that working so we don't break ImagenesTab.tsx and similar.
+// Los call sites usan <Tooltip content="..." side="..."><trigger/></Tooltip>.
+// Se mantiene esa forma de uso para no romper ImagenesTab.tsx y similares.
 function Tooltip({
   content,
   children,
@@ -79,7 +79,7 @@ function Tooltip({
   className?: string;
 }) {
   if (content === undefined) {
-    // Used as a Radix-style root: <Tooltip><TooltipTrigger/><TooltipContent/></Tooltip>
+    // Usado como root estilo Radix: <Tooltip><TooltipTrigger/><TooltipContent/></Tooltip>
     return <TooltipRoot>{children}</TooltipRoot>;
   }
   return (

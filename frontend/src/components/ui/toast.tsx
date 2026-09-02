@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle, XCircle, Info, X, AlertTriangle } from "lucide-react";
 
 type ToastType = "success" | "error" | "info" | "warning";
@@ -45,10 +45,17 @@ const DEFAULT_TITLES: Record<ToastType, string> = {
 };
 
 const ICON_BG: Record<ToastType, string> = {
-  info: "bg-info",
-  success: "bg-success",
-  warning: "bg-warning",
-  error: "bg-destructive",
+  info: "bg-info/10",
+  success: "bg-success/10",
+  warning: "bg-warning/10",
+  error: "bg-destructive/10",
+};
+
+const ICON_COLOR: Record<ToastType, string> = {
+  info: "text-info",
+  success: "text-success",
+  warning: "text-warning",
+  error: "text-destructive",
 };
 
 const ICONS: Record<ToastType, React.ElementType> = {
@@ -94,7 +101,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   const confirm = useCallback((options: ConfirmOptions): Promise<boolean> => {
     return new Promise((resolve) => {
-      setDialog({ ...options, resolve });
+      // Solo hay un slot de diálogo global: si ya había una confirmación pendiente, se resuelve en false para no dejarla huérfana.
+      setDialog((prev) => {
+        prev?.resolve(false);
+        return { ...options, resolve };
+      });
     });
   }, []);
 
@@ -103,29 +114,32 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     setDialog(null);
   }
 
+  // Memoizado para no re-renderizar todos los consumidores de useToast() en cada aparición/desaparición de un toast.
+  const ctxValue = useMemo(() => ({ toast, confirm }), [toast, confirm]);
+
   return (
-    <ToastContext.Provider value={{ toast, confirm }}>
+    <ToastContext.Provider value={ctxValue}>
       {children}
 
-      {/* Toast stack */}
+      {/* Pila de toasts */}
       <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2.5 pointer-events-none">
         {toasts.map((t) => {
           const Icon = ICONS[t.type];
           return (
             <div
               key={t.id}
-              className={`pointer-events-auto flex items-start gap-3 pl-4 pr-3 py-3.5 rounded-xl border-l-4 ${BORDER_COLOR[t.type]} bg-foreground shadow-2xl max-w-sm animate-in slide-in-from-right-5 duration-300`}
+              className={`pointer-events-auto flex items-start gap-3 pl-4 pr-3 py-3.5 rounded-xl border-l-4 ${BORDER_COLOR[t.type]} bg-card shadow-2xl border border-border max-w-sm animate-in slide-in-from-right-5 duration-300`}
             >
               <div className={`w-8 h-8 rounded-full ${ICON_BG[t.type]} flex items-center justify-center shrink-0 mt-0.5`}>
-                <Icon className="w-4 h-4 text-background" strokeWidth={2.5} />
+                <Icon className={`w-4 h-4 ${ICON_COLOR[t.type]}`} strokeWidth={2.5} />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-background">{t.title}</p>
-                {t.message && <p className="text-13 text-background/70 mt-0.5 leading-snug">{t.message}</p>}
+                <p className="text-sm font-bold text-card-foreground">{t.title}</p>
+                {t.message && <p className="text-13 text-muted-foreground mt-0.5 leading-snug">{t.message}</p>}
               </div>
               <button
                 onClick={() => remove(t.id)}
-                className="shrink-0 text-background/60 hover:text-background transition-colors mt-0.5"
+                className="shrink-0 text-muted-foreground hover:text-card-foreground transition-colors mt-0.5"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -134,7 +148,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         })}
       </div>
 
-      {/* Confirm dialog */}
+      {/* Diálogo de confirmación */}
       {dialog && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50" onClick={() => handleConfirm(false)} />

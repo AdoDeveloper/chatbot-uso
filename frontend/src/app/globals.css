@@ -3,12 +3,12 @@
 @import "shadcn/tailwind.css";
 
 /* ─────────────────────────────────────────────────────────────
- * DESIGN TOKENS — single source of truth
+ * DESIGN TOKENS - single source of truth
  *
  * Foundation: Navy/Royal/Dodger family (institutional brand) +
  * neutral grayscale. Tuned for WCAG AA on every text/icon pair.
  *
- * Density target: AdminLTE-style — compacta pero respirable.
+ * Density target: AdminLTE-style - compacta pero respirable.
  * Tables 36px, body 13.5px, headings -0.015em letter-spacing.
  *
  * Contrast verified pairs (against #FFFFFF and #F8FAFC):
@@ -73,14 +73,14 @@
   --font-mono: var(--font-jetbrains-mono);
   --font-heading: var(--font-inter);
 
-  /* Radii — subtle, professional */
+  /* Radii - subtle, professional */
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) * 1.4);
   --radius-2xl: calc(var(--radius) * 1.8);
 
-  /* Shadows — AdminLTE-like depth, not floaty */
+  /* Shadows - AdminLTE-like depth, not floaty */
   --shadow-xs: 0 1px 2px 0 rgb(15 23 42 / 0.04);
   --shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.05), 0 1px 3px 0 rgb(15 23 42 / 0.05);
   --shadow-md: 0 2px 4px -1px rgb(15 23 42 / 0.06), 0 4px 6px -1px rgb(15 23 42 / 0.06);
@@ -94,11 +94,11 @@
   --color-brand-mid:     #1C386D;
   --color-brand-soft:    #10254F;
   --color-brand-teal:    #0369A1;
-  --color-brand-bright:  #2563EB;   /* dodger blue — focus/info */
+  --color-brand-bright:  #2563EB;   /* dodger blue - focus/info */
   --color-brand-steel:   #336699;
   --color-brand-cornflower: #6C8ED2;
   --color-brand-sky:        #93C5FD;
-  --color-brand-green:   #16A34A;   /* success — AA on white */
+  --color-brand-green:   #14742F;   /* success - AA both on white and on its own bg-brand-green/N tint */
 
   /* Blue scale for charts, heatmaps */
   --color-blue-50:  #EFF6FF;
@@ -148,29 +148,34 @@
   --popover: #FFFFFF;
   --popover-foreground: #111827;
 
-  /* Primary — institutional navy, AAA contrast */
+  /* Primary - institutional navy, AAA contrast */
   --primary: #1E40AF;
   --primary-foreground: #FFFFFF;
   --primary-hover: #1E3A8A;
 
-  /* Secondary — soft tonal lift */
+  /* Secondary - soft tonal lift */
   --secondary: #EFF6FF;
   --secondary-foreground: #1E3A8A;
 
-  /* Muted — subtle backgrounds & dimmed text */
+  /* Muted - subtle backgrounds & dimmed text */
   --muted: #F1F5F9;
   --muted-foreground: #4B5563;
 
-  /* Accent — for hover states on neutral elements */
+  /* Accent - for hover states on neutral elements */
   --accent: #F1F5F9;
   --accent-foreground: #111827;
 
-  /* Status colors — all AA+ on white */
+  /* Status colors - all AA+ on white, and (destructive/success/warning/info)
+     also AA+ as text-on-tint (text-X on bg-X/N badges, used throughout the
+     panel - the original values only cleared the white-background bar). */
   --destructive: #B91C1C;
   --destructive-foreground: #FFFFFF;
-  --success: #15803D;
+  --success: #14742F;
   --success-foreground: #FFFFFF;
-  --warning: #B45309;
+  /* Darkened from the original #CA8A04 (2.7:1 on its own light tint) so
+     text-warning stays WCAG AA on both solid fills (with white text on top)
+     and the bg-warning/N tint badges used throughout the panel. */
+  --warning: #854D0E;
   --warning-foreground: #FFFFFF;
   --info: #1D4ED8;
   --info-foreground: #FFFFFF;
@@ -180,14 +185,14 @@
   --input: #E5E7EB;
   --ring: #2563EB;
 
-  /* Charts — sequential blue + supporting hues */
+  /* Charts - sequential blue + supporting hues */
   --chart-1: #1E40AF;
   --chart-2: #2563EB;
   --chart-3: #60A5FA;
   --chart-4: #0369A1;
   --chart-5: #16A34A;
 
-  /* Sidebar — institutional dark */
+  /* Sidebar - institutional dark */
   --sidebar: #0A2251;
   --sidebar-foreground: #E2E8F0;
   --sidebar-primary: #2563EB;
@@ -197,7 +202,7 @@
   --sidebar-border: rgba(255, 255, 255, 0.08);
   --sidebar-ring: #60A5FA;
 
-  /* Radius (8px base — AdminLTE-like, not too round) */
+  /* Radius (8px base - AdminLTE-like, not too round) */
   --radius: 0.5rem;
 }
 
@@ -249,7 +254,7 @@
     font-feature-settings: inherit;
   }
 
-  /* Focus ring — single canonical pattern */
+  /* Focus ring - single canonical pattern */
   :focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
@@ -271,7 +276,7 @@
     }
   }
 
-  /* Cursor pointer en interactivos — Tailwind v4 cambió el default a `default`,
+  /* Cursor pointer en interactivos - Tailwind v4 cambió el default a `default`,
    * lo restauramos para que UX sea consistente con expectativa del usuario.
    * Excluye estados disabled/aria-disabled. */
   button:not(:disabled):not([aria-disabled="true"]),
@@ -367,7 +372,7 @@
 
 /* ── Markdown rendered in playground chat bubbles ────────────── */
 @layer base {
-  .md-content { line-height: 1.65; word-break: break-word; }
+  .md-content { line-height: 1.65; word-break: break-word; overflow-x: auto; }
   .md-content p { margin: 0 0 7px; }
   .md-content p:last-child { margin-bottom: 0; }
   .md-content h1 { font-size: 17px; font-weight: 700; margin: 10px 0 5px; }
@@ -429,7 +434,8 @@
   .md-content pre { background: #1e293b; color: #e2e8f0; padding: 12px 14px; border-radius: 8px; overflow-x: auto; margin: 8px 0; }
   .md-content pre code { background: transparent; color: inherit; padding: 0; }
   .md-content blockquote { border-left: 3px solid #93c5fd; margin: 6px 0; padding: 3px 12px; color: #6b7280; background: rgba(147,197,253,0.1); border-radius: 0 4px 4px 0; }
-  .md-content table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 8px 0; }
+  .md-content .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 8px 0; }
+  .md-content .table-wrap table { width: auto; border-collapse: collapse; font-size: 13px; white-space: nowrap; }
   .md-content th { background: #e5e7eb; padding: 6px 8px; text-align: left; font-weight: 600; border: 1px solid #d1d5db; }
   .md-content td { padding: 5px 8px; border: 1px solid #e5e7eb; }
   .md-content hr { border: none; border-top: 1px solid #e5e7eb; margin: 8px 0; }

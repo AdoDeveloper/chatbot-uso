@@ -89,7 +89,7 @@ function InyeccionesContent() {
                 <div className="min-w-0 flex-1">
                   <p className="text-13 font-medium">{ev.meta_json?.reason ?? "Inyección detectada"}</p>
                   <p className="text-2xs text-muted-foreground mt-0.5 truncate">
-                    IP {ev.ip ?? "—"} · {formatInProjectTz(ev.created_at)}
+                    IP {ev.ip ?? "N/A"} · {formatInProjectTz(ev.created_at)}
                   </p>
                   {ev.meta_json?.question_preview && (
                     <p className="text-2xs text-muted-foreground mt-1 italic line-clamp-2">
@@ -140,6 +140,7 @@ export default function ActividadPage() {
       <UnderlineTabs
         tabs={TABS.map((t) => ({ ...t, onClick: () => selectTab(t.value) }))}
         activeValue={tab}
+        scrollable
       />
 
       {tab === "auditoria" && <AuditoriaTab />}

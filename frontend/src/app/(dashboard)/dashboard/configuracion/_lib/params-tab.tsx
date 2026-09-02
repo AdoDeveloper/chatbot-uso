@@ -10,19 +10,19 @@ const RAG_PRESETS = [
   id: "preciso",
   label: "Preciso",
   description: "Respuestas fieles al documento, sin divagaciones",
-  values: { top_k: 5, score_threshold: 0.3, temperature: 0.1, use_corrective_rag: true, use_reranker: true },
+  values: { top_k: 5, score_threshold: 0.03, temperature: 0.1, use_corrective_rag: true },
  },
- {
-  id: "equilibrado",
-  label: "Equilibrado",
-  description: "Balance entre precisión y fluidez (recomendado)",
-  values: { top_k: 8, score_threshold: 0.0, temperature: 0.3, use_corrective_rag: true, use_reranker: false },
- },
+  {
+   id: "equilibrado",
+   label: "Equilibrado",
+   description: "Balance entre precisión y fluidez (recomendado)",
+   values: { top_k: 12, score_threshold: 0.0, temperature: 0.55, use_corrective_rag: true },
+  },
  {
   id: "exploratorio",
   label: "Exploratorio",
   description: "Respuestas amplias con más contexto",
-  values: { top_k: 12, score_threshold: 0.0, temperature: 0.6, use_corrective_rag: true, use_reranker: false },
+  values: { top_k: 15, score_threshold: 0.0, temperature: 0.6, use_corrective_rag: true },
  },
 ] as const;
 
@@ -34,8 +34,7 @@ function detectActivePreset(form: ChatbotSettings): RagPresetId | null {
    form.top_k === p.values.top_k &&
    form.score_threshold === p.values.score_threshold &&
    form.temperature === p.values.temperature &&
-   form.use_corrective_rag === p.values.use_corrective_rag &&
-   form.use_reranker === p.values.use_reranker
+   form.use_corrective_rag === p.values.use_corrective_rag
   ) return p.id;
  }
  return null;
@@ -99,11 +98,11 @@ export function ParamsTab({ form, set }: { form: ChatbotSettings; set: (k: keyof
       label="Umbral de relevancia"
       valueBadge={form.score_threshold.toFixed(2)}
       help={{
-       description: "Puntaje mínimo que debe tener un fragmento para incluirse. Se mide entre 0 (cualquier cosa) y 1 (coincidencia perfecta).",
-       example: "0 = sin filtro. 0.3–0.5 = equilibrio. Si sube a 0.7+ el chatbot puede quedarse sin contexto y responder 'no sé'.",
+       description: "Puntaje mínimo que debe tener un fragmento para incluirse. La búsqueda combina texto y significado (RRF), cuyos puntajes se mueven en una escala baja, no de 0 a 1 completo.",
+       example: "0 = sin filtro (recomendado). Valores de 0.05 en adelante quedan fuera de la escala real y se ignoran automáticamente para no dejar al chatbot sin contexto.",
       }}
      >
-      <input type="range" min={0} max={1} step={0.05} value={form.score_threshold}
+      <input type="range" min={0} max={0.05} step={0.01} value={form.score_threshold}
        onChange={(e) => set("score_threshold", Number(e.target.value))} className="w-full accent-primary" />
      </ParamField>
     </div>
@@ -115,13 +114,6 @@ export function ParamsTab({ form, set }: { form: ChatbotSettings; set: (k: keyof
       </div>
      </div>
      <Switch checked={form.use_corrective_rag} onCheckedChange={(v) => set("use_corrective_rag", v)} className="shrink-0" />
-    </div>
-    <div className="flex items-center justify-between gap-3 py-3 border-t border-border">
-     <div className="min-w-0">
-      <p className="text-13 font-medium text-foreground">Reordenamiento por relevancia</p>
-      <p className="text-2xs text-muted-foreground mt-0.5">Reordena los fragmentos recuperados para priorizar los más relevantes. Mejora la precisión de las respuestas añadiendo ~350ms.</p>
-     </div>
-     <Switch checked={form.use_reranker} onCheckedChange={(v) => set("use_reranker", v)} className="shrink-0" />
     </div>
    </div>
    <div className="bg-card border border-border rounded-xl shadow-sm p-6 space-y-5">

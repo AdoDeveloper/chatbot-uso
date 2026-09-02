@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { APP_URL, BACKEND_INTERNAL_URL } from "@/lib/config";
+import { APP_URL, BASE_URL } from "@/lib/config";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const resp = await fetch(`${BACKEND_INTERNAL_URL}/api/v1/auth/microsoft/callback`, {
+    const resp = await fetch(`${BASE_URL}/api/v1/auth/microsoft/callback`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ code, redirect_uri: redirectUri }),
@@ -49,8 +49,8 @@ export async function GET(request: NextRequest) {
     // Limpiar la cookie de state una vez usado
     response.cookies.delete("oauth_state");
 
-    // Bearer mode: cookies are JS-readable so lib/api.ts (js-cookie) can attach
-    // the Authorization header. httpOnly is always false.
+    // Modo Bearer: las cookies son legibles por JS para que lib/api.ts (js-cookie)
+    // pueda adjuntar el header Authorization. httpOnly siempre es false.
     const isHttps = appOrigin.startsWith("https://");
     response.cookies.set("chatbot_access", access_token, {
       maxAge: 60 * 60 * 24,
@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
 
     return response;
   } catch (err) {
-    console.error("[microsoft/callback] fetch to backend failed", err instanceof Error ? err.message : err, "BACKEND=", BACKEND_INTERNAL_URL);
+    console.error("[microsoft/callback] fetch to backend failed", err instanceof Error ? err.message : err, "BACKEND=", BASE_URL);
     return NextResponse.redirect(loginUrl("Credenciales incorrectas"));
   }
 }

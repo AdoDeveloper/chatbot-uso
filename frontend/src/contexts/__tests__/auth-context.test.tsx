@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { AuthProvider, useAuth } from "../auth-context";
+
+const { mockClearApiCache } = vi.hoisted(() => ({ mockClearApiCache: vi.fn() }));
+vi.mock("@/hooks/use-api", () => ({
+  clearApiCache: mockClearApiCache,
+}));
 
 vi.mock("@/lib/api", () => {
   const mockTokenStore = {
@@ -86,8 +91,8 @@ describe("AuthProvider", () => {
     const { tokenStore } = await import("@/lib/api");
     vi.mocked(tokenStore.getAccess).mockReturnValue("some-token");
     const api = (await import("@/lib/api")).default;
-    // Network/CORS errors reject without a `response` property — distinct
-    // from a real 401. This must not be treated as an invalid session.
+    // Los errores de red/CORS rechazan sin una propiedad `response` - se distinguen
+    // de un 401 real. Esto no debe tratarse como una sesión inválida.
     vi.mocked(api.get).mockRejectedValue(new Error("Network Error"));
 
     render(
@@ -101,6 +106,34 @@ describe("AuthProvider", () => {
     });
 
     expect(tokenStore.clear).not.toHaveBeenCalled();
+  });
+
+  it("clears the useApi cache on logout so the next user in a shared computer doesn't see stale data", async () => {
+    const { tokenStore } = await import("@/lib/api");
+    vi.mocked(tokenStore.getAccess).mockReturnValue("some-token");
+    const api = (await import("@/lib/api")).default;
+    vi.mocked(api.get).mockResolvedValue({
+      data: { id: "1", full_name: "Admin", role: "admin", must_change_password: false },
+    });
+    vi.mocked(api.post).mockResolvedValue({ data: {} });
+
+    render(
+      <AuthProvider>
+        <TestConsumer />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("user-name")).toBeInTheDocument();
+    });
+
+    expect(mockClearApiCache).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText("Cerrar sesión"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("unauthenticated")).toBeInTheDocument();
+    });
+    expect(mockClearApiCache).toHaveBeenCalledTimes(1);
   });
 
   it("clears the session when /auth/me fails with a real 401", async () => {

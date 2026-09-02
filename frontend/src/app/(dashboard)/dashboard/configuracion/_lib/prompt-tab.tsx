@@ -1,27 +1,12 @@
 "use client";
 
 import type { ChatbotSettings } from "@/types";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { CollapsibleCard } from "./shared";
 
 export function PromptTab({ form, set }: { form: ChatbotSettings; set: (k: keyof ChatbotSettings, v: unknown) => void }) {
  return (
   <div className="space-y-5">
-   <div className="bg-card border border-border rounded-xl shadow-sm p-6 space-y-5">
-    <div>
-     <h3 className="text-15 font-semibold tracking-tight">Identidad del asistente</h3>
-     <p className="text-2xs text-muted-foreground mt-1">Cómo se presenta el bot a los usuarios finales.</p>
-    </div>
-    <div>
-     <label className="block text-xs font-medium text-muted-foreground mb-1.5">Nombre</label>
-     <Input value={form.chatbot_name} onChange={(e) => set("chatbot_name", e.target.value)} />
-    </div>
-    <div>
-     <label className="block text-xs font-medium text-muted-foreground mb-1.5">Mensaje de bienvenida</label>
-     <Input value={form.welcome_message} onChange={(e) => set("welcome_message", e.target.value)} />
-    </div>
-   </div>
    <CollapsibleCard
     title="Prompt del sistema"
     description={<>Instrucciones base del modelo. Usa <code className="text-xs bg-muted px-1 rounded">{"{context}"}</code> para insertar las fuentes recuperadas.</>}
@@ -29,7 +14,9 @@ export function PromptTab({ form, set }: { form: ChatbotSettings; set: (k: keyof
    >
     <Textarea value={form.system_prompt} onChange={(e) => set("system_prompt", e.target.value)}
      rows={14}
+     maxLength={4000}
      className="font-mono resize-none leading-relaxed" />
+    <p className="text-2xs text-muted-foreground mt-1 text-right">{form.system_prompt.length}/4000</p>
    </CollapsibleCard>
 
    <CollapsibleCard
@@ -61,7 +48,7 @@ export function PromptTab({ form, set }: { form: ChatbotSettings; set: (k: keyof
        Bloqueo por guardrails
       </label>
       <p className="text-2xs text-muted-foreground mb-2">
-       Se devuelve cuando los filtros de seguridad detectan contenido no permitido. Mantenelo amable y reorienta la conversación.
+       Se devuelve cuando los filtros de seguridad detectan contenido no permitido. Manténgalo amable y reoriente la conversación.
       </p>
       <Textarea
        value={form.guardrail_blocked_message}

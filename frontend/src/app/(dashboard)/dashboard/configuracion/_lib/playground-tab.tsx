@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Marked } from "marked";
 import {
   Loader2, Send, RotateCcw, FileText, Copy, Check, X, Bot,
   ThumbsUp, ThumbsDown, GitBranch, Rocket, Globe, Zap,
@@ -13,56 +12,17 @@ import { getErrorMessage } from "@/hooks/use-api";
 import { useAuth } from "@/contexts/auth-context";
 import { useToast } from "@/components/ui/toast";
 import { SegmentedControl } from "@/components/composed/segmented-control";
+import { Badge } from "@/components/ui/badge";
+import { renderMarkdown } from "@/lib/render-markdown";
 import type { ChatbotSettings, WidgetConfig } from "@/types";
 
 import { BASE_URL } from "@/lib/config";
 const CHAT_API_URL = `${BASE_URL}/api/v1/chat`;
 
-// marked v10+: instanciar con opciones, usar parseInline sync o lexer+parser
-const _marked = new Marked({ breaks: true, gfm: true, async: false });
-_marked.use({
-  renderer: {
-    link({ href, text }: { href: string; text: string }) {
-      const isPdf = /\.pdf(\?.*)?$/i.test(href || "");
-      const cls = isPdf ? ' class="pdf-link"' : "";
-      return `<a href="${href}" target="_blank" rel="noopener noreferrer"${cls}>${text}</a>`;
-    },
-  },
-});
-
-// DOMPurify needs the browser DOM — lazy-load it client-side only.
-let _purify: ((html: string) => string) | null = null;
-if (typeof window !== "undefined") {
-  import("dompurify").then((m) => {
-    _purify = (html: string) =>
-      m.default.sanitize(html, {
-        ADD_TAGS: ["img"],
-        ADD_ATTR: ["target", "src", "alt", "width", "height", "title"],
-      });
-  });
-}
-
 function maybePortal(condition: boolean, node: React.ReactElement): React.ReactNode {
   if (!condition) return node;
   if (typeof document === "undefined") return node;
   return createPortal(node, document.body);
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-// Si DOMPurify aún no cargó (ventana breve tras el mount), renderizamos el
-// Markdown como texto plano escapado en vez de inyectar `raw` sin sanitizar.
-function renderMarkdown(text: string): string {
-  const raw = _marked.parse(text) as string;
-  if (!_purify) return escapeHtml(text);
-  return _purify(raw);
 }
 
 interface Message {
@@ -82,7 +42,7 @@ function SourceCard({
   source, score, text, index,
 }: { source: string; score: number; text: string; index: number }) {
   const color =
-    score > 0.7 ? "#16a34a" : score > 0.4 ? "#ca8a04" : "#dc2626";
+    score > 0.7 ? "hsl(var(--color-success))" : score > 0.4 ? "#ca8a04" : "hsl(var(--color-destructive))";
   return (
     <div className="border border-border rounded-lg p-2.5 space-y-1.5 bg-card">
       <div className="flex items-center gap-1.5">
@@ -153,6 +113,8 @@ export function PlaygroundTab({
   });
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  // Paridad con el widget real: fallo de backend muestra panel "Sin conexión".
+  const [offlineMode, setOfflineMode] = useState(false);
   const [lastSources, setLastSources] = useState<
     { source: string; score: number; text: string }[]
   >([]);
@@ -163,15 +125,15 @@ export function PlaygroundTab({
   } | null>(null);
   const [mode, setMode] = useState<PlaygroundMode>("draft");
   const [widgetOpen, setWidgetOpen] = useState(true);
-  // CSAT — mismos 4 estados que el widget real para paridad estricta.
-  const [csatState, setCsatState] = useState<"hidden" | "pending" | "comment" | "submitted">(
+  // CSAT - mismos 3 estados que el widget real para paridad estricta.
+  const [csatState, setCsatState] = useState<"hidden" | "pending" | "submitted">(
     "hidden",
   );
   const [csatScore, setCsatScore] = useState(0);
   const [csatComment, setCsatComment] = useState("");
-  // Escalamiento simulado — replica el flujo del widget real. En el preview
-  // no se despacha nada al backend; es solo visual para que el admin vea
-  // exactamente cómo se comporta con su configuración.
+  const [csatReasons, setCsatReasons] = useState<string[]>([]);
+  const [csatReasonOptions, setCsatReasonOptions] = useState<Record<string, string>>({});
+  // Escalamiento simulado: replica el flujo visual del widget real sin despachar nada al backend.
   const [escalState, setEscalState] = useState<"hidden" | "prompt" | "form" | "submitted" | "continue">("hidden");
   const [escalType, setEscalType] = useState<"email" | "whatsapp">("email");
   const [escalValue, setEscalValue] = useState("");
@@ -184,10 +146,7 @@ export function PlaygroundTab({
   const [speakingId, setSpeakingId] = useState<string | null>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
 
-  // Mismo breakpoint que las clases `md:` de este componente (768px) — el
-  // chat abierto se porta a un overlay `fixed inset-0` de pantalla completa
-  // en vez de quedar contenido dentro de la card acotada a 82dvh, que en
-  // mobile perdía el input cuando la conversación crecía.
+  // Mismo breakpoint que las clases `md:` (768px): en mobile el chat abierto pasa a overlay full-screen.
   const [isMobilePreview, setIsMobilePreview] = useState(false);
   useEffect(() => {
     const mql = window.matchMedia("(max-width: 767px)");
@@ -195,6 +154,17 @@ export function PlaygroundTab({
     onChange();
     mql.addEventListener("change", onChange);
     return () => mql.removeEventListener("change", onChange);
+  }, []);
+
+  // Mismo shape id->label que recibe el widget real vía /widget/public/config.
+  useEffect(() => {
+    api.get<{ id: string; label: string; enabled: boolean }[]>("/widget/csat-reasons")
+      .then(({ data }) => {
+        const enabled: Record<string, string> = {};
+        for (const r of data) if (r.enabled) enabled[r.id] = r.label;
+        setCsatReasonOptions(enabled);
+      })
+      .catch(() => setCsatReasonOptions({}));
   }, []);
 
   const ttsBrowserSupported = typeof window !== "undefined" && !!window.speechSynthesis;
@@ -233,17 +203,14 @@ export function PlaygroundTab({
     if (err) { setEscalError(err); return; }
     setEscalError("");
     setEscalState("submitted");
-    // Paridad con el widget real: la confirmación "✓ Listo" es transitoria.
-    // Tras un momento para leerla, se oculta el escalamiento y se pasa a CSAT
-    // (o el chat vuelve a su estado normal si CSAT está deshabilitado). No se
-    // deja como burbuja permanente en el historial.
+    // La confirmación "✓ Listo" es transitoria: se oculta y pasa a CSAT (o vuelve al chat normal).
     setTimeout(() => {
       setEscalState("hidden");
       if (enableCsat) setCsatState("pending");
     }, 2200);
   }
 
-  // Active settings according to mode
+  // Configuración activa según el modo
   const activeSettings =
     mode === "deployed" && savedSettings ? savedSettings : settings;
   const activeWidgetConfig =
@@ -252,14 +219,8 @@ export function PlaygroundTab({
       : widgetConfig;
 
   const primaryColor = activeWidgetConfig?.primary_color ?? "#1C386D";
-  const chatbotName =
-    activeWidgetConfig?.chatbot_name ??
-    activeSettings.chatbot_name ??
-    "Asistente";
-  const welcomeMessage =
-    activeWidgetConfig?.welcome_message ??
-    activeSettings.welcome_message ??
-    "¡Hola! ¿En qué puedo ayudarte?";
+  const chatbotName = activeWidgetConfig?.chatbot_name ?? "Asistente";
+  const welcomeMessage = activeWidgetConfig?.welcome_message ?? "¡Hola! ¿En qué puedo ayudarte?";
   const showBotIcon = activeWidgetConfig?.show_bot_icon ?? true;
   const suggestions: string[] = activeWidgetConfig?.suggestions ?? [];
   const logoUrl = activeWidgetConfig?.logo_url ?? null;
@@ -314,11 +275,13 @@ export function PlaygroundTab({
       skipModeReset.current = false;
       return;
     }
+    abortRef.current?.abort();
     setMessages([]);
     setLastSources([]);
     setMeta(null);
     setCsatState("hidden");
     setCsatScore(0);
+    setCsatReasons([]);
     sessionIdRef.current = crypto.randomUUID();
     try {
       sessionStorage.removeItem(_PG_STORAGE_KEY);
@@ -328,12 +291,14 @@ export function PlaygroundTab({
   }, [mode]);
 
   function resetConversation() {
+    abortRef.current?.abort();
     setMessages([]);
     setLastSources([]);
     setMeta(null);
     setCsatState("hidden");
     setCsatScore(0);
     setCsatComment("");
+    setCsatReasons([]);
     setEscalState("hidden");
     setEscalValue("");
     setEscalError("");
@@ -386,10 +351,7 @@ export function PlaygroundTab({
     const q = (question ?? input).trim();
     if (!q || loading) return;
 
-    // Simulación de escalamiento en el preview: si está habilitado y el
-    // usuario pide un humano, se muestra el prompt Sí/No igual que lo haría
-    // el widget real cuando una regla de escalamiento dispara. En el preview
-    // no se despacha nada al backend (is_playground no evalúa reglas).
+    // Simulación visual del prompt de escalamiento; no despacha nada al backend.
     if (enableEscalation && escalState === "hidden" && /humano|persona|agente|asesor|alguien real/i.test(q)) {
       setMessages((prev) => [...prev, { role: "user", content: q }]);
       setInput("");
@@ -406,16 +368,20 @@ export function PlaygroundTab({
     setLoading(true);
     setLastSources([]);
     setMeta(null);
+    setOfflineMode(false);
     setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
 
+    // Instancia local a esta invocación: distingue "me abortaron por ya no
+    // ser la request vigente" (ignorar) de "fallo de red real" (mostrar error).
+    const controller = new AbortController();
     try {
       const accessToken = tokenStore.getAccess();
       abortRef.current?.abort();
-      abortRef.current = new AbortController();
+      abortRef.current = controller;
 
       const response = await fetch(CHAT_API_URL, {
         method: "POST",
-        signal: abortRef.current.signal,
+        signal: controller.signal,
         headers: {
           "Content-Type": "application/json",
           ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
@@ -438,10 +404,11 @@ export function PlaygroundTab({
       if (!response.ok)
         throw new Error(`HTTP ${response.status}`);
 
-      // Respuesta completa (sin streaming): mientras se espera, la burbuja
-      // del asistente queda con content: "" mostrando el indicador de
-      // "escribiendo..."; al llegar la respuesta se rellena de una vez.
+      // Sin streaming: la burbuja queda con content: "" (indicador "escribiendo...") hasta que llega la respuesta completa.
       const event = await response.json();
+
+      // No pisar el historial vigente con el resultado de una request obsoleta.
+      if (abortRef.current !== controller || controller.signal.aborted) return;
 
       if (event.type === "error") {
         const msg = event.message ?? "Error desconocido";
@@ -476,20 +443,18 @@ export function PlaygroundTab({
         });
       }
     } catch {
-      setMessages((prev) => {
-        const u = [...prev];
-        if (
-          u[u.length - 1]?.role === "assistant" &&
-          u[u.length - 1].content === ""
-        )
-          u[u.length - 1] = {
-            role: "assistant",
-            content: "⚠️ No se pudo conectar con el backend.",
-          };
-        return u;
-      });
+      if (controller.signal.aborted) {
+        // Request cancelada por un mensaje nuevo: la request vigente controla el estado.
+        return;
+      }
+      // Mismo criterio que el widget real: fallo de red activa "Sin conexión".
+      setMessages((prev) => prev.slice(0, -2));
+      setOfflineMode(true);
     } finally {
-      setLoading(false);
+      // Solo la request vigente apaga el spinner de carga.
+      if (abortRef.current === controller) {
+        setLoading(false);
+      }
     }
   }
 
@@ -511,8 +476,10 @@ export function PlaygroundTab({
               { value: "deployed", label: "Producción", icon: Rocket },
             ]}
           />
-          <span
-            className={`hidden sm:inline-flex text-2xs px-2.5 py-0.5 rounded-full font-medium ${
+          <Badge
+            variant="outline"
+            size="sm"
+            className={`hidden sm:inline-flex border-transparent ${
               mode === "draft"
                 ? "text-warning"
                 : "bg-success/10 text-success"
@@ -521,7 +488,7 @@ export function PlaygroundTab({
             {mode === "draft"
               ? "Entorno de pruebas"
               : "Entorno de producción"}
-          </span>
+          </Badge>
         </div>
       </div>
 
@@ -531,7 +498,7 @@ export function PlaygroundTab({
           página. En mobile usa una fracción del viewport; desde md: la
           ventana flotante de tamaño fijo.
           dvh en vez de vh: vh mide el viewport de layout completo (fijo),
-          dvh se ajusta al viewport visual real — con vh, al abrir el
+          dvh se ajusta al viewport visual real - con vh, al abrir el
           teclado el chat quedaba parcialmente tapado (el input inaccesible)
           porque 82vh seguía calculando sobre la altura sin teclado. */}
       <div
@@ -543,7 +510,7 @@ export function PlaygroundTab({
             chrome" y el skeleton fantasma como una tira inútil detrás. Se
             oculta bajo md: y el chat pasa a ocupar el panel completo. */}
         <div className="flex-1 relative overflow-hidden bg-slate-100 dark:bg-slate-800/60 flex flex-col min-h-0">
-          {/* Browser chrome */}
+          {/* Chrome del navegador */}
           <div className="hidden md:flex bg-white dark:bg-slate-900 border-b border-border/50 px-3 py-2 items-center gap-2 shrink-0">
             <div className="flex gap-1">
               <div className="w-2.5 h-2.5 rounded-full bg-red-400/60" />
@@ -558,7 +525,7 @@ export function PlaygroundTab({
             </div>
           </div>
 
-          {/* Fake webpage skeleton */}
+          {/* Skeleton de página falsa */}
           <div className="hidden md:block flex-1 overflow-hidden p-6 pointer-events-none select-none">
             <div className="max-w-lg">
               <div className="h-6 bg-white/70 dark:bg-white/10 rounded-md w-48 mb-4" />
@@ -606,7 +573,7 @@ export function PlaygroundTab({
                 </p>
               </div>
             )}
-            {/* Proactive message (only when widget is closed). El simulador
+            {/* Mensaje proactivo (solo cuando el widget está cerrado). El simulador
                 emula un sitio web real (siempre claro), por eso se fijan
                 colores explícitos en vez de usar variantes dark: del panel. */}
             {!widgetOpen && proactiveMessage && (
@@ -615,7 +582,7 @@ export function PlaygroundTab({
               </div>
             )}
 
-            {/* Chat panel — overlay fijo de pantalla completa real en
+            {/* Chat panel - overlay fijo de pantalla completa real en
                 mobile (portal a document.body, fuera de la card acotada a
                 82dvh: si quedaba dentro del flujo normal, el input se
                 perdía al crecer la conversación), ventana flotante de
@@ -629,7 +596,7 @@ export function PlaygroundTab({
                     : "rounded-none md:rounded-2xl overflow-hidden flex flex-col shadow-2xl border-0 md:border border-border bg-background flex-1 w-full md:w-[340px] md:flex-none md:max-w-[calc(100vw-3rem)] md:h-[440px] md:max-h-[calc(100%-1rem)]"
                 }
               >
-                {/* Widget header */}
+                {/* Encabezado del widget */}
                 <div
                   className="flex items-center gap-2.5 px-3.5 py-2.5 shrink-0"
                   style={{ backgroundColor: primaryColor }}
@@ -653,7 +620,7 @@ export function PlaygroundTab({
                     </p>
                     <p className="text-3xs text-white/70">En línea</p>
                   </div>
-                  {/* Kebab (⋮) — paridad con el widget real: agrupa Nueva
+                  {/* Kebab (⋮) - paridad con el widget real: agrupa Nueva
                       conversación, Accesibilidad y Finalizar chat. Se oculta
                       si no hay ningún ítem que mostrar. */}
                   {(showNewChatButton || enableAccessibility || showEndChatButton) && (
@@ -671,17 +638,17 @@ export function PlaygroundTab({
                     {kebabOpen && (
                       <div role="menu" className="absolute right-0 top-7 z-10 min-w-[170px] bg-popover border border-border rounded-lg shadow-lg py-1 text-foreground">
                         {showNewChatButton && messages.length > 0 && (
-                          <button type="button" role="menuitem" onClick={() => { resetConversation(); setKebabOpen(false); }} className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] hover:bg-muted-foreground/10 text-left">
+                          <button type="button" role="menuitem" onClick={() => { resetConversation(); setKebabOpen(false); }} className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-muted-foreground/10 text-left">
                             <RotateCcw className="w-3.5 h-3.5" /> Nueva conversación
                           </button>
                         )}
                         {enableAccessibility && (
-                          <button type="button" role="menuitem" onClick={() => { setA11yOpen(true); setKebabOpen(false); }} className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] hover:bg-muted-foreground/10 text-left">
+                          <button type="button" role="menuitem" onClick={() => { setA11yOpen(true); setKebabOpen(false); }} className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-muted-foreground/10 text-left">
                             <Accessibility className="w-3.5 h-3.5" /> Accesibilidad
                           </button>
                         )}
                         {showEndChatButton && (
-                          <button type="button" role="menuitem" onClick={() => { endChat(); setKebabOpen(false); }} className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] hover:bg-muted-foreground/10 text-left text-destructive">
+                          <button type="button" role="menuitem" onClick={() => { endChat(); setKebabOpen(false); }} className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-muted-foreground/10 text-left text-destructive">
                             <LogOut className="w-3.5 h-3.5" /> Finalizar chat
                           </button>
                         )}
@@ -760,13 +727,42 @@ export function PlaygroundTab({
                   </div>
                 )}
 
-                {/* Messages */}
+                {/* Modo offline - paridad con widget/src/widget.tsx: un fallo
+                    de red/backend reemplaza TODO el cuerpo del chat (mensajes,
+                    CSAT, sugerencias) por este panel, en vez de mezclarse con
+                    la conversación existente. */}
+                {offlineMode ? (
+                  <div className="flex-1 flex flex-col items-center justify-center gap-2 px-6 py-8 text-center">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} width={36} height={36} className="text-muted-foreground/40">
+                      <line x1="1" y1="1" x2="23" y2="23" />
+                      <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55" />
+                      <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39" />
+                      <path d="M10.71 5.05A16 16 0 0 1 22.56 9" />
+                      <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88" />
+                      <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
+                      <circle cx="12" cy="20" r="1" fill="currentColor" />
+                    </svg>
+                    <p className="text-xs font-semibold text-foreground">Sin conexión</p>
+                    <p className="text-2xs text-muted-foreground leading-relaxed max-w-55">
+                      En este momento el asistente no está disponible. Por favor, inténtalo más tarde.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setOfflineMode(false)}
+                      className="mt-1 text-2xs px-3.5 py-1.5 rounded-full border border-border hover:bg-muted-foreground/10 text-foreground"
+                    >
+                      Reintentar
+                    </button>
+                  </div>
+                ) : (
+                <>
+                {/* Mensajes */}
                 <div ref={chatScrollRef} className="flex-1 overflow-y-auto bg-background p-3 space-y-2.5">
-                  {/* Welcome bubble */}
+                  {/* Burbuja de bienvenida */}
                   <div className="flex items-end gap-1.5">
                     {showBotIcon && (
                       <div
-                        className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 mb-0.5 overflow-hidden"
+                        className="w-6.5 h-6.5 rounded-full flex items-center justify-center shrink-0 mb-0.5 overflow-hidden"
                         style={{ backgroundColor: primaryColor }}
                       >
                         {logoUrl ? (
@@ -776,7 +772,7 @@ export function PlaygroundTab({
                             className="w-full h-full object-cover"
                           />
                         ) : (
-                          <Bot className="w-2.5 h-2.5 text-white" />
+                          <Bot className="w-3.5 h-3.5 text-white" />
                         )}
                       </div>
                     )}
@@ -791,7 +787,7 @@ export function PlaygroundTab({
                     </div>
                   </div>
 
-                  {/* Conversation */}
+                  {/* Conversación */}
                   {messages.map((msg, i) => (
                     <div
                       key={i}
@@ -802,7 +798,7 @@ export function PlaygroundTab({
                       >
                         {msg.role === "assistant" && showBotIcon && (
                           <div
-                            className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 mb-0.5 overflow-hidden"
+                            className="w-6.5 h-6.5 rounded-full flex items-center justify-center shrink-0 mb-0.5 overflow-hidden"
                             style={{ backgroundColor: primaryColor }}
                           >
                             {logoUrl ? (
@@ -812,7 +808,7 @@ export function PlaygroundTab({
                                 className="w-full h-full object-cover"
                               />
                             ) : (
-                              <Bot className="w-2.5 h-2.5 text-white" />
+                              <Bot className="w-3.5 h-3.5 text-white" />
                             )}
                           </div>
                         )}
@@ -859,7 +855,7 @@ export function PlaygroundTab({
                         </div>
                       </div>
 
-                      {/* Source pills below assistant message */}
+                      {/* Pills de fuentes bajo el mensaje del asistente */}
                       {msg.role === "assistant" &&
                         showSources &&
                         msg.sources &&
@@ -957,21 +953,21 @@ export function PlaygroundTab({
                     </div>
                   ))}
 
-                  {/* Escalamiento simulado — burbuja del bot (paridad con widget real) */}
+                  {/* Escalamiento simulado - burbuja del bot (paridad con widget real) */}
                   {escalState !== "hidden" && (
                     <div className="flex items-end gap-1.5">
                       {showBotIcon && (
-                        <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 mb-0.5 overflow-hidden" style={{ backgroundColor: primaryColor }}>
-                          {logoUrl ? <img src={logoUrl} alt="" className="w-full h-full object-cover" /> : <Bot className="w-2.5 h-2.5 text-white" />}
+                        <div className="w-6.5 h-6.5 rounded-full flex items-center justify-center shrink-0 mb-0.5 overflow-hidden" style={{ backgroundColor: primaryColor }}>
+                          {logoUrl ? <img src={logoUrl} alt="" className="w-full h-full object-cover" /> : <Bot className="w-3.5 h-3.5 text-white" />}
                         </div>
                       )}
-                      <div className={`max-w-[90%] border px-3 py-2.5 rounded-xl text-xs leading-relaxed space-y-2 shadow-sm ${escalState === "submitted" ? "bg-brand-green/10 border-brand-green/30 text-foreground" : "bg-background border-border text-foreground"}`}>
+                      <div className={`max-w-[90%] border px-3.5 py-3 rounded-2xl text-xs leading-relaxed space-y-2 shadow-sm ${escalState === "submitted" ? "bg-brand-green/10 border-brand-green/30 text-foreground" : "bg-background border-border text-foreground"}`}>
                         {escalState === "prompt" && (
                           <>
                             <p className="font-medium">¿Desea que la universidad se ponga en contacto con usted?</p>
                             <div className="flex gap-1.5">
-                              <button type="button" onClick={() => setEscalState("form")} className="flex-1 py-1.5 rounded-lg text-white text-2xs font-medium" style={{ backgroundColor: primaryColor }}>Sí</button>
-                              <button type="button" onClick={() => setEscalState("continue")} className="flex-1 py-1.5 rounded-lg border border-border bg-background text-2xs font-medium hover:bg-muted-foreground/10">No</button>
+                              <button type="button" onClick={() => setEscalState("form")} className="flex-1 py-1.5 rounded-full text-white text-2xs font-medium" style={{ backgroundColor: primaryColor }}>Sí</button>
+                              <button type="button" onClick={() => setEscalState("continue")} className="flex-1 py-1.5 rounded-full border border-border bg-background text-2xs font-medium hover:bg-muted-foreground/10">No</button>
                             </div>
                           </>
                         )}
@@ -979,8 +975,8 @@ export function PlaygroundTab({
                           <>
                             <p className="font-medium">¿Desea continuar con el asistente virtual?</p>
                             <div className="flex gap-1.5">
-                              <button type="button" onClick={() => setEscalState("hidden")} className="flex-1 py-1.5 rounded-lg text-white text-2xs font-medium" style={{ backgroundColor: primaryColor }}>Sí, continuar</button>
-                              <button type="button" onClick={() => { setEscalState("hidden"); if (enableCsat) setCsatState("pending"); }} className="flex-1 py-1.5 rounded-lg border border-border bg-background text-2xs font-medium hover:bg-muted-foreground/10">No, finalizar</button>
+                              <button type="button" onClick={() => setEscalState("hidden")} className="flex-1 py-1.5 rounded-full text-white text-2xs font-medium" style={{ backgroundColor: primaryColor }}>Sí, continuar</button>
+                              <button type="button" onClick={() => { setEscalState("hidden"); if (enableCsat) setCsatState("pending"); }} className="flex-1 py-1.5 rounded-full border border-border bg-background text-2xs font-medium hover:bg-muted-foreground/10">No, finalizar</button>
                             </div>
                           </>
                         )}
@@ -1016,10 +1012,10 @@ export function PlaygroundTab({
                               <p id="pg-escal-error" role="alert" className="text-3xs text-destructive font-medium mt-1">{escalError}</p>
                             )}
                             <div className="flex gap-1.5 justify-end mt-2">
-                              <button type="button" onClick={() => { setEscalState("hidden"); setEscalError(""); }} className="text-2xs px-2 py-1 text-muted-foreground hover:text-foreground">Cancelar</button>
+                              <button type="button" onClick={() => { setEscalState("hidden"); setEscalError(""); }} className="text-2xs px-3 py-1.5 rounded-full border border-border text-muted-foreground hover:bg-muted-foreground/10">Cancelar</button>
                               <button
                                 type="submit"
-                                className="text-2xs px-2.5 py-1 rounded text-white"
+                                className="text-2xs px-3.5 py-1.5 rounded-full text-white"
                                 style={{ backgroundColor: primaryColor }}
                               >Enviar</button>
                             </div>
@@ -1033,64 +1029,91 @@ export function PlaygroundTab({
                   )}
                 </div>
 
-                {/* CSAT — paso 1: estrellas (paridad con widget real) */}
+                {/* CSAT - pantalla única: estrellas + motivos + comentario (paridad con widget real) */}
                 {enableCsat && csatState === "pending" && (
                   <div className="border-t border-border bg-muted/40 px-3 py-3 shrink-0 flex flex-col items-center gap-2">
                     <p className="text-xs font-medium text-foreground text-center">
                       {csatQuestion}
                     </p>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center justify-between w-full max-w-55">
                       {[1, 2, 3, 4, 5].map((n) => (
                         <button
                           key={n}
                           type="button"
-                          onClick={() => { setCsatScore(n); setCsatState("comment"); }}
-                          onMouseEnter={() => setCsatScore(n)}
-                          className="text-2xl leading-none transition-transform hover:scale-110 text-amber-400"
+                          onClick={() => setCsatScore(n)}
+                          className="text-2xl leading-none transition-transform hover:scale-110 text-warning"
                           aria-label={`${n} estrella${n !== 1 ? "s" : ""}`}
                         >
                           {n <= csatScore ? "★" : "☆"}
                         </button>
                       ))}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setCsatState("submitted")}
-                      className="text-2xs text-muted-foreground hover:text-foreground"
-                    >
-                      Omitir valoración
-                    </button>
-                  </div>
-                )}
-                {/* CSAT — paso 2: comentario opcional */}
-                {enableCsat && csatState === "comment" && (
-                  <div className="border-t border-border bg-muted/40 px-3 py-3 shrink-0 flex flex-col items-center gap-2">
-                    <p className="text-xs font-medium text-foreground text-center">
-                      ¿Quieres agregar un comentario? <span className="font-normal text-muted-foreground">(opcional)</span>
-                    </p>
-                    <div className="flex items-center gap-0.5">
-                      {[1, 2, 3, 4, 5].map((n) => (
-                        <span key={n} className={`text-lg leading-none ${n <= csatScore ? "text-amber-400" : "text-muted-foreground/30"}`} aria-hidden="true">★</span>
-                      ))}
+                    <div className="flex items-center justify-between w-full text-3xs text-muted-foreground -mt-1">
+                      <span>Muy disconforme</span>
+                      <span>Muy conforme</span>
                     </div>
+                    {Object.keys(csatReasonOptions).length > 0 && (
+                      <div className="flex flex-col gap-1.5 w-full mt-1">
+                        {Object.entries(csatReasonOptions).map(([key, label]) => (
+                          <label
+                            key={key}
+                            className={`flex items-center gap-2 text-2xs rounded-lg border px-2.5 py-2 cursor-pointer transition-colors ${
+                              csatReasons.includes(key)
+                                ? ""
+                                : "border-border bg-background hover:border-muted-foreground/40"
+                            }`}
+                            style={csatReasons.includes(key) ? {
+                              borderColor: primaryColor,
+                              backgroundColor: `color-mix(in srgb, ${primaryColor} 8%, transparent)`,
+                            } : undefined}
+                          >
+                            <input
+                              type="checkbox"
+                              className="shrink-0"
+                              checked={csatReasons.includes(key)}
+                              onChange={() => setCsatReasons((prev) =>
+                                prev.includes(key) ? prev.filter((r) => r !== key) : [...prev, key]
+                              )}
+                              style={{ accentColor: primaryColor }}
+                            />
+                            {label}
+                          </label>
+                        ))}
+                      </div>
+                    )}
                     <textarea
-                      className="w-full bg-background rounded-lg px-2.5 py-2 text-xs outline-none border border-border resize-none placeholder:text-muted-foreground"
-                      placeholder="Cuéntenos su experiencia…"
+                      className="w-full bg-background rounded-lg px-2.5 py-2 text-xs outline-none border border-border resize-none placeholder:text-muted-foreground mt-1 focus:border-(--csat-focus-color)"
+                      placeholder="Cuéntenos su experiencia (opcional)…"
                       maxLength={300}
                       rows={2}
                       value={csatComment}
                       onChange={(e) => setCsatComment(e.target.value)}
+                      style={{ "--csat-focus-color": primaryColor } as React.CSSProperties}
                     />
-                    <div className="flex items-center gap-2 self-stretch justify-end">
+                    <div className="flex items-center gap-2 self-stretch justify-between">
                       <button type="button" onClick={() => setCsatState("submitted")} className="text-2xs text-muted-foreground hover:text-foreground">Omitir</button>
-                      <button type="button" onClick={() => setCsatState("submitted")} className="text-2xs px-2.5 py-1 rounded text-white" style={{ backgroundColor: primaryColor }}>Enviar valoración</button>
+                      <button
+                        type="button"
+                        onClick={() => setCsatState("submitted")}
+                        disabled={!csatScore}
+                        className="text-2xs px-3.5 py-1.5 rounded-full text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                        style={{ backgroundColor: primaryColor }}
+                      >
+                        Finalizar
+                      </button>
                     </div>
                   </div>
                 )}
                 {enableCsat && csatState === "submitted" && (
                   <div className="border-t border-border bg-muted/40 px-3 py-3 shrink-0 flex flex-col items-center gap-1.5">
-                    <p className="text-xs font-medium text-foreground">
-                      ¡Gracias por su valoración!
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full border-2 border-success text-success">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} width={22} height={22}>
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="8 12.5 10.8 15.5 16 9" />
+                      </svg>
+                    </div>
+                    <p className="text-xs font-semibold text-foreground">
+                      ¡Muchas gracias!
                     </p>
                     <button
                       type="button"
@@ -1102,7 +1125,7 @@ export function PlaygroundTab({
                   </div>
                 )}
 
-                {/* Quick suggestions */}
+                {/* Sugerencias rápidas */}
                 {showSuggestions && csatState === "hidden" && escalState === "hidden" && (
                   <div className="border-t border-border bg-background px-2.5 pt-2 pb-1.5 shrink-0 flex flex-wrap gap-1">
                     {suggestions.slice(0, 3).map((s, i) => (
@@ -1117,7 +1140,7 @@ export function PlaygroundTab({
                   </div>
                 )}
 
-                {/* Input bar — estilo "pill" (paridad con el widget). */}
+                {/* Input bar - estilo "pill" (paridad con el widget). */}
                 {csatState === "hidden" && (
                   <div className={`bg-background px-2.5 py-2.5 shrink-0 ${showSuggestions ? "" : "border-t border-border"}`}>
                     <div className="flex gap-1.5 items-center">
@@ -1146,10 +1169,12 @@ export function PlaygroundTab({
                     </div>
                   </div>
                 )}
+                </>
+                )}
               </div>
             )}
 
-            {/* Launcher row: label + button. Oculto en mobile cuando el
+            {/* Fila del launcher: label + botón. Oculto en mobile cuando el
                 chat ya está abierto (ahí el botón "minimizar" vive dentro
                 del propio header del chat, ver arriba). */}
             <div className={`items-center gap-2 self-center md:self-auto ${widgetOpen ? "hidden md:flex" : "flex"}`}>
@@ -1183,7 +1208,7 @@ export function PlaygroundTab({
 
         {/* ── Right: debug panel ── */}
         <div className="w-full md:w-[272px] shrink-0 border-t md:border-t-0 md:border-l border-border bg-background flex flex-col overflow-hidden max-h-[320px] md:max-h-none">
-          {/* Panel header */}
+          {/* Encabezado del panel */}
           <div className="px-4 py-3 border-b border-border shrink-0">
             <p className="text-xs font-semibold text-foreground">
               Panel de diagnóstico
@@ -1195,9 +1220,9 @@ export function PlaygroundTab({
             </p>
           </div>
 
-          {/* Scrollable content */}
+          {/* Contenido con scroll */}
           <div className="flex-1 overflow-y-auto">
-            {/* Empty state */}
+            {/* Estado vacío */}
             {!meta && lastSources.length === 0 && (
               <div className="flex flex-col items-center justify-center gap-3 px-6 py-10 text-center h-full">
                 <MessageSquare className="w-9 h-9 text-muted-foreground/20" />
@@ -1207,7 +1232,7 @@ export function PlaygroundTab({
               </div>
             )}
 
-            {/* Response metadata */}
+            {/* Metadata de la respuesta */}
             {meta && (
               <div className="p-4 border-b border-border">
                 <p className="text-3xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
@@ -1255,7 +1280,7 @@ export function PlaygroundTab({
               </div>
             )}
 
-            {/* RAG sources */}
+            {/* Fuentes RAG */}
             {lastSources.length > 0 && (
               <div className="p-4">
                 <p className="text-3xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">

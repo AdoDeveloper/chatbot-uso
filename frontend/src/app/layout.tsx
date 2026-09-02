@@ -5,10 +5,7 @@ import "./globals.css";
 import { AuthProvider } from "@/contexts/auth-context";
 import { ProgressBarProvider } from "@/components/composed/progress-bar-provider";
 
-// Inter con weights explícitos. El variable font (sin array de weight) no
-// estaba sirviendo correctamente vía next/font en este setup, causando
-// fallback a serif (Times New Roman). Volvemos a la config estática que
-// funcionaba antes con los pesos que realmente usa el design system.
+// Weights explícitos: el variable font sin array de weight fallaba a serif (Times New Roman) en este setup.
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
@@ -17,9 +14,7 @@ const inter = Inter({
   fallback: ["system-ui", "-apple-system", "Segoe UI", "Roboto", "sans-serif"],
 });
 
-// JetBrains Mono se mantiene solo para snippets de codigo (panel admin tiene
-// previews de embed snippets, regex de guardrails, etc). El sitio publico no
-// la necesita.
+// Solo para snippets de código (embed snippets, regex de guardrails en el panel admin).
 const jetbrainsMono = JetBrains_Mono({
   variable: "--font-jetbrains-mono",
   subsets: ["latin"],

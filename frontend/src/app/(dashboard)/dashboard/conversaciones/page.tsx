@@ -5,11 +5,14 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
  MessageSquare, Search, ThumbsUp, ThumbsDown, Download,
- FileText, Zap, Database, Route, ChevronDown,
+ FileText, Zap, Database, Route, ChevronDown, Trash2,
 } from "lucide-react";
 import api from "@/lib/api";
 import { useApi, getErrorMessage } from "@/hooks/use-api";
+import { usePermission } from "@/hooks/use-permission";
+import { PERM } from "@/lib/permissions";
 import { timeAgo } from "@/lib/utils";
+import { renderMarkdown } from "@/lib/render-markdown";
 import type {
   ChatConversationDetail, ChatConversationOut, ChatMessageOut, ConversationStatus, MessageFeedback,
 } from "@/types";
@@ -29,11 +32,18 @@ import { TablePagination } from "@/components/composed/table-pagination";
 
 function MessageFeedbackBar({ messageId, currentFeedback }: { messageId: string; currentFeedback: MessageFeedback | null }) {
  const [fb, setFb] = useState<MessageFeedback | null>(currentFeedback);
+ const { toast } = useToast();
 
  async function handleFeedback(type: MessageFeedback) {
   if (fb === type) return;
+  const previous = fb;
   setFb(type);
-  try { await api.patch(`/conversations/messages/${messageId}/feedback`, { feedback: type }); } catch { /* ignore */ }
+  try {
+   await api.patch(`/conversations/messages/${messageId}/feedback`, { feedback: type });
+  } catch (err) {
+   setFb(previous);
+   toast({ type: "error", message: getErrorMessage(err, "No se pudo guardar la retroalimentación.") });
+  }
  }
 
  return (
@@ -119,9 +129,7 @@ function SourcesDisclosure({ sources }: { sources: ChatMessageOut["sources_json"
 }
 
 type StatusFilter = ConversationStatus | "all";
-// Sin chip "Escaladas": esas conversaciones ya tienen su propia pestaña de
-// ruta (/conversaciones/escalamientos) — repetir el filtro aquí duplicaba
-// la misma distinción con dos mecanismos distintos (ruta vs. query param).
+// Sin chip "Escaladas": esas conversaciones tienen su propia pestaña de ruta (/conversaciones/escalamientos).
 const STATUS_CHIPS: { value: StatusFilter; label: string }[] = [
  { value: "all", label: "Todas" },
  { value: "active", label: "Activas" },
@@ -136,10 +144,12 @@ function statusBadgeVariant(s: ConversationStatus): "success" | "destructive" | 
 
 export default function HistorialPage() {
  const searchParams = useSearchParams();
- const { toast } = useToast();
+ const { toast, confirm } = useToast();
+ const can = usePermission();
  const [page, setPage] = useState(1);
  const [selected, setSelected] = useState<string | null>(() => searchParams.get("id"));
  const [detail, setDetail] = useState<ChatConversationDetail | null>(null);
+ const [deleting, setDeleting] = useState(false);
 
  useEffect(() => {
   setSelected(searchParams.get("id"));
@@ -160,7 +170,7 @@ export default function HistorialPage() {
   return params.toString();
  }, [page, pageSize, search, dateFrom, dateTo, statusFilter]);
 
- const { data: listData, loading, error: listError } =
+ const { data: listData, loading, error: listError, refetch: refetchList } =
   useApi<{ items: ChatConversationOut[]; total: number }>(`/conversations?${listQuery}`);
  const conversations = listData?.items ?? [];
  const total = listData?.total ?? 0;
@@ -203,6 +213,29 @@ export default function HistorialPage() {
   }
  }
 
+ async function handleDeleteConversation() {
+  if (!detail || deleting) return;
+  const ok = await confirm({
+   title: "¿Eliminar esta conversación?",
+   message: "Se eliminará permanentemente junto con todos sus mensajes. Esta acción no se puede deshacer.",
+   confirmText: "Eliminar",
+   variant: "danger",
+  });
+  if (!ok) return;
+  setDeleting(true);
+  try {
+   await api.delete(`/conversations/${detail.id}`);
+   toast({ type: "success", message: "Conversación eliminada." });
+   setSelected(null);
+   setDetail(null);
+   await refetchList();
+  } catch (err) {
+   toast({ type: "error", message: getErrorMessage(err, "No se pudo eliminar la conversación.") });
+  } finally {
+   setDeleting(false);
+  }
+ }
+
  return (
   <div>
    <PageHeader
@@ -212,10 +245,10 @@ export default function HistorialPage() {
    />
    <ConversacionesTabs />
 
-   {/* Responsive: stack on mobile, split panel de altura fija desde lg (como Gmail/Slack).
+   {/* Responsive: apilado en mobile, split panel de altura fija desde lg (como Gmail/Slack).
        dvh en vez de vh: en móviles evita que la barra de navegador oculte contenido. */}
    <div className="flex flex-col lg:flex-row gap-4 lg:h-[calc(100dvh-19rem)] lg:min-h-100">
-    {/* Conversation list */}
+    {/* Lista de conversaciones */}
     <Card className="w-full lg:max-w-sm lg:shrink-0 overflow-hidden flex flex-col">
      <div className="p-3 border-b space-y-2">
       <div className="flex items-center justify-between gap-2">
@@ -249,7 +282,7 @@ export default function HistorialPage() {
        onFromChange={(v) => { setDateFrom(v); setPage(1); }}
        onToChange={(v) => { setDateTo(v); setPage(1); }}
       />
-      {/* Status chips */}
+      {/* Chips de estado */}
       <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="Filtrar por estado">
        {STATUS_CHIPS.map((chip) => {
         const active = statusFilter === chip.value;
@@ -309,7 +342,7 @@ export default function HistorialPage() {
            <span className="shrink-0">{timeAgo(c.last_message_at)}</span>
           <span aria-hidden="true" className="shrink-0">·</span>
           <span className="shrink-0">{c.message_count} msgs</span>
-          {c.device && <><span aria-hidden="true" className="shrink-0">·</span><span className="truncate min-w-0">{c.device}</span></>}
+          {c.browser && <><span aria-hidden="true" className="shrink-0">·</span><span className="truncate min-w-0">{c.browser}</span></>}
          </div>
         </button>
        ))
@@ -326,30 +359,47 @@ export default function HistorialPage() {
      />
     </Card>
 
-    {/* Detail panel */}
+    {/* Panel de detalle */}
     <Card className="flex-1 overflow-hidden flex flex-col min-h-100">
      {detail ? (
       <>
        <div className="px-6 py-3 border-b bg-muted/30">
         <div className="flex items-center justify-between gap-2 mb-1">
-         <Badge variant={statusBadgeVariant(detail.status)} className="text-3xs">{detail.status}</Badge>
-         <p className="text-2xs font-mono text-muted-foreground truncate">{detail.session_id}</p>
+         <div className="flex items-center gap-2 min-w-0">
+          <Badge variant={statusBadgeVariant(detail.status)} className="text-3xs">{detail.status}</Badge>
+          <p className="text-2xs font-mono text-muted-foreground truncate">{detail.session_id}</p>
+         </div>
+         {can(PERM.CONVERSATIONS_DELETE) && (
+          <Button
+           type="button"
+           variant="outline"
+           size="sm"
+           onClick={handleDeleteConversation}
+           disabled={deleting}
+           className="gap-1.5 shrink-0 text-destructive hover:bg-destructive/10"
+          >
+           <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Eliminar
+          </Button>
+         )}
         </div>
 <p className="text-2xs text-muted-foreground">
-          {timeAgo(detail.last_message_at)} · {detail.device ?? "Desconocido"} · {detail.message_count} mensajes
+          {timeAgo(detail.last_message_at)} · {detail.browser ?? "Desconocido"} · {detail.message_count} mensajes
          </p>
        </div>
        <div className="flex-1 min-h-0 p-4 sm:p-6 space-y-4 overflow-y-auto">
         {detail.messages.map((msg) => (
          <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
           <div className="max-w-[80%] sm:max-w-[75%]">
-           <div
-            className={`px-3.5 py-2.5 rounded-xl text-13 leading-relaxed whitespace-pre-wrap wrap-break-word ${
-             msg.role === "user" ? "bg-primary text-primary-foreground rounded-br-sm" : "bg-muted rounded-bl-sm"
-            }`}
-           >
-            {msg.content}
-           </div>
+           {msg.role === "assistant" ? (
+            <div
+             className="px-3.5 py-2.5 rounded-xl text-13 leading-relaxed wrap-break-word bg-muted rounded-bl-sm md-content"
+             dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
+            />
+           ) : (
+            <div className="px-3.5 py-2.5 rounded-xl text-13 leading-relaxed whitespace-pre-wrap wrap-break-word bg-primary text-primary-foreground rounded-br-sm">
+             {msg.content}
+            </div>
+           )}
            {msg.role === "assistant" && (
             <>
              <div className="flex items-center gap-1.5 mt-1 flex-wrap">

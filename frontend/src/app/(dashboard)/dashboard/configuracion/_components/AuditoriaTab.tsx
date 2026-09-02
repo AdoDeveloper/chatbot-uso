@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search, ShieldCheck, Download, Eye } from "lucide-react";
+import { Search, ShieldCheck, Download, Eye, Loader2 } from "lucide-react";
 import api from "@/lib/api";
-import { useApi } from "@/hooks/use-api";
+import { useApi, getErrorMessage } from "@/hooks/use-api";
+import { useToast } from "@/components/ui/toast";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import type { AuditLog } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -69,6 +70,7 @@ const RESOURCE_TYPES = [
 interface ActorOption { id: string; name: string; }
 
 export function AuditoriaTab() {
+  const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [resourceType, setResourceType] = useState("");
   const [actorId, setActorId] = useState("");
@@ -77,6 +79,7 @@ export function AuditoriaTab() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [detail, setDetail] = useState<AuditLog | null>(null);
+  const [exporting, setExporting] = useState<"xlsx" | "pdf" | null>(null);
 
   const { data: actorsData } = useApi<ActorOption[]>("/audit/actors");
   const actors = actorsData ?? [];
@@ -130,27 +133,34 @@ export function AuditoriaTab() {
         <div className="flex items-center gap-2 shrink-0">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-1.5 text-muted-foreground" disabled={logs.length === 0}>
-                <Download className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Exportar</span>
+              <Button variant="outline" size="sm" className="gap-1.5 text-muted-foreground" disabled={logs.length === 0 || !!exporting}>
+                {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                <span className="hidden sm:inline">{exporting ? "Exportando..." : "Exportar"}</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               {(["xlsx", "pdf"] as const).map((fmt) => (
-                <DropdownMenuItem key={fmt} onClick={async () => {
+                <DropdownMenuItem key={fmt} disabled={!!exporting} onClick={async () => {
                   const params = new URLSearchParams({ format: fmt });
                   if (search.trim()) params.set("action", search.trim());
                   if (resourceType) params.set("resource_type", resourceType);
                   if (actorId) params.set("actor_id", actorId);
                   if (dateFrom) params.set("date_from", new Date(dateFrom).toISOString());
                   if (dateTo) params.set("date_to", new Date(dateTo + "T23:59:59").toISOString());
-                  const resp = await api.get(`/audit/logs/export?${params}`, { responseType: "blob" });
-                  const url = URL.createObjectURL(resp.data as Blob);
-                  const a = document.createElement("a");
-                  a.href = url;
-                  a.download = `auditoria-${new Date().toISOString().slice(0, 10)}.${fmt}`;
-                  a.click();
-                  URL.revokeObjectURL(url);
+                  setExporting(fmt);
+                  try {
+                    const resp = await api.get(`/audit/logs/export?${params}`, { responseType: "blob" });
+                    const url = URL.createObjectURL(resp.data as Blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `auditoria-${new Date().toISOString().slice(0, 10)}.${fmt}`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  } catch (err) {
+                    toast({ type: "error", message: getErrorMessage(err, "No se pudo exportar el registro de auditoría.") });
+                  } finally {
+                    setExporting(null);
+                  }
                 }}>
                   {fmt === "xlsx" ? "Excel (.xlsx)" : "PDF"}
                 </DropdownMenuItem>
@@ -166,7 +176,8 @@ export function AuditoriaTab() {
           <select
             value={resourceType}
             onChange={(e) => { setResourceType(e.target.value); setPage(1); }}
-            className="h-7 px-2 text-[12px] border border-border rounded-lg bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 min-w-0"
+            className="h-7 px-2 text-xs border border-border rounded-lg bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 min-w-0"
+            aria-label="Filtrar por tipo de recurso"
           >
             {RESOURCE_TYPES.map((rt) => (
               <option key={rt.value} value={rt.value}>{rt.label}</option>
@@ -175,8 +186,9 @@ export function AuditoriaTab() {
           <select
             value={actorId}
             onChange={(e) => { setActorId(e.target.value); setPage(1); }}
-            className="h-7 px-2 text-[12px] border border-border rounded-lg bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 min-w-0"
+            className="h-7 px-2 text-xs border border-border rounded-lg bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 min-w-0"
             title="Filtrar por actor"
+            aria-label="Filtrar por actor"
           >
             <option value="">Todos los actores</option>
             {actors.map((a) => (
@@ -236,7 +248,7 @@ export function AuditoriaTab() {
           return (
             <tr key={entry.id} className="group border-b border-border/60 transition-colors hover:bg-muted/40">
               <td className="px-3 py-2 align-top">
-                <span className="text-[12px] font-mono text-muted-foreground tabular-nums whitespace-nowrap">
+                <span className="text-xs font-mono text-muted-foreground tabular-nums whitespace-nowrap">
                   {relativeTime(entry.created_at)}
                 </span>
               </td>
@@ -258,10 +270,10 @@ export function AuditoriaTab() {
                 <p className="text-13 text-muted-foreground leading-snug">{entry.action}</p>
               </td>
               <td className="px-3 py-2 align-top hidden md:table-cell">
-                <span className="text-2xs text-muted-foreground">{entry.resource_type ?? "—"}</span>
+                <span className="text-2xs text-muted-foreground">{entry.resource_type ?? "N/A"}</span>
               </td>
               <td className="px-3 py-2 align-top hidden sm:table-cell">
-                <span className="text-2xs font-mono text-muted-foreground/70">{entry.ip ?? "—"}</span>
+                <span className="text-2xs font-mono text-muted-foreground/70">{entry.ip ?? "N/A"}</span>
               </td>
               <td className="px-3 py-2 align-top text-right sticky right-0 z-10 bg-card group-hover:bg-muted/40 border-l border-border/60">
                 <Button
@@ -305,13 +317,13 @@ export function AuditoriaTab() {
 
             <dl className="grid grid-cols-[140px_1fr] gap-x-3 gap-y-2 text-2xs">
               <dt className="text-muted-foreground">Recurso</dt>
-              <dd className="text-foreground break-all">{detail.resource_type ?? "—"}</dd>
+              <dd className="text-foreground break-all">{detail.resource_type ?? "N/A"}</dd>
               <dt className="text-muted-foreground">Resource ID</dt>
-              <dd className="text-foreground break-all font-mono">{detail.resource_id ?? "—"}</dd>
+              <dd className="text-foreground break-all font-mono">{detail.resource_id ?? "N/A"}</dd>
               <dt className="text-muted-foreground">IP</dt>
-              <dd className="text-foreground break-all font-mono">{detail.ip ?? "—"}</dd>
+              <dd className="text-foreground break-all font-mono">{detail.ip ?? "N/A"}</dd>
               <dt className="text-muted-foreground">User agent</dt>
-              <dd className="text-foreground break-all">{detail.user_agent ?? "—"}</dd>
+              <dd className="text-foreground break-all">{detail.user_agent ?? "N/A"}</dd>
             </dl>
 
             {detail.meta_json && Object.keys(detail.meta_json).length > 0 && (

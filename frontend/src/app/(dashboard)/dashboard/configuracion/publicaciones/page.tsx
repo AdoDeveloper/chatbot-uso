@@ -9,7 +9,7 @@ import {
   HelpCircle, Shield, Zap,
 } from "lucide-react";
 import api from "@/lib/api";
-import { useApi, getErrorMessage } from "@/hooks/use-api";
+import { useApi, getErrorMessage, invalidateApiCache } from "@/hooks/use-api";
 import { useAuth } from "@/contexts/auth-context";
 import { useToast } from "@/components/ui/toast";
 import { PageHeader } from "@/components/ui/page-header";
@@ -104,8 +104,8 @@ function DiffSection({ section, changes }: { section: string; changes: DiffChang
               {changes.map((c, i) => (
                 <TableRow key={i} className={c.action === "added" ? "bg-brand-green/10 hover:bg-brand-green/10" : c.action === "removed" ? "bg-destructive/5 hover:bg-destructive/5" : ""}>
                   <TableCell className="font-mono text-xs">{c.key}</TableCell>
-                  <TableCell className="text-muted-foreground max-w-48 truncate">{c.old != null ? String(c.old).slice(0, 80) : "—"}</TableCell>
-                  <TableCell className="max-w-48 truncate">{c.new != null ? String(c.new).slice(0, 80) : "—"}</TableCell>
+                  <TableCell className="text-muted-foreground max-w-48 truncate">{c.old != null ? String(c.old).slice(0, 80) : "N/A"}</TableCell>
+                  <TableCell className="max-w-48 truncate">{c.new != null ? String(c.new).slice(0, 80) : "N/A"}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -241,6 +241,7 @@ export default function PublicacionesPage() {
   async function handleApprove(s: Source) {
     setReviewing(s.id);
     try {
+      invalidateApiCache("/sources");
       await api.post(`/sources/${s.id}/approve`);
       setSources((prev) => prev
         ? prev.map((x) => (x.id === s.id ? { ...x, review_status: "aprobada" as Source["review_status"] } : x))
@@ -256,6 +257,7 @@ export default function PublicacionesPage() {
     const { source, reason } = rejectTarget;
     setReviewing(source.id);
     try {
+      invalidateApiCache("/sources");
       await api.post(`/sources/${source.id}/reject`, { reason });
       setSources((prev) => prev
         ? prev.map((x) => (x.id === source.id ? { ...x, review_status: "rechazada" as Source["review_status"] } : x))
@@ -366,7 +368,7 @@ export default function PublicacionesPage() {
         }
       />
 
-      {/* Never-deployed warning — widget is using draft settings */}
+      {/* Advertencia sin desplegar - el widget usa configuración borrador */}
       {!loading && neverDeployed && (
         <Alert variant="warning">
           <AlertTriangle className="h-4 w-4" />
@@ -381,7 +383,7 @@ export default function PublicacionesPage() {
         </Alert>
       )}
 
-      {/* Stat cards */}
+      {/* Tarjetas de estadísticas */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <StatCard
           title="Última publicación"
@@ -408,14 +410,14 @@ export default function PublicacionesPage() {
         />
       </div>
 
-      {/* Pre-flight */}
+      {/* Verificación previa */}
       <Card>
         <CardHeader className="pb-4 border-b">
           <CardTitle className="text-15 font-semibold">Validación previa</CardTitle>
           <p className="text-2xs text-muted-foreground mt-0.5">Revise y apruebe los cambios antes de publicar a producción.</p>
         </CardHeader>
 
-        {/* Config row */}
+        {/* Fila de configuración */}
         <div className="px-5 py-3 border-b border-border/60">
           <div className="flex items-center gap-3">
             <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${hasConfigChanges ? "bg-warning/10" : "bg-success/10"}`}>
@@ -426,7 +428,7 @@ export default function PublicacionesPage() {
               {loading ? <Skeleton className="h-3 w-52 mt-1.5" /> : (
                 <p className="text-2xs text-muted-foreground mt-0.5">
                   {neverDeployed
-                    ? "Primera publicación — se publicará la configuración inicial del chatbot."
+                    ? "Primera publicación · se publicará la configuración inicial del chatbot."
                     : hasConfigChanges
                       ? "Hay cambios sin publicar en ajustes del asistente, widget o proveedores LLM."
                       : "Sin cambios desde la última publicación."}
@@ -441,7 +443,7 @@ export default function PublicacionesPage() {
           </div>
         </div>
 
-        {/* Sources row */}
+        {/* Fila de fuentes */}
         <div className="px-5 py-3 border-b border-border/60">
           <div className="flex items-center gap-3 mb-3">
             <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${hasPendingSources ? "bg-warning/10" : "bg-success/10"}`}>
@@ -477,7 +479,7 @@ export default function PublicacionesPage() {
 
       </Card>
 
-      {/* Publish action */}
+      {/* Acción de publicar */}
       <Card>
         <CardHeader className="pb-4 border-b">
           <CardTitle className="text-15 font-semibold">Publicar versión</CardTitle>
@@ -492,7 +494,7 @@ export default function PublicacionesPage() {
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div className="flex items-center gap-2 text-sm text-success">
                 <CheckCircle2 className="w-4 h-4 shrink-0" />
-                Producción al día — sin cambios pendientes
+                Producción al día, sin cambios pendientes
               </div>
               <Button variant="ghost" size="xs" onClick={() => setSnapshotOpen(true)} className="text-muted-foreground shrink-0">
                 <Save /> Guardar punto de restauración
@@ -503,7 +505,7 @@ export default function PublicacionesPage() {
               {hasPendingSources && (
                 <div className="flex items-center gap-2 rounded-lg border border-warning/20 bg-warning/5 px-3.5 py-2.5 text-xs text-warning">
                   <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                  {pendingSources.length} fuente(s) aún pendientes de aprobación — no estarán disponibles en producción hasta ser aprobadas arriba
+                  {pendingSources.length} fuente(s) aún pendientes de aprobación: no estarán disponibles en producción hasta ser aprobadas arriba
                 </div>
               )}
               <div className="flex items-center gap-3 flex-wrap">
@@ -523,7 +525,7 @@ export default function PublicacionesPage() {
         </CardContent>
       </Card>
 
-      {/* History */}
+      {/* Historial */}
       <div>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-base font-semibold flex items-center gap-2">
@@ -613,7 +615,7 @@ export default function PublicacionesPage() {
                         <div className="space-y-2">{[1, 2].map((i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
                       ) : !diff || activeSections.length === 0 ? (
                         <p className="text-13 text-muted-foreground text-center py-3">
-                          {v.snapshot_schema_version < 2 ? "Versión antigua — solo configuración básica" : "Sin cambios detectados"}
+                          {v.snapshot_schema_version < 2 ? "Versión antigua · solo configuración básica" : "Sin cambios detectados"}
                         </p>
                       ) : activeSections.length === 1 ? (
                         <div>
@@ -646,7 +648,7 @@ export default function PublicacionesPage() {
         )}
       </div>
 
-      {/* Reject modal */}
+      {/* Modal de rechazo */}
       <Modal
         open={!!rejectTarget}
         onClose={() => setRejectTarget(null)}
@@ -683,15 +685,15 @@ export default function PublicacionesPage() {
         </div>
       </Modal>
 
-      {/* Snapshot dialog */}
+      {/* Diálogo de snapshot */}
       <Modal
         open={snapshotOpen}
-        onClose={() => setSnapshotOpen(false)}
+        onClose={() => { setSnapshotOpen(false); setSnapshotDesc(""); }}
         title="Guardar punto de restauración"
         subtitle="Guarde el estado actual como punto de restauración. No afecta la versión activa en el widget."
         footer={
           <>
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setSnapshotOpen(false)}>
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => { setSnapshotOpen(false); setSnapshotDesc(""); }}>
               <X className="h-3.5 w-3.5" /> Cancelar
             </Button>
             <Button size="sm" className="gap-1.5" onClick={handleSaveSnapshot} disabled={saving}>
@@ -712,7 +714,7 @@ export default function PublicacionesPage() {
         </div>
       </Modal>
 
-      {/* Rollback dialog */}
+      {/* Diálogo de rollback */}
       <Modal
         open={!!rollbackTarget}
         onClose={() => { setRollbackTarget(null); setRollbackWarnings([]); }}

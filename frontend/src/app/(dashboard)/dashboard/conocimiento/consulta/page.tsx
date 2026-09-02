@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Search, Zap, FileText, Loader2 } from "lucide-react";
 import api from "@/lib/api";
 import type { Source } from "@/types";
@@ -11,7 +11,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -36,29 +35,32 @@ export default function ChunkTestPage() {
  const { toast } = useToast();
  const [query, setQuery] = useState("");
  const [topK, setTopK] = useState(5);
- const [useReranker, setUseReranker] = useState(false);
  const [sourceFilter, setSourceFilter] = useState<string[]>([]);
  const { data: sourcesData } = useApi<Source[]>("/sources");
  const sources = (sourcesData ?? []).filter((s) => s.status === "ready");
  const [results, setResults] = useState<ChunkTestResponse | null>(null);
  const [loading, setLoading] = useState(false);
+ // Token de la request más reciente: evita que una respuesta vieja sobrescriba una más nueva.
+ const latestRequestRef = useRef(0);
 
  async function handleTest() {
   if (!query.trim()) return;
+  const requestId = ++latestRequestRef.current;
   setLoading(true);
   try {
    const { data } = await api.post<ChunkTestResponse>("/chunks/test-query", {
     query: query.trim(),
     source_ids: sourceFilter.length > 0 ? sourceFilter : null,
     top_k: topK,
-    use_reranker: useReranker,
    });
+   if (requestId !== latestRequestRef.current) return; // superada por una consulta más nueva
    setResults(data);
   } catch (err) {
+   if (requestId !== latestRequestRef.current) return;
    setResults(null);
    toast({ type: "error", message: getErrorMessage(err, "Error al ejecutar la consulta de prueba.") });
   } finally {
-   setLoading(false);
+   if (requestId === latestRequestRef.current) setLoading(false);
   }
  }
 
@@ -77,7 +79,7 @@ export default function ChunkTestPage() {
    />
 
    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-    {/* Config panel */}
+    {/* Panel de configuración */}
     <Card>
      <CardHeader>
       <CardTitle className="text-15">Configuración</CardTitle>
@@ -101,11 +103,6 @@ export default function ChunkTestPage() {
       <div className="space-y-2">
        <Label>Fragmentos a recuperar: {topK}</Label>
        <Slider value={topK} onValueChange={setTopK} min={1} max={20} step={1} />
-      </div>
-
-      <div className="flex items-center justify-between">
-       <Label>Reordenar por relevancia</Label>
-       <Switch checked={useReranker} onCheckedChange={setUseReranker} />
       </div>
 
       {sources.length > 0 && (
@@ -141,7 +138,7 @@ export default function ChunkTestPage() {
      </CardContent>
     </Card>
 
-    {/* Results panel */}
+    {/* Panel de resultados */}
     <div className="lg:col-span-2 space-y-4">
      {results && (
       <div className="flex items-center gap-3 text-sm text-muted-foreground">

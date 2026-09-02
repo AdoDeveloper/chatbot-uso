@@ -11,5 +11,5 @@ const TABS = [
 
 export function ConversacionesTabs() {
   const pathname = usePathname();
-  return <UnderlineTabs tabs={[...TABS]} activeValue={pathname} />;
+  return <UnderlineTabs tabs={[...TABS]} activeValue={pathname} scrollable />;
 }

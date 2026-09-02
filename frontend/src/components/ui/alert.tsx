@@ -10,9 +10,9 @@ const alertVariants = cva(
           "bg-foreground text-background border-foreground/20",
         destructive:
           "bg-destructive/10 text-destructive border-destructive/30",
-        // Success uses the institutional forest green token #1FB107.
-        // Soft tint for the surface, full token for text/border on light;
-        // mirror inverted for dark mode legibility.
+        // Success usa el token verde bosque institucional #1FB107.
+        // Tinte suave para la superficie, token completo para texto/borde en claro;
+        // se invierte el espejo para legibilidad en modo oscuro.
         success:
           "bg-brand-green/12 text-brand-green border-brand-green/40",
         warning:

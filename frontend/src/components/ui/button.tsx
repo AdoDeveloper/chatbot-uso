@@ -11,7 +11,7 @@ const buttonVariants = cva(
         default: "bg-primary text-primary-foreground [a]:hover:bg-primary/80",
         // `bg-card` (blanco puro), no `bg-background`: este botón casi
         // siempre vive sobre una Card blanca, y `--background` (#F8FAFC) es
-        // visualmente indistinguible de `--muted` (#F1F5F9) a ese tamaño —
+        // visualmente indistinguible de `--muted` (#F1F5F9) a ese tamaño -
         // el botón se veía "sin relleno", plano contra el fondo de página.
         outline:
           "border-border bg-card hover:bg-muted-foreground/10 hover:text-foreground active:bg-muted-foreground/15 aria-expanded:bg-muted-foreground/10 aria-expanded:text-foreground",

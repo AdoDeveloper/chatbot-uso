@@ -43,9 +43,7 @@ const sheetVariants = {
   bottom: "inset-x-0 bottom-0 w-full border-t translate-y-full data-[open=true]:translate-y-0",
 } as const
 
-// Mapea cada `side` al eje/signo de swipe que debe cerrarlo: un sheet que
-// entra desde la izquierda se cierra deslizando hacia la izquierda, uno
-// desde arriba se cierra deslizando hacia arriba, etc.
+// Mapea cada `side` al eje/signo de swipe que debe cerrarlo.
 const SWIPE_CLOSE_DIRECTION: Record<keyof typeof sheetVariants, "x" | "y"> = {
   left: "x",
   right: "x",

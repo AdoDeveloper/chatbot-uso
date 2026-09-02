@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectOption } from "@/components/ui/select";
 import Link from "next/link";
 import api from "@/lib/api";
 import { useApi, getErrorMessage } from "@/hooks/use-api";
@@ -116,10 +117,17 @@ const patternSchema = z.object({
 
 type PatternFormValues = z.infer<typeof patternSchema>;
 
-const { register: registerPattern, handleSubmit: handlePatternSubmit, reset: resetPattern, formState: { errors: patternErrors, isSubmitting: patternSaving } } = useForm<PatternFormValues>({
+const { register: registerPattern, handleSubmit: handlePatternSubmit, reset: resetPattern, watch: watchPattern, setValue: setPatternValue, formState: { errors: patternErrors, isSubmitting: patternSaving } } = useForm<PatternFormValues>({
   resolver: zodResolver(patternSchema),
   defaultValues: { regex: "", label: "", category: "Custom", example: "", enabled: true },
 });
+
+// Categorías conocidas (evita fragmentar reportes con variantes tipeadas a mano).
+const KNOWN_PATTERN_CATEGORIES = [
+  "Override de instrucciones", "Secuestro de rol", "Inyección estructural",
+  "Jailbreak conocidos", "Fuga de información", "Ofuscación",
+  "Inyección de markup", "Activación de modo especial",
+] as const;
 
   useEffect(() => {
     if (!configData) return;
@@ -227,7 +235,7 @@ const { register: registerPattern, handleSubmit: handlePatternSubmit, reset: res
     setLoadingImpactId(p.id);
     try {
       const { data } = await api.get<{ blocks: number; days: number }>(`/guardrails/patterns/${p.id}/impact?days=7`);
-      setImpactByLabel((prev) => ({ ...prev, [p.label]: data.blocks }));
+      setImpactByLabel((prev) => ({ ...prev, [p.id]: data.blocks }));
     } catch (err) {
       toast({ type: "error", message: getErrorMessage(err, "No se pudo calcular el impacto.") });
     } finally {
@@ -252,7 +260,7 @@ const { register: registerPattern, handleSubmit: handlePatternSubmit, reset: res
       />
 
       <>
-        {/* Config editable */}
+        {/* Configuración editable */}
         {loadingConfig ? (
           <Card className="mb-6">
             <CardHeader className="pb-3 border-b">
@@ -279,7 +287,7 @@ const { register: registerPattern, handleSubmit: handlePatternSubmit, reset: res
                 </div>
               </CardHeader>
             <CardContent className="pt-4 space-y-4">
-              {/* Master toggle */}
+              {/* Toggle maestro */}
               <div className="flex items-center justify-between rounded-lg border px-4 py-3 bg-muted/20">
                 <div>
                   <p className="text-13 font-medium">Guardrails activos</p>
@@ -291,7 +299,7 @@ const { register: registerPattern, handleSubmit: handlePatternSubmit, reset: res
                 />
               </div>
 
-              {/* Numeric limits */}
+              {/* Límites numéricos */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="block text-2xs font-semibold text-muted-foreground uppercase tracking-wide">
@@ -384,7 +392,7 @@ const { register: registerPattern, handleSubmit: handlePatternSubmit, reset: res
           </>
           )}
 
-          {/* Test inline */}
+          {/* Prueba inline */}
           {loadingConfig ? (
           <Card className="mb-6">
             <CardHeader className="pb-3 border-b">
@@ -469,7 +477,7 @@ const { register: registerPattern, handleSubmit: handlePatternSubmit, reset: res
           </Card>
           )}
 
-          {/* Patrones — built-in read-only + custom CRUD */}
+          {/* Patrones - built-in de solo lectura + CRUD de personalizados */}
           {loadingPatterns ? (
           <Card className="mb-6">
             <CardHeader className="pb-3 border-b">
@@ -531,7 +539,8 @@ const { register: registerPattern, handleSubmit: handlePatternSubmit, reset: res
                           <div className="divide-y border-t border-border max-h-105 overflow-y-auto">
                             {items.map((p) => {
                               const isCustom = p.source === "custom";
-                              const impact = impactByLabel[p.label];
+                              // Indexado por id, no por label (label es texto libre editable).
+                              const impact = impactByLabel[p.id];
                               return (
                                 <div key={p.id} className="px-3 py-2.5 flex items-start gap-3 group">
                                   <div className="flex-1 min-w-0">
@@ -562,14 +571,14 @@ const { register: registerPattern, handleSubmit: handlePatternSubmit, reset: res
                                       <p className="text-2xs text-muted-foreground mt-0.5 italic">Ej: {p.example}</p>
                                     )}
                                   </div>
-                                  <div className="flex items-center gap-0.5 shrink-0 opacity-60 group-hover:opacity-100 transition-opacity">
+                                  <div className="flex items-center gap-0.5 shrink-0">
                                     <Button
                                       variant="ghost"
                                       size="icon-xs"
                                       onClick={() => loadImpact(p)}
                                       disabled={loadingImpactId === p.id}
                                       title="Calcular bloqueos en últimos 7 días"
-                                      className="text-muted-foreground hover:text-primary"
+                                      className="text-muted-foreground hover:text-primary opacity-60 group-hover:opacity-100 transition-opacity"
                                     >
                                       {loadingImpactId === p.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <BarChart3 className="w-3.5 h-3.5" />}
                                     </Button>
@@ -686,7 +695,18 @@ const { register: registerPattern, handleSubmit: handlePatternSubmit, reset: res
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold uppercase tracking-wide">Categoría</Label>
-              <Input {...registerPattern("category")} placeholder="Custom" />
+              <Select
+                value={KNOWN_PATTERN_CATEGORIES.includes(watchPattern("category") as typeof KNOWN_PATTERN_CATEGORIES[number]) ? watchPattern("category") : "__custom__"}
+                onChange={(e) => setPatternValue("category", e.target.value === "__custom__" ? "" : e.target.value, { shouldDirty: true })}
+              >
+                {KNOWN_PATTERN_CATEGORIES.map((c) => (
+                  <SelectOption key={c} value={c}>{c}</SelectOption>
+                ))}
+                <SelectOption value="__custom__">Otra (especificar)…</SelectOption>
+              </Select>
+              {!KNOWN_PATTERN_CATEGORIES.includes(watchPattern("category") as typeof KNOWN_PATTERN_CATEGORIES[number]) && (
+                <Input {...registerPattern("category")} placeholder="Nombre de la categoría" />
+              )}
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold uppercase tracking-wide">Ejemplo (opcional)</Label>

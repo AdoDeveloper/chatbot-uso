@@ -45,7 +45,7 @@ const STEPS: StepDef[] = [
   {
     num: 3,
     title: "Subir el primer documento",
-    description: "El chatbot solo responde sobre el contenido que usted le da. PDF, DOCX, URL o FAQ — todos sirven.",
+    description: "El chatbot solo responde sobre el contenido que usted le da. PDF, DOCX, URL o FAQ · todos sirven.",
     icon: Upload,
     cta: "Subir documento",
     href: "/dashboard/conocimiento/documentos",
@@ -82,8 +82,8 @@ export function OnboardingWizard() {
 
   async function handleRefresh() {
     setRefreshing(true);
-    refresh();
-    setTimeout(() => setRefreshing(false), 500);
+    await refresh();
+    setRefreshing(false);
   }
 
   const completedCount = STEPS.filter((s) => s.isDone(status!)).length;
@@ -91,7 +91,7 @@ export function OnboardingWizard() {
 
   return (
     <Card className="mb-6 overflow-hidden border-primary/30 bg-gradient-to-br from-primary/5 to-brand-green/5">
-      {/* Header */}
+      {/* Encabezado */}
       <div className="px-6 pt-5 pb-4 border-b border-border/40 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2 mb-1">
@@ -112,7 +112,7 @@ export function OnboardingWizard() {
         </button>
       </div>
 
-      {/* Progress bar */}
+      {/* Barra de progreso */}
       <div className="px-6 py-3 bg-muted/30 border-b border-border/40">
         <div className="flex items-center justify-between text-xs mb-1.5">
           <span className="font-medium">{completedCount}/{STEPS.length} pasos completados</span>
@@ -126,7 +126,7 @@ export function OnboardingWizard() {
         </div>
       </div>
 
-      {/* Steps */}
+      {/* Pasos */}
       <div className="divide-y divide-border/40">
         {STEPS.map((step) => {
           const done = step.isDone(status);
@@ -142,7 +142,7 @@ export function OnboardingWizard() {
               }`}
             >
               <div className="flex items-center gap-4 flex-1 min-w-0">
-                {/* Number / check */}
+                {/* Número / check */}
                 <div className="shrink-0">
                   {done ? (
                     <CheckCircle2 className="w-6 h-6 text-brand-green" />
@@ -155,7 +155,7 @@ export function OnboardingWizard() {
                   )}
                 </div>
 
-                {/* Content */}
+                {/* Contenido */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <Icon className={`w-3.5 h-3.5 shrink-0 ${done ? "text-brand-green" : isCurrent ? "text-primary" : "text-muted-foreground/60"}`} />

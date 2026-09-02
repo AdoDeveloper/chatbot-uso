@@ -48,6 +48,18 @@ function _cacheSet(path: string, data: unknown): void {
 }
 
 /**
+ * Invalida la entrada de caché de useApi para una ruta. Llámalo tras PUT/POST/DELETE
+ * para que la próxima vez que se monte un useApi(path) haga un fetch real.
+ */
+export function invalidateApiCache(path: string): void {
+  _cache.delete(path);
+}
+
+export function clearApiCache(): void {
+  _cache.clear();
+}
+
+/**
  * Ciclo completo de GET a la API: loading/refetching, error con `detail` del
  * backend, cancelación con AbortController al desmontar o cambiar deps, y
  * nunca setState tras unmount.
@@ -57,7 +69,7 @@ function _cacheSet(path: string, data: unknown): void {
  *   // Recarga sola cuando cambia el filtro:
  *   const { data } = useApi<TopicsResponse>(`/analytics/topics?days=${days}`, [days]);
  *
- *   // Carga condicional — `null` pospone el fetch (p. ej. faltan fechas):
+ *   // Carga condicional - `null` pospone el fetch (p. ej. faltan fechas):
  *   const { data } = useApi<Metrics>(ready ? `/analytics?${qs}` : null, [ready, qs]);
  */
 export function useApi<T>(path: string | null, deps: unknown[] = []): UseApiResult<T> {
@@ -75,9 +87,7 @@ export function useApi<T>(path: string | null, deps: unknown[] = []): UseApiResu
     const current = pathRef.current;
     if (current === null) return;
 
-    // Caché: si hay datos frescos y no forzamos, mostramos al instante y
-    // revalidamos en background (sin loading). Mejora la percepción de velocidad
-    // al navegar entre vistas.
+    // Con caché fresca: se muestra al instante y se revalida en background (sin loading).
     const cached = force ? null : _cacheGet(current);
     if (cached !== null) {
       setData(cached as T);

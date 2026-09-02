@@ -13,8 +13,8 @@ export function FloatingSaveBar({
 }) {
  if (!dirty) return null;
  return (
-  <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-3 duration-200 pointer-events-none">
-   <div className="flex items-center gap-2 bg-card border border-border rounded-2xl shadow-xl px-4 py-2.5 pointer-events-auto">
+  <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-1.5rem)] max-w-md animate-in slide-in-from-bottom-3 duration-200 pointer-events-none">
+   <div className="flex flex-wrap items-center gap-2 bg-card border border-border rounded-2xl shadow-xl px-4 py-2.5 pointer-events-auto">
     <span className="h-1.5 w-1.5 rounded-full bg-warning animate-pulse shrink-0" />
     <span className="text-13 font-medium text-foreground whitespace-nowrap">Cambios sin guardar</span>
     {onDiscard && (

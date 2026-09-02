@@ -6,6 +6,8 @@ import api from "@/lib/api";
 import { useApi, getErrorMessage } from "@/hooks/use-api";
 import type { FAQEntry } from "@/types";
 import { useToast } from "@/components/ui/toast";
+import { usePermission } from "@/hooks/use-permission";
+import { PERM } from "@/lib/permissions";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,7 +37,8 @@ const EMPTY_FORM: FAQForm = { question: "", answer: "", tags: "", is_active: tru
 type StateFilter = "all" | "active" | "inactive";
 
 export default function FAQTab() {
-  const { toast } = useToast();
+  const { toast, confirm } = useToast();
+  const can = usePermission();
   const { data: entriesData, loading, error: entriesError, refetch: load } = useApi<FAQEntry[]>("/faq");
   const entries = useMemo(() => entriesData ?? [], [entriesData]);
   const [showModal, setShowModal] = useState(false);
@@ -43,7 +46,6 @@ export default function FAQTab() {
   const [form, setForm] = useState<FAQForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<FAQEntry | null>(null);
 
   const [search, setSearch] = useState("");
   const [stateFilter, setStateFilter] = useState<StateFilter>("all");
@@ -119,13 +121,17 @@ export default function FAQTab() {
     }
   }
 
-  async function confirmAndDelete() {
-    if (!confirmDelete) return;
-    const id = confirmDelete.id;
-    setDeleting(id);
-    setConfirmDelete(null);
+  async function handleDelete(entry: FAQEntry) {
+    const ok = await confirm({
+      title: "Eliminar entrada",
+      message: `¿Eliminar permanentemente "${entry.question}"? Esta acción no se puede deshacer.`,
+      confirmText: "Eliminar",
+      variant: "danger",
+    });
+    if (!ok) return;
+    setDeleting(entry.id);
     try {
-      await api.delete(`/faq/${id}`);
+      await api.delete(`/faq/${entry.id}`);
       toast({ type: "success", message: "Entrada eliminada." });
       load();
     } catch (err) {
@@ -148,11 +154,13 @@ export default function FAQTab() {
           <p className="text-sm text-muted-foreground">
             Pares pregunta/respuesta que el chatbot usa como conocimiento directo.
           </p>
-          <div className="grid grid-cols-1 sm:flex sm:justify-end gap-2">
-            <Button onClick={openCreate} size="sm" className="gap-1.5">
-              <Plus className="w-3.5 h-3.5" aria-hidden="true" /> Nueva entrada
-            </Button>
-          </div>
+          {can(PERM.KNOWLEDGE_CREATE) && (
+            <div className="grid grid-cols-1 sm:flex sm:justify-end gap-2">
+              <Button onClick={openCreate} size="sm" className="gap-1.5">
+                <Plus className="w-3.5 h-3.5" aria-hidden="true" /> Nueva entrada
+              </Button>
+            </div>
+          )}
         </div>
 
         <div className="flex flex-col lg:flex-row lg:items-center gap-3 px-5 pt-4">
@@ -233,7 +241,7 @@ export default function FAQTab() {
             { id: "respuesta", header: "Respuesta", hideBelow: "lg" },
             { id: "tags", header: "Tags", className: "w-[180px]", hideBelow: "md" },
             { id: "estado", header: "Estado", className: "w-[90px]", hideBelow: "sm" },
-            { id: "acciones", header: "Acciones", className: "w-[80px] text-right", sticky: true },
+            { id: "acciones", header: "Acciones", className: "whitespace-nowrap text-right", sticky: true },
           ]}
           data={paginated}
           rowKey={(entry) => entry.id}
@@ -270,14 +278,18 @@ export default function FAQTab() {
                   {entry.is_active ? "Activo" : "Inactivo"}
                 </Badge>
               </TableCell>
-              <TableCell className="align-top" sticky>
-                <div className="flex items-center gap-1 justify-end">
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={() => openEdit(entry)} aria-label={`Editar "${entry.question.slice(0, 40)}"`}>
-                    <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => setConfirmDelete(entry)} disabled={deleting === entry.id} aria-label={`Eliminar "${entry.question.slice(0, 40)}"`}>
-                    {deleting === entry.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />}
-                  </Button>
+              <TableCell className="align-top whitespace-nowrap" sticky>
+                <div className="flex w-full items-center gap-1 justify-end">
+                  {can(PERM.KNOWLEDGE_UPDATE) && (
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={() => openEdit(entry)} aria-label={`Editar "${entry.question.slice(0, 40)}"`}>
+                      <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
+                    </Button>
+                  )}
+                  {can(PERM.KNOWLEDGE_DELETE) && (
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => handleDelete(entry)} disabled={deleting === entry.id} aria-label={`Eliminar "${entry.question.slice(0, 40)}"`}>
+                      {deleting === entry.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />}
+                    </Button>
+                  )}
                 </div>
               </TableCell>
             </TableRow>
@@ -351,27 +363,6 @@ export default function FAQTab() {
         </div>
       </Modal>
 
-      <Modal
-        open={!!confirmDelete}
-        onClose={() => setConfirmDelete(null)}
-        title="Eliminar entrada"
-        size="sm"
-        footer={
-          <>
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setConfirmDelete(null)}><X className="w-3.5 h-3.5" /> Cancelar</Button>
-            <Button variant="destructive" size="sm" className="gap-1.5" onClick={confirmAndDelete}><Trash2 className="w-3.5 h-3.5" /> Eliminar</Button>
-          </>
-        }
-      >
-        <p className="text-sm text-muted-foreground">
-          ¿Eliminar permanentemente esta entrada? Esta acción no se puede deshacer.
-        </p>
-        {confirmDelete && (
-          <p className="mt-3 text-13 font-medium border-l-2 border-destructive pl-3 line-clamp-2">
-            {confirmDelete.question}
-          </p>
-        )}
-      </Modal>
     </div>
   );
 }

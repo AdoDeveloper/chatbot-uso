@@ -28,7 +28,7 @@ test.describe("Login smoke", () => {
     await page.goto("/login");
     // The skip-to-content link added in Paso 7 should be in the DOM
     await expect(page.getByRole("link", { name: "Ir al contenido" })).toBeAttached();
-    // Use input type / id selectors — language-independent and resilient to
+    // Use input type / id selectors - language-independent and resilient to
     // copy changes in the labels.
     await expect(page.locator('input[type="email"]')).toBeVisible();
     await expect(page.locator('input#login-password')).toBeVisible();
@@ -52,12 +52,26 @@ test.describe("Login smoke", () => {
     await page.goto("/dashboard");
     await expect(page).toHaveURL(/\/login/);
   });
+
+  test("mostrar/ocultar contraseña toggle", async ({ page }) => {
+    await page.goto("/login");
+    const passwordInput = page.locator("input#login-password");
+    await passwordInput.fill("cualquier-cosa");
+    await expect(passwordInput).toHaveAttribute("type", "password");
+
+    const toggleBtn = page.getByLabel(/mostrar contraseña/i);
+    await toggleBtn.click();
+    await expect(passwordInput).toHaveAttribute("type", "text");
+
+    await page.getByLabel(/ocultar contraseña/i).click();
+    await expect(passwordInput).toHaveAttribute("type", "password");
+  });
 });
 
 // ── Happy path (gated on credentials) ────────────────────────────────────────
 
 test.describe("Login happy path", () => {
-  test.skip(!E2E_USER || !E2E_PASS, "E2E_USER / E2E_PASS not set — skipping");
+  test.skip(!E2E_USER || !E2E_PASS, "E2E_USER / E2E_PASS not set - skipping");
 
   test("signs in and lands on the dashboard", async ({ page }) => {
     await page.goto("/login");
@@ -65,79 +79,37 @@ test.describe("Login happy path", () => {
     await page.locator('input#login-password').fill(E2E_PASS!);
     await page.locator('button[type="submit"]').click();
 
-    // Successful login redirects out of /login. Use a generous timeout —
+    // Successful login redirects out of /login. Use a generous timeout -
     // the auth context takes a tick to populate cookies + bootstrap user.
     await expect(page).toHaveURL(/\/dashboard/, { timeout: 10_000 });
 
-    // Sidebar landmark is in the layout — its presence confirms we're inside
-    // the authenticated shell, not on a redirect destination.
-    await expect(page.getByRole("navigation", { name: /navegación principal/i }))
-      .toBeVisible();
+    // "Chatbot USO" brand text in the sidebar confirms we're inside the
+    // authenticated shell, not just parked on a redirect destination.
+    await expect(page.getByText("Chatbot USO")).toBeVisible();
   });
 
-  test("logged-in user can reach a deep route (admin tabs)", async ({ page }) => {
-    // Reuse the session from the previous test by signing in fresh.
-    await page.goto("/login");
-    await page.locator('input[type="email"]').fill(E2E_USER!);
-    await page.locator('input#login-password').fill(E2E_PASS!);
-    await page.locator('button[type="submit"]').click();
-    await expect(page).toHaveURL(/\/dashboard/, { timeout: 10_000 });
+  test("logged-in user can reach a deep route (admin tabs)", async ({ browser }) => {
+    // Reuses the session saved by global-setup instead of logging in again -
+    // repeated UI logins in the same run trip the backend's anti-brute-force
+    // rate limit on /auth/login.
+    const context = await browser.newContext({ storageState: "e2e/.auth/admin.json" });
+    const page = await context.newPage();
 
-    // Old standalone URL → server-side redirect → unified target. Validates
-    // both the redirect rule and that the admin shell renders for an authed
-    // user. After the consolidation, /configuracion/cache lives inside
-    // /sistema/estado as a recovery tool.
-    await page.goto("/dashboard/configuracion/cache");
-    await expect(page).toHaveURL(/\/dashboard\/sistema\/estado/);
+    // Deep nested route under configuración should render for an authed user.
+    await page.goto("/dashboard/configuracion/acceso/usuarios");
+    await expect(page).toHaveURL(/\/dashboard\/configuracion\/acceso\/usuarios/);
+    await context.close();
   });
-});
-
-// ── Sidebar consolidation redirects ──────────────────────────────────────────
-
-test.describe("Legacy route redirects", () => {
-  test.skip(!E2E_USER || !E2E_PASS, "E2E_USER / E2E_PASS not set — skipping");
-
-  test.beforeEach(async ({ page }) => {
-    await page.goto("/login");
-    await page.locator('input[type="email"]').fill(E2E_USER!);
-    await page.locator('input#login-password').fill(E2E_PASS!);
-    await page.locator('button[type="submit"]').click();
-    await expect(page).toHaveURL(/\/dashboard/, { timeout: 10_000 });
-  });
-
-  // Cada item: ruta vieja → fragmento esperado en la nueva URL.
-  // Estos redirects existen porque el rediseño del sidebar (22 → 15 items)
-  // movió/fusionó pantallas. Bookmarks viejos deben seguir funcionando.
-  const REDIRECTS: { from: string; to: RegExp }[] = [
-    { from: "/dashboard/publicacion", to: /\/configuracion\?tab=widget/ },
-    { from: "/dashboard/mantenimiento", to: /\/sistema\/estado/ },
-    { from: "/dashboard/sistema/webhooks", to: /\/configuracion\/integraciones/ },
-    { from: "/dashboard/sistema/salud", to: /\/sistema\/estado/ },
-    { from: "/dashboard/sistema/auditoria", to: /\/actividad/ },
-    { from: "/dashboard/sistema/seguridad", to: /\/actividad/ },
-    { from: "/dashboard/conocimiento/faq", to: /\/conocimiento\/documentos/ },
-    { from: "/dashboard/conocimiento/versiones", to: /\/sistema\/versiones/ },
-    { from: "/dashboard/configuracion/cache", to: /\/sistema\/estado/ },
-  ];
-
-  for (const { from, to } of REDIRECTS) {
-    test(`${from} redirects to consolidated route`, async ({ page }) => {
-      await page.goto(from);
-      await expect(page).toHaveURL(to);
-    });
-  }
 });
 
 // ── Notifications bell ──────────────────────────────────────────────────────
 
 test.describe("Notifications bell", () => {
-  test.skip(!E2E_USER || !E2E_PASS, "E2E_USER / E2E_PASS not set — skipping");
+  test.skip(!E2E_USER || !E2E_PASS, "E2E_USER / E2E_PASS not set - skipping");
+  test.use({ storageState: "e2e/.auth/admin.json" });
 
   test("bell trigger is reachable in header", async ({ page }) => {
-    await page.goto("/login");
-    await page.locator('input[type="email"]').fill(E2E_USER!);
-    await page.locator('input#login-password').fill(E2E_PASS!);
-    await page.locator('button[type="submit"]').click();
+    await page.goto("/dashboard");
     await expect(page).toHaveURL(/\/dashboard/, { timeout: 10_000 });
 
     // Bell button has an aria-label that always matches "Notificaciones..."
@@ -145,7 +117,7 @@ test.describe("Notifications bell", () => {
     await expect(bell).toBeVisible();
     await bell.click();
 
-    // Dropdown should show the inbox header. Don't assert specific items —
+    // Dropdown should show the inbox header. Don't assert specific items -
     // the test DB may have zero notifications, in which case we get the
     // empty state.
     await expect(page.getByText(/Sin notificaciones|Marcar todas|Ver historial/i)).toBeVisible();

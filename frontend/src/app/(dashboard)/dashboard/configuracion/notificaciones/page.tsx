@@ -1,10 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell, FileText, AlertCircle, UserRound, Plug, Inbox, Loader2, Clock, Mail, MailOpen } from "lucide-react";
+import { Bell, FileText, AlertCircle, UserRound, Plug, Inbox, Loader2, Clock, Mail, MailOpen, Check } from "lucide-react";
 import { useApi, getErrorMessage } from "@/hooks/use-api";
 import { useToast } from "@/components/ui/toast";
 import api from "@/lib/api";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/composed/data-table";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
@@ -28,37 +31,46 @@ interface ReportSchedule {
   month?: number | null;
 }
 
-interface NotificationLogItem {
+interface ChannelDelivery {
+  channel: string;
+  status: string;
+  recipients: number;
+  target: string | null;
+  error_message: string | null;
+}
+
+interface NotificationTrigger {
   id: string;
   event: string;
-  channel: string;
-  target: string | null;
-  status: string;
-  error_message: string | null;
   created_at: string;
-  read_at: string | null;
+  channels: ChannelDelivery[];
+  summary: string | null;
+  own_log_id: string | null;
+  own_read_at: string | null;
 }
 
 interface NotificationsPage {
-  items: NotificationLogItem[];
+  items: NotificationTrigger[];
   total: number;
   page: number;
   page_size: number;
 }
+
+const CHANNEL_LABEL: Record<string, string> = {
+  email: "Correo",
+  in_app: "En la app",
+};
 
 const EVENT_META: Record<string, { label: string; icon: typeof FileText }> = {
   doc_ready: { label: "Documento procesado", icon: FileText },
   doc_error: { label: "Error procesando documento", icon: AlertCircle },
   escalation: { label: "Chat escalado a humano", icon: UserRound },
   provider_down: { label: "Proveedor IA caído", icon: Plug },
-  unanswered_daily: { label: "Resumen diario", icon: Inbox },
+  unanswered_digest: { label: "Resumen diario", icon: Inbox },
+  rate_limit_threshold: { label: "Límite de solicitudes cerca del máximo", icon: AlertCircle },
+  service_down: { label: "Servicio degradado", icon: AlertCircle },
 };
 
-const STATUS_BADGE: Record<string, string> = {
-  sent: "bg-success/10 text-success",
-  failed: "bg-destructive/10 text-destructive",
-  pending: "bg-muted text-muted-foreground",
-};
 const STATUS_LABEL: Record<string, string> = {
   sent: "Enviada",
   failed: "Falló",
@@ -99,8 +111,8 @@ function humanizeNext(s: ReportSchedule): string {
     const ds = (s.days_of_week ?? []).slice().sort().map((d) => WEEKDAY_LABELS[d] ?? "?").join(", ");
     return ds.length ? `Los ${ds}` : "Ningún día seleccionado";
   }
-  if (s.unit === "monthly") return `El día ${s.day_of_month ?? "—"} de cada mes`;
-  if (s.unit === "yearly") return `El ${s.day_of_month ?? "—"} de ${MONTH_LABELS[(s.month ?? 1) - 1] ?? ""}`;
+  if (s.unit === "monthly") return `El día ${s.day_of_month ?? "N/A"} de cada mes`;
+  if (s.unit === "yearly") return `El ${s.day_of_month ?? "N/A"} de ${MONTH_LABELS[(s.month ?? 1) - 1] ?? ""}`;
   return "";
 }
 
@@ -110,9 +122,37 @@ export default function NotificacionesHistorialPage() {
   const [pageSize, setPageSize] = useState(20);
 
   const query = new URLSearchParams({ page: String(page), page_size: String(pageSize) }).toString();
-  const { data, loading } = useApi<NotificationsPage>(`/notifications?${query}`);
+  const { data, loading, setData } = useApi<NotificationsPage>(`/notifications?${query}`);
   const items = data?.items ?? [];
   const total = data?.total ?? 0;
+  const unreadOwnCount = items.filter((i) => i.own_log_id && !i.own_read_at).length;
+
+  async function markTriggerRead(trigger: NotificationTrigger) {
+    if (!trigger.own_log_id || trigger.own_read_at) return;
+    try {
+      await api.post(`/notifications/inbox/${trigger.own_log_id}/read`);
+      setData((prev) => prev ? {
+        ...prev,
+        items: prev.items.map((i) =>
+          i.id === trigger.id ? { ...i, own_read_at: new Date().toISOString() } : i
+        ),
+      } : prev);
+    } catch (err) {
+      toast({ type: "error", message: getErrorMessage(err, "No se pudo marcar como leída.") });
+    }
+  }
+
+  async function markAllTriggersRead() {
+    try {
+      await api.post("/notifications/inbox/mark-all-read");
+      setData((prev) => prev ? {
+        ...prev,
+        items: prev.items.map((i) => i.own_log_id ? { ...i, own_read_at: i.own_read_at ?? new Date().toISOString() } : i),
+      } : prev);
+    } catch (err) {
+      toast({ type: "error", message: getErrorMessage(err, "No se pudo marcar todas como leídas.") });
+    }
+  }
 
   const { data: scheduleData, loading: loadingSchedule } =
     useApi<ReportSchedule>("/notifications/report-schedule");
@@ -123,7 +163,7 @@ export default function NotificacionesHistorialPage() {
   // Toggle global de correos: refleja si AL MENOS una regla email está
   // habilitada. Activarlo habilita el canal email para todos los eventos;
   // desactivarlo lo apaga para todos (el canal in-app queda intacto).
-  const { data: rulesData, loading: loadingRules } = useApi<{ email_enabled: boolean }>(
+  const { data: rulesData, loading: loadingRules } = useApi<{ email_enabled: boolean; smtp_configured: boolean }>(
     "/notifications/rules/email/status",
   );
   const [emailEnabled, setEmailEnabled] = useState(false);
@@ -198,6 +238,13 @@ export default function NotificacionesHistorialPage() {
         </TabsList>
 
         <TabsContent value="historial">
+          {unreadOwnCount > 0 && (
+            <div className="flex justify-end mb-2">
+              <Button variant="outline" size="sm" onClick={markAllTriggersRead} className="gap-1.5">
+                <Check className="w-3.5 h-3.5" /> Marcar todas ({unreadOwnCount})
+              </Button>
+            </div>
+          )}
           <DataTable
             loading={loading}
             empty={
@@ -206,35 +253,67 @@ export default function NotificacionesHistorialPage() {
             pagination={{ page, pageSize, total, onPageChange: setPage, onPageSizeChange: (n) => { setPageSize(n); setPage(1); }, itemLabel: "notificaciones" }}
             columns={[
               { id: "evento", header: "Evento" },
-              { id: "destino", header: "Destino", hideBelow: "md" },
+              { id: "canales", header: "Canales", hideBelow: "md" },
               { id: "estado", header: "Estado", className: "w-28" },
               { id: "fecha", header: "Fecha", className: "w-44 hidden sm:table-cell", hideBelow: "sm" },
+              { id: "leida", header: "", className: "w-10" },
             ]}
             data={items}
             rowKey={(item) => item.id}
             renderRow={(item) => {
               const meta = EVENT_META[item.event] ?? { label: item.event, icon: Bell };
               const Icon = meta.icon;
+              const anyFailed = item.channels.some((c) => c.status === "failed");
               return (
                 <TableRow>
                   <TableCell>
                     <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                      <div className="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0" title={meta.label}>
                         <Icon className="w-3.5 h-3.5" />
                       </div>
-                      <span className="truncate">{meta.label}</span>
+                      <span className="truncate">{item.summary || meta.label}</span>
                     </div>
                   </TableCell>
                   <TableCell className="hidden md:table-cell">
-                    <span className="text-muted-foreground truncate">{item.target ?? "—"}</span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {item.channels.map((c) => (
+                        <Badge
+                          key={c.channel}
+                          variant={c.status === "failed" ? "destructive" : "muted"}
+                          size="xs"
+                          title={
+                            c.channel === "email"
+                              ? (c.target ?? undefined)
+                              : `${c.recipients} ${c.recipients === 1 ? "destinatario" : "destinatarios"}`
+                          }
+                        >
+                          {CHANNEL_LABEL[c.channel] ?? c.channel}
+                          {c.channel === "in_app" && c.recipients > 1 ? ` (${c.recipients})` : ""}
+                        </Badge>
+                      ))}
+                    </div>
                   </TableCell>
                   <TableCell>
-                    <span className={`text-2xs px-1.5 py-0.5 rounded-full whitespace-nowrap ${STATUS_BADGE[item.status] ?? "bg-muted text-muted-foreground"}`}>
-                      {STATUS_LABEL[item.status] ?? item.status}
-                    </span>
+                    <Badge variant={anyFailed ? "destructive" : "success"} size="xs">
+                      {anyFailed ? STATUS_LABEL.failed : STATUS_LABEL.sent}
+                    </Badge>
                   </TableCell>
                   <TableCell className="hidden sm:table-cell">
                     <span className="text-muted-foreground whitespace-nowrap tabular-nums">{fmtDateTime(item.created_at)}</span>
+                  </TableCell>
+                  <TableCell>
+                    {item.own_log_id && !item.own_read_at && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-primary"
+                        title="Marcar como leída"
+                        aria-label="Marcar como leída"
+                        onClick={() => markTriggerRead(item)}
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               );
@@ -272,6 +351,9 @@ export default function NotificacionesHistorialPage() {
                         <SelectOption key={u} value={u}>{UNIT_LABELS[u]}</SelectOption>
                       ))}
                     </Select>
+                    {draft.unit !== "weekly" && (
+                      <p className="text-2xs text-muted-foreground">Elegí &quot;Semanal&quot; para escoger días específicos de envío.</p>
+                    )}
                   </div>
 
                   {draft.unit === "weekly" && (
@@ -380,40 +462,6 @@ export default function NotificacionesHistorialPage() {
           )}
         </TabsContent>
 
-        <TabsContent value="correos">
-          <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                    {emailEnabled ? <MailOpen className="w-4 h-4" /> : <Mail className="w-4 h-4" />}
-                  </div>
-                  <div className="min-w-0">
-                    <CardTitle className="text-15 font-semibold">Correos</CardTitle>
-                    <CardDescription>
-                      {emailEnabled
-                        ? "Los administradores reciben estas alertas por correo electrónico."
-                        : "Las alertas solo se muestran en la campana."}
-                    </CardDescription>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {loadingRules ? (
-                    <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                  ) : (
-                    <Switch
-                      checked={emailEnabled}
-                      disabled={togglingEmail}
-                      onCheckedChange={toggleEmail}
-                      aria-label="Activar correos"
-                    />
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
         <TabsContent value="eventos">
           <Card className="mb-4">
             <CardContent className="pt-4">
@@ -444,6 +492,13 @@ export default function NotificacionesHistorialPage() {
                   )}
                 </div>
               </div>
+              {emailEnabled && rulesData && !rulesData.smtp_configured && (
+                <Alert variant="warning" className="mt-3">
+                  <AlertDescription>
+                    El canal de correo está activado, pero el servidor no tiene SMTP configurado. Los correos no se enviarán hasta configurarlo.
+                  </AlertDescription>
+                </Alert>
+              )}
             </CardContent>
           </Card>
           <NotificacionesTab />

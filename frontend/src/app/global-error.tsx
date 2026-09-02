@@ -1,8 +1,6 @@
 "use client";
 
-// Fallback de último recurso: solo se activa si el propio layout raíz falla.
-// Reemplaza todo el documento, por eso incluye <html> y <body> propios y no
-// puede depender de los providers ni de los estilos del layout.
+// Fallback si el layout raíz falla: reemplaza todo el documento, por eso incluye <html>/<body> propios sin depender de providers ni estilos del layout.
 
 export default function GlobalError({
   error: _error,

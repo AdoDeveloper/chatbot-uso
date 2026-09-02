@@ -20,10 +20,11 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 /**
- * Antes un heatmap de cuadros de color (estilo GitHub) para los 4 modos.
- * En móvil las celdas se volvían ilegibles (demasiado pequeñas, sin espacio
- * para 24 columnas). Reemplazado por gráficos de barras — mismo dato,
- * consistente con el resto de Estadísticas, legible en cualquier ancho.
+ * Gráficos de barras para los 4 modos de ventana. Se evita el heatmap de
+ * cuadros de color (estilo GitHub) porque en móvil las celdas se vuelven
+ * ilegibles (demasiado pequeñas, sin espacio para 24 columnas); las barras
+ * muestran el mismo dato, consistentes con el resto de Estadísticas y
+ * legibles en cualquier ancho.
  */
 export function ActivityChart({ cells, window = "week", rangeEnd }: ActivityChartProps) {
   if (window === "day") return <DayBars cells={cells} />;
@@ -85,7 +86,7 @@ function WeekBars({ cells }: { cells: HeatmapCell[] }) {
           <Bar dataKey="count" fill="var(--color-count)" radius={[3, 3, 0, 0]} />
         </BarChart>
       </ChartContainer>
-      <EmptyNote>Suma por día de la semana — últimos 30 días</EmptyNote>
+      <EmptyNote>Suma por día de la semana · últimos 30 días</EmptyNote>
     </>
   );
 }
@@ -152,7 +153,7 @@ function YearBars({ cells, rangeEnd }: { cells: HeatmapCell[]; rangeEnd?: string
           <Bar dataKey="count" fill="var(--color-count)" radius={[3, 3, 0, 0]} />
         </BarChart>
       </ChartContainer>
-      <EmptyNote>Suma mensual — últimos 12 meses</EmptyNote>
+      <EmptyNote>Suma mensual · últimos 12 meses</EmptyNote>
     </>
   );
 }

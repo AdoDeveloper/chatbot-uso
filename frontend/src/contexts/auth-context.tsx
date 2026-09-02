@@ -12,8 +12,8 @@ import {
 import { usePathname, useRouter } from "next/navigation";
 import { isAxiosError } from "axios";
 import api, { tokenStore } from "@/lib/api";
+import { clearApiCache } from "@/hooks/use-api";
 import { decodeJwt } from "@/lib/jwt";
-import { logger } from "@/lib/logger";
 import type { TokenResponse, User } from "@/types";
 
 interface AuthContextValue {
@@ -32,34 +32,11 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 // tokens: el access token nuevo trae permisos frescos, así que re-decodificamos.
 export const TOKENS_REFRESHED_EVENT = "auth:tokens-refreshed";
 
-// Permisos desde el JWT (claim `permissions`). Es la fuente preferida: se
-// incrustan al emitir el token, por lo que están disponibles de inmediato sin
-// una llamada extra y no dependen de la disponibilidad de /rbac/my-permissions.
-// La firma del token la valida el backend; aquí solo leemos para la UI.
+// Permisos desde el claim `permissions` del JWT, incrustado por el backend en todo login/refresh/SSO.
 function permsFromToken(): Set<string> | null {
   const payload = decodeJwt(tokenStore.getAccess());
   const p = payload?.permissions;
   return Array.isArray(p) ? new Set(p) : null;
-}
-
-// Fallback para tokens emitidos antes de incrustar permisos en el JWT.
-async function fetchPermissionsFromApi(): Promise<Set<string> | null> {
-  try {
-    const { data } = await api.get<{ permissions: string[] }>("/rbac/my-permissions");
-    return new Set(data.permissions);
-  } catch (err) {
-    logger.error("[auth] fetchPermissions failed:", err);
-    return null;
-  }
-}
-
-// Resuelve permisos: JWT primero; si el token no trae el claim (token antiguo)
-// o falla, cae a la API. Devuelve null si ambas fallan, para que el llamador
-// conserve el valor previo (fail-closed solo en error real, nunca por rol).
-async function resolvePermissions(): Promise<Set<string> | null> {
-  const fromToken = permsFromToken();
-  if (fromToken) return fromToken;
-  return fetchPermissionsFromApi();
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -75,7 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data } = await api.get<User>("/auth/me");
       setUser(data);
-      const next = await resolvePermissions();
+      const next = permsFromToken();
       setPermissions((prev) => next ?? prev);
       const currentPath = pathnameRef.current;
       if (data.must_change_password && !currentPath.startsWith("/cambiar-contrasena")) {
@@ -84,10 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         router.push("/dashboard");
       }
     } catch (err: unknown) {
-      // Solo una sesión realmente inválida (401) debe cerrar sesión. Un error
-      // de red, CORS o 5xx transitorio no implica que el token sea inválido —
-      // limpiarlo en ese caso desloguea al usuario innecesariamente ante un
-      // problema de conectividad temporal.
+      // Solo un 401 real cierra sesión; un error de red/CORS/5xx no implica token inválido.
       if (isAxiosError(err) && err.response?.status === 401) {
         tokenStore.clear();
         setUser(null);
@@ -98,7 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshPermissions = useCallback(async () => {
     if (!user) return;
-    const next = await resolvePermissions();
+    const next = permsFromToken();
     setPermissions((prev) => next ?? prev);
   }, [user]);
 
@@ -126,7 +100,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data } = await api.post<TokenResponse>("/auth/login", { email, password });
     tokenStore.set(data.access_token, data.refresh_token);
     setUser(data.user);
-    const next = permsFromToken() ?? (await fetchPermissionsFromApi());
+    const next = permsFromToken();
     setPermissions((prev) => next ?? prev);
     if (data.user.must_change_password) {
       router.push("/cambiar-contrasena");
@@ -141,9 +115,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await api.post("/auth/logout", { refresh_token: tokenStore.getRefresh() });
     } catch {
-      /* ignore — el cierre de sesión local procede de todos modos */
+      /* ignore - el cierre de sesión local procede de todos modos */
     }
     tokenStore.clear();
+    clearApiCache();
     setUser(null);
     setPermissions(new Set());
     router.push("/login");

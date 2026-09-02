@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Upload, Loader2, AlertCircle, Save, X } from "lucide-react";
-import api, { UPLOAD_LIMITS } from "@/lib/api";
-import { getErrorMessage } from "@/hooks/use-api";
+import api from "@/lib/api";
+import { getErrorMessage, invalidateApiCache, useApi } from "@/hooks/use-api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,7 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Modal } from "@/components/composed/modal";
 import { TagInput, fmtSize } from "./sources-helpers";
 
-const ACCEPTED_EXTENSIONS = [".pdf", ".docx", ".xlsx", ".csv", ".txt"];
+const ACCEPTED_EXTENSIONS = [".pdf", ".docx", ".txt"];
 
 export function AddSourcePanel({ open, onClose, onCreated }: {
   open: boolean; onClose: () => void; onCreated: () => void;
@@ -25,6 +25,8 @@ export function AddSourcePanel({ open, onClose, onCreated }: {
   const [files, setFiles] = useState<File[]>([]);
   const [dragging, setDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { data: uploadLimits } = useApi<{ source_mb: number }>("/sources/upload-limits");
+  const sourceMb = uploadLimits?.source_mb ?? 50;
 
   useEffect(() => {
     if (!open) {
@@ -40,10 +42,10 @@ export function AddSourcePanel({ open, onClose, onCreated }: {
       setError(`${invalid.map((f) => f.name).join(", ")}: tipo de archivo no soportado. Use ${ACCEPTED_EXTENSIONS.join(", ")}.`);
       return;
     }
-    const maxBytes = UPLOAD_LIMITS.source_mb * 1024 * 1024;
+    const maxBytes = sourceMb * 1024 * 1024;
     const tooBig = arr.filter((f) => f.size > maxBytes);
     if (tooBig.length) {
-      setError(`${tooBig.map((f) => f.name).join(", ")} excede el límite de ${UPLOAD_LIMITS.source_mb} MB.`);
+      setError(`${tooBig.map((f) => f.name).join(", ")} excede el límite de ${sourceMb} MB.`);
       return;
     }
     setFiles((prev) => {
@@ -53,7 +55,7 @@ export function AddSourcePanel({ open, onClose, onCreated }: {
       return merged;
     });
     setError(null);
-  }, [sourceName]);
+  }, [sourceName, sourceMb]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault(); setDragging(false);
@@ -68,7 +70,7 @@ export function AddSourcePanel({ open, onClose, onCreated }: {
     setSubmitting(true);
     try {
       if (files.length > 1) {
-        // Bulk upload — names are derived from filenames
+        // Carga masiva - los nombres se derivan de los nombres de archivo
         const form = new FormData();
         files.forEach((f) => form.append("files", f));
         form.append("tags", JSON.stringify(tags));
@@ -84,20 +86,18 @@ export function AddSourcePanel({ open, onClose, onCreated }: {
         }
         return;
       }
-      // Single file with custom name/description
+      // Archivo único con nombre/descripción personalizados
       const form = new FormData();
       form.append("file", files[0]);
       form.append("name", sourceName.trim());
       if (description.trim()) form.append("description", description.trim());
       form.append("tags", JSON.stringify(tags));
+      invalidateApiCache("/sources");
       await api.post("/sources/upload", form, { headers: { "Content-Type": "multipart/form-data" } });
       onCreated();
       onClose();
     } catch (err: unknown) {
-      // El backend puede devolver `detail` como string o como objeto
-      // estructurado (p. ej. 409 DUPLICATE_CONTENT: {code, message,
-      // existing_id, existing_name}) — getErrorMessage extrae el `message`
-      // del objeto para no inyectar un objeto crudo en el JSX.
+      // getErrorMessage extrae `detail.message` cuando el backend devuelve un objeto estructurado (ej. 409 DUPLICATE_CONTENT), no un string.
       setError(getErrorMessage(err, "No se pudo crear la fuente"));
     } finally { setSubmitting(false); }
   };
@@ -150,10 +150,10 @@ export function AddSourcePanel({ open, onClose, onCreated }: {
               <>
                 <div className="text-center">
                   <p className="text-sm text-muted-foreground"><span className="font-semibold text-primary">Haga clic para seleccionar</span></p>
-                  <p className="text-sm text-muted-foreground/60 mt-0.5">o arrastre los archivos aquí — puede seleccionar varios</p>
+                  <p className="text-sm text-muted-foreground/60 mt-0.5">o arrastre los archivos aquí · puede seleccionar varios</p>
                 </div>
                 <p className="text-2xs text-muted-foreground bg-muted px-3 py-1 rounded-full">
-                  PDF · DOCX · XLSX
+                  PDF · DOCX · TXT
                 </p>
               </>
             ) : (
@@ -170,7 +170,17 @@ export function AddSourcePanel({ open, onClose, onCreated }: {
                   <span className="text-muted-foreground ml-2 shrink-0">{fmtSize(f.size)}</span>
                   <button
                     type="button"
-                    onClick={(e) => { e.stopPropagation(); setFiles((prev) => prev.filter((_, j) => j !== i)); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setFiles((prev) => {
+                        const next = prev.filter((_, j) => j !== i);
+                        // Autocompleta el nombre si queda un solo archivo (el form lo exige).
+                        if (next.length === 1 && !sourceName) {
+                          setSourceName(next[0].name.replace(/\.[^/.]+$/, ""));
+                        }
+                        return next;
+                      });
+                    }}
                     className="ml-2 text-muted-foreground hover:text-destructive transition shrink-0"
                   >
                     <X className="w-3 h-3" />

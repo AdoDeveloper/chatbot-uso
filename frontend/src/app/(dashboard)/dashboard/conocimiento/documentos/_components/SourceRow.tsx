@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   RefreshCw, Trash2, AlertCircle, Loader2, FileSearch,
-  CheckCheck, Ban, Eye,
+  CheckCheck, Ban, Eye, Upload,
   MoreHorizontal, Save, X,
 } from "lucide-react";
 import type { Source, SourcePreview, SourceQuality } from "@/types";
@@ -14,6 +14,7 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { TableCell, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import api from "@/lib/api";
 import { getErrorMessage } from "@/hooks/use-api";
 import {
@@ -44,6 +45,7 @@ function InlineTagEditor({ source, onUpdated }: { source: Source; onUpdated: () 
       await patchSourceTags(source.id, tags);
       onUpdated();
       setEditing(false);
+      toast({ type: "success", message: "Etiquetas actualizadas.", duration: 1500 });
     } catch (err) {
       toast({ type: "error", message: getErrorMessage(err, "No se pudieron guardar las etiquetas.") });
     } finally { setSaving(false); }
@@ -89,14 +91,17 @@ function InlineTagEditor({ source, onUpdated }: { source: Source; onUpdated: () 
 }
 
 export function SourceRow({
-  source, reviewing, onReingest, onDelete, onApprove, onReject, onUpdated,
+  source, reviewing, selected, onToggleSelect, onReingest, onDelete, onApprove, onReject, onReplaceFile, onUpdated,
 }: {
   source: Source;
   reviewing: string | null;
+  selected: boolean;
+  onToggleSelect: (id: string) => void;
   onReingest: (s: Source) => void;
   onDelete: (s: Source) => void;
   onApprove: (s: Source) => void;
   onReject: (s: Source) => void;
+  onReplaceFile: (s: Source) => void;
   onUpdated: () => void;
 }) {
   const router = useRouter();
@@ -132,7 +137,7 @@ export function SourceRow({
 
   const reviewBadge = REVIEW_BADGE[source.review_status];
   const errorTooltip = isError && source.error_message
-    ? `${source.error_code ? `[${source.error_code}] ` : ""}${source.error_message}${source.error_hint ? ` — ${source.error_hint}` : ""}`
+    ? `${source.error_code ? `[${source.error_code}] ` : ""}${source.error_message}${source.error_hint ? `: ${source.error_hint}` : ""}`
     : undefined;
   const rejectionTooltip = source.review_status === "rechazada" && source.rejection_reason
     ? `${source.rejection_reason}${source.reviewed_by_name ? ` (${source.reviewed_by_name})` : ""}`
@@ -140,7 +145,15 @@ export function SourceRow({
 
   return (
     <>
-    <TableRow>
+    <TableRow className={selected ? "bg-primary/5" : undefined}>
+      <TableCell className="w-8">
+       <input
+        type="checkbox"
+        checked={selected}
+        onChange={() => onToggleSelect(source.id)}
+        className="h-3.5 w-3.5 accent-primary cursor-pointer"
+       />
+      </TableCell>
       <TableCell className="max-w-40 sm:max-w-none">
        <div className="flex items-center gap-1.5 min-w-0">
         <span className="font-semibold text-foreground text-13 truncate">{source.name}</span>
@@ -151,9 +164,9 @@ export function SourceRow({
       </TableCell>
      <TableCell className="hidden sm:table-cell">
       <div className="flex items-center gap-1.5">
-       <span className={`text-3xs px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap ${STATUS_BADGE[source.status]}`}>
+       <Badge variant="outline" size="xs" className={`whitespace-nowrap border-transparent ${STATUS_BADGE[source.status]}`}>
         {STATUS_LABEL[source.status] ?? source.status}
-       </span>
+       </Badge>
        {isBusy && stage && (
         <span className="text-3xs text-muted-foreground tabular-nums" title={stage.label}>
          {stage.percent !== null ? `${stage.percent}%` : "…"}
@@ -173,7 +186,7 @@ export function SourceRow({
          {reviewBadge.label}
         </span>
        );
-      })() : <span className="text-3xs text-muted-foreground">—</span>}
+      })() : <span className="text-3xs text-muted-foreground">N/A</span>}
      </TableCell>
      <TableCell className="hidden md:table-cell">
       <span className="tabular-nums text-13">{source.chunk_count.toLocaleString()}</span>
@@ -181,7 +194,7 @@ export function SourceRow({
      <TableCell className="hidden lg:table-cell">
       <InlineTagEditor source={source} onUpdated={onUpdated} />
      </TableCell>
-     <TableCell sticky>
+     <TableCell sticky className="whitespace-nowrap">
       <div className="flex justify-end">
        <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -205,9 +218,15 @@ export function SourceRow({
           </>
          )}
          {can(PERM.KNOWLEDGE_UPDATE) && isError && (
-          <DropdownMenuItem onClick={() => onReingest(source)}>
+          <DropdownMenuItem onClick={() => onReingest(source)} disabled={isBusy}>
            <RefreshCw className="w-3.5 h-3.5 mr-2" />
            Reingestar
+          </DropdownMenuItem>
+         )}
+         {can(PERM.KNOWLEDGE_UPDATE) && source.review_status === "rechazada" && (
+          <DropdownMenuItem onClick={() => onReplaceFile(source)}>
+           <Upload className="w-3.5 h-3.5 mr-2" />
+           Reemplazar archivo
           </DropdownMenuItem>
          )}
          <DropdownMenuItem onClick={openPreview}>
@@ -227,7 +246,7 @@ export function SourceRow({
           </DropdownMenuItem>
          )}
          {can(PERM.KNOWLEDGE_UPDATE) && !isError && !isBusy && (
-          <DropdownMenuItem onClick={() => onReingest(source)}>
+          <DropdownMenuItem onClick={() => onReingest(source)} disabled={isBusy}>
            <RefreshCw className="w-3.5 h-3.5 mr-2" />
            Reingestar
           </DropdownMenuItem>
@@ -250,7 +269,7 @@ export function SourceRow({
      </TableCell>
     </TableRow>
 
-    {/* Preview modal */}
+    {/* Modal de vista previa */}
       <Modal
         open={previewOpen}
         onClose={() => setPreviewOpen(false)}
@@ -258,7 +277,7 @@ export function SourceRow({
         title={
           <span className="flex items-center gap-2">
             <Eye className="w-4 h-4 text-primary" />
-            Vista previa — {source.name}
+            {source.name}
           </span>
         }
       >
@@ -290,7 +309,7 @@ export function SourceRow({
             {previewLoading ? (
               <Loading />
             ) : preview?.error ? (
-              <div className="rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-warning-foreground">
+              <div className="rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-warning">
                 {preview.error}
               </div>
             ) : (

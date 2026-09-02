@@ -1,7 +1,7 @@
 "use client";
 
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { HeartPulse, Wrench, Loader2, Trash2, BarChart2, Database, Activity } from "lucide-react";
+import { HeartPulse, Wrench, Loader2, Trash2, BarChart2, Database, Activity, List, X } from "lucide-react";
 import api from "@/lib/api";
 import { useApi, getErrorMessage } from "@/hooks/use-api";
 import { useToast } from "@/components/ui/toast";
@@ -11,6 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/ui/page-header";
+import { Modal } from "@/components/composed/modal";
+import { EmptyState } from "@/components/ui/empty-state";
 import { FloatingSaveBar } from "../_lib/save-bar";
 import { SaludTab, type SaludTabHandle } from "../_components/SaludTab";
 import { LimitesTab, type LimitesTabHandle } from "../cuotas/_components/LimitesTab";
@@ -30,8 +32,76 @@ interface CacheStatsOut {
   similarity_threshold: number;
 }
 
+interface CacheEntryOut {
+  key: string;
+  question: string;
+}
+
 interface CacheConfigCardHandle {
   refetch: () => Promise<void>;
+}
+
+function CacheEntriesModal({ open, onClose, onChanged }: { open: boolean; onClose: () => void; onChanged: () => void }) {
+  const { toast, confirm } = useToast();
+  const { data, loading, refetch } = useApi<CacheEntryOut[]>(open ? "/cache/entries?page_size=100" : null);
+  const entries = data ?? [];
+  const [deletingKey, setDeletingKey] = useState<string | null>(null);
+
+  async function handleDelete(entry: CacheEntryOut) {
+    const ok = await confirm({
+      title: "¿Eliminar esta entrada del caché?",
+      message: "La próxima vez que se haga una pregunta similar, el chatbot volverá a generar la respuesta en vez de usar la guardada.",
+      confirmText: "Eliminar",
+      variant: "danger",
+    });
+    if (!ok) return;
+    setDeletingKey(entry.key);
+    try {
+      await api.delete(`/cache/entry/${encodeURIComponent(entry.key)}`);
+      await refetch();
+      onChanged();
+      toast({ type: "success", message: "Entrada eliminada del caché.", duration: 1500 });
+    } catch (err) {
+      toast({ type: "error", message: getErrorMessage(err, "No se pudo eliminar la entrada.") });
+    } finally {
+      setDeletingKey(null);
+    }
+  }
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      size="lg"
+      title="Entradas del caché"
+      footer={<Button variant="outline" size="sm" onClick={onClose}>Cerrar</Button>}
+    >
+      <div className="py-2">
+        {loading ? (
+          <div className="space-y-2">
+            {[0, 1, 2].map((i) => <div key={i} className="h-10 rounded-lg bg-muted animate-pulse" />)}
+          </div>
+        ) : entries.length === 0 ? (
+          <EmptyState icon={Database} title="Sin entradas" description="El caché está vacío por ahora." />
+        ) : (
+          <ul className="space-y-2 max-h-96 overflow-y-auto">
+            {entries.map((entry) => (
+              <li key={entry.key} className="flex items-center gap-3 rounded-lg border px-3 py-2 bg-muted/30">
+                <p className="text-13 flex-1 min-w-0 truncate" title={entry.question}>{entry.question}</p>
+                <Button
+                  variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
+                  onClick={() => handleDelete(entry)}
+                  disabled={deletingKey === entry.key}
+                >
+                  {deletingKey === entry.key ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </Modal>
+  );
 }
 
 const CacheConfigCard = forwardRef<CacheConfigCardHandle>(function CacheConfigCard(_props, ref) {
@@ -42,6 +112,7 @@ const CacheConfigCard = forwardRef<CacheConfigCardHandle>(function CacheConfigCa
   const [threshold, setThreshold] = useState(0.9);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState<{ enabled: boolean; ttlHours: number; threshold: number } | null>(null);
+  const [showEntries, setShowEntries] = useState(false);
 
   useImperativeHandle(ref, () => ({ refetch }), [refetch]);
 
@@ -87,8 +158,15 @@ const CacheConfigCard = forwardRef<CacheConfigCardHandle>(function CacheConfigCa
             {data ? ` Entradas actuales: ${data.total_entries}.` : ""}
           </p>
         </div>
+        {!!data?.total_entries && (
+          <Button variant="ghost" size="sm" className="gap-1.5 shrink-0 text-13" onClick={() => setShowEntries(true)}>
+            <List className="w-3.5 h-3.5" /> Ver entradas
+          </Button>
+        )}
         <Switch checked={enabled} onCheckedChange={setEnabled} aria-label="Activar caché" />
       </div>
+
+      <CacheEntriesModal open={showEntries} onClose={() => setShowEntries(false)} onChanged={refetch} />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
         <div>

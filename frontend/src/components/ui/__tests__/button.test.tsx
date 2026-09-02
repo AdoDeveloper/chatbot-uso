@@ -36,9 +36,9 @@ describe("Button", () => {
   it("applies the destructive variant class", () => {
     render(<Button variant="destructive">Borrar</Button>);
     const btn = screen.getByRole("button", { name: "Borrar" });
-    // Test the public-facing data attribute that styling hooks off.
+    // Prueba el data attribute público del que dependen los estilos.
     expect(btn).toHaveAttribute("data-slot", "button");
-    // The cva-generated class for destructive includes "destructive" somewhere.
+    // La clase generada por cva para destructive incluye "destructive" en algún lugar.
     expect(btn.className).toMatch(/destructive/);
   });
 });

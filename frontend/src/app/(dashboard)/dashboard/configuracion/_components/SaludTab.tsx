@@ -29,7 +29,7 @@ function fmtDuration(s: number | null): string {
 }
 
 function fmtRelative(iso: string | null): string {
-  if (!iso) return "—";
+  if (!iso) return "N/A";
   const ms = Date.now() - new Date(iso).getTime();
   const min = Math.floor(ms / 60_000);
   if (min < 1) return "hace un momento";
@@ -109,9 +109,12 @@ export const SaludTab = forwardRef<SaludTabHandle>(function SaludTab(_props, ref
 
   useEffect(() => {
     if (autoRefreshSec <= 0) return;
-    const handle = setInterval(() => { void check(); }, autoRefreshSec * 1000);
+    const handle = setInterval(() => {
+      if (checking) return;
+      void check();
+    }, autoRefreshSec * 1000);
     return () => clearInterval(handle);
-  }, [autoRefreshSec, check]);
+  }, [autoRefreshSec, check, checking]);
 
 
   if (loading && !health) {
@@ -119,7 +122,14 @@ export const SaludTab = forwardRef<SaludTabHandle>(function SaludTab(_props, ref
   }
 
   if (!health) {
-    return <div className="text-center py-16 text-sm text-muted-foreground">No se pudo conectar al backend.</div>;
+    return (
+      <EmptyState
+        icon={AlertTriangle}
+        title="No se pudo conectar al backend"
+        description="Verifique la conexión e intente de nuevo."
+        className="py-16"
+      />
+    );
   }
 
   const degraded = health.services.filter((s) => s.status !== "ok");
@@ -179,7 +189,7 @@ export const SaludTab = forwardRef<SaludTabHandle>(function SaludTab(_props, ref
         </div>
       </div>
 
-      {/* Services table — ahora con uptime y P50/P95/P99. El selector de
+      {/* Services table - ahora con uptime y P50/P95/P99. El selector de
           rango de fechas vive aquí porque afecta tanto esta tabla (uptime/
           P50-P95-P99) como la de incidentes debajo. */}
       <Card className="overflow-hidden">
@@ -234,24 +244,24 @@ export const SaludTab = forwardRef<SaludTabHandle>(function SaludTab(_props, ref
                       }`}>
                         {u.uptime_pct.toFixed(1)}%
                       </span>
-                    ) : <span className="text-sm text-muted-foreground">—</span>}
+                    ) : <span className="text-sm text-muted-foreground">N/A</span>}
                   </TableCell>
                   <TableCell className="text-right text-sm tabular-nums hidden sm:table-cell">
-                    {u?.p50_ms != null ? `${Math.round(u.p50_ms)}ms` : <span className="text-muted-foreground">—</span>}
+                    {u?.p50_ms != null ? `${Math.round(u.p50_ms)}ms` : <span className="text-muted-foreground">N/A</span>}
                   </TableCell>
                   <TableCell className="text-right text-sm tabular-nums hidden sm:table-cell">
                     {u?.p95_ms != null ? (
                       <span className={u.p95_ms > 500 ? "text-warning font-medium" : ""}>
                         {Math.round(u.p95_ms)}ms
                       </span>
-                    ) : <span className="text-muted-foreground">—</span>}
+                    ) : <span className="text-muted-foreground">N/A</span>}
                   </TableCell>
                   <TableCell className="text-right text-sm tabular-nums hidden md:table-cell">
                     {u?.p99_ms != null ? (
                       <span className={u.p99_ms > 1000 ? "text-destructive font-medium" : ""}>
                         {Math.round(u.p99_ms)}ms
                       </span>
-                    ) : <span className="text-muted-foreground">—</span>}
+                    ) : <span className="text-muted-foreground">N/A</span>}
                   </TableCell>
                 </TableRow>
               );
@@ -266,7 +276,7 @@ export const SaludTab = forwardRef<SaludTabHandle>(function SaludTab(_props, ref
         )}
       </Card>
 
-      {/* Resource utilization */}
+      {/* Uso de recursos */}
       {latestSnapshot && (latestSnapshot.cpu_percent != null || latestSnapshot.mem_percent != null) && (
         <Card className="p-4">
           <div className="flex items-center gap-1.5 mb-3">
@@ -313,8 +323,8 @@ export const SaludTab = forwardRef<SaludTabHandle>(function SaludTab(_props, ref
               </TableRow>
             </TableHeader>
             <TableBody>
-              {incidents.slice(0, 30).map((inc, i) => (
-                <TableRow key={i}>
+              {incidents.slice(0, 30).map((inc) => (
+                <TableRow key={`${inc.service_name}-${inc.started_at}`}>
                   <TableCell className="font-medium">{inc.service_name}</TableCell>
                   <TableCell className="text-2xs text-muted-foreground tabular-nums">
                     {formatInProjectTz(inc.started_at, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
@@ -326,7 +336,7 @@ export const SaludTab = forwardRef<SaludTabHandle>(function SaludTab(_props, ref
                   </TableCell>
                   <TableCell className="text-xs tabular-nums text-muted-foreground">{inc.samples}</TableCell>
                   <TableCell className="text-2xs font-mono text-muted-foreground truncate max-w-md">
-                    {inc.last_error ?? "—"}
+                    {inc.last_error ?? "N/A"}
                   </TableCell>
                 </TableRow>
               ))}
@@ -336,7 +346,7 @@ export const SaludTab = forwardRef<SaludTabHandle>(function SaludTab(_props, ref
         )}
       </Card>
 
-      {/* Compute info */}
+      {/* Información de cómputo */}
       {health.compute && (
         <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-2xs text-muted-foreground px-1">
           <span>Versión: <span className="font-medium text-foreground">{health.version}</span></span>
@@ -367,7 +377,7 @@ function ResourceBar({ label, value, icon: Icon }: {
           {label}
         </div>
         <span className={`text-sm font-bold tabular-nums ${textCls}`}>
-          {value != null ? `${value.toFixed(1)}%` : "—"}
+          {value != null ? `${value.toFixed(1)}%` : "N/A"}
         </span>
       </div>
       <div className="h-1.5 bg-muted rounded-full overflow-hidden">

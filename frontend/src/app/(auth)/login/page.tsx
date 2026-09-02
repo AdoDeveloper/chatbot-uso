@@ -112,17 +112,17 @@ function LoginContent() {
         }
       `}</style>
 
-      {/* Animated grid overlay */}
+      {/* Overlay de grid animado */}
       <div className="login-grid-bg absolute inset-0 pointer-events-none" />
 
-      {/* Main content */}
+      {/* Contenido principal */}
       <div className="relative flex-1 flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-sm">
 
-        {/* Card */}
+        {/* Tarjeta */}
         <div className="bg-card rounded-xl shadow-md overflow-hidden border border-border">
 
-          {/* Brand header */}
+          {/* Encabezado de marca */}
           <div className="bg-sidebar px-8 py-6 flex flex-col items-center text-center gap-2">
             <img src="/logo_uso.png" alt="Universidad de Sonsonate" className="w-full max-w-[180px] h-auto object-contain" />
             <div>
@@ -135,7 +135,7 @@ function LoginContent() {
             </div>
           </div>
 
-          {/* Body */}
+          {/* Cuerpo */}
           <div className="px-8 pt-7 pb-5">
             <h1 className="text-xl font-semibold text-foreground mb-6">
               Acceder
@@ -148,7 +148,7 @@ function LoginContent() {
               </Alert>
             )}
 
-            {/* Loading skeleton */}
+            {/* Skeleton de carga */}
             {providersLoading && (
               <div className="flex justify-center py-8">
                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -158,7 +158,7 @@ function LoginContent() {
             {!providersLoading && providers && (
               <div className="space-y-4">
 
-                {/* Credentials form */}
+                {/* Formulario de credenciales */}
                 {providers.credentials && (
                   <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                     <div className="space-y-1.5">
@@ -211,7 +211,7 @@ function LoginContent() {
                   </form>
                 )}
 
-                {/* Divider */}
+                {/* Separador */}
                 {showBoth && (
                   <div className="relative">
                     <div className="absolute inset-0 flex items-center">
@@ -225,7 +225,7 @@ function LoginContent() {
                   </div>
                 )}
 
-                {/* Microsoft SSO */}
+                {/* SSO de Microsoft */}
                 {providers.microsoft && (
                   <Button
                     type="button"

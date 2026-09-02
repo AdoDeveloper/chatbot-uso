@@ -7,14 +7,11 @@ interface PageHeaderProps {
   action?: React.ReactNode;
   badge?: React.ReactNode;
   icon?: LucideIcon;
-  /** Tooltip informativo (ⓘ) junto al título — qué es esta vista y para qué sirve. */
+  /** Tooltip informativo (ⓘ) junto al título - qué es esta vista y para qué sirve. */
   tip?: React.ReactNode;
 }
 
-// La prop `description` se mantiene por compatibilidad con los llamadores
-// existentes, pero ya no se renderiza: el estándar del panel pasó a mostrar
-// solo el título de página, sin subtítulo redundante debajo. Para dar
-// contexto adicional sin ocupar espacio permanente, usar `tip` en su lugar.
+// `description` no se renderiza (el estándar del panel es solo título, sin subtítulo); usar `tip` para contexto adicional.
 export function PageHeader({ title, action, badge, icon: Icon, tip }: PageHeaderProps) {
   return (
     <div className="flex items-center justify-between gap-2 mb-6 pb-5 border-b border-border">

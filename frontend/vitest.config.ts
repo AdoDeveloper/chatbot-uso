@@ -11,7 +11,7 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  // Disable PostCSS auto-discovery — the Tailwind v4 postcss.config.mjs uses
+  // Disable PostCSS auto-discovery - the Tailwind v4 postcss.config.mjs uses
   // the new "@tailwindcss/postcss" plugin which Vite's PostCSS pipeline can't
   // load. Tests don't need CSS anyway.
   css: { postcss: { plugins: [] } },

@@ -37,7 +37,7 @@ function DateRangeFilter({
   showLabels = false,
 }: DateRangeFilterProps) {
   // Estándar: grid de 2 columnas fijas (nunca flex+separador, que rompía el
-  // layout en mobile) — cada input ocupa su celda al 100%, sin desbordes.
+  // layout en mobile) - cada input ocupa su celda al 100%, sin desbordes.
   const inputClass = cn(SIZE_CLASS[size], "w-full min-w-0")
   const labelClass = "text-2xs font-medium text-muted-foreground block mb-1"
   const visibleFrom = fromLabel.length > 12 ? "Desde" : fromLabel

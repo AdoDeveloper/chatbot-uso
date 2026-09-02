@@ -13,13 +13,9 @@ export function UnpublishedBanner() {
  if (!show) return null;
 
  return (
-  // Mismo patrón que el resto de avisos de warning del sistema (ver
-  // estadisticas/page.tsx): fondo tenue + acento de borde izquierdo, texto
-  // en text-foreground (no text-warning-foreground, pensado para fondo
-  // sólido — sobre bg-warning/10 quedaría casi blanco sobre casi blanco).
-  <div className="flex items-center gap-2.5 rounded-lg border-l-4 border-warning bg-warning/10 px-4 py-2.5 text-sm shadow-sm mb-5">
+  <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 rounded-lg border-l-4 border-warning bg-warning/10 px-4 py-2.5 text-sm shadow-sm mb-5">
    <AlertTriangle className="w-4 h-4 shrink-0 text-warning" />
-   <span className="flex-1 text-foreground">
+   <span className="flex-1 min-w-48 text-foreground">
     Hay cambios sin publicar. Los usuarios del widget siguen viendo la última versión publicada.
    </span>
    <Link

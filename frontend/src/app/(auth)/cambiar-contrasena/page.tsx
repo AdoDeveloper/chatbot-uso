@@ -31,7 +31,9 @@ const schema = z
 type FormData = z.infer<typeof schema>;
 
 export default function CambiarContrasenaPage() {
-  const { refreshUser } = useAuth();
+  const { user, refreshUser } = useAuth();
+  // Distingue redirect forzado (contraseña temporal) de acceso voluntario.
+  const isForced = user?.must_change_password ?? false;
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [serverError, setServerError] = useState("");
@@ -77,7 +79,7 @@ export default function CambiarContrasenaPage() {
         <div className="w-full max-w-sm">
           <div className="bg-card rounded-xl shadow-md overflow-hidden border border-border">
 
-            {/* Header */}
+            {/* Encabezado */}
             <div className="bg-sidebar px-8 py-6 flex items-center gap-4">
               <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-white/10 shrink-0">
                 <Bot className="w-5 h-5 text-white" />
@@ -92,16 +94,18 @@ export default function CambiarContrasenaPage() {
               </div>
             </div>
 
-            {/* Body */}
+            {/* Cuerpo */}
             <div className="px-8 pt-7 pb-5">
               <div className="flex items-center gap-2 mb-1">
                 <KeyRound className="w-5 h-5 text-primary" />
                 <h1 className="text-xl font-semibold text-foreground">
-                  Cambie su contraseña
+                  {isForced ? "Cambie su contraseña" : "Cambiar contraseña"}
                 </h1>
               </div>
               <p className="text-sm text-muted-foreground mb-6">
-                Por seguridad debe establecer una contraseña personal antes de continuar.
+                {isForced
+                  ? "Por seguridad debe establecer una contraseña personal antes de continuar."
+                  : "Ingrese su contraseña actual y la nueva contraseña que desea usar."}
               </p>
 
               {serverError && (

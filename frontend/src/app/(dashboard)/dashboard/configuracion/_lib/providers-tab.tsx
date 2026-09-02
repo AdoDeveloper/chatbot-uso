@@ -11,7 +11,7 @@ import {
  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
  DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useApi, getErrorMessage } from "@/hooks/use-api";
+import { useApi, getErrorMessage, invalidateApiCache } from "@/hooks/use-api";
 import { useToast } from "@/components/ui/toast";
 import type { LLMProvider } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -162,9 +162,10 @@ function ProviderPanel({ editing, onClose, onSaved }: {
     priority: form.priority !== "" ? Number(form.priority) : null,
    };
    if (form.api_key) payload.api_key = form.api_key;
-   if (editing) { await api.patch(`/providers/${editing.id}`, payload); }
-   else { await api.post("/providers", payload); }
-   onSaved(); onClose();
+    invalidateApiCache("/providers");
+    if (editing) { await api.patch(`/providers/${editing.id}`, payload); }
+    else { await api.post("/providers", payload); }
+    onSaved(); onClose();
   } catch (err) {
    toast({ type: "error", message: getErrorMessage(err, "No se pudo guardar.") });
   } finally { setSaving(false); }
@@ -314,11 +315,6 @@ function ProviderPanel({ editing, onClose, onSaved }: {
  );
 }
 
-// Modal estándar central (antes "SlideOver"). Reusa el <Modal> compuesto para
-// mantener consistencia: header arriba, sin X, y el footer lo aporta el
-// contenido (ProviderPanel) conservando su propio bloque de botones.
-
-
 export function ProvidersTab() {
  const { toast, confirm } = useToast();
  const { data: providersData, loading, refetch: fetchProviders, setData: setProviders } =
@@ -335,10 +331,11 @@ export function ProvidersTab() {
   if (deletingId) return;
   const ok = await confirm({ title: `¿Eliminar "${p.name}"?`, confirmText: "Eliminar", variant: "danger" });
   if (!ok) return;
-  setDeletingId(p.id);
-  try {
-   await api.delete(`/providers/${p.id}`);
-   fetchProviders();
+   setDeletingId(p.id);
+   try {
+    invalidateApiCache("/providers");
+    await api.delete(`/providers/${p.id}`);
+    fetchProviders();
   } catch (err) {
    toast({ type: "error", message: getErrorMessage(err, "No se pudo eliminar el proveedor.") });
   } finally {
@@ -347,8 +344,14 @@ export function ProvidersTab() {
  }
 
  async function handleSetPriority(p: LLMProvider, priority: number | null) {
-  await api.patch(`/providers/${p.id}`, { priority });
-  fetchProviders();
+  invalidateApiCache("/providers");
+  try {
+    await api.patch(`/providers/${p.id}`, { priority });
+    fetchProviders();
+    toast({ type: "success", message: priority === null ? "Proveedor quitado de la cadena." : "Proveedor agregado a la cadena.", duration: 1500 });
+  } catch (err) {
+    toast({ type: "error", message: getErrorMessage(err, "No se pudo actualizar la posición del proveedor.") });
+  }
  }
 
  async function handleQuickTest(p: LLMProvider) {
@@ -373,7 +376,7 @@ export function ProvidersTab() {
  const offChainProviders = providers.filter((p) => p.priority === null);
 
  async function persistReorder(reordered: LLMProvider[]) {
-  // Optimistic
+  // Actualización optimista
   setProviders((prev) => {
    const map = new Map(reordered.map((p, i) => [p.id, i + 1]));
    return (prev ?? []).map((p) => map.has(p.id) ? { ...p, priority: map.get(p.id)! } : p);
@@ -383,11 +386,12 @@ export function ProvidersTab() {
     ...reordered.map((p, i) => ({ id: p.id, priority: i + 1 })),
     ...offChainProviders.map((p) => ({ id: p.id, priority: null })),
    ];
+   invalidateApiCache("/providers");
    await api.post("/providers/reorder", { items });
-  } catch (err) {
-   toast({ type: "error", message: getErrorMessage(err, "No se pudo reordenar la cadena.") });
-   fetchProviders();
-  }
+   } catch (err) {
+    toast({ type: "error", message: getErrorMessage(err, "No se pudo reordenar la cadena.") });
+    fetchProviders();
+   }
  }
  async function moveInChain(idx: number, direction: -1 | 1) {
   const targetIdx = idx + direction;
@@ -447,7 +451,7 @@ export function ProvidersTab() {
         <TableHead className="hidden md:table-cell">Modelo</TableHead>
         <TableHead className="w-28 hidden sm:table-cell">Estado</TableHead>
         <TableHead className="w-32 hidden lg:table-cell">Salud</TableHead>
-         <TableHead className="w-14 text-right" sticky>Acciones</TableHead>
+         <TableHead className="whitespace-nowrap text-right" sticky>Acciones</TableHead>
        </TableRow>
       </TableHeader>
       <TableBody>
@@ -497,7 +501,7 @@ export function ProvidersTab() {
  );
 }
 
-// ProviderRow — fila de tabla reutilizable para cadena y fuera-de-cadena
+// ProviderRow - fila de tabla reutilizable para cadena y fuera-de-cadena
 interface ProviderRowProps {
  p: LLMProvider;
  inChain: boolean;
@@ -546,7 +550,7 @@ function ProviderRow({
       </div>
      </div>
     ) : (
-     <span className="text-muted-foreground">—</span>
+     <span className="text-muted-foreground">N/A</span>
     )}
    </TableCell>
    <TableCell className="max-w-32 sm:max-w-none">
@@ -565,7 +569,7 @@ function ProviderRow({
      {healthBadge.label}
     </span>
    </TableCell>
-   <TableCell sticky>
+   <TableCell sticky className="whitespace-nowrap">
      <DropdownMenu>
       <DropdownMenuTrigger asChild>
        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground">

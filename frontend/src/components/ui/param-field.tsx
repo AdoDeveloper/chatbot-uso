@@ -16,19 +16,19 @@ interface ParamFieldProps {
     learnMoreHref?: string;
   };
   children: React.ReactNode;
-  /** Optional value displayed next to the label, e.g. the current slider value */
+  /** Valor opcional mostrado junto al label, ej. el valor actual del slider */
   valueBadge?: React.ReactNode;
   className?: string;
   htmlFor?: string;
 }
 
 /**
- * Standard wrapper for configuration/form inputs.
- * Ensures every editable parameter in the app has: label + optional value badge
- * + optional HelpTip + optional hint text + inline error.
+ * Wrapper estándar para inputs de configuración/formularios.
+ * Garantiza que cada parámetro editable de la app tenga: label + badge de valor
+ * opcional + HelpTip opcional + texto de ayuda opcional + error inline.
  *
- * Use this everywhere config is edited so the user never faces a bare input
- * without knowing what it does.
+ * Se usa en todo lugar donde se edite configuración, para que el usuario
+ * nunca enfrente un input sin saber qué hace.
  */
 export function ParamField({
   label,

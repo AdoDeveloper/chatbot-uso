@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
  Copy, Check, Plus, X, ChevronRight, Eye,
 } from "lucide-react";
 
 import api from "@/lib/api";
-import { useApi, getErrorMessage } from "@/hooks/use-api";
+import { useApi, getErrorMessage, invalidateApiCache } from "@/hooks/use-api";
 import { useToast } from "@/components/ui/toast";
 import type { WidgetConfig } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -15,9 +15,8 @@ import { Input } from "@/components/ui/input";
 import { SegmentedControl } from "@/components/composed/segmented-control";
 import { FloatingSaveBar } from "./save-bar";
 import { Loading } from "@/components/ui/loading";
+import { CsatReasonsManager } from "../_components/CsatReasonsManager";
 
-// Lightweight inline disclosure — used inside a card to hide secondary toggles
-// behind a "Más opciones" link. Doesn't render its own card chrome.
 function InlineDisclosure({ label, children }: { label: string; children: React.ReactNode }) {
  const [open, setOpen] = useState(false);
  return (
@@ -74,8 +73,9 @@ function WidgetApiKey({ config, onRegenerated }: {
   if (!ok) return;
   setRegenerating(true);
   try {
-   const { data } = await api.post<WidgetConfig>("/widget/regenerate-key");
-   onRegenerated(data);
+   invalidateApiCache("/widget/config");
+    const { data } = await api.post<WidgetConfig>("/widget/regenerate-key");
+    onRegenerated(data);
    toast({ type: "success", message: "Clave regenerada correctamente." });
   } catch (err) {
    toast({ type: "error", message: getErrorMessage(err, "No se pudo regenerar la clave.") });
@@ -106,6 +106,8 @@ function WidgetApiKey({ config, onRegenerated }: {
  );
 }
 
+const DOMAIN_RE = /^(\*\.)?[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i;
+
 function DomainAllowlist({
  config, setConfig,
 }: {
@@ -113,24 +115,31 @@ function DomainAllowlist({
  setConfig: React.Dispatch<React.SetStateAction<WidgetConfig | null>>;
 }) {
  const [newDomain, setNewDomain] = useState("");
+ const [domainError, setDomainError] = useState<string | null>(null);
 
  if (!config) return null;
  const domains = config.domain_allowlist ?? [];
 
  function addDomain() {
   const d = newDomain.trim().toLowerCase();
-  if (!d || domains.includes(d)) return;
+  if (!d) return;
+  if (!DOMAIN_RE.test(d)) {
+   setDomainError("Formato de dominio inválido. Ej: ejemplo.com o *.ejemplo.com");
+   return;
+  }
+  if (domains.includes(d)) {
+   setDomainError(null);
+   return;
+  }
   setConfig((c) => c ? { ...c, domain_allowlist: [...(c.domain_allowlist ?? []), d] } : c);
   setNewDomain("");
+  setDomainError(null);
  }
 
  function removeDomain(domain: string) {
   setConfig((c) => c ? { ...c, domain_allowlist: (c.domain_allowlist ?? []).filter((x) => x !== domain) } : c);
  }
 
- // Sin botón "Guardar" propio: los dominios editan el mismo estado que el
- // resto del tab y se persisten con la barra flotante global — antes había
- // dos botones de guardado con alcances distintos en la misma pantalla.
  return (
   <div className="bg-card border border-border rounded-xl shadow-sm p-6">
    <div className="flex items-center justify-between mb-1">
@@ -139,10 +148,10 @@ function DomainAllowlist({
    <p className="text-13 text-muted-foreground mb-4">
     Sitios web que pueden cargar el widget. Usa <code className="text-xs bg-muted px-1 rounded">*.ejemplo.com</code> para incluir subdominios. Si la lista está vacía, cualquier sitio puede usarlo.
    </p>
-   <div className="flex gap-2 mb-3">
+   <div className={`flex gap-2 ${domainError ? "mb-1.5" : "mb-3"}`}>
     <Input
      value={newDomain}
-     onChange={(e) => setNewDomain(e.target.value)}
+     onChange={(e) => { setNewDomain(e.target.value); setDomainError(null); }}
      onKeyDown={(e) => e.key === "Enter" && addDomain()}
      placeholder="ejemplo.com o *.ejemplo.com"
      className="flex-1"
@@ -151,6 +160,7 @@ function DomainAllowlist({
      <Plus className="w-3.5 h-3.5" />
     </Button>
    </div>
+   {domainError && <p className="text-2xs text-destructive mb-3">{domainError}</p>}
    {domains.length > 0 ? (
     <div className="space-y-1.5">
      {domains.map((d) => (
@@ -163,19 +173,15 @@ function DomainAllowlist({
      ))}
     </div>
    ) : (
-    <p className="text-2xs text-muted-foreground italic">Sin restricciones — el widget se puede incrustar en cualquier dominio.</p>
+    <p className="text-2xs text-muted-foreground italic">Sin restricciones · el widget se puede incrustar en cualquier dominio.</p>
    )}
   </div>
  );
 }
 
-// Selector visual de la esquina donde vive el widget. Grilla 2x2 con flechas
-// SVG apuntando hacia cada esquina. Sin emojis (regla del proyecto: solo SVG).
 type WidgetPosition = "bottom-right" | "bottom-left" | "top-right" | "top-left";
 
 function PositionPicker({ value, onChange }: { value: string; onChange: (p: WidgetPosition) => void }) {
- // Cada celda tiene su esquina target + el rotation del icono de flecha. La
- // flecha base apunta hacia abajo-derecha (45°), las demás se rotan.
  const POSITIONS: { id: WidgetPosition; label: string; rotate: number }[] = [
   { id: "top-left",     label: "Superior izquierda", rotate: 225 },
   { id: "top-right",    label: "Superior derecha",   rotate: 315 },
@@ -222,9 +228,6 @@ function PositionPicker({ value, onChange }: { value: string; onChange: (p: Widg
  );
 }
 
-
-// Límites en sync con backend (schemas/widget.py). Si cambian allá, actualizar
-// aquí también — el backend valida igual, así que TS solo es para UX.
 const MAX_PROACTIVE_LEN = 200;
 const MAX_SUGGESTIONS = 6;
 const MAX_SUGGESTION_LEN = 60;
@@ -240,12 +243,12 @@ function ProactiveMessageInput({ value, onChange }: { value: string; onChange: (
      type="text"
      value={value}
      onChange={(e) => onChange(e.target.value)}
-     placeholder='Ej: "¿Tenés dudas sobre la universidad? Preguntame."'
+     placeholder='Ej: "¿Tienes dudas sobre la universidad? Pregúntame."'
      maxLength={MAX_PROACTIVE_LEN + 20}  // tope con margen, validacion real abajo
      className={`pr-14 ${overLimit ? "border-destructive" : ""}`}
     />
     <span className={`absolute right-2 top-1/2 -translate-y-1/2 text-3xs tabular-nums ${
-     overLimit ? "text-destructive" : remaining < 30 ? "text-amber-600" : "text-muted-foreground"
+     overLimit ? "text-destructive" : remaining < 30 ? "text-warning" : "text-muted-foreground"
     }`}>
      {value.length}/{MAX_PROACTIVE_LEN}
     </span>
@@ -333,22 +336,10 @@ export type WidgetSubtab = "apariencia" | "integracion" | "limites";
 interface WidgetTabProps {
  subtab: WidgetSubtab;
  onPreview: () => void;
- /**
-  * Estado del config elevado al padre (página Asistente) para que el
-  * formulario de Apariencia y el preview funcional compartan el MISMO objeto
-  * y los cambios se reflejen en vivo. Si no se pasan, el componente maneja su
-  * propio estado (uso standalone).
-  */
  config?: WidgetConfig | null;
  setConfig?: React.Dispatch<React.SetStateAction<WidgetConfig | null>>;
 }
 
-/**
- * Contenido de las secciones Apariencia/Integración/Límites del chatbot.
- * La navegación entre subtabs la controla el padre (página Asistente) para
- * que viva en una sola fila de tabs junto a Identidad/Prompt/Previsualizar —
- * antes esto tenía su propia barra de tabs anidada.
- */
 export function WidgetTab({ subtab, onPreview, config: configProp, setConfig: setConfigProp }: WidgetTabProps) {
  const { toast } = useToast();
  const [snippetKind, setSnippetKind] = useState<"script" | "iframe">("script");
@@ -358,8 +349,6 @@ export function WidgetTab({ subtab, onPreview, config: configProp, setConfig: se
  const [saving, setSaving] = useState(false);
  const [copied, setCopied] = useState(false);
 
- // Si el padre provee estado, usamos ESE (fuente única compartida con el
- // preview); si no, el estado local propio.
  const config = configProp !== undefined ? configProp : configOwn;
  const setConfig = setConfigProp ?? setConfigOwn;
 
@@ -370,9 +359,10 @@ export function WidgetTab({ subtab, onPreview, config: configProp, setConfig: se
  const scriptTag = embedData?.script_tag ?? "";
  const iframeTag = embedData?.iframe_tag ?? "";
 
- // Sembrar el estado editable cuando llega la config del backend.
+ const seededRef = useRef(false);
  useEffect(() => {
-  if (!widgetData) return;
+  if (!widgetData || seededRef.current) return;
+  seededRef.current = true;
   setConfig(widgetData);
   setSavedConfig(widgetData);
   // Captación abierta si algún campo tiene contenido
@@ -381,7 +371,6 @@ export function WidgetTab({ subtab, onPreview, config: configProp, setConfig: se
    (widgetData.proactive_message ?? "") !== "" ||
    (widgetData.suggestions ?? []).length > 0
   );
-  // eslint-disable-next-line react-hooks/exhaustive-deps
  }, [widgetData]);
 
  const currentSnippet = snippetKind === "script" ? scriptTag : iframeTag;
@@ -394,14 +383,14 @@ export function WidgetTab({ subtab, onPreview, config: configProp, setConfig: se
    toast({ type: "error", message: "El nombre del chatbot no puede estar vacío." });
    return;
   }
-  setSaving(true);
-  try {
-   const { data } = await api.put<WidgetConfig>("/widget/config", config);
-   setConfig(data);
-   setSavedConfig(data);
-  } catch (err) {
-   // El backend devuelve mensajes de validación útiles (p. ej. contraste de
-   // color insuficiente). Se muestran al usuario en vez de un error genérico.
+   setSaving(true);
+   try {
+    invalidateApiCache("/widget/config");
+    const { data } = await api.put<WidgetConfig>("/widget/config", config);
+    setConfig(data);
+    setSavedConfig(data);
+    toast({ type: "success", message: "Configuración del widget guardada." });
+   } catch (err) {
    toast({ type: "error", message: getErrorMessage(err, "No se pudo guardar la configuración del widget.") });
   } finally { setSaving(false); }
  }
@@ -472,7 +461,7 @@ export function WidgetTab({ subtab, onPreview, config: configProp, setConfig: se
 
       </div>
 
-      {/* Apariencia — toggle primario visible, resto colapsado */}
+      {/* Apariencia - toggle primario visible, resto colapsado */}
       <div className="bg-card border border-border rounded-xl shadow-sm p-5 space-y-1">
        <h3 className="text-13 font-semibold uppercase tracking-wider text-muted-foreground mb-2">Apariencia</h3>
        <SettingToggle label="Mostrar icono del bot" description="Icono en el header y junto a cada respuesta."
@@ -514,6 +503,10 @@ export function WidgetTab({ subtab, onPreview, config: configProp, setConfig: se
           maxLength={200}
          />
          <p className="text-2xs text-muted-foreground mt-1">{(config.csat_question ?? "").length}/200 caracteres</p>
+         <div className="mt-3 pt-3 border-t border-border">
+          <label className="block text-xs font-medium text-muted-foreground mb-1.5">Motivos seleccionables</label>
+          <CsatReasonsManager />
+         </div>
         </div>
        )}
       </div>
@@ -611,11 +604,6 @@ export function WidgetTab({ subtab, onPreview, config: configProp, setConfig: se
   </div>
  );
 }
-
-//
-// Caps anti-abuso aplicados al widget público (independientes del rate limit
-// global por IP del sistema). Vivían en /publicacion antes; movidos aquí para
-// no duplicar configuración del widget en dos rutas.
 
 function WidgetUsageCaps({
  config, setConfig,

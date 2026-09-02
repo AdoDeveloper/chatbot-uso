@@ -4,11 +4,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
-  Plus, Database, Search, X, XCircle, Loader2,
+  Plus, Database, Search, X, XCircle, Loader2, RefreshCw, Trash2, Tag,
 } from "lucide-react";
 import api from "@/lib/api";
 import type { Source } from "@/types";
-import { useApi, getErrorMessage } from "@/hooks/use-api";
+import { useApi, getErrorMessage, invalidateApiCache } from "@/hooks/use-api";
 import { usePermission } from "@/hooks/use-permission";
 import { PERM } from "@/lib/permissions";
 import { useToast } from "@/components/ui/toast";
@@ -26,6 +26,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 
 import { SourceRow } from "./_components/SourceRow";
 import { AddSourcePanel } from "./_components/AddSourcePanel";
+import { ReplaceFileModal } from "./_components/ReplaceFileModal";
 import { mergeSources } from "./_components/sources-helpers";
 
 function SourcesListContent() {
@@ -44,8 +45,21 @@ function SourcesListContent() {
   const [panelOpen, setPanelOpen] = useState(false);
   const [reviewing, setReviewing] = useState<string | null>(null);
   const [rejectModal, setRejectModal] = useState<{ source: Source; reason: string; saving: boolean } | null>(null);
+  const [replaceFileSource, setReplaceFileSource] = useState<Source | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkTagInput, setBulkTagInput] = useState("");
   const sourcesRef = useRef(sources);
   sourcesRef.current = sources;
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+  function clearSelection() { setSelectedIds(new Set()); }
 
   useEffect(() => {
     if (error) toast({ type: "error", message: "No se pudo cargar la base de conocimiento." });
@@ -65,8 +79,13 @@ function SourcesListContent() {
 
   const handleReingest = async (s: Source) => {
     setSources((prev) => prev.map((x) => x.id === s.id ? { ...x, status: "pending" as const, error_message: null, progress_stage: null } : x));
-    try { await api.post(`/sources/${s.id}/ingest`); }
-    catch { load(); }
+    try {
+      invalidateApiCache("/sources");
+      await api.post(`/sources/${s.id}/ingest`);
+    } catch (err: unknown) {
+      toast({ type: "error", message: getErrorMessage(err, "No se pudo reiniciar la ingesta.") });
+      load();
+    }
   };
 
   const handleDelete = async (s: Source) => {
@@ -77,8 +96,10 @@ function SourcesListContent() {
     });
     if (!ok) return;
     try {
+      invalidateApiCache("/sources");
       await api.delete(`/sources/${s.id}`);
       setSources((prev) => prev.filter((x) => x.id !== s.id));
+      toast({ type: "success", message: "Fuente eliminada." });
     } catch (err: unknown) {
       toast({ type: "error", message: getErrorMessage(err, "No se pudo eliminar la fuente.") });
     }
@@ -94,6 +115,7 @@ function SourcesListContent() {
 
     setReviewing(s.id);
     try {
+      invalidateApiCache("/sources");
       const { data } = await api.post(`/sources/${s.id}/approve`);
       setSources((prev) => prev.map((x) => x.id === s.id
         ? { ...x, review_status: "aprobada" as const, reviewed_at: data.reviewed_at, reviewed_by_name: data.reviewed_by_name }
@@ -116,6 +138,7 @@ function SourcesListContent() {
     setRejectModal((m) => m ? { ...m, saving: true } : null);
     setReviewing(source.id);
     try {
+      invalidateApiCache("/sources");
       await api.post(`/sources/${source.id}/reject`, { reason: reason.trim() });
       setSources((prev) => prev.map((x) => x.id === source.id
         ? { ...x, review_status: "rechazada" as const, rejection_reason: reason.trim() }
@@ -130,6 +153,62 @@ function SourcesListContent() {
     }
   };
 
+  async function bulkDeleteSelected() {
+    const ok = await confirm({
+      title: `¿Eliminar ${selectedIds.size} fuentes?`,
+      message: "Se eliminarán todos los vectores del índice de cada una.",
+      confirmText: "Eliminar", variant: "danger",
+    });
+    if (!ok) return;
+    setBulkBusy(true);
+    try {
+      invalidateApiCache("/sources");
+      await api.post("/sources/bulk/delete", { source_ids: Array.from(selectedIds) });
+      setSources((prev) => prev.filter((s) => !selectedIds.has(s.id)));
+      toast({ type: "success", message: `${selectedIds.size} fuentes eliminadas.` });
+      clearSelection();
+    } catch (err) {
+      toast({ type: "error", message: getErrorMessage(err, "Error al eliminar fuentes.") });
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
+  async function bulkReingestSelected() {
+    setBulkBusy(true);
+    try {
+      invalidateApiCache("/sources");
+      const { data } = await api.post<{ queued: number }>("/sources/bulk/reingest", { source_ids: Array.from(selectedIds) });
+      toast({ type: "success", message: `${data.queued} fuentes en cola de reingesta.` });
+      clearSelection();
+      load();
+    } catch (err) {
+      toast({ type: "error", message: getErrorMessage(err, "Error al reingestar fuentes.") });
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
+  async function bulkTagSelected(action: "add" | "remove") {
+    if (!bulkTagInput.trim()) return;
+    setBulkBusy(true);
+    try {
+      await api.post("/sources/bulk/tag", {
+        source_ids: Array.from(selectedIds),
+        tags: [bulkTagInput.trim()],
+        action,
+      });
+      toast({ type: "success", message: "Etiquetas actualizadas." });
+      setBulkTagInput("");
+      clearSelection();
+      load();
+    } catch (err) {
+      toast({ type: "error", message: getErrorMessage(err, "Error al aplicar etiquetas.") });
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
   const allTags = Array.from(new Set(sources.flatMap((s) => s.tags ?? [])));
 
   const filtered = sources.filter((s) => {
@@ -139,6 +218,7 @@ function SourcesListContent() {
   });
 
   useEffect(() => { setPage(1); }, [search, activeTagFilter]);
+  useEffect(() => { clearSelection(); }, [search, activeTagFilter, page]);
   const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
 
   const ready = sources.filter((s) => s.status === "ready").length;
@@ -228,13 +308,14 @@ function SourcesListContent() {
         )}
 
         <DataTable
+          noCard
           loading={loading}
           skeleton={<div className="p-5 space-y-3">{[1,2,3].map(i => <div key={i} className="h-14 rounded-lg border bg-muted/30 animate-pulse" />)}</div>}
           empty={
             <EmptyState
               icon={Database}
-              title="Sin fuentes de datos"
-              description="Agrega un archivo o URL para comenzar"
+              title="Sin documentos"
+              description="Agrega un archivo para comenzar"
               action={can(PERM.KNOWLEDGE_UPDATE) ? (
                 <Button variant="outline" size="sm" onClick={() => setPanelOpen(true)} className="gap-1.5">
                   <Plus className="w-3.5 h-3.5" /> Agregar
@@ -245,12 +326,37 @@ function SourcesListContent() {
           }
           pagination={{ page, pageSize, total: filtered.length, onPageChange: setPage, onPageSizeChange: (n) => { setPageSize(n); setPage(1); } }}
           columns={[
-            { id: "fuente", header: "Fuente" },
+            {
+              id: "sel",
+              header: (
+                <input
+                  type="checkbox"
+                  checked={paginated.length > 0 && paginated.every((s) => selectedIds.has(s.id))}
+                  onChange={() => {
+                    setSelectedIds((prev) => {
+                      const allSelected = paginated.length > 0 && paginated.every((s) => prev.has(s.id));
+                      if (allSelected) {
+                        const next = new Set(prev);
+                        paginated.forEach((s) => next.delete(s.id));
+                        return next;
+                      }
+                      const next = new Set(prev);
+                      paginated.forEach((s) => next.add(s.id));
+                      return next;
+                    });
+                  }}
+                  className="h-3.5 w-3.5 accent-primary cursor-pointer"
+                  title="Seleccionar todos"
+                />
+              ),
+              className: "w-8",
+            },
+            { id: "fuente", header: "Documento" },
             { id: "estado", header: "Estado", className: "w-24", hideBelow: "sm" },
             { id: "revision", header: "Revisión", className: "w-28", hideBelow: "sm" },
             { id: "chunks", header: "Chunks", className: "w-24", hideBelow: "md" },
             { id: "etiquetas", header: "Etiquetas", className: "w-56", hideBelow: "lg" },
-            { id: "acciones", header: "Acciones", className: "w-16 text-right", sticky: true },
+            { id: "acciones", header: "Acciones", className: "whitespace-nowrap text-right", sticky: true },
           ]}
           data={paginated}
           rowKey={(s) => s.id}
@@ -258,16 +364,61 @@ function SourcesListContent() {
             <SourceRow
               source={s}
               reviewing={reviewing}
+              selected={selectedIds.has(s.id)}
+              onToggleSelect={toggleSelect}
               onReingest={handleReingest}
               onDelete={handleDelete}
               onApprove={handleApprove}
               onReject={handleReject}
+              onReplaceFile={setReplaceFileSource}
               onUpdated={load}
             />
           )}
         />
+
+        {selectedIds.size > 0 && (can(PERM.KNOWLEDGE_UPDATE) || can(PERM.KNOWLEDGE_DELETE)) && (
+          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-card border border-primary/40 shadow-xl rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap max-w-[95vw]">
+            <span className="text-13 font-medium tabular-nums">
+              {selectedIds.size} seleccionada{selectedIds.size !== 1 ? "s" : ""}
+            </span>
+            <Button size="sm" variant="ghost" onClick={clearSelection} className="h-7 px-2 text-xs">
+              <X className="w-3 h-3 mr-1" /> Limpiar
+            </Button>
+            {can(PERM.KNOWLEDGE_UPDATE) && (
+              <>
+                <div className="h-6 w-px bg-border" />
+                <Button size="sm" variant="outline" onClick={bulkReingestSelected} disabled={bulkBusy} className="gap-1.5 text-xs h-7">
+                  {bulkBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                  Reingestar
+                </Button>
+                <div className="h-6 w-px bg-border" />
+                <Input
+                  value={bulkTagInput}
+                  onChange={(e) => setBulkTagInput(e.target.value)}
+                  placeholder="tag..."
+                  className="h-7 text-xs w-28"
+                />
+                <Button size="sm" variant="outline" onClick={() => bulkTagSelected("add")} disabled={bulkBusy || !bulkTagInput.trim()} className="gap-1.5 text-xs h-7">
+                  <Tag className="w-3 h-3" /> +Tag
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => bulkTagSelected("remove")} disabled={bulkBusy || !bulkTagInput.trim()} className="gap-1.5 text-xs h-7 text-muted-foreground">
+                  −Tag
+                </Button>
+              </>
+            )}
+            {can(PERM.KNOWLEDGE_DELETE) && (
+              <>
+                <div className="h-6 w-px bg-border" />
+                <Button size="sm" variant="destructive" onClick={bulkDeleteSelected} disabled={bulkBusy} className="gap-1.5 text-xs h-7">
+                  {bulkBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                  Eliminar
+                </Button>
+              </>
+            )}
+          </div>
+        )}
       </Card>
-      {/* Reject reason dialog */}
+      {/* Diálogo de motivo de rechazo */}
       <Modal
         open={!!rejectModal}
         onClose={() => { if (!rejectModal?.saving) setRejectModal(null); }}
@@ -275,7 +426,7 @@ function SourcesListContent() {
         title={
           <span className="flex items-center gap-2">
             <XCircle className="w-4 h-4 text-destructive" />
-            Rechazar fuente
+            Rechazar documento
           </span>
         }
         footer={
@@ -304,7 +455,7 @@ function SourcesListContent() {
       >
         <div className="space-y-4 pt-1">
  <p className="text-13 text-muted-foreground">
-             ¿Por qué rechazas <span className="font-semibold text-foreground">&ldquo;{rejectModal?.source.name}&rdquo;</span>?
+             ¿Por qué rechaza <span className="font-semibold text-foreground">&ldquo;{rejectModal?.source.name}&rdquo;</span>?
              El motivo quedará registrado y el admin podrá revisarla luego.
            </p>
           <Textarea
@@ -316,6 +467,11 @@ function SourcesListContent() {
           />
         </div>
       </Modal>
+      <ReplaceFileModal
+        source={replaceFileSource}
+        onClose={() => setReplaceFileSource(null)}
+        onReplaced={load}
+      />
     </div>
   );
 }
@@ -353,12 +509,10 @@ export default function SourcesPage() {
         tip="Fuentes de datos y FAQ que alimentan al chatbot."
       />
       <Tabs value={tab} onValueChange={(v) => setTab(v as TabId)}>
-        <div className="overflow-x-auto -mx-2 px-2">
-          <TabsList className="mb-6">
-            <TabsTrigger value="sources">Fuentes</TabsTrigger>
-            <TabsTrigger value="faq">FAQ</TabsTrigger>
-          </TabsList>
-        </div>
+        <TabsList className="mb-6">
+          <TabsTrigger value="sources">Fuentes</TabsTrigger>
+          <TabsTrigger value="faq">FAQ</TabsTrigger>
+        </TabsList>
 
         <TabsContent value="sources"><SourcesListContent /></TabsContent>
         <TabsContent value="faq"><FAQTab /></TabsContent>

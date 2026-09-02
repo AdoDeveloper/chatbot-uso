@@ -1,6 +1,3 @@
-// Barrel — re-exporta los módulos de cada tab para mantener compatibles los
-// imports existentes desde "../_lib/tabs". El código vive en módulos separados.
-
 export { UnpublishedBanner } from "./unpublished-banner";
 export { SETTINGS_DEFAULTS } from "./defaults";
 export { PromptTab } from "./prompt-tab";

@@ -4,10 +4,7 @@ import { useEffect, useState } from "react";
 import { ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, MoreHorizontal } from "lucide-react";
 import { Select, SelectOption } from "@/components/ui/select";
 
-// Umbral propio (no el de useIsMobile, pensado para el sidebar a 1024px):
-// por debajo de este ancho la fila de botones de página con siblings=1 más
-// los saltos a primera/última puede exceder el espacio disponible dentro de
-// una card angosta, empujando el último botón fuera de la pantalla.
+// Umbral propio (no el de useIsMobile): por debajo de este ancho, la fila de botones de paginación puede exceder el espacio de una card angosta.
 const NARROW_BREAKPOINT = 480;
 
 function useIsNarrow() {
@@ -63,9 +60,7 @@ function buildPageList(current: number, total: number, siblings: number): (numbe
 /**
  * Pie de tabla estándar (formato datatable) para todo el panel: a la
  * izquierda "Mostrando N de Total", a la derecha
- * << < [1][2][3] > >>. Reemplaza los distintos formatos de paginación que
- * antes convivían (texto con flechas ASCII, solo iconos, indicadores
- * duplicados arriba y abajo de la tabla).
+ * << < [1][2][3] > >>.
  */
 export function TablePagination({
   total, page, pageSize, shown, onPageChange, onPageSizeChange, className,
@@ -77,7 +72,7 @@ export function TablePagination({
 
   const shownCount = shown ?? Math.min(pageSize, total - (page - 1) * pageSize);
   // En pantallas angostas se omiten los siblings y los saltos a primera/
-  // última página — sin eso, la fila de botones (cada uno en su propio
+  // última página - sin eso, la fila de botones (cada uno en su propio
   // recuadro) puede ser más ancha que la card y el último botón queda
   // cortado fuera de la pantalla.
   const pageList = buildPageList(page, totalPages, narrow ? 0 : SIBLINGS);
