@@ -7,17 +7,17 @@ import structlog
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.models import (
     Distance,
-    PointStruct,
-    SparseIndexParams,
-    SparseVectorParams,
-    VectorParams,
-    Filter,
     FieldCondition,
+    Filter,
     MatchAny,
     MatchValue,
-    SparseVector,
-    RrfQuery,
+    PointStruct,
     Rrf,
+    RrfQuery,
+    SparseIndexParams,
+    SparseVector,
+    SparseVectorParams,
+    VectorParams,
 )
 
 from app.core.config import get_settings
@@ -256,7 +256,7 @@ async def hybrid_search(
     mayor peso a fuentes minoritarias según su cantidad de chunks.
     (requiere Qdrant v1.17+ para RrfQuery).
     """
-    from qdrant_client.models import Prefetch, FusionQuery, Fusion
+    from qdrant_client.models import Fusion, FusionQuery, Prefetch
 
     client = _get_client()
 

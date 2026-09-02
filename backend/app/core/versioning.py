@@ -6,10 +6,10 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from typing import Any, MutableMapping
+from collections.abc import MutableMapping
+from typing import Any
 
 import jwt as pyjwt
-
 import structlog
 from starlette.requests import Request
 from starlette.types import ASGIApp, Receive, Scope, Send

@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import structlog
 
-
 log = structlog.get_logger()
 
 # Tuplas de 1-2 palabras normalizadas para matching greedy de saludos encadenados.

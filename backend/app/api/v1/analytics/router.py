@@ -20,8 +20,8 @@ from app.schemas.analytics import (
     AnalyticsResponseQuality,
     AnalyticsRoutes,
     AnalyticsSourceQuality,
-    AnalyticsTimeSeries,
     AnalyticsTimeline,
+    AnalyticsTimeSeries,
     AnalyticsTopics,
     CacheStats,
     PeriodComparison,
@@ -290,6 +290,7 @@ async def _get_unanswered_summary(
 ) -> dict:
     """Resumen de preguntas sin responder en la ventana del reporte."""
     from sqlalchemy import func, select
+
     from app.models.unanswered_question import UnansweredQuestion
 
     _until = until or datetime.now(timezone.utc)
@@ -628,6 +629,7 @@ async def _build_report_sections(
 
     elif report_type == "conocimiento":
         from sqlalchemy import func, select
+
         from app.models.enums import ReviewStatus
         from app.models.source import Source
 

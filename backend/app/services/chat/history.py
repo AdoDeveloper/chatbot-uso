@@ -5,16 +5,13 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 import structlog
-from sqlalchemy import select, func
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sqlalchemy import or_
-
+from app.core.constants import PLAYGROUND_BROWSERS
 from app.models.chat_conversation import ChatConversation
 from app.models.chat_message import ChatMessage
 from app.models.enums import ConversationStatus, MessageRole
-
-from app.core.constants import PLAYGROUND_BROWSERS
 
 log = structlog.get_logger()
 
@@ -27,6 +24,7 @@ async def acquire_session_lock(session_id: str, *, timeout: float = 5.0) -> bool
     """Serializa la persistencia de turnos concurrentes con el mismo session_id
     para evitar conversaciones duplicadas. Fail-open si Redis no está."""
     import asyncio
+
     from app.core.redis import get_redis
     try:
         redis = get_redis()

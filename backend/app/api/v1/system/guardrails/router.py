@@ -12,7 +12,7 @@ from app.db.session import get_db
 from app.models.audit_log import AuditLog
 from app.models.global_setting import GlobalSetting
 from app.schemas.common import OperationStatus
-from app.services.ai.guardrails import validate_input, reload_custom_patterns
+from app.services.ai.guardrails import reload_custom_patterns, validate_input
 from app.services.system import guardrail_patterns as patterns_svc
 
 router = APIRouter(prefix="/guardrails", tags=["system:guardrails"])

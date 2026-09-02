@@ -12,7 +12,8 @@ from app.core.dates import since_until
 from app.core.deps import require_perm
 from app.core.permissions import P
 from app.core.rate_limit import (
-    get_throttled_ips, reset_ip,
+    get_throttled_ips,
+    reset_ip,
 )
 from app.db.session import get_db
 from app.models.rate_limit_event import RateLimitEvent

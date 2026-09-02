@@ -4,13 +4,12 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Text, Uuid, func
+from sqlalchemy import text as sa_text
 from sqlalchemy.dialects import mysql
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from sqlalchemy import text as sa_text
-
-from app.db.types import JSONList
 from app.db.session import Base
+from app.db.types import JSONList
 
 
 class FAQEntry(Base):
@@ -50,7 +49,7 @@ class FAQEntry(Base):
         DateTime(timezone=True).with_variant(mysql.DATETIME(fsp=6), "mysql"), nullable=True
     )
 
-    created_by: Mapped["User | None"] = relationship("User", foreign_keys=[created_by_id])  # noqa: F821
+    created_by: Mapped[User | None] = relationship("User", foreign_keys=[created_by_id])  # noqa: F821
 
     def __repr__(self) -> str:
         return f"<FAQEntry id={self.id} question={self.question[:40]!r}>"

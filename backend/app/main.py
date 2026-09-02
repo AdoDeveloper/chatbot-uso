@@ -1,36 +1,39 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.exceptions import (
+    HTTPException,
+    RequestValidationError,
+    ResponseValidationError,
+)
+from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+from sqlalchemy import select, update
+from sqlalchemy.exc import TimeoutError as SQLATimeoutError
 from starlette.datastructures import MutableHeaders
 from starlette.requests import Request
 from starlette.responses import Response
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from sqlalchemy import select, update
-from sqlalchemy.exc import TimeoutError as SQLATimeoutError
-
 from app.api.v1.router import router as v1_router
-from app.core.exceptions import DomainError
 from app.core.config import get_settings
+from app.core.exceptions import DomainError
 from app.core.logging import get_logger, setup_logging
+from app.core.versioning import VersioningMiddleware
 from app.db import session as db_session
 from app.models.enums import SourceStatus
 from app.models.source import Source
-from app.services.system.seed import seed_first_admin, seed_defaults
-from app.services.system.settings import seed_default_settings
-from app.services.system.rbac import seed_rbac
 from app.services.ai.embedding import _get_dense_model, _get_sparse_model
 from app.services.ai.guardrails import _get_presidio_analyzer, _get_presidio_anonymizer
 from app.services.system import scheduler
-from app.core.versioning import VersioningMiddleware
-from fastapi.exceptions import HTTPException, RequestValidationError, ResponseValidationError
-from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
-from pathlib import Path
-import json
+from app.services.system.rbac import seed_rbac
+from app.services.system.seed import seed_defaults, seed_first_admin
+from app.services.system.settings import seed_default_settings
 
 logger = get_logger(__name__)
 

@@ -5,11 +5,12 @@ from app.api.v1.analytics.router import router as analytics_router
 from app.api.v1.audit.router import router as audit_router
 from app.api.v1.auth.router import router as auth_router
 from app.api.v1.chat.router import router as chat_router
-from app.api.v1.conversations.router import router as chat_history_router
 from app.api.v1.chunks.router import router as chunks_router
+from app.api.v1.conversations.router import router as chat_history_router
 from app.api.v1.escalation.router import router as escalation_router
 from app.api.v1.faq.router import router as faq_router
-from app.api.v1.health.router import liveness, router as health_router
+from app.api.v1.health.router import liveness
+from app.api.v1.health.router import router as health_router
 from app.api.v1.integrations.router import router as integrations_router
 from app.api.v1.invitations.router import router as invitations_router
 from app.api.v1.notifications.router import router as notifications_router

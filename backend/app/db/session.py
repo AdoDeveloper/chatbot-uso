@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
+from collections.abc import AsyncGenerator
 from datetime import datetime, timezone
-from typing import AsyncGenerator
 
-from sqlalchemy import event, inspect as sa_inspect, text as sa_text
+from sqlalchemy import event
+from sqlalchemy import inspect as sa_inspect
+from sqlalchemy import text as sa_text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -33,11 +35,11 @@ def _make_engine():
     settings = get_settings()
 
     is_sqlite = settings.DATABASE_URL.startswith("sqlite")
-    kwargs: dict = dict(
-        echo=settings.DEBUG,
-        json_serializer=lambda obj: json.dumps(obj, ensure_ascii=False),
-        json_deserializer=json.loads,
-    )
+    kwargs: dict = {
+        "echo": settings.DEBUG,
+        "json_serializer": lambda obj: json.dumps(obj, ensure_ascii=False),
+        "json_deserializer": json.loads,
+    }
     if is_sqlite and ":memory:" in settings.DATABASE_URL:
         from sqlalchemy.pool import StaticPool
         kwargs["poolclass"] = StaticPool

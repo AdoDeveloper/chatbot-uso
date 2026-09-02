@@ -18,8 +18,8 @@ from app.schemas.chunk import (
     ChunkTestResponse,
     ChunkTestResult,
 )
-from app.services.ingestion import vector_store
 from app.services.ai.embedding import embed_texts_async
+from app.services.ingestion import vector_store
 from app.services.knowledge import chunk_editing
 
 router = APIRouter(prefix="/chunks", tags=["chunks"])

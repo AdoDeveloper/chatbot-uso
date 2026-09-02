@@ -11,7 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import NotFoundError
 from app.models.audit_log import AuditLog
 from app.models.global_setting import GlobalSetting
-from app.services.ai.guardrails import get_injection_pattern_defs, reload_custom_patterns
+from app.services.ai.guardrails import (
+    get_injection_pattern_defs,
+    reload_custom_patterns,
+)
 
 
 async def _load_custom_list(db: AsyncSession) -> list[dict]:

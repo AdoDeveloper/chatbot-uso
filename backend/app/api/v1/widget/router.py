@@ -5,9 +5,8 @@ import uuid
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from pydantic import BaseModel, Field, field_validator
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_client_ip, require_perm
 from app.core.permissions import P
@@ -21,9 +20,9 @@ from app.schemas.widget import (
     WidgetConfigUpdate,
     WidgetPublicConfigOut,
 )
-from app.services.widget import service as svc
-from app.services.widget import csat_reasons as csat_reasons_svc
 from app.services.escalation import lifecycle as lifecycle_svc
+from app.services.widget import csat_reasons as csat_reasons_svc
+from app.services.widget import service as svc
 
 log = structlog.get_logger()
 
@@ -204,10 +203,10 @@ async def public_chat(
     widget: WidgetConfig = Depends(verify_widget_access),
 ):
     from app.api.v1.chat.router import (
-        ChatRequest,
-        run_chat,
-        _llm_semaphore,
         _LLM_QUEUE_TIMEOUT,
+        ChatRequest,
+        _llm_semaphore,
+        run_chat,
     )
     try:
         body = await request.json()

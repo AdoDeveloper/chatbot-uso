@@ -20,9 +20,9 @@ from app.schemas.notification import (
     ChannelToggleIn,
     InboxOut,
     MarkReadOut,
+    NotificationItemOut,
     NotificationListOut,
     NotificationRuleOut,
-    NotificationItemOut,
     NotificationRuleUpdate,
     NotificationTriggerOut,
 )
@@ -30,6 +30,8 @@ from app.schemas.report_schedule import ReportSchedule
 from app.services.notifications.audience import visible_events as _visible_events
 from app.services.system.report_schedule import (
     get_report_schedule as load_report_schedule,
+)
+from app.services.system.report_schedule import (
     upsert_report_schedule,
 )
 
@@ -327,8 +329,9 @@ async def mark_all_notifications_read(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_perm(P.NOTIFICATIONS_UPDATE)),
 ):
-    from sqlalchemy import update
     from datetime import datetime, timezone
+
+    from sqlalchemy import update
     now = datetime.now(timezone.utc)
     visible = await _visible_events(db, current_user.role)
     res = await db.execute(

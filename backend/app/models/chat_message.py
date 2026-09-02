@@ -3,7 +3,20 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum as SAEnum, Float, ForeignKey, Index, Integer, JSON, String, Text, Uuid, func, text as sa_text
+from sqlalchemy import (
+    JSON,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    Uuid,
+    func,
+)
+from sqlalchemy import Enum as SAEnum
+from sqlalchemy import text as sa_text
 from sqlalchemy.dialects import mysql
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -41,7 +54,7 @@ class ChatMessage(Base):
         server_default=func.now(), nullable=False
     )
 
-    conversation: Mapped["ChatConversation"] = relationship(  # noqa: F821
+    conversation: Mapped[ChatConversation] = relationship(  # noqa: F821
         "ChatConversation", back_populates="messages"
     )
 

@@ -73,7 +73,7 @@ class Settings(BaseSettings):
     FIRST_ADMIN_PASSWORD: str = ""
 
     @model_validator(mode="after")
-    def _check_secrets(self) -> "Settings":
+    def _check_secrets(self) -> Settings:
         _insecure = {
             "cambia_esta_clave_secreta_en_produccion",
             "cambia_esta_clave_antes_del_primer_arranque",

@@ -13,7 +13,6 @@ from app.models.invitation import Invitation
 from app.models.user import User
 from app.services.users import service as user_service
 
-
 _MAX_ACTIVE_INVITATIONS_PER_EMAIL = 3
 
 async def create_invitation(

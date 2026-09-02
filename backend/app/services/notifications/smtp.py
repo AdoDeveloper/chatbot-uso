@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-import structlog
-import aiosmtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.utils import make_msgid, formatdate
 from dataclasses import dataclass
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.utils import formatdate, make_msgid
+
+import aiosmtplib
+import structlog
 
 log = structlog.get_logger()
 

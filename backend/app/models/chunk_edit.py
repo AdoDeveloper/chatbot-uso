@@ -45,7 +45,7 @@ class ChunkEdit(Base):
         server_default=func.now(), nullable=False, index=True
     )
 
-    edited_by: Mapped["User | None"] = relationship("User", foreign_keys=[edited_by_id])  # noqa: F821
+    edited_by: Mapped[User | None] = relationship("User", foreign_keys=[edited_by_id])  # noqa: F821
 
     def __repr__(self) -> str:
         return f"<ChunkEdit id={self.id} chunk={self.chunk_point_id[:8]} by={self.edited_by_id}>"

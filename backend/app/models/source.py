@@ -3,7 +3,19 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum as SAEnum, ForeignKey, Index, Integer, JSON, String, Text, Uuid, func, text as sa_text
+from sqlalchemy import (
+    JSON,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    Uuid,
+    func,
+)
+from sqlalchemy import Enum as SAEnum
+from sqlalchemy import text as sa_text
 from sqlalchemy.dialects import mysql
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -78,8 +90,8 @@ class Source(Base):
         DateTime(timezone=True).with_variant(mysql.DATETIME(fsp=6), "mysql"), nullable=True
     )
 
-    created_by: Mapped["User | None"] = relationship("User", foreign_keys=[created_by_id])  # noqa: F821
-    reviewed_by: Mapped["User | None"] = relationship("User", foreign_keys=[reviewed_by_id])  # noqa: F821
+    created_by: Mapped[User | None] = relationship("User", foreign_keys=[created_by_id])  # noqa: F821
+    reviewed_by: Mapped[User | None] = relationship("User", foreign_keys=[reviewed_by_id])  # noqa: F821
 
     @property
     def is_deleted(self) -> bool:

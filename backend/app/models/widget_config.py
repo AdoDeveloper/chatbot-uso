@@ -4,12 +4,13 @@ import secrets
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Integer, String, Text, Uuid, func, text as sa_text
+from sqlalchemy import Boolean, DateTime, Integer, String, Text, Uuid, func
+from sqlalchemy import text as sa_text
 from sqlalchemy.dialects import mysql
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.types import JSONList
 from app.db.session import Base
+from app.db.types import JSONList
 
 
 def _generate_widget_key() -> str:

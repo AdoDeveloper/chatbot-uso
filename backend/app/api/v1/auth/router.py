@@ -4,7 +4,6 @@ import datetime
 import uuid
 
 import jwt as pyjwt
-
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
@@ -15,7 +14,6 @@ from app.core.config import get_settings
 from app.core.deps import get_client_ip, get_current_user
 from app.core.rate_limit import RateLimitExceeded, check_rate_limit
 from app.core.security import decode_token, hash_password, verify_password
-from app.services.system import rbac as rbac_service
 from app.core.token_revocation import is_jti_revoked, is_token_stale, revoke_jti
 from app.db.session import get_db
 from app.models.chat_message import ChatMessage
@@ -23,10 +21,17 @@ from app.models.enums import ReviewStatus
 from app.models.global_setting import GlobalSetting
 from app.models.llm_provider import LLMProvider
 from app.models.source import Source
-from app.schemas.auth import ChangePasswordRequest, LoginRequest, RefreshRequest, TokenResponse, UserResponse
+from app.schemas.auth import (
+    ChangePasswordRequest,
+    LoginRequest,
+    RefreshRequest,
+    TokenResponse,
+    UserResponse,
+)
 from app.schemas.common import OperationStatus
-from app.services.users import service as user_service
+from app.services.system import rbac as rbac_service
 from app.services.system.audit import log_action
+from app.services.users import service as user_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 

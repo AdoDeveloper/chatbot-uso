@@ -18,8 +18,8 @@ from app.models.enums import ReviewStatus, SourceStatus, SourceType
 from app.models.source import Source
 from app.models.user import User
 from app.schemas.common import BulkUploadResult
-from app.services.system import audit as audit_svc
 from app.services.ingestion import service as ingestion
+from app.services.system import audit as audit_svc
 
 log = structlog.get_logger()
 
@@ -359,12 +359,12 @@ async def delete_source(db: AsyncSession, *, source_id: uuid.UUID, req: Request,
         user_agent=req.headers.get("user-agent"),
     )
     await db.commit()
-    from app.services.ingestion.vector_store import delete_source as qdrant_delete
     from app.services.ai import semantic_cache as cache_svc
+    from app.services.ingestion.vector_store import delete_source as qdrant_delete
     try:
         await qdrant_delete(str(source_id))
-    except Exception:
-        pass
+    except Exception as exc:
+        log.warning("sources.vector_cleanup_failed", source_id=str(source_id), error=str(exc))
     try:
         await cache_svc.invalidate_by_source(str(source_id))
     except Exception:
@@ -372,8 +372,8 @@ async def delete_source(db: AsyncSession, *, source_id: uuid.UUID, req: Request,
 
 
 async def bulk_delete_sources(db: AsyncSession, *, source_ids: list[uuid.UUID]) -> None:
-    from app.services.ingestion.vector_store import delete_source as qdrant_delete
     from app.services.ai import semantic_cache as cache_svc
+    from app.services.ingestion.vector_store import delete_source as qdrant_delete
     now = datetime.now(timezone.utc)
     result = await db.execute(
         select(Source).where(Source.id.in_(source_ids), Source.deleted_at.is_(None))
@@ -385,8 +385,8 @@ async def bulk_delete_sources(db: AsyncSession, *, source_ids: list[uuid.UUID]) 
         deleted_any = True
         try:
             await qdrant_delete(str(source.id))
-        except Exception:
-            pass
+        except Exception as exc:
+            log.warning("sources.vector_cleanup_failed", source_id=str(source.id), error=str(exc))
     await db.commit()
     if deleted_any:
         try:
@@ -442,6 +442,7 @@ async def _release_ingestion_lock(source_id: uuid.UUID) -> None:
 
 async def run_ingestion(source_id: uuid.UUID) -> None:
     import structlog as _structlog
+
     from app.db.session import AsyncSessionLocal
     _log = _structlog.get_logger()
 

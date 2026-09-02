@@ -3,7 +3,8 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Uuid, func, true as sa_true
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, Uuid, func
+from sqlalchemy import true as sa_true
 from sqlalchemy.dialects import mysql
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -41,7 +42,7 @@ class Invitation(Base):
         server_default=func.now(), nullable=False
     )
 
-    created_by: Mapped["User | None"] = relationship("User", foreign_keys=[created_by_id])  # noqa: F821
+    created_by: Mapped[User | None] = relationship("User", foreign_keys=[created_by_id])  # noqa: F821
 
     @property
     def is_expired(self) -> bool:

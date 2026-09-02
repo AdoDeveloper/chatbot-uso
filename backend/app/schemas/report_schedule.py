@@ -29,7 +29,7 @@ class ReportSchedule(BaseModel):
     month: int | None = Field(default=None, ge=1, le=12)
 
     @model_validator(mode="after")
-    def _check_consistency(self) -> "ReportSchedule":
+    def _check_consistency(self) -> ReportSchedule:
         if self.unit not in ("daily", "weekly", "monthly", "yearly"):
             raise ValueError("unit debe ser daily|weekly|monthly|yearly")
         if self.unit == "weekly" and not self.days_of_week:

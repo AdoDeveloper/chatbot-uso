@@ -5,8 +5,9 @@ Falls open if Redis is down. All limits configurable via Settings.
 from __future__ import annotations
 
 import asyncio
-import structlog
 import time
+
+import structlog
 
 from app.core import redis as redis_mod
 
@@ -234,5 +235,6 @@ async def reset_ip(ip: str) -> None:
                 break
         if keys_to_delete:
             await redis.delete(*keys_to_delete)
-    except Exception:
-        pass
+    except Exception as exc:
+        log.warning("rate_limit.reset_ip_failed", ip=ip, error=str(exc))
+        raise

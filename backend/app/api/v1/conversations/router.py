@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from pydantic import BaseModel as _BM
 from pydantic import Field as _Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,12 +19,15 @@ from app.models.chat_conversation import ChatConversation
 from app.models.chat_message import ChatMessage
 from app.models.enums import ConversationStatus
 from app.models.user import User
-from app.schemas.chat_history import ChatConversationDetail, ChatConversationOut, FeedbackUpdate
+from app.schemas.chat_history import (
+    ChatConversationDetail,
+    ChatConversationOut,
+    FeedbackUpdate,
+)
 from app.services.chat import history as svc
 from app.services.escalation import lifecycle as lifecycle_svc
 from app.services.ingestion.export import excel_response, pdf_response
 from app.services.system import audit as audit_svc
-from pydantic import BaseModel as _BM
 
 
 class _TagsBody(_BM):
@@ -242,7 +246,7 @@ async def bulk_action(
                     t = body.tag.strip().lower()
                     current_tags = [x for x in current_tags if x != t]
                 elif body.action == "set_tags" and body.tags is not None:
-                    current_tags = sorted(set(t.strip().lower() for t in body.tags if t.strip()))
+                    current_tags = sorted({t.strip().lower() for t in body.tags if t.strip()})
                 conv.tags = current_tags
             affected += 1
         except HTTPException as e:
@@ -357,7 +361,7 @@ async def set_conversation_tags(
     conv = result.scalar_one_or_none()
     if not conv:
         raise NotFoundError("Conversación no encontrada")
-    cleaned = sorted(set(t.strip().lower() for t in body.tags if t.strip()))
+    cleaned = sorted({t.strip().lower() for t in body.tags if t.strip()})
     conv.tags = cleaned
     await db.commit()
     return {"id": str(conv.id), "tags": conv.tags}

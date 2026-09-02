@@ -34,7 +34,7 @@ class SourceResponse(BaseModel):
     model_config = {"from_attributes": True}
 
     @classmethod
-    def from_source(cls, source: object) -> "SourceResponse":
+    def from_source(cls, source: object) -> SourceResponse:
         meta: dict = getattr(source, "meta", {}) or {}
         user = getattr(source, "created_by", None)
         reviewer = getattr(source, "reviewed_by", None)

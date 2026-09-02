@@ -9,7 +9,12 @@ from app.core.constants import PLAYGROUND_BROWSERS
 from app.models.audit_log import AuditLog
 from app.models.chat_conversation import ChatConversation
 from app.models.chat_message import ChatMessage
-from app.models.enums import ConversationStatus, MessageRole, SourceStatus, UnansweredStatus
+from app.models.enums import (
+    ConversationStatus,
+    MessageRole,
+    SourceStatus,
+    UnansweredStatus,
+)
 from app.models.source import Source
 from app.models.unanswered_question import UnansweredQuestion
 from app.schemas.analytics import (
@@ -23,8 +28,8 @@ from app.schemas.analytics import (
     AnalyticsResponseQuality,
     AnalyticsRoutes,
     AnalyticsSourceQuality,
-    AnalyticsTimeSeries,
     AnalyticsTimeline,
+    AnalyticsTimeSeries,
     AnalyticsTopics,
     CacheStats,
     ChannelStat,
@@ -745,7 +750,7 @@ async def get_period_comparison(
 ) -> PeriodComparison:
     """Compara la ventana de N días con los N días anteriores."""
     anchor = until or datetime.now(timezone.utc)
-    from app.core.timezone import utc_to_sv, sv_to_utc
+    from app.core.timezone import sv_to_utc, utc_to_sv
     anchor_sv = utc_to_sv(anchor)
     end_sv = anchor_sv.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
     end = sv_to_utc(end_sv)

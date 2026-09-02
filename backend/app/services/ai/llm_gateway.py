@@ -27,7 +27,7 @@ import json
 import re
 import time
 from abc import ABC, abstractmethod
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 import httpx
 import structlog
@@ -91,9 +91,7 @@ _breaker = CircuitBreaker()
 def _is_retryable(exc: BaseException) -> bool:
     if isinstance(exc, httpx.HTTPStatusError):
         return exc.response.status_code in (429, 500, 502, 503, 504)
-    if isinstance(exc, (httpx.ConnectError, httpx.ReadTimeout)):
-        return True
-    return False
+    return isinstance(exc, (httpx.ConnectError, httpx.ReadTimeout))
 
 
 # El admin SIEMPRE puede sobrescribirlas vía api_base en el panel.
@@ -710,15 +708,14 @@ def _get_adapter(
     pt = provider_type.lower().strip()
 
     adapter_cls = _ADAPTER_MAP.get(pt)
-    if adapter_cls:
-        if adapter_cls in (AnthropicAdapter, GeminiAdapter, CohereAdapter,
-                           AzureOpenAIAdapter, BedrockAdapter):
-            if not api_key:
-                raise RuntimeError(
-                    f"El proveedor '{provider_name}' ({pt}) requiere una API key configurada."
-                )
-            log.debug("llm.adapter_selected", provider_type=pt, adapter=adapter_cls.__name__)
-            return adapter_cls(model_name, api_key, api_base)
+    if adapter_cls and adapter_cls in (AnthropicAdapter, GeminiAdapter, CohereAdapter,
+                                        AzureOpenAIAdapter, BedrockAdapter):
+        if not api_key:
+            raise RuntimeError(
+                f"El proveedor '{provider_name}' ({pt}) requiere una API key configurada."
+            )
+        log.debug("llm.adapter_selected", provider_type=pt, adapter=adapter_cls.__name__)
+        return adapter_cls(model_name, api_key, api_base)
 
     log.debug("llm.adapter_selected", provider_type=pt, adapter="OpenAICompatAdapter")
     return OpenAICompatAdapter(pt, model_name, api_key, api_base)

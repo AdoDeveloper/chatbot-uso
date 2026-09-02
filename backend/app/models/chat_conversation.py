@@ -3,13 +3,25 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum as SAEnum, ForeignKey, Index, Integer, String, Text, Uuid, false, func
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    Uuid,
+    false,
+    func,
+)
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy import text as sa_text
 from sqlalchemy.dialects import mysql
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.types import JSONList
 from app.db.session import Base
+from app.db.types import JSONList
 from app.models.enums import ConversationStatus
 
 
@@ -71,13 +83,13 @@ class ChatConversation(Base):
 
     tags: Mapped[list[str]] = mapped_column(JSONList, default=list, server_default=sa_text("('[]')"), nullable=False)
 
-    user: Mapped["User | None"] = relationship("User", foreign_keys=[user_id])  # noqa: F821
-    resolver: Mapped["User | None"] = relationship("User", foreign_keys=[resolved_by_user_id])  # noqa: F821
-    messages: Mapped[list["ChatMessage"]] = relationship(  # noqa: F821
+    user: Mapped[User | None] = relationship("User", foreign_keys=[user_id])  # noqa: F821
+    resolver: Mapped[User | None] = relationship("User", foreign_keys=[resolved_by_user_id])  # noqa: F821
+    messages: Mapped[list[ChatMessage]] = relationship(  # noqa: F821
         "ChatMessage", back_populates="conversation", order_by="ChatMessage.created_at",
         passive_deletes=True,
     )
-    escalation_events: Mapped[list["EscalationEvent"]] = relationship(  # noqa: F821
+    escalation_events: Mapped[list[EscalationEvent]] = relationship(  # noqa: F821
         "EscalationEvent", back_populates="conversation",
         order_by="EscalationEvent.created_at", cascade="all, delete-orphan",
     )

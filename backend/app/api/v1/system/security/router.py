@@ -139,8 +139,8 @@ async def security_summary(
     throttled = 0
     try:
         throttled = len(await get_throttled_ips())
-    except Exception:
-        pass
+    except Exception as exc:
+        log.warning("security_summary.throttled_ips_unavailable", error=str(exc))
 
     return SecuritySummary(
         days=days,

@@ -6,15 +6,15 @@ import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings as get_env_settings
 from app.models.enums import ReviewStatus, SourceStatus, SourceType
 from app.models.source import Source
-from app.core.config import get_settings as get_env_settings
-from app.services.ingestion.chunking import chunk_text
-from app.services.ingestion.chunk_warnings import compute_warnings
 from app.services.ai.embedding import embed_texts_async
-from app.services.ingestion.parsing import parse_source
 from app.services.ai.semantic_cache import invalidate_by_source
 from app.services.ingestion import vector_store
+from app.services.ingestion.chunk_warnings import compute_warnings
+from app.services.ingestion.chunking import chunk_text
+from app.services.ingestion.parsing import parse_source
 
 log = structlog.get_logger()
 
@@ -151,8 +151,8 @@ async def ingest(db: AsyncSession, source: Source) -> None:
         log.info("ingestion.aborted_source_deleted", source_id=source_id)
         try:
             await vector_store.delete_source(source_id)
-        except Exception:
-            pass
+        except Exception as exc:
+            log.warning("ingestion.vector_cleanup_failed", source_id=source_id, error=str(exc))
 
     except Exception as exc:
         from app.services.ingestion.source_quality import classify_error
@@ -164,8 +164,8 @@ async def ingest(db: AsyncSession, source: Source) -> None:
         source.chunk_count = 0
         try:
             await vector_store.delete_source(source_id)
-        except Exception:
-            pass
+        except Exception as vec_exc:
+            log.warning("ingestion.vector_cleanup_failed", source_id=source_id, error=str(vec_exc))
         source.error_message = friendly or raw
         source.error_code = code
         source.error_hint = hint

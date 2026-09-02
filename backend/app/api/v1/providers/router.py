@@ -10,13 +10,20 @@ from app.core.exceptions import NotFoundError
 from app.core.permissions import P
 from app.db.session import get_db
 from app.models.user import User
-from app.services.system.audit import log_action
 from app.schemas.provider import (
-    ProviderCreate, ProviderOut, ProviderReorderRequest, ProviderTestRequest, ProviderTestResult, ProviderUpdate,
-    ProviderModelsRequest, ProviderModelsResult, ProviderModelItem,
+    ProviderCreate,
+    ProviderModelItem,
+    ProviderModelsRequest,
+    ProviderModelsResult,
+    ProviderOut,
+    ProviderReorderRequest,
+    ProviderTestRequest,
+    ProviderTestResult,
+    ProviderUpdate,
 )
+from app.services.ai.llm_gateway import fetch_models, test_connection
 from app.services.system import settings as settings_service
-from app.services.ai.llm_gateway import test_connection, fetch_models
+from app.services.system.audit import log_action
 
 router = APIRouter(prefix="/providers", tags=["providers"])
 

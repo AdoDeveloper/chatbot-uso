@@ -3,7 +3,18 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, JSON, String, Uuid, func, text as sa_text
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Uuid,
+    func,
+)
+from sqlalchemy import text as sa_text
 from sqlalchemy.dialects import mysql
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -44,7 +55,7 @@ class ConfigVersion(Base):
         server_default=func.now(), nullable=False
     )
 
-    created_by: Mapped["User | None"] = relationship("User", foreign_keys=[created_by_id])  # noqa: F821
+    created_by: Mapped[User | None] = relationship("User", foreign_keys=[created_by_id])  # noqa: F821
 
     def __repr__(self) -> str:
         return f"<ConfigVersion v{self.version_number} active={self.is_active}>"

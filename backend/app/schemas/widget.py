@@ -6,7 +6,6 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field, field_validator
 
-
 _HEX_RE = re.compile(r"^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
 
 

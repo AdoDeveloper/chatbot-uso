@@ -3,7 +3,8 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, JSON, String, Text, Uuid, func, text as sa_text
+from sqlalchemy import JSON, DateTime, ForeignKey, Index, String, Text, Uuid, func
+from sqlalchemy import text as sa_text
 from sqlalchemy.dialects import mysql
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -37,7 +38,7 @@ class AuditLog(Base):
         server_default=func.now(), nullable=False, index=True,
     )
 
-    actor: Mapped["User | None"] = relationship("User", foreign_keys=[actor_id])  # noqa: F821
+    actor: Mapped[User | None] = relationship("User", foreign_keys=[actor_id])  # noqa: F821
 
     def __repr__(self) -> str:
         return f"<AuditLog id={self.id} action={self.action!r} resource={self.resource_type}>"

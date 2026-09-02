@@ -2,12 +2,10 @@ from __future__ import annotations
 
 import uuid
 
+import jwt as pyjwt
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-
 from sqlalchemy.ext.asyncio import AsyncSession
-
-import jwt as pyjwt
 
 from app.core.security import decode_token
 from app.core.token_revocation import is_jti_revoked, is_token_stale

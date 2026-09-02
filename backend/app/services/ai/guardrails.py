@@ -124,6 +124,7 @@ def _load_custom_from_db_sync(value: list | None) -> None:
 async def reload_custom_patterns(db) -> None:
     """Recarga los patrones custom desde GlobalSetting. Llamar tras CRUD."""
     from sqlalchemy import select
+
     from app.models.global_setting import GlobalSetting
     result = await db.execute(select(GlobalSetting).where(GlobalSetting.key == "injection_patterns_custom"))
     row = result.scalar_one_or_none()
@@ -204,7 +205,10 @@ def _build_recognizers() -> list:
     y los documentos salvadoreños."""
     from presidio_analyzer import Pattern, PatternRecognizer
     from presidio_analyzer.predefined_recognizers import (
-        EmailRecognizer, CreditCardRecognizer, IbanRecognizer, PhoneRecognizer,
+        CreditCardRecognizer,
+        EmailRecognizer,
+        IbanRecognizer,
+        PhoneRecognizer,
     )
 
     recognizers: list = [
@@ -259,13 +263,14 @@ class _PatternOnlyNlpEngine:
         return []
 
     def process_text(self, text: str, language: str):
-        from presidio_analyzer.nlp_engine import NlpArtifacts
         import inspect
-        candidate = dict(
-            entities=[], tokens=[], tokens_indices=[],
-            dependencies=[], lemmas=[], score_cutoff=0, nlp_engine=self,
-            language=language,
-        )
+
+        from presidio_analyzer.nlp_engine import NlpArtifacts
+        candidate = {
+            "entities": [], "tokens": [], "tokens_indices": [],
+            "dependencies": [], "lemmas": [], "score_cutoff": 0, "nlp_engine": self,
+            "language": language,
+        }
         accepted = set(inspect.signature(NlpArtifacts.__init__).parameters)
         kwargs = {k: v for k, v in candidate.items() if k in accepted}
         return NlpArtifacts(**kwargs)
@@ -304,7 +309,7 @@ def _get_presidio_anonymizer():
 
 
 class GuardrailResult:
-    __slots__ = ("passed", "reason", "sanitized_text", "matched_pattern", "matched_label", "matched_category")
+    __slots__ = ("matched_category", "matched_label", "matched_pattern", "passed", "reason", "sanitized_text")
 
     def __init__(
         self,

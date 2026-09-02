@@ -3,7 +3,9 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum as SAEnum, ForeignKey, JSON, String, Uuid, func, text as sa_text
+from sqlalchemy import JSON, DateTime, ForeignKey, String, Uuid, func
+from sqlalchemy import Enum as SAEnum
+from sqlalchemy import text as sa_text
 from sqlalchemy.dialects import mysql
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -40,10 +42,10 @@ class EscalationEvent(Base):
         server_default=func.now(), nullable=False,
     )
 
-    conversation: Mapped["ChatConversation"] = relationship(  # noqa: F821
+    conversation: Mapped[ChatConversation] = relationship(  # noqa: F821
         "ChatConversation", back_populates="escalation_events",
     )
-    actor: Mapped["User | None"] = relationship("User", foreign_keys=[actor_user_id])  # noqa: F821
+    actor: Mapped[User | None] = relationship("User", foreign_keys=[actor_user_id])  # noqa: F821
 
     def __repr__(self) -> str:
         return f"<EscalationEvent {self.event_type} conv={self.conversation_id}>"

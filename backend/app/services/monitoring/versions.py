@@ -8,7 +8,8 @@ from __future__ import annotations
 import uuid
 
 import structlog
-from sqlalchemy import delete, func as sa_func, select
+from sqlalchemy import delete, select
+from sqlalchemy import func as sa_func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.config_version import ConfigVersion
@@ -225,22 +226,23 @@ def _diff_collection(old: list[dict], new: list[dict], section: str) -> list[dic
     new_map = {item["id"]: item for item in new}
     changes = []
 
-    for oid in old_map:
+    for oid, old_item in old_map.items():
         if oid not in new_map:
-            changes.append({"id": oid, "name": old_map[oid].get(nf, ""), "action": "removed"})
+            changes.append({"id": oid, "name": old_item.get(nf, ""), "action": "removed"})
 
-    for nid in new_map:
+    for nid, new_item in new_map.items():
         if nid not in old_map:
-            changes.append({"id": nid, "name": new_map[nid].get(nf, ""), "action": "added"})
+            changes.append({"id": nid, "name": new_item.get(nf, ""), "action": "added"})
         elif nid in old_map:
+            old_item = old_map[nid]
             field_changes = {}
-            for field in new_map[nid]:
+            for field in new_item:
                 if field == "id":
                     continue
-                if old_map[nid].get(field) != new_map[nid][field]:
-                    field_changes[field] = [old_map[nid].get(field), new_map[nid][field]]
+                if old_item.get(field) != new_item[field]:
+                    field_changes[field] = [old_item.get(field), new_item[field]]
             if field_changes:
-                changes.append({"id": nid, "name": new_map[nid].get(nf, ""), "action": "modified", "changes": field_changes})
+                changes.append({"id": nid, "name": new_item.get(nf, ""), "action": "modified", "changes": field_changes})
 
     return changes
 

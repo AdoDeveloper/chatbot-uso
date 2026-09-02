@@ -56,7 +56,7 @@ def build_excel(
     title: str | None = None,
 ) -> bytes:
     from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill, Alignment
+    from openpyxl.styles import Alignment, Font, PatternFill
     from openpyxl.utils import get_column_letter
 
     wb = Workbook()
@@ -203,7 +203,7 @@ def build_pdf(
 ) -> bytes:
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4, landscape
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
     from reportlab.lib.units import cm
     from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table
 
@@ -414,7 +414,7 @@ def _cover_story(title: str, subtitle: str | None, page_size) -> list:
     from reportlab.lib.units import cm
     from reportlab.platypus import HRFlowable, Image, PageBreak, Paragraph, Spacer
 
-    center = dict(alignment=TA_CENTER, fontName="Helvetica")
+    center = {"alignment": TA_CENTER, "fontName": "Helvetica"}
     brand_style = ParagraphStyle("CoverBrand", fontSize=20, leading=24,
                                  textColor=colors.HexColor(BRAND_COLOR),
                                  fontName="Helvetica-Bold", alignment=TA_CENTER)
@@ -463,10 +463,15 @@ def build_pdf_report(
     """
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4, landscape
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
     from reportlab.lib.units import cm
     from reportlab.platypus import (
-        HRFlowable, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle,
+        HRFlowable,
+        Paragraph,
+        SimpleDocTemplate,
+        Spacer,
+        Table,
+        TableStyle,
     )
 
     nonempty = [s for s in sections if s.get("rows") or s.get("text")]

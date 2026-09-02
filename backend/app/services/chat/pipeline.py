@@ -22,6 +22,7 @@ from app.core.rate_limit import (
     record_throttle_event,
 )
 from app.core.redis import get_redis
+from app.models.audit_log import AuditLog
 from app.models.enums import MessageRole, ReviewStatus, SourceStatus
 from app.models.escalation_rule import EscalationRule
 from app.models.source import Source
@@ -33,7 +34,6 @@ from app.services.ai.guardrails import (
     validate_input,
 )
 from app.services.ai.semantic_cache import get_cached_response, store_cached_response
-from app.models.audit_log import AuditLog
 from app.services.chat import history as history_svc
 from app.services.escalation.engine import evaluate_rule
 from app.services.rag.corrective import run_adaptive_rag
@@ -364,10 +364,10 @@ async def _feedback_negative_ratio(db: AsyncSession, conversation_id) -> float |
     """Proporción de mensajes del asistente con feedback negativo sobre el
     total de mensajes con feedback registrado en la conversación. None si
     aún no hay ninguna valoración (evita falsos positivos con 0/0)."""
-    from app.models.chat_message import ChatMessage
-
-    from app.models.enums import MessageFeedback, MessageRole
     from sqlalchemy import func as sa_func
+
+    from app.models.chat_message import ChatMessage
+    from app.models.enums import MessageFeedback, MessageRole
 
     result = await db.execute(
         select(ChatMessage.feedback, sa_func.count())
@@ -560,9 +560,10 @@ async def evaluate_response_quality(
         return
 
     try:
+        import uuid as _uuid
+
         from app.db.session import AsyncSessionLocal
         from app.models.chat_message import ChatMessage
-        import uuid as _uuid
 
         async with AsyncSessionLocal() as db:
             await db.execute(

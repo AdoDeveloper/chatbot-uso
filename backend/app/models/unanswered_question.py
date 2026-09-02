@@ -3,7 +3,8 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum as SAEnum, ForeignKey, String, Text, Uuid, func
+from sqlalchemy import DateTime, ForeignKey, String, Text, Uuid, func
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects import mysql
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -45,10 +46,10 @@ class UnansweredQuestion(Base):
         server_default=func.now(), nullable=False
     )
 
-    conversation: Mapped["ChatConversation | None"] = relationship(  # noqa: F821
+    conversation: Mapped[ChatConversation | None] = relationship(  # noqa: F821
         "ChatConversation", foreign_keys=[conversation_id]
     )
-    resolved_by: Mapped["User | None"] = relationship(  # noqa: F821
+    resolved_by: Mapped[User | None] = relationship(  # noqa: F821
         "User", foreign_keys=[resolved_by_id]
     )
 

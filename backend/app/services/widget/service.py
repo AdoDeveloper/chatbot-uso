@@ -115,6 +115,7 @@ async def handle_escalation_consent(
     ambos casos el consentimiento explícito basta por sí solo.
     """
     from sqlalchemy import select as sa_select
+
     from app.models.chat_conversation import ChatConversation
     from app.models.chat_message import ChatMessage
     from app.models.enums import MessageRole

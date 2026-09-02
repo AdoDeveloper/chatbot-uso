@@ -14,7 +14,12 @@ from app.db.session import get_db
 from app.models.enums import UnansweredStatus
 from app.models.unanswered_question import UnansweredQuestion
 from app.models.user import User
-from app.schemas.unanswered import CreateFAQFromUnanswered, UnansweredGroup, UnansweredGroupList, UnansweredQuestionOut
+from app.schemas.unanswered import (
+    CreateFAQFromUnanswered,
+    UnansweredGroup,
+    UnansweredGroupList,
+    UnansweredQuestionOut,
+)
 
 router = APIRouter(prefix="/unanswered", tags=["unanswered"])
 

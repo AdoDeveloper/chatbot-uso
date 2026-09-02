@@ -16,8 +16,13 @@ from app.core.permissions import P
 from app.db import session as db_session
 from app.db.session import get_db
 from app.schemas.health import (
-    ComputeDevice, HealthDetailed, HealthHistoryEntry,
-    HealthSnapshotResult, IncidentEntry, ServiceStatus, UptimeSummary,
+    ComputeDevice,
+    HealthDetailed,
+    HealthHistoryEntry,
+    HealthSnapshotResult,
+    IncidentEntry,
+    ServiceStatus,
+    UptimeSummary,
 )
 from app.services.monitoring import health as health_history
 

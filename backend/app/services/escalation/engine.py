@@ -5,7 +5,6 @@ from typing import Any
 
 from app.models.enums import EscalationTrigger
 
-
 # Tipo de contexto
 # {
 #   "user_message": str,                 # último mensaje del usuario

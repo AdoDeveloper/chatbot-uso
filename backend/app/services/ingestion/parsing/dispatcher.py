@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from app.models.enums import SourceType
-from app.services.ingestion.parsing.pdf import parse_pdf
 from app.services.ingestion.parsing.docx import parse_docx
+from app.services.ingestion.parsing.pdf import parse_pdf
 from app.services.ingestion.parsing.txt import parse_txt
 
 _PARSERS = {

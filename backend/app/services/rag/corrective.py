@@ -10,9 +10,9 @@ import structlog
 from langgraph.graph import END, StateGraph
 
 from app.models.llm_provider import LLMProvider
-from app.services.ingestion import vector_store
 from app.services.ai.embedding import embed_texts_async
 from app.services.ai.llm_gateway import grade_documents, rewrite_query
+from app.services.ingestion import vector_store
 from app.services.rag.router import QueryRoute, classify_query, get_greeting_response
 
 log = structlog.get_logger()

@@ -138,8 +138,8 @@ async def _health_loop() -> None:
             bucket = int(time.time() / _HEALTH_INTERVAL)
             lock_key = f"scheduler:health:{bucket}"
             if await _acquire_once(lock_key, ttl=270):
-                from app.services.monitoring.health import collect_snapshot
                 from app.services.monitoring.alerts import run_all_checks
+                from app.services.monitoring.health import collect_snapshot
                 async with AsyncSessionLocal() as db:
                     await collect_snapshot(db)
                     await run_all_checks(db)

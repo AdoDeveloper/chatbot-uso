@@ -12,7 +12,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
-
 def file_hash(content: bytes) -> str:
     """SHA-256 hex del archivo. Usado para detectar uploads duplicados."""
     return hashlib.sha256(content).hexdigest()
@@ -66,8 +65,8 @@ async def quality_report(db: AsyncSession, source_id) -> dict:
     - long_chunks: >2000 chars
     - last_used_at: última vez que un chunk fue recuperado (chat_messages.sources_json)
     """
-    from app.models.source import Source
     from app.models.chat_message import ChatMessage
+    from app.models.source import Source
 
     # No tenemos tabla de chunks SQL (viven en Qdrant). Aproximamos via campos del Source.
     source = await db.get(Source, source_id)

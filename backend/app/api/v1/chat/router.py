@@ -4,7 +4,6 @@ import asyncio
 import time
 
 import jwt as pyjwt
-
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field

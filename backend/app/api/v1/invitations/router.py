@@ -9,8 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_client_ip, require_perm
 from app.core.exceptions import NotFoundError
-from app.core.rate_limit import RateLimitExceeded, check_rate_limit
 from app.core.permissions import P
+from app.core.rate_limit import RateLimitExceeded, check_rate_limit
 from app.db.session import get_db
 from app.models.invitation import Invitation
 from app.models.user import User

@@ -6,7 +6,18 @@ from pathlib import Path
 from typing import Literal
 
 import structlog
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+    status,
+)
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,8 +31,8 @@ from app.models.source import Source
 from app.models.user import User
 from app.schemas.common import BulkQueueResult, BulkUploadResult, OperationStatus
 from app.schemas.source import SourceResponse, SourceUpdateMeta
-from app.services.system import audit as audit_svc
 from app.services.sources import service as sources_svc
+from app.services.system import audit as audit_svc
 
 router = APIRouter(prefix="/sources", tags=["sources"])
 log = structlog.get_logger()
@@ -347,6 +358,7 @@ async def preview_source(
                 preview_text = "\n\n".join(pages)
             elif ext in (".docx",):
                 from docx import Document
+
                 from app.services.ingestion.parsing.docx import _check_zip_bomb
                 _check_zip_bomb(str(p))
                 doc = Document(str(p))

@@ -11,9 +11,9 @@ from app.models.enums import ReviewStatus, SourceStatus, SourceType
 from app.models.faq_entry import FAQEntry
 from app.models.source import Source
 from app.services.ai import semantic_cache as cache_svc
+from app.services.ai.embedding import embed_texts_async
 from app.services.ingestion import vector_store
 from app.services.ingestion.chunking import chunk_text
-from app.services.ai.embedding import embed_texts_async
 
 log = structlog.get_logger()
 

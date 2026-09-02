@@ -67,9 +67,10 @@ async def check_index_sync(db: AsyncSession) -> dict:
     """Compara los chunks declarados en MySQL contra los puntos reales en Qdrant.
     """
     from sqlalchemy import select
+
     from app.models.enums import SourceStatus
     from app.models.source import Source
-    from app.services.ingestion.vector_store import _get_client, COLLECTION
+    from app.services.ingestion.vector_store import COLLECTION, _get_client
 
     result = await db.execute(
         select(Source.id, Source.name, Source.chunk_count).where(
@@ -224,7 +225,7 @@ async def get_uptime_summary(
         .order_by(HealthSnapshot.service_name, HealthSnapshot.recorded_at.desc())
     )
     # Quedarse con el registro más reciente por servicio.
-    last_by_svc: dict[str, "HealthSnapshot"] = {}
+    last_by_svc: dict[str, HealthSnapshot] = {}
     for r in last_q.scalars().all():
         last_by_svc.setdefault(r.service_name, r)
 

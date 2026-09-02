@@ -53,14 +53,13 @@ async def check_service_down(db: AsyncSession) -> int:
         snaps = last_q.scalars().all()
         if len(snaps) < 2:
             continue
-        if all(not s.is_ok for s in snaps):
-            if await _can_fire(NotificationEvent.service_down, svc):
-                await send_notification(db, event=NotificationEvent.service_down, payload={
-                    "service": svc,
-                    "error": snaps[0].error or "(sin detalle)",
-                    "since": snaps[1].recorded_at.isoformat(),
-                })
-                fired += 1
+        if all(not s.is_ok for s in snaps) and await _can_fire(NotificationEvent.service_down, svc):
+            await send_notification(db, event=NotificationEvent.service_down, payload={
+                "service": svc,
+                "error": snaps[0].error or "(sin detalle)",
+                "since": snaps[1].recorded_at.isoformat(),
+            })
+            fired += 1
     return fired
 
 
@@ -82,14 +81,13 @@ async def check_rate_limit_threshold(db: AsyncSession, *, ratio: float = 0.8) ->
     cnt = int(cnt_q.scalar_one() or 0)
     pct = cnt / limit_per_hour
 
-    if pct >= ratio:
-        if await _can_fire(NotificationEvent.rate_limit_threshold, "global"):
-            await send_notification(db, event=NotificationEvent.rate_limit_threshold, payload={
-                "current_requests_last_hour": cnt,
-                "limit_per_hour": limit_per_hour,
-                "percent": round(pct * 100, 1),
-            })
-            return 1
+    if pct >= ratio and await _can_fire(NotificationEvent.rate_limit_threshold, "global"):
+        await send_notification(db, event=NotificationEvent.rate_limit_threshold, payload={
+            "current_requests_last_hour": cnt,
+            "limit_per_hour": limit_per_hour,
+            "percent": round(pct * 100, 1),
+        })
+        return 1
     return 0
 
 

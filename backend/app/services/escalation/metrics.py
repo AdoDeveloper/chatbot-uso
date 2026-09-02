@@ -10,7 +10,6 @@ from app.models.chat_conversation import ChatConversation
 from app.models.enums import ConversationStatus, EscalationEventType
 from app.models.escalation_event import EscalationEvent
 
-
 _ESCALATION_STATES = (
     ConversationStatus.escalated,
     ConversationStatus.resolved,

@@ -15,7 +15,6 @@ from app.core.permissions import P
 from app.db.session import get_db
 from app.services.monitoring.alerts import run_all_checks
 
-
 router = APIRouter(prefix="/alerts", tags=["system:alerts"])
 _admin = require_perm(P.SYSTEM_MANAGE)
 
