@@ -168,8 +168,6 @@ export default function AsistentePage() {
        <Skeleton className="h-[580px] w-full" />
       ) : (
      <PlaygroundTab
-      settings={form}
-      savedSettings={savedForm}
       widgetConfig={widgetForm ?? widgetConfig}
       deployedWidgetConfig={deployedWidgetConfig}
      />

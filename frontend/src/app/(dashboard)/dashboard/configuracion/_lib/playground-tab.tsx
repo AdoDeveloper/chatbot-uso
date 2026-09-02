@@ -14,7 +14,7 @@ import { useToast } from "@/components/ui/toast";
 import { SegmentedControl } from "@/components/composed/segmented-control";
 import { Badge } from "@/components/ui/badge";
 import { renderMarkdown } from "@/lib/render-markdown";
-import type { ChatbotSettings, WidgetConfig } from "@/types";
+import type { WidgetConfig } from "@/types";
 
 import { BASE_URL } from "@/lib/config";
 const CHAT_API_URL = `${BASE_URL}/api/v1/chat`;
@@ -77,13 +77,9 @@ function SourceCard({
 
 // Tab: Previsualizar
 export function PlaygroundTab({
-  settings,
-  savedSettings,
   widgetConfig,
   deployedWidgetConfig,
 }: {
-  settings: ChatbotSettings;
-  savedSettings: ChatbotSettings | null;
   widgetConfig: WidgetConfig | null;
   deployedWidgetConfig?: WidgetConfig | null;
 }) {
@@ -210,9 +206,6 @@ export function PlaygroundTab({
     }, 2200);
   }
 
-  // Configuración activa según el modo
-  const activeSettings =
-    mode === "deployed" && savedSettings ? savedSettings : settings;
   const activeWidgetConfig =
     mode === "deployed" && deployedWidgetConfig
       ? deployedWidgetConfig
