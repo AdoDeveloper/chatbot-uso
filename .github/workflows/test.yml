@@ -118,6 +118,14 @@ jobs:
       - name: Bring up the stack
         run: docker compose up -d --wait mysql redis qdrant backend frontend
 
+      - name: Show backend logs
+        if: always()
+        run: |
+          echo "=== docker compose ps ==="
+          docker compose ps
+          echo "=== backend logs ==="
+          docker compose logs backend --no-color
+
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
