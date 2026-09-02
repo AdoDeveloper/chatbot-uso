@@ -2,9 +2,6 @@
 
 API REST del backend. Prefijo base: `/api/v1`.
 
-> Documento de referencia de los endpoints expuestos por el backend FastAPI.
-> Total: 173 rutas agrupadas por dominio funcional.
-
 ---
 
 ## Convenciones
@@ -19,6 +16,15 @@ API REST del backend. Prefijo base: `/api/v1`.
 - **Códigos**: `200` OK, `201` creado, `204` sin contenido, `401` no
   autenticado, `403` sin permiso, `404` no encontrado, `409` conflicto, `422`
   validación, `429` límite de tasa.
+
+### Documentación interactiva
+
+FastAPI genera Swagger UI y ReDoc automáticamente desde el código
+(`app/main.py`), pero quedan **deshabilitados en producción** a propósito
+(`ENVIRONMENT=production` → `docs_url=None`) para no exponer la superficie
+completa de la API. Solo están disponibles en un entorno con
+`ENVIRONMENT` distinto de `production`, en `/api/docs` (Swagger) y
+`/api/redoc`. Este documento es la referencia válida en producción.
 
 ---
 
@@ -35,6 +41,7 @@ API REST del backend. Prefijo base: `/api/v1`.
 | POST | `/auth/microsoft/callback` | Callback de OAuth de Microsoft 365 |
 | GET | `/auth/onboarding-status` | Estado del asistente de configuración inicial |
 | POST | `/auth/onboarding-dismiss` | Ocultar el asistente de configuración |
+| POST | `/auth/onboarding-reset` | Volver a mostrar el asistente de configuración |
 | GET | `/auth/invite/{token}` | Información pública de una invitación |
 | POST | `/auth/invite/{token}/accept` | Aceptar invitación y crear cuenta |
 
@@ -44,16 +51,18 @@ API REST del backend. Prefijo base: `/api/v1`.
 | --- | --- | --- |
 | POST | `/chat` | Conversación con el chatbot (respuesta única completa, sin streaming) |
 
-## Conocimiento — Fuentes (`/sources`)
+## Conocimiento - Fuentes (`/sources`)
 
 | Método | Ruta | Descripción |
 | --- | --- | --- |
 | GET | `/sources` | Listar fuentes |
+| GET | `/sources/upload-limits` | Límite de tamaño de archivo configurado (MB) |
 | POST | `/sources/upload` | Subir un documento e iniciar ingestión |
 | POST | `/sources/bulk-upload` | Subir varios documentos |
 | GET | `/sources/{id}` | Detalle de una fuente |
 | PATCH | `/sources/{id}` | Editar metadatos de una fuente |
 | DELETE | `/sources/{id}` | Eliminar una fuente (y sus vectores) |
+| POST | `/sources/{id}/replace-file` | Reemplazar el archivo de una fuente existente y reingestar |
 | POST | `/sources/{id}/ingest` | Reprocesar la ingestión |
 | POST | `/sources/{id}/approve` | Aprobar una fuente para uso |
 | POST | `/sources/{id}/reject` | Rechazar una fuente |
@@ -63,7 +72,7 @@ API REST del backend. Prefijo base: `/api/v1`.
 | POST | `/sources/bulk/reingest` | Reprocesar varias fuentes |
 | POST | `/sources/bulk/tag` | Etiquetar varias fuentes |
 
-## Conocimiento — Fragmentos (`/chunks`)
+## Conocimiento - Fragmentos (`/chunks`)
 
 | Método | Ruta | Descripción |
 | --- | --- | --- |
@@ -75,7 +84,7 @@ API REST del backend. Prefijo base: `/api/v1`.
 | GET | `/chunks/{point_id}/history` | Historial de ediciones del fragmento |
 | POST | `/chunks/test-query` | Búsqueda de prueba contra los fragmentos |
 
-## Conocimiento — FAQ (`/faq`)
+## Conocimiento - FAQ (`/faq`)
 
 | Método | Ruta | Descripción |
 | --- | --- | --- |
@@ -91,14 +100,15 @@ API REST del backend. Prefijo base: `/api/v1`.
 | --- | --- | --- |
 | GET | `/conversations` | Listar conversaciones |
 | GET | `/conversations/{id}` | Detalle de una conversación con sus mensajes |
+| DELETE | `/conversations/{id}` | Eliminar una conversación (borrado físico, con auditoría) |
 | PATCH | `/conversations/{id}/status` | Cambiar el estado |
 | PUT | `/conversations/{id}/tags` | Asignar etiquetas |
 | POST | `/conversations/{id}/csat` | Registrar satisfacción (CSAT) |
 | GET | `/conversations/tags` | Etiquetas existentes |
+| GET | `/conversations/csat-reason-labels` | Etiquetas legibles de los motivos CSAT configurados |
 | POST | `/conversations/bulk` | Acciones en lote |
 | GET | `/conversations/export` | Exportar (CSV/PDF) |
 | PATCH | `/conversations/messages/{id}/feedback` | Valorar un mensaje |
-| PATCH | `/conversations/messages/{id}/annotate` | Anotar un mensaje |
 
 ## Preguntas sin responder (`/unanswered`)
 
@@ -128,6 +138,7 @@ API REST del backend. Prefijo base: `/api/v1`.
 | Método | Ruta | Descripción |
 | --- | --- | --- |
 | GET | `/analytics/dashboard` | Métricas del panel principal |
+| GET | `/analytics/csat` | Satisfacción del usuario (CSAT) agregada, con desglose por motivo |
 | GET | `/analytics/comparison` | Comparativa entre periodos |
 | GET | `/analytics/timeseries` | Serie temporal de consultas |
 | GET | `/analytics/timeline` | Línea de tiempo de actividad |
@@ -141,6 +152,7 @@ API REST del backend. Prefijo base: `/api/v1`.
 | GET | `/analytics/feedback` | Valoración de respuestas |
 | GET | `/analytics/cache` | Estadísticas de caché |
 | GET | `/analytics/sources/quality` | Calidad de las fuentes |
+| GET | `/analytics/quality` | Calidad de las respuestas del asistente (context relevance, faithfulness, answer relevance) |
 | POST | `/analytics/export` | Exportar datos |
 | POST | `/analytics/reports` | Generar reporte |
 
@@ -157,12 +169,20 @@ API REST del backend. Prefijo base: `/api/v1`.
 
 | Método | Ruta | Descripción |
 | --- | --- | --- |
+| GET | `/notifications` | Historial de notificaciones enviadas (todos los canales), paginado |
 | GET | `/notifications/rules` | Listar reglas de notificación |
 | PUT | `/notifications/rules/{id}` | Editar regla |
-| POST | `/notifications/test` | Enviar notificación de prueba |
+| GET | `/notifications/rules/email/status` | Estado del canal de correo (activo/inactivo) |
+| PUT | `/notifications/rules/email/toggle` | Activar/desactivar el canal de correo |
+| GET | `/notifications/report-schedule` | Programación vigente de reportes automáticos |
+| PUT | `/notifications/report-schedule` | Editar la programación de reportes |
 | GET | `/notifications/inbox` | Bandeja de notificaciones |
 | POST | `/notifications/inbox/{id}/read` | Marcar una como leída |
 | POST | `/notifications/inbox/mark-all-read` | Marcar todas como leídas |
+
+> `POST /integrations/smtp/test` cubre el envío de un correo de prueba (ver
+> sección Integraciones) — no existe un endpoint de prueba dedicado bajo
+> `/notifications`.
 
 ## Salud del sistema (`/health`)
 
@@ -183,6 +203,11 @@ API REST del backend. Prefijo base: `/api/v1`.
 | --- | --- | --- | --- |
 | GET | `/widget/config` | Configuración del widget (admin) | JWT |
 | PUT | `/widget/config` | Editar configuración | JWT |
+| GET | `/widget/csat-reasons` | Listar motivos seleccionables de la encuesta CSAT | JWT |
+| POST | `/widget/csat-reasons` | Crear un motivo | JWT |
+| PATCH | `/widget/csat-reasons/{id}` | Editar un motivo (texto, activo/inactivo) | JWT |
+| DELETE | `/widget/csat-reasons/{id}` | Eliminar un motivo | JWT |
+| PUT | `/widget/csat-reasons/reorder` | Reordenar los motivos | JWT |
 | GET | `/widget/embed-code` | Código de integración | JWT |
 | POST | `/widget/regenerate-key` | Regenerar la API key | JWT |
 | GET | `/widget/public/config` | Configuración pública | API key |
@@ -198,26 +223,27 @@ API REST del backend. Prefijo base: `/api/v1`.
 Requieren permisos RBAC específicos. Organizados por dominio, sin un prefijo
 común: cada grupo vive en su propia carpeta bajo `backend/app/api/v1/`.
 
-### Acceso — usuarios, invitaciones, roles y permisos (`access/`)
+### Acceso - usuarios e invitaciones (`access/`)
 
 | Método | Ruta | Descripción |
 | --- | --- | --- |
 | GET | `/users` | Listar usuarios |
+| GET | `/users/summary` | Conteos agregados del equipo (total, activos, sin acceso, admins) |
 | GET | `/users/{id}` | Detalle de usuario |
 | PATCH | `/users/{id}` | Editar usuario |
 | DELETE | `/users/{id}` | Eliminar usuario |
+| POST | `/users/{id}/reset-password` | Generar una contraseña temporal para el usuario |
 | GET | `/users/invitations` | Listar invitaciones |
 | POST | `/users/invitations` | Crear invitación (envía correo) |
+| POST | `/users/invitations/{id}/resend` | Reenviar el correo de invitación |
 | DELETE | `/users/invitations/{id}` | Revocar invitación |
-| GET | `/rbac/matrix` | Matriz módulos × roles × acciones |
-| GET | `/rbac/roles` | Listar roles |
-| POST | `/rbac/roles` | Crear rol |
-| PATCH | `/rbac/roles/{name}` | Editar rol |
-| DELETE | `/rbac/roles/{name}` | Eliminar rol |
-| PUT | `/rbac/toggle` | Conceder/revocar un permiso a un rol |
-| PUT | `/rbac/batch-toggle` | Conceder/revocar permisos en lote |
+| DELETE | `/users/invitations/{id}/permanent` | Eliminar definitivamente una invitación no activa |
+| GET | `/rbac/roles` | Listar roles del sistema |
 | GET | `/rbac/my-permissions` | Permisos del usuario actual |
-| POST | `/rbac/seed` | Inicializar módulos y permisos |
+
+> Los roles (`admin`/`editor`/`viewer`) son fijos, definidos en código
+> (`SYSTEM_ROLES`) — no existe un endpoint para crear, editar o eliminar
+> roles ni para conceder permisos individuales
 
 ### Proveedores de IA (`providers/`)
 
@@ -266,7 +292,7 @@ común: cada grupo vive en su propia carpeta bajo `backend/app/api/v1/`.
 | GET | `/integrations/auth-methods` | Métodos de autenticación activos |
 | PUT | `/integrations/auth-methods` | Activar/desactivar métodos |
 
-### Sistema — caché, cuotas, seguridad, guardrails y mantenimiento (`system/`)
+### Sistema - caché, cuotas, seguridad, guardrails y mantenimiento (`system/`)
 
 | Método | Ruta | Descripción |
 | --- | --- | --- |

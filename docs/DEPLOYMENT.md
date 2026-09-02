@@ -1,4 +1,4 @@
-# Despliegue en producción — Ubuntu Server
+# Despliegue en producción - Ubuntu Server
 
 Guía para desplegar el chatbot en un servidor Ubuntu 22.04 LTS sin Docker, accesible por dominio público con HTTPS.
 
@@ -8,13 +8,7 @@ Guía para desplegar el chatbot en un servidor Ubuntu 22.04 LTS sin Docker, acce
 
 ## 0. Nota crítica sobre la memoria
 
-El sistema carga modelos de IA en memoria (embeddings multilingües + BM25 + reranker + detección de PII). **Cada worker del backend consume ~1.7 GB.**
-
-| RAM del servidor | Workers recomendados |
-| --- | --- |
-| 4 GB | 1 (obligatorio — con 2 hay riesgo de OOM) |
-| 8 GB | 2 |
-| 16 GB+ | 4 |
+El sistema carga modelos de IA en memoria (embeddings multilingües + BM25 + detección de PII), ~1.4 GB en total. El backend corre como un único proceso Uvicorn (ver §0.1) - no hay múltiples workers que sumar.
 
 Con 4 GB se recomienda configurar **swap de 2 GB** como red de seguridad (ver §1.3).
 
@@ -23,7 +17,7 @@ Con 4 GB se recomienda configurar **swap de 2 GB** como red de seguridad (ver §
 **Diseño: cola, no rechazo.** El endpoint de chat usa un `asyncio.Semaphore`
 (`LLM_MAX_CONCURRENCY`) que limita cuántas conversaciones usan un proveedor
 LLM al mismo tiempo. Las peticiones que exceden el límite **esperan en cola**
-hasta `LLM_QUEUE_TIMEOUT_SECONDS` (no reciben un error de inmediato) — el
+hasta `LLM_QUEUE_TIMEOUT_SECONDS` (no reciben un error de inmediato) - el
 usuario percibe una respuesta más lenta en horas pico, nunca un rechazo,
 salvo que la cola se sature por completo durante ese tiempo de espera.
 Este es el patrón documentado oficialmente para `asyncio.Semaphore`: `acquire()`
@@ -31,7 +25,7 @@ bloquea y espera en vez de lanzar una excepción
 ([Python docs, asyncio synchronization primitives](https://docs.python.org/3/library/asyncio-sync.html)).
 
 El semáforo se adquiere al principio del request, antes de tocar la base de
-datos — así el pico de conexiones a MySQL (guardrails, config, caché) nunca
+datos - así el pico de conexiones a MySQL (guardrails, config, caché) nunca
 supera `LLM_MAX_CONCURRENCY` tampoco, y el pool de conexiones no necesita
 dimensionarse contra la concurrencia pico de usuarios, solo contra
 `LLM_MAX_CONCURRENCY` con margen.
@@ -50,25 +44,23 @@ Medido en pruebas de carga reales contra el endpoint público del widget
 | Concurrencia real | Resultado |
 | --- | --- |
 | 9 chats | 9/9 exitosos, ~3s |
-| 60 chats (2× el límite) | 60/60 exitosos — la mitad esperó en cola, nadie fue rechazado |
+| 60 chats (2× el límite) | 60/60 exitosos - la mitad esperó en cola, nadie fue rechazado |
 | 150 chats (5× el límite) | 110/150 exitosos (esperaron su turno), 40 con `503` tras agotar la cola de 45s |
 
 `LLM_MAX_CONCURRENCY` debe ajustarse según la cuota real del proveedor LLM
-contratado — un valor alto en el semáforo no sirve de nada si el proveedor
+contratado - un valor alto en el semáforo no sirve de nada si el proveedor
 externo tiene un rate limit más estricto (ver, por ejemplo, la
 [documentación oficial de rate limits de Groq](https://console.groq.com/docs/rate-limits),
 que en su plan gratuito limita a 30 peticiones/min y 8,000 tokens/min para
-modelos grandes — verificar el plan contratado antes de subir este valor).
+modelos grandes - verificar el plan contratado antes de subir este valor).
 
 **Límite aparte, no relacionado con la cola de chats:** el circuit breaker
 de proveedores LLM (`app/services/ai/llm_gateway.py`) guarda su estado en
-memoria del proceso. Con `WORKERS=1` esto es irrelevante. Si se sube a
-`WORKERS>1` (servidores de 8 GB+), cada worker lleva su propio conteo de
-fallos por proveedor de forma independiente — un proveedor caído puede
-tardar más en "abrirse" globalmente, o abrirse en un worker y no en otro.
-No bloquea el uso con varios workers, pero es una limitación a tener en
-cuenta si se diagnostica un comportamiento inconsistente del fallback entre
-proveedores en ese escenario.
+memoria del proceso. Con un solo proceso backend (la configuración de esta
+guía) esto no es un problema; solo aplica si en algún momento se corre más
+de una instancia del backend a la vez (ej. varios servidores detrás de un
+balanceador), donde cada una llevaría su propio conteo de fallos por
+proveedor de forma independiente.
 
 ---
 
@@ -79,7 +71,7 @@ proveedores en ese escenario.
 ```bash
 sudo apt update && sudo apt upgrade -y
 
-# Ubuntu 22.04 trae Python 3.10 de fábrica — 3.12 requiere el PPA deadsnakes.
+# Ubuntu 22.04 trae Python 3.10 de fábrica - 3.12 requiere el PPA deadsnakes.
 sudo add-apt-repository -y ppa:deadsnakes/ppa
 sudo apt update
 sudo apt install -y \
@@ -215,7 +207,6 @@ python3.12 -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip
 pip install -r requirements.txt
-pip install gunicorn
 ```
 
 ### 6.2 Archivo `.env`
@@ -241,7 +232,7 @@ DB_MAX_OVERFLOW=50
 
 # Máximo de conversaciones que usan un proveedor LLM al mismo tiempo. Las que
 # exceden ESPERAN en cola (no se rechazan) hasta LLM_QUEUE_TIMEOUT_SECONDS.
-# Ajustar según la cuota real del proveedor contratado — ver §0.1.
+# Ajustar según la cuota real del proveedor contratado - ver §0.1.
 LLM_MAX_CONCURRENCY=30
 LLM_QUEUE_TIMEOUT_SECONDS=45
 
@@ -255,15 +246,13 @@ QDRANT_API_KEY=API_KEY_QDRANT
 # Dominio público del panel (sustituir por el real)
 ALLOWED_ORIGINS=["https://chatbot.usonsonate.edu.sv"]
 WIDGET_BASE_URL=https://chatbot.usonsonate.edu.sv
+FRONTEND_URL=https://chatbot.usonsonate.edu.sv
 
 # Primer administrador (se crea solo en el primer arranque)
 FIRST_ADMIN_EMAIL=admin@usonsonate.edu.sv
 FIRST_ADMIN_PASSWORD=CONTRASEÑA_FUERTE_INICIAL
 
-# Con 4 GB de RAM: 1 solo worker. Con 8 GB: 2.
-WORKERS=1
-
-# SMTP (opcional — para invitaciones)
+# SMTP (opcional - para invitaciones)
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=correo@usonsonate.edu.sv
@@ -288,8 +277,8 @@ alembic upgrade head
 
 > Para una instalación nueva (base de datos vacía), `python -m scripts.init_db`
 > hace este paso y además siembra el admin/datos por defecto en un solo
-> comando — útil si quieres poblar la base antes de arrancar el servicio, en
-> vez de esperar a que el seeding corra en el arranque de `gunicorn`.
+> comando - útil si quieres poblar la base antes de arrancar el servicio, en
+> vez de esperar a que el seeding corra en el arranque del backend.
 
 ### 6.4 Pre-descargar modelos (obligatorio)
 
@@ -302,12 +291,6 @@ from fastembed import TextEmbedding, SparseTextEmbedding
 TextEmbedding('intfloat/multilingual-e5-large')
 SparseTextEmbedding('Qdrant/bm25')
 print('Embeddings descargados.')
-"
-
-python3 -c "
-from flashrank import Ranker
-Ranker(model_name='ms-marco-MultiBERT-L-12')
-print('Reranker descargado.')
 "
 
 # spaCy para detección de PII (recomendado)
@@ -336,12 +319,10 @@ User=www-data
 WorkingDirectory=/opt/chatbot/backend
 EnvironmentFile=/opt/chatbot/backend/.env
 Environment=HF_HUB_OFFLINE=1
-ExecStart=/opt/chatbot/backend/.venv/bin/gunicorn app.main:app \
-    --bind 127.0.0.1:8000 \
-    --worker-class uvicorn.workers.UvicornWorker \
-    --workers 1 \
-    --timeout 300 \
-    --graceful-timeout 30
+ExecStart=/opt/chatbot/backend/.venv/bin/uvicorn app.main:app \
+    --host 127.0.0.1 \
+    --port 8000 \
+    --timeout-graceful-shutdown 30
 Restart=always
 RestartSec=10
 
@@ -354,8 +335,6 @@ sudo chown -R www-data:www-data /opt/chatbot/backend
 sudo systemctl daemon-reload
 sudo systemctl enable --now chatbot-backend
 ```
-
-> Ajustar `--workers` según la RAM disponible (ver §0).
 
 ---
 
@@ -449,7 +428,7 @@ server {
     add_header X-XSS-Protection        "0"       always;
     add_header Referrer-Policy         "strict-origin-when-cross-origin" always;
     add_header Permissions-Policy      "camera=(), microphone=(), geolocation=()" always;
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http: https:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" always;
     # Descomentar tras configurar HTTPS con certbot (sección 10):
     # add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
 
@@ -464,7 +443,7 @@ server {
         proxy_read_timeout 300s;
         proxy_send_timeout 120s;
         # Sin streaming SSE: el chat responde con un unico JSON completo.
-        # Buffering desactivado igual — no afecta una respuesta JSON normal.
+        # Buffering desactivado igual - no afecta una respuesta JSON normal.
         proxy_buffering off;
         proxy_cache     off;
     }
@@ -480,7 +459,7 @@ server {
         add_header X-XSS-Protection        "0"       always;
         add_header Referrer-Policy         "strict-origin-when-cross-origin" always;
         add_header Permissions-Policy      "camera=(), microphone=(), geolocation=()" always;
-        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http: https:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" always;
         expires    1d;
         add_header Cache-Control "public, max-age=86400";
     }
@@ -654,18 +633,17 @@ Pruebas funcionales:
 
 ## 15. Checklist de go-live
 
-### Bloqueantes — no entrar a producción sin esto
+### Bloqueantes - no entrar a producción sin esto
 
 - [ ] `SECRET_KEY` generada con `openssl rand -hex 32`, no el valor de ejemplo.
 - [ ] `ENVIRONMENT=production` y `DEBUG=false` en el `.env` del servidor.
 - [ ] `.env` con `chmod 600` y fuera del repositorio.
 - [ ] HTTPS activo con certificado válido; `http://` redirige a `https://`.
 - [ ] HSTS habilitado en nginx (`Strict-Transport-Security`).
-- [ ] `WORKERS=1` confirmado en servidor de 4 GB.
 - [ ] Los 5 servicios systemd habilitados con `systemctl enable` (arrancan tras reinicio).
 - [ ] Backup automático corriendo y probado con una restauración real.
 
-### Importantes — completar en los primeros días
+### Importantes - completar en los primeros días
 
 - [ ] Contraseña del primer admin cambiada tras el primer login.
 - [ ] `ALLOWED_ORIGINS` con solo el dominio real del panel.
@@ -711,9 +689,8 @@ Más `FIRST_ADMIN_PASSWORD` (≥12 chars, mayúscula, minúscula, dígito y sím
 
 ## 18. Entorno de desarrollo (WSL)
 
-Para desarrollo se usa **WSL (Ubuntu 22.04)** sobre Windows, con los mismos servicios (`mysql`, `redis-server`, `qdrant`, `chatbot-backend`, `chatbot-frontend`) gestionados por systemd, pero con dos diferencias respecto a producción:
+Para desarrollo se usa **WSL (Ubuntu 22.04)** sobre Windows, con los mismos servicios (`mysql`, `redis-server`, `qdrant`, `chatbot-backend`, `chatbot-frontend`) gestionados por systemd, con una diferencia respecto a producción:
 
-- **Backend con Uvicorn directo** (sin Gunicorn): un solo proceso, suficiente para desarrollo. El `ExecStart` del servicio apunta a `uvicorn app.main:app --host 127.0.0.1 --port 8000`.
 - **Sin reverse proxy ni HTTPS**: se accede directo a `localhost:3000` (frontend) y `localhost:8000` (backend).
 
 ### Flujo de sincronización (Windows → WSL)
@@ -735,9 +712,9 @@ cd ~/chatbot-uso/widget && npm run build
 cp dist/widget.js /opt/chatbot/backend/static/widget/widget.js
 ```
 
-> **Nota sobre `node_modules`**: no copiar `node_modules` desde Windows a WSL — los enlaces simbólicos y binarios nativos se corrompen al cruzar el sistema de archivos NTFS. Ejecutar `npm install` directamente en WSL.
+> **Nota sobre `node_modules`**: no copiar `node_modules` desde Windows a WSL - los enlaces simbólicos y binarios nativos se corrompen al cruzar el sistema de archivos NTFS. Ejecutar `npm install` directamente en WSL.
 >
-> **Nota sobre `nginx.conf`**: la config activa en producción vive en `/etc/nginx/sites-available/chatbot`, gestionada aparte de este repo (nginx nativo vía systemd, no Docker) — `nginx/nginx.conf` es solo la plantilla de referencia para despliegues con Docker. Un cambio en `nginx/nginx.conf` **no** llega solo a producción; hay que aplicarlo también en `/etc/nginx/sites-available/chatbot` y recargar (`nginx -t && sudo systemctl reload nginx`) manualmente.
+> **Nota sobre `nginx.conf`**: la config activa en producción vive en `/etc/nginx/sites-available/chatbot`, gestionada aparte de este repo (nginx nativo vía systemd, no Docker) - `nginx/nginx.conf` es solo la plantilla de referencia para despliegues con Docker. Un cambio en `nginx/nginx.conf` **no** llega solo a producción; hay que aplicarlo también en `/etc/nginx/sites-available/chatbot` y recargar (`nginx -t && sudo systemctl reload nginx`) manualmente.
 
 ### Variable `HF_HUB_OFFLINE`
 

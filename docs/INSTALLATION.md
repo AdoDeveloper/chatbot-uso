@@ -4,14 +4,14 @@ Guía para levantar el chatbot en un entorno local de desarrollo usando Docker C
 
 ---
 
-## Opción A — Docker Compose (recomendado)
+## Opción A - Docker Compose (recomendado)
 
 La forma más rápida. Requiere Docker Desktop 24+ con Docker Compose v2.
 
 ### Requisitos
 
 - Docker Desktop 24+ (Windows 11 con WSL2 backend, macOS, o Linux)
-- 8 GB RAM mínimo (los modelos de IA ocupan ~1.7 GB por worker)
+- 8 GB RAM mínimo (los modelos de IA ocupan ~1.7 GB)
 - 15 GB de disco libre (imágenes + modelos)
 
 > **En Windows**: clonar el repo dentro del filesystem de WSL2 (`~/chatbot-uso`), **no** en `/mnt/c/`. El I/O cruzado NTFS↔WSL2 es 5-10× más lento y corrompe permisos de volúmenes Docker.
@@ -27,7 +27,7 @@ cd chatbot-uso
 cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env.local
 
-# 3. Editar backend/.env — ajustar mínimo:
+# 3. Editar backend/.env - ajustar mínimo:
 #    SECRET_KEY           → openssl rand -hex 32
 #    FIRST_ADMIN_EMAIL    → su correo
 #    FIRST_ADMIN_PASSWORD → contraseña temporal
@@ -58,7 +58,7 @@ make dev-frontend    # Frontend con hot-reload
 
 ---
 
-## Opción B — WSL2 manual (sin Docker)
+## Opción B - WSL2 manual (sin Docker)
 
 Para desarrollo local en Windows con WSL2 Ubuntu 22.04 sin usar Docker.
 
@@ -84,7 +84,7 @@ wsl --set-default-version 2
 
 Después de reiniciar, abrir la terminal de Ubuntu.
 
-**Importante — evitar conflicto de paths con Windows:** añadir a `/etc/wsl.conf`:
+**Importante - evitar conflicto de paths con Windows:** añadir a `/etc/wsl.conf`:
 
 ```ini
 [interop]
@@ -98,7 +98,7 @@ Reiniciar WSL (`wsl --shutdown`) y verificar: `which node` debe dar `/usr/bin/no
 ```bash
 sudo apt update && sudo apt upgrade -y
 
-# Ubuntu 22.04 trae Python 3.10 de fábrica — 3.12 requiere el PPA deadsnakes.
+# Ubuntu 22.04 trae Python 3.10 de fábrica - 3.12 requiere el PPA deadsnakes.
 sudo add-apt-repository -y ppa:deadsnakes/ppa
 sudo apt update
 sudo apt install -y \
@@ -129,6 +129,19 @@ SQL
 ```
 
 > En desarrollo puede usar una contraseña simple. En producción use `openssl rand -hex 16`.
+>
+> Para correr la suite de tests del backend (`pytest`) se necesita además una
+> segunda base de datos, `chatbot_test_ci`, con el mismo usuario `chatbot`:
+> los tests corren contra MySQL real (no SQLite) para detectar divergencias
+> de sintaxis/semántica que solo aparecen en producción.
+>
+> ```bash
+> sudo mysql <<'SQL'
+> CREATE DATABASE chatbot_test_ci CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+> GRANT ALL PRIVILEGES ON chatbot_test_ci.* TO 'chatbot'@'localhost';
+> FLUSH PRIVILEGES;
+> SQL
+> ```
 
 #### Nota WSL2 + Redis
 
@@ -182,7 +195,6 @@ python3.12 -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip
 pip install -r requirements.txt
-pip install gunicorn
 ```
 
 #### Variables de entorno
@@ -224,12 +236,6 @@ SparseTextEmbedding('Qdrant/bm25')
 print('Embeddings descargados.')
 "
 
-python3 -c "
-from flashrank import Ranker
-Ranker(model_name='ms-marco-MultiBERT-L-12')
-print('Reranker descargado.')
-"
-
 # spaCy para detección de PII (opcional pero recomendado)
 python3 -m spacy download es_core_news_sm
 ```
@@ -246,12 +252,12 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 curl http://localhost:8000/api/v1/health/live  # → {"status":"ok"}
 ```
 
-> El primer arranque de `uvicorn`/`gunicorn` ya siembra el admin inicial y los
+> El primer arranque de `uvicorn` ya siembra el admin inicial y los
 > datos por defecto automáticamente (`app/main.py`, evento de arranque). Si
 > necesitas migrar y sembrar la base de datos SIN levantar el servidor (por
 > ejemplo en un script de CI o para verificar antes de exponer el servicio),
 > usa `python -m scripts.init_db` en vez de correr `alembic upgrade head`
-> manualmente — hace ambos pasos en uno solo y es seguro repetirlo.
+> manualmente - hace ambos pasos en uno solo y es seguro repetirlo.
 
 ### 6. Frontend (Next.js)
 
@@ -276,7 +282,7 @@ npm run dev
 
 ---
 
-## Variables de entorno — referencia
+## Variables de entorno - referencia
 
 ### Backend (`backend/.env`)
 
@@ -290,8 +296,7 @@ npm run dev
 | `ALLOWED_ORIGINS` | Dominios CORS permitidos | `["http://localhost:3000"]` |
 | `FIRST_ADMIN_EMAIL` | Email del primer admin (seed) | `admin@dev.local` |
 | `FIRST_ADMIN_PASSWORD` | Contraseña inicial del admin | `DevPassword123!` |
-| `WORKERS` | Workers de Gunicorn | `1` (dev), `2` (prod 8 GB+) |
-| `SMTP_*` | Envío de correo: invitaciones, escalamientos y notificaciones (opcional) | — |
+| `SMTP_*` | Envío de correo: invitaciones, escalamientos y notificaciones (opcional) | - |
 
 ### Frontend (`frontend/.env.local`)
 
@@ -315,6 +320,21 @@ curl -I http://localhost:3000
 ```
 
 Abrir `http://localhost:3000` y entrar con las credenciales de `FIRST_ADMIN_EMAIL` / `FIRST_ADMIN_PASSWORD`. El sistema pedirá cambiar la contraseña en el primer login.
+
+## Correr los tests
+
+```bash
+# Backend (requiere la BD chatbot_test_ci, ver paso 3 arriba, y Redis activo)
+cd backend && source .venv/bin/activate
+pytest
+
+# Frontend (unitarios)
+cd frontend && npm run test
+
+# Frontend (E2E, requiere backend + frontend corriendo y un usuario admin real)
+cd frontend
+E2E_USER=<email-admin> E2E_PASS=<contraseña> npm run test:e2e
+```
 
 ### Limpieza de dependencias Node entre WSL y Windows
 

@@ -59,7 +59,7 @@ flowchart LR
     subgraph fe["Frontend"]
         next["Next.js 15.5<br/>App Router"]
         tw["Tailwind v4<br/>+ shadcn/ui"]
-        rq["TanStack Query"]
+        rq["useApi<br/>(hook propio, caché 30s)"]
     end
 
     subgraph be["Backend"]
@@ -72,7 +72,6 @@ flowchart LR
     subgraph emb["Pipeline RAG"]
         fe2["fastembed<br/>multilingual-e5-large"]
         bm25["Qdrant BM25<br/>(sparse)"]
-        rerank["FlashRank<br/>(MultiBERT-L-12)"]
     end
 
     subgraph guard["Seguridad"]
@@ -92,13 +91,12 @@ flowchart LR
 | ORM | SQLAlchemy async + Alembic | 2.0 |
 | Base de datos | MySQL | 8.0 |
 | Caché / rate-limit | Redis | 7 |
-| Vector DB (cliente) | Qdrant | qdrant-client 1.13.3 |
+| Vector DB (cliente) | Qdrant | qdrant-client 1.17.1 |
 | Embeddings densos | intfloat/multilingual-e5-large (fastembed) | 1024 dims |
-| Embeddings sparse | Qdrant/bm25 (fastembed) | — |
-| Reranker | ms-marco-MultiBERT-L-12 (FlashRank) | — |
-| RAG | LangGraph Adaptive RAG | — |
-| Frontend | Next.js 15 + Tailwind v4 + shadcn/ui | — |
-| Widget | Preact + Shadow DOM | — |
+| Embeddings sparse | Qdrant/bm25 (fastembed) | - |
+| RAG | LangGraph Adaptive RAG | - |
+| Frontend | Next.js 15 + Tailwind v4 + shadcn/ui | - |
+| Widget | Preact + Shadow DOM | - |
 
 ---
 
@@ -170,7 +168,7 @@ sequenceDiagram
 - 6-7: clasificación de la query y retrieval (200-800 ms).
 - 8: generación del LLM (1-30 s según modelo). El backend consume internamente
   el stream de tokens del proveedor LLM, pero responde al cliente con el
-  mensaje completo en un único JSON — no hay streaming SSE de por medio; el
+  mensaje completo en un único JSON - no hay streaming SSE de por medio; el
   cliente muestra un indicador de "escribiendo..." durante la espera.
 
 ---
@@ -179,19 +177,17 @@ sequenceDiagram
 
 ```mermaid
 flowchart TB
-    upload["Admin sube fuente<br/>(PDF / DOCX / XLSX / CSV / TXT / FAQ)"]
+    upload["Admin sube fuente<br/>(PDF / DOCX / TXT / FAQ)"]
     detect{"Tipo?"}
 
     upload --> detect
     detect -->|PDF| ext_pdf["pypdf"]
     detect -->|DOCX| ext_docx["python-docx"]
-    detect -->|XLSX/CSV| ext_sheet["openpyxl / csv"]
     detect -->|TXT| ext_txt["texto plano"]
     detect -->|FAQ| faq["Texto directo<br/>(sin archivo)"]
 
     ext_pdf --> chunk
     ext_docx --> chunk
-    ext_sheet --> chunk
     ext_txt --> chunk
     faq --> chunk
 
@@ -221,7 +217,7 @@ flowchart TB
 - Embeddings: 8-15 s (CPU only).
 - Upsert Qdrant: < 2 s.
 
-**Nota sobre aprobación**: los documentos (PDF/DOCX/XLSX/CSV/TXT) quedan en estado `pendiente_revision` hasta que un admin los aprueba. Las FAQs creadas desde el panel se aprueban automáticamente.
+**Nota sobre aprobación**: los documentos (PDF/DOCX/TXT) quedan en estado `pendiente_revision` hasta que un admin los aprueba. Las FAQs creadas desde el panel se aprueban automáticamente.
 
 ---
 
@@ -251,7 +247,7 @@ erDiagram
     SOURCES {
         uuid id PK
         string name
-        string type "pdf/docx/xlsx/csv/txt/faq"
+        string type "pdf/docx/txt/faq"
         string status "pending/processing/ready/error"
         string review_status "procesando/pendiente_revision/aprobada/rechazada"
         int chunk_count
@@ -274,13 +270,16 @@ erDiagram
         json sources_json
         int latency_ms
         string rag_route
+        float context_relevance_ratio "métrica de calidad, nullable"
+        float faithfulness_score "métrica de calidad, nullable"
+        float answer_relevance_score "métrica de calidad, nullable"
     }
 
 ```
 
 ---
 
-## 6. Adaptive RAG — máquina de estados
+## 6. Adaptive RAG - máquina de estados
 
 ```mermaid
 stateDiagram-v2
@@ -293,9 +292,7 @@ stateDiagram-v2
     Greeting --> [*]: respuesta predefinida<br/>(sin retrieval)
 
     Factual --> Retrieve: hybrid search
-    Retrieve --> Rerank: reranker activo?
-    Rerank --> [*]: top_k chunks
-    Retrieve --> [*]: top_k chunks (sin rerank)
+    Retrieve --> [*]: top_k chunks
 
     Complex --> Expand: rewrite_query
     Expand --> Retrieve2: hybrid search
@@ -311,6 +308,16 @@ stateDiagram-v2
 - Greeting: 0 llamadas LLM, 0 retrievals.
 - Factual: 1 llamada LLM (generación), 1 retrieval.
 - Complex: 2-3 llamadas LLM (grade + opcional rewrite + generación).
+
+**Métricas de calidad de la respuesta** (`services/rag/quality.py`,
+`llm_gateway.grade_faithfulness`): tras responder, una tarea async
+fire-and-forget calcula `context_relevance_ratio` (fracción de chunks
+recuperados que resultaron relevantes), `faithfulness_score` (fracción de
+afirmaciones de la respuesta respaldadas por el contexto, vía LLM-juez en 2
+pasos siguiendo la metodología RAGAS) y `answer_relevance_score` (similitud
+coseno entre pregunta y respuesta), y las persiste en `ChatMessage`. No
+bloquea la respuesta al usuario. Se agregan en `GET /analytics/quality` y se
+muestran en el panel de Estadísticas.
 
 ---
 
@@ -370,15 +377,24 @@ chatbot-uso/
 | Widget público | Validación de API key + allowlist de dominios por `Origin` |
 | IP real tras proxy | `CF-Connecting-IP` / `X-Real-IP` / `X-Forwarded-For` |
 
-## 9. Notificaciones por correo
+## 9. Notificaciones (correo + bandeja in-app)
 
-El sistema envía correo (SMTP, configurado por variables de entorno) en:
+El sistema notifica por correo (SMTP, configurado por variables de entorno)
+y/o por una bandeja in-app en el panel en:
 
 - **Invitaciones de usuario**: enlace de registro al correo del invitado.
 - **Escalamientos**: aviso a los administradores cuando una conversación se escala.
 - **Reglas de notificación**: eventos configurables (servicio caído, proveedor caído, etc.).
 
-El envío es *best-effort*: un fallo de SMTP queda registrado pero no interrumpe la operación que lo originó.
+El envío es *best-effort*: un fallo de SMTP queda registrado pero no
+interrumpe la operación que lo originó.
+
+Cada disparo de `send_notification()` genera un `trigger_id` compartido por
+todas sus filas (`NotificationLog`, una por canal/destinatario), de modo que
+`GET /notifications` agrupa la entrega multi-canal (email + N admins in-app)
+en un solo ítem por trigger en vez de una fila duplicada por destinatario. El
+marcado de leída (`POST /notifications/inbox/{id}/read`) es individual por
+admin, vía la fila `in_app` que le corresponde dentro del trigger.
 
 ## 10. Convención de configuración: fuente única
 
@@ -394,7 +410,7 @@ Cada ajuste tiene exactamente una fuente:
 ## 11. Convenciones de la interfaz
 
 - El texto del panel de administración, los errores de la API y los correos emplea tratamiento formal de **usted**.
-- El chatbot público y el widget **tutean** a propósito (el system prompt por defecto instruye "tutea al usuario") — es una decisión de producto para el público estudiantil.
+- El chatbot público y el widget **tutean** a propósito (el system prompt por defecto instruye "tutea al usuario") - es una decisión de producto para el público estudiantil.
 - No se exponen detalles técnicos de configuración (rutas, variables de entorno, logs) en la interfaz.
 - La terminología es en español: las acciones de valoración (👍/👎) se denominan «valoración», no «feedback».
 
@@ -407,7 +423,7 @@ como snapshots JSON en la tabla `config_versions`.
 Las versiones se generan de tres formas:
 
 - **Automática**: un middleware ASGI captura un snapshot tras cada mutación
-  exitosa de configuración (sin añadir latencia a la respuesta — es
+  exitosa de configuración (sin añadir latencia a la respuesta - es
   *fire-and-forget*). Solo crea una versión nueva si hubo cambios reales
   respecto a la anterior.
 - **Manual**: el administrador crea un punto de restauración explícito.

@@ -52,11 +52,11 @@ setup:
 	@echo "  Edita backend/.env con SECRET_KEY, FIRST_ADMIN_EMAIL y FIRST_ADMIN_PASSWORD."
 	@echo "  Luego ejecuta: docker compose up -d --build"
 
-# ── Stack completo — local ─────────────────────────────────────────────────────
+# ── Stack completo - local ─────────────────────────────────────────────────────
 up:
 	docker compose up -d --build
 
-# ── Stack completo — servidor ──────────────────────────────────────────────────
+# ── Stack completo - servidor ──────────────────────────────────────────────────
 prod:
 	@echo "Desplegando con FRONTEND_API_URL=$(FRONTEND_API_URL) ..."
 	@echo "Panel público FRONTEND_APP_URL=$(FRONTEND_APP_URL)"

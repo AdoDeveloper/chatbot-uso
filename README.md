@@ -1,4 +1,4 @@
-# Chatbot RAG — Universidad de Sonsonate
+# Chatbot RAG - Universidad de Sonsonate
 
 Chatbot institucional con pipeline RAG (Retrieval-Augmented Generation) y panel de administración para la Universidad de Sonsonate (USO).
 
@@ -45,7 +45,7 @@ cd chatbot-uso
 cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env.local
 
-# 3. Editar backend/.env — ajustar mínimo:
+# 3. Editar backend/.env - ajustar mínimo:
 #    SECRET_KEY           → openssl rand -hex 32
 #    FIRST_ADMIN_EMAIL    → su correo
 #    FIRST_ADMIN_PASSWORD → contraseña temporal
@@ -142,7 +142,7 @@ chatbot-uso/
 
 | Variable | Descripción |
 | --- | --- |
-| `SECRET_KEY` | JWT signing — generar con `openssl rand -hex 32` |
+| `SECRET_KEY` | JWT signing - generar con `openssl rand -hex 32` |
 | `DATABASE_URL` | MySQL: `mysql+aiomysql://user:pass@host:3306/db` |
 | `REDIS_URL` | Redis: `redis://:password@host:6379/0` |
 | `QDRANT_URL` | URL del servicio Qdrant |
@@ -150,7 +150,6 @@ chatbot-uso/
 | `ALLOWED_ORIGINS` | Dominios CORS: `["https://admin.usonsonate.edu.sv"]` |
 | `FIRST_ADMIN_EMAIL` | Email del primer admin (seed) |
 | `FIRST_ADMIN_PASSWORD` | Contraseña inicial del admin |
-| `WORKERS` | Workers Gunicorn: 1 (4 GB RAM), 2 (8 GB+) |
 
 ### Docker Compose / Makefile
 

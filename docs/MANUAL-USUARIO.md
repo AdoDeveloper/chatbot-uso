@@ -67,7 +67,7 @@ sección gestiona ese contenido.
 
 En **Conocimiento → Documentos** puede:
 
-- **Subir documentos**: PDF, DOCX, XLSX, CSV o TXT. Arrastre los archivos o
+- **Subir documentos**: PDF, DOCX o TXT. Arrastre los archivos o
   pulse para seleccionarlos. Puede subir varios a la vez.
 - **Seguir el progreso**: cada documento pasa por las etapas de extracción,
   fragmentación e indexación. El estado se actualiza en tiempo real.
@@ -169,7 +169,9 @@ como un botón para abrirlo).
 
 En **Conversaciones** se revisa todo el historial de interacciones: mensajes,
 fuentes citadas, latencia, valoración (👍/👎) y ruta seguida por el sistema.
-Se pueden filtrar, etiquetar y exportar (CSV/PDF).
+Se pueden filtrar, etiquetar, exportar (CSV/PDF) y eliminar de forma
+permanente (solo con el permiso correspondiente; la eliminación no se puede
+deshacer).
 
 ### 5.2 Pendientes y escalamientos
 
@@ -237,6 +239,13 @@ límite.
 - **Resumen de preguntas sin responder**: un correo periódico con las preguntas
   que el chatbot no pudo contestar. La cadencia (diaria, semanal, mensual o
   anual) y la hora de envío se configuran aparte.
+
+Además del correo, las notificaciones llegan a la campana en la esquina
+superior del panel. Al abrir una notificación se marca como leída
+automáticamente; también puede marcarse individualmente (botón que aparece al
+pasar el mouse) o todas a la vez. El historial completo (Configuración →
+Notificaciones) agrupa en una sola fila los envíos que salieron por varios
+canales a la vez (por ejemplo, correo + varios administradores en la app).
 
 ---
 

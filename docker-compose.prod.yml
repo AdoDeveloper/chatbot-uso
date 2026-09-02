@@ -1,4 +1,4 @@
-# Overrides de producción — usar con:
+# Overrides de producción - usar con:
 #   make prod SERVER=<ip-o-dominio>
 # o manualmente:
 #   MYSQL_ROOT_PASSWORD=... MYSQL_PASSWORD=... REDIS_PASSWORD=... QDRANT_API_KEY=... \
@@ -6,10 +6,10 @@
 #     docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build -d
 #
 # Variables OBLIGATORIAS en producción (compose falla con un mensaje claro si faltan):
-#   MYSQL_ROOT_PASSWORD — genera con: openssl rand -hex 16
-#   MYSQL_PASSWORD      — genera con: openssl rand -hex 16
-#   REDIS_PASSWORD      — genera con: openssl rand -hex 16
-#   QDRANT_API_KEY      — genera con: openssl rand -hex 32
+#   MYSQL_ROOT_PASSWORD - genera con: openssl rand -hex 16
+#   MYSQL_PASSWORD      - genera con: openssl rand -hex 16
+#   REDIS_PASSWORD      - genera con: openssl rand -hex 16
+#   QDRANT_API_KEY      - genera con: openssl rand -hex 32
 #
 # Nota: MYSQL_ROOT_PASSWORD y MYSQL_PASSWORD solo aplican al inicializar el
 # volumen de datos. Si el volumen ya existe con otra contraseña, cámbiala con
@@ -18,7 +18,7 @@
 services:
   mysql:
     restart: unless-stopped
-    # Solo accesible por la red interna de Docker — nunca expuesto al host
+    # Solo accesible por la red interna de Docker - nunca expuesto al host
     ports: []
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Define MYSQL_ROOT_PASSWORD para producción (openssl rand -hex 16)}
@@ -65,8 +65,6 @@ services:
       ENVIRONMENT: production
       DATABASE_URL: mysql+aiomysql://${MYSQL_USER:-chatbot}:${MYSQL_PASSWORD:?Define MYSQL_PASSWORD para producción}@mysql:3306/${MYSQL_DATABASE:-chatbot}
       QDRANT_API_KEY: ${QDRANT_API_KEY:?Define QDRANT_API_KEY para producción}
-    # Cada worker carga ~1.7 GB de modelos. mem_limit debe escalar con WORKERS:
-    # 1 worker → ~3g; cada worker extra suma ~1.7g. Ajustar si subes WORKERS.
     mem_limit: ${BACKEND_MEM_LIMIT:-3g}
     mem_reservation: 2g
     # Espera a que Qdrant esté SANO (healthcheck añadido arriba), no solo
@@ -79,11 +77,10 @@ services:
         condition: service_healthy
       qdrant:
         condition: service_healthy
-    # Quita el bind-mount de desarrollo (./backend:/app) — usa solo volúmenes nombrados
+    # Quita el bind-mount de desarrollo (./backend:/app) - usa solo volúmenes nombrados
     volumes:
       - uploads_data:/app/uploads
       - model_cache:/home/appuser/.cache/fastembed
-      - reranker_cache:/home/appuser/.cache/flashrank
 
   frontend:
     build:
@@ -94,7 +91,7 @@ services:
         NEXT_PUBLIC_APP_URL: ${FRONTEND_APP_URL:-${FRONTEND_API_URL:-http://localhost}}
     # En producción no se expone el puerto; nginx enruta el tráfico
     ports: []
-    volumes: []           # Sin bind-mounts — usa los archivos compilados en la imagen
+    volumes: []           # Sin bind-mounts - usa los archivos compilados en la imagen
     command: []           # Usa el CMD del Dockerfile (node server.js)
     environment:
       - NODE_ENV=production
@@ -128,10 +125,10 @@ services:
       - /bin/sh
       - -c
       - |
-        echo "[backup] servicio iniciado — vuelca cada 24h, retención $${RETENTION_DAYS}d"
+        echo "[backup] servicio iniciado - vuelca cada 24h, retención $${RETENTION_DAYS}d"
         while true; do
           TS=$$(date +%Y%m%d_%H%M%S)
-          echo "[backup] $$TS — dumping MySQL..."
+          echo "[backup] $$TS - dumping MySQL..."
           if mysqldump -h mysql -u root --single-transaction --routines \
                "$${MYSQL_DATABASE}" | gzip > "/backups/mysql_$${TS}.sql.gz"; then
             if gzip -t "/backups/mysql_$${TS}.sql.gz"; then

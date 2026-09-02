@@ -12,6 +12,7 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
     ports:
+      # 3307 en el host, no 3306: evita chocar con una instancia de MySQL nativa ya corriendo en el mismo servidor.
       - "3307:3306"
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "--password=${MYSQL_ROOT_PASSWORD:-chatbot_root_2026}"]
@@ -47,7 +48,7 @@ services:
       retries: 5
 
   qdrant:
-    image: qdrant/qdrant:v1.13.6
+    image: qdrant/qdrant:v1.17.1
     container_name: chatbot_qdrant
     restart: unless-stopped
     volumes:
@@ -76,10 +77,6 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD:-chatbot_redis_2026}@redis:6379/0
       QDRANT_URL: http://qdrant:6333
       HF_HUB_OFFLINE: "1"
-      # Cada worker carga ~1.7 GB de modelos en RAM (e5-large + flashrank).
-      # RAM mínima recomendada: 8 GB (WORKERS=2), 16 GB (WORKERS=4+).
-      # Sobreescribir desde shell: WORKERS=4 docker compose up
-      WORKERS: ${WORKERS:-1}
     ports:
       - "8000:8000"
     depends_on:
@@ -93,7 +90,6 @@ services:
       - ./backend:/app
       - uploads_data:/app/uploads
       - model_cache:/home/appuser/.cache/fastembed
-      - reranker_cache:/home/appuser/.cache/flashrank
     healthcheck:
       test: ["CMD-SHELL", "python -c 'import urllib.request,sys; sys.exit(0 if urllib.request.urlopen(\"http://127.0.0.1:8000/api/v1/health/live\", timeout=5).status==200 else 1)'"]
       interval: 30s
@@ -117,15 +113,12 @@ services:
     environment:
       - NODE_ENV=production
       - NEXT_TELEMETRY_DISABLED=1
-      # URL interna para llamadas server-side desde Next.js al backend (red Docker).
-      # No es pública — nunca llega al browser.
-      - BACKEND_URL=http://backend:8000
     depends_on:
       backend:
         condition: service_healthy
     healthcheck:
-      # Use 127.0.0.1 explicitly — `localhost` resolves to IPv6 (::1) on alpine
-      # and Next.js binds to IPv4 (0.0.0.0), so the IPv4-only busybox wget fails.
+      # Usa 127.0.0.1 explícitamente - `localhost` resuelve a IPv6 (::1) en alpine
+      # y Next.js escucha en IPv4 (0.0.0.0), así que el wget de busybox (solo IPv4) falla.
       test: ["CMD-SHELL", "wget -q --spider --tries=1 http://127.0.0.1:3000/login || exit 1"]
       interval: 30s
       timeout: 5s
@@ -152,4 +145,3 @@ volumes:
   qdrant_data:
   uploads_data:
   model_cache:
-  reranker_cache:
