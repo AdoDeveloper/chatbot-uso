@@ -1,17 +1,17 @@
 /**
- * Chatbot Widget — Preact + Shadow DOM
+ * Chatbot Widget - Preact + Shadow DOM
  *
  * Atributos del script tag (auto-init):
- *   data-api-url="..."            — URL del backend
- *   data-api-key="..."            — API key del widget
- *   data-chatbot-name="..."       — nombre del bot
- *   data-greeting-message="..."  — mensaje de bienvenida
- *   data-open-on-load="true"      — abre el panel al cargar
- *   data-suggestions="a,b,c"     — sugerencias iniciales (CSV o JSON array)
- *   data-proactive-message="..."  — burbuja flotante sobre el launcher
- *   data-position="bottom-right"  — esquina del widget
- *   data-show-bot-icon="false"    — ocultar icono SVG del bot
- *   data-launcher-label="..."     — etiqueta junto al launcher (opcional)
+ *   data-api-url="..."            - URL del backend
+ *   data-api-key="..."            - API key del widget
+ *   data-chatbot-name="..."       - nombre del bot
+ *   data-greeting-message="..."  - mensaje de bienvenida
+ *   data-open-on-load="true"      - abre el panel al cargar
+ *   data-suggestions="a,b,c"     - sugerencias iniciales (CSV o JSON array)
+ *   data-proactive-message="..."  - burbuja flotante sobre el launcher
+ *   data-position="bottom-right"  - esquina del widget
+ *   data-show-bot-icon="false"    - ocultar icono SVG del bot
+ *   data-launcher-label="..."     - etiqueta junto al launcher (opcional)
  *
  * API programática (window.UsoBot):
  *   open() / close() / toggle() / isOpen()
@@ -29,9 +29,7 @@ import { streamChat, SERVICE_UNAVAILABLE_MESSAGE } from "./chat";
 import type { SourceChunk, ChatHistoryMessage } from "./chat";
 import { STYLES } from "./styles";
 
-// Endurece los enlaces del bot contra reverse tabnabbing: cualquier <a> con
-// target (p. ej. target="_blank") recibe rel="noopener noreferrer nofollow",
-// impidiendo que la página destino acceda a window.opener.
+// Mitigación de reverse tabnabbing: todo <a target> recibe rel="noopener noreferrer nofollow".
 DOMPurify.addHook("afterSanitizeAttributes", (node) => {
   if (node.tagName === "A" && node.hasAttribute("target")) {
     node.setAttribute("rel", "noopener noreferrer nofollow");
@@ -105,7 +103,7 @@ function createController(): WidgetController {
 if (typeof window !== "undefined" && !window.__USOBOT__) {
   const ctrl = createController();
   window.__USOBOT__ = ctrl;
-  // Legacy alias para compatibilidad con versiones anteriores
+  // Alias para integraciones existentes que referencian window.UsoBot.
   Object.defineProperty(window, "UsoBot", { value: ctrl, writable: false, configurable: true });
 }
 
@@ -116,6 +114,10 @@ marked.use({
       const isPdf = /\.pdf(\?.*)?$/i.test(href || "");
       const cls = isPdf ? ' class="pdf-link"' : "";
       return `<a href="${href}" target="_blank" rel="noopener noreferrer"${cls}>${text}</a>`;
+    },
+    image(href: string, _title: string | null | undefined, text: string) {
+      const src = href.startsWith("http") || href.startsWith("data:") || href.startsWith("/") ? href : `/uploads/${href}`;
+      return `<img src="${src}" alt="${text || ""}" />`;
     },
   },
 });
@@ -161,48 +163,55 @@ interface PersistedHistory {
   v: number;
   messages: Message[];
   updatedAt: number;
+  conversationId?: string | null;
+}
+function _apiKeyFingerprint(apiKey: string): string {
+  let h = 0;
+  for (let i = 0; i < apiKey.length; i++) {
+    h = (h * 31 + apiKey.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h).toString(36);
 }
 
-function storageKey(apiUrl: string): string {
+function storageKey(apiUrl: string, apiKey: string): string {
   let host = "default";
   try { host = new URL(apiUrl).host || "default"; } catch { /* URL inválida */ }
-  return `usobot:history:${host}`;
+  return `usobot:history:${host}:${_apiKeyFingerprint(apiKey)}`;
 }
 
-function loadHistory(apiUrl: string): Message[] | null {
+function loadHistory(apiUrl: string, apiKey: string): { messages: Message[]; conversationId: string | null } | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(storageKey(apiUrl));
+    const raw = window.localStorage.getItem(storageKey(apiUrl, apiKey));
     if (!raw) return null;
     const parsed = JSON.parse(raw) as PersistedHistory;
     if (parsed.v !== STORAGE_VERSION || !Array.isArray(parsed.messages)) return null;
-    return parsed.messages.map((m) => ({ ...m, streaming: false, error: false }));
+    return {
+      messages: parsed.messages.map((m) => ({ ...m, streaming: false, error: false })),
+      conversationId: parsed.conversationId ?? null,
+    };
   } catch { return null; }
 }
 
-function saveHistory(apiUrl: string, messages: Message[]): void {
+function saveHistory(apiUrl: string, apiKey: string, messages: Message[], conversationId: string | null): void {
   if (typeof window === "undefined") return;
   try {
     const clean = messages
       .filter((m) => !m.streaming && !m.error && m.content.trim().length > 0)
       .slice(-MAX_PERSISTED_MESSAGES);
-    const payload: PersistedHistory = { v: STORAGE_VERSION, messages: clean, updatedAt: Date.now() };
-    window.localStorage.setItem(storageKey(apiUrl), JSON.stringify(payload));
-  } catch { /* quota exceeded o incógnito — falla silenciosamente */ }
+    const payload: PersistedHistory = { v: STORAGE_VERSION, messages: clean, updatedAt: Date.now(), conversationId };
+    window.localStorage.setItem(storageKey(apiUrl, apiKey), JSON.stringify(payload));
+  } catch { /* quota exceeded o incógnito - falla silenciosamente */ }
 }
 
-function clearHistory(apiUrl: string): void {
+function clearHistory(apiUrl: string, apiKey: string): void {
   if (typeof window === "undefined") return;
-  try { window.localStorage.removeItem(storageKey(apiUrl)); } catch { /* ignore */ }
+  try { window.localStorage.removeItem(storageKey(apiUrl, apiKey)); } catch { /* ignore */ }
 }
 
-// session_id estable por navegador. Sin esto, el backend agrupa todas las
-// conversaciones de una misma IP como una sola sesión (chat/router.py usa
-// `request.session_id or client_ip`) y los caps por sesión del widget
-// (max_chats_per_session) nunca se activan.
-function getSessionId(apiUrl: string): string {
+function getSessionId(apiUrl: string, apiKey: string): string {
   if (typeof window === "undefined") return "";
-  const key = `${storageKey(apiUrl)}:sid`;
+  const key = `${storageKey(apiUrl, apiKey)}:sid`;
   try {
     let sid = window.localStorage.getItem(key);
     if (!sid) {
@@ -215,14 +224,21 @@ function getSessionId(apiUrl: string): string {
   }
 }
 
-// Preferencias de accesibilidad — persistidas por navegador. Se guardan
+function resetSessionId(apiUrl: string, apiKey: string): void {
+  if (typeof window === "undefined") return;
+  try { window.localStorage.removeItem(`${storageKey(apiUrl, apiKey)}:sid`); } catch { /* ignore */ }
+}
+
+// Preferencias de accesibilidad - persistidas por navegador. Se guardan
 // aparte del historial para que sobrevivan a "nueva conversación".
 type TextScale = "sm" | "md" | "lg";
 interface A11yPrefs { textScale: TextScale; highContrast: boolean; }
 const A11Y_DEFAULTS: A11yPrefs = { textScale: "md", highContrast: false };
 
 function a11yKey(apiUrl: string): string {
-  return `${storageKey(apiUrl)}:a11y`;
+  let host = "default";
+  try { host = new URL(apiUrl).host || "default"; } catch { /* URL inválida */ }
+  return `usobot:history:${host}:a11y`;
 }
 
 function loadA11yPrefs(apiUrl: string): A11yPrefs {
@@ -263,6 +279,9 @@ interface WidgetSettings {
   show_new_chat_button: boolean;
   enable_csat: boolean;
   csat_question: string;
+  csat_reasons: Record<string, string>;
+  enable_escalation: boolean;
+  max_input_chars: number;
 }
 
 let _id = 0;
@@ -279,7 +298,8 @@ function MarkdownContent({ content, streaming }: { content: string; streaming?: 
     );
   }
   const raw = marked.parse(content || "") as string;
-  const html = DOMPurify.sanitize(raw, {
+  const wrapped = raw.replace(/<table>/g, '<div class="table-wrap"><table>').replace(/<\/table>/g, '</table></div>');
+  const html = DOMPurify.sanitize(wrapped, {
     ADD_TAGS: ["img"],
     ADD_ATTR: ["target", "src", "alt", "width", "height", "title"],
   });
@@ -316,8 +336,8 @@ function Sources({ sources }: { sources: SourceChunk[] }) {
   );
 }
 
-function MessageActions({ content, backendId, apiUrl, apiKey, settings, ttsSupported, isSpeaking, onSpeak }: {
-  content: string; backendId?: string; apiUrl: string; apiKey: string; settings: WidgetSettings;
+function MessageActions({ content, backendId, conversationId, apiUrl, apiKey, settings, ttsSupported, isSpeaking, onSpeak }: {
+  content: string; backendId?: string; conversationId?: string | null; apiUrl: string; apiKey: string; settings: WidgetSettings;
   ttsSupported?: boolean; isSpeaking?: boolean; onSpeak?: () => void;
 }) {
   const [copied, setCopied] = useState(false);
@@ -332,12 +352,12 @@ function MessageActions({ content, backendId, apiUrl, apiKey, settings, ttsSuppo
   async function handleFeedback(type: "positive" | "negative") {
     if (feedback === type) return;
     setFeedback(type);
-    if (!backendId) return;
+    if (!backendId || !conversationId) return;
     try {
       await fetch(`${apiUrl}/api/v1/widget/public/messages/${backendId}/feedback`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", "X-Widget-Key": apiKey },
-        body: JSON.stringify({ feedback: type }),
+        body: JSON.stringify({ feedback: type, conversation_id: conversationId }),
       });
     } catch { /* fire and forget */ }
   }
@@ -390,10 +410,7 @@ interface Props {
   proactiveMessage: string;
   position: WidgetPosition;
   showBotIcon: boolean;
-  // Etiqueta junto al launcher. El script tag es el default inicial;
-  // /widget/public/config puede sobrescribirlo (igual que suggestions/proactive).
   launcherLabel: string;
-  // Callback del custom element para actualizar CSS vars del shadow host
   applyPrimaryColor: (color: string) => void;
 }
 
@@ -407,6 +424,9 @@ const DEFAULT_SETTINGS: WidgetSettings = {
   show_new_chat_button: true,
   enable_csat: false,
   csat_question: "¿Qué tan útil fue esta conversación?",
+  csat_reasons: {},
+  enable_escalation: true,
+  max_input_chars: 4000,
 };
 
 function ChatWidget({
@@ -421,16 +441,14 @@ function ChatWidget({
   const [showBotIcon, setShowBotIcon]           = useState<boolean>(initialShowBotIcon);
   const [logoUrl, setLogoUrl]                   = useState<string | null>(null);
   const [activeLauncherLabel, setLauncherLabel] = useState<string>(launcherLabel);
-  // Nombre y welcome remotos: el script tag aporta solo el valor inicial,
-  // pero el config del backend (panel admin) gana cuando se carga. Sin esto,
-  // cambiar el nombre del bot en el panel no afecta al widget embebido.
   const [activeChatbotName, setActiveChatbotName] = useState<string>(chatbotName);
   const [activeWelcome, setActiveWelcome]         = useState<string>(welcomeMessage);
   const [open, setOpen]                         = useState(openOnLoad);
   const [settings, setSettings]                 = useState<WidgetSettings>(DEFAULT_SETTINGS);
+  const initialHistoryRef = useRef(loadHistory(apiUrl, apiKey));
   const [messages, setMessages]                 = useState<Message[]>(() => {
-    const persisted = loadHistory(apiUrl);
-    if (persisted && persisted.length > 0) return persisted;
+    const persisted = initialHistoryRef.current;
+    if (persisted && persisted.messages.length > 0) return persisted.messages;
     return [{ id: uid(), role: "assistant", content: welcomeMessage }];
   });
   const [input, setInput]     = useState("");
@@ -443,17 +461,16 @@ function ChatWidget({
   // Modo offline: el backend no respondió al cargar
   const [offlineMode, setOfflineMode]     = useState(false);
   // CSAT: se activa cuando el usuario pulsa "Finalizar chat"
-  const [conversationId, setConversationId] = useState<string | null>(null);
-  const [csatState, setCsatState]           = useState<"hidden" | "pending" | "comment" | "submitted">("hidden");
+  const [conversationId, setConversationId] = useState<string | null>(
+    () => initialHistoryRef.current?.conversationId ?? null,
+  );
+  const [csatState, setCsatState]           = useState<"hidden" | "pending" | "submitted">("hidden");
   const [csatScore, setCsatScore]           = useState<number | null>(null);
   const [csatComment, setCsatComment]       = useState("");
-  // Escalamiento: se activa cuando el backend detecta un trigger pero
-  // espera consentimiento del usuario antes de notificar al área responsable.
-  // prompt   → pregunta "¿hablar con un humano?" (Sí/No)
-  // form     → formulario de contacto (correo o WhatsApp, uno de los dos)
-  // submitted→ confirmación de contacto enviado
-  // continue → tras decir "No": pregunta "¿continuar con el chatbot?" (Sí/No)
-  const [escalState, setEscalState]         = useState<"hidden" | "prompt" | "form" | "submitted" | "continue">("hidden");
+  const [csatReasons, setCsatReasons]       = useState<string[]>([]);
+  // prompt: "¿hablar con un humano?" · form: contacto (correo/WhatsApp) · submitted: confirmación
+  // continue: "¿continuar con el chatbot?" tras un "No" · error: falló el envío del contacto.
+  const [escalState, setEscalState]         = useState<"hidden" | "prompt" | "form" | "submitted" | "continue" | "error">("hidden");
   const [escalConvId, setEscalConvId]       = useState<string | null>(null);
   const [escalType, setEscalType]           = useState<"email" | "whatsapp">("email");
   const [escalValue, setEscalValue]         = useState("");
@@ -493,7 +510,7 @@ function ChatWidget({
     if (open) setUnreadCount(0);
   }, [open]);
 
-  // Cerrar kebab si se hace click fuera
+  // Cerrar kebab si se hace click fuera, o con Escape (navegación por teclado)
   useEffect(() => {
     if (!kebabOpen) return;
     function onOutsideClick(e: MouseEvent) {
@@ -501,10 +518,29 @@ function ChatWidget({
         setKebabOpen(false);
       }
     }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setKebabOpen(false);
+    }
     document.addEventListener("mousedown", onOutsideClick);
-    return () => document.removeEventListener("mousedown", onOutsideClick);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onOutsideClick);
+      document.removeEventListener("keydown", onKeyDown);
+    };
   }, [kebabOpen]);
 
+  // Cerrar panel de accesibilidad con Escape (solo tenía el botón "×" interno)
+  useEffect(() => {
+    if (!a11yOpen) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setA11yOpen(false);
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [a11yOpen]);
+
+  // retryTick permite reintentar la carga de config sin recargar la página (botón "Reintentar" del panel offline).
+  const [retryTick, setRetryTick] = useState(0);
   useEffect(() => {
     let cancelled = false;
     fetch(`${apiUrl}/api/v1/widget/public/config`, {
@@ -513,6 +549,7 @@ function ChatWidget({
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return;
+        setOfflineMode(false);
         setSettings({
           show_sources:          data.show_sources          ?? true,
           enable_copy_action:    data.enable_copy_action    ?? true,
@@ -523,6 +560,9 @@ function ChatWidget({
           show_new_chat_button:  data.show_new_chat_button  ?? true,
           enable_csat:           data.enable_csat           ?? false,
           csat_question:         data.csat_question         ?? DEFAULT_SETTINGS.csat_question,
+          csat_reasons:          data.csat_reasons          ?? {},
+          enable_escalation:     data.enable_escalation     ?? true,
+          max_input_chars:       data.max_input_chars       ?? DEFAULT_SETTINGS.max_input_chars,
         });
         if (typeof data.show_bot_icon === "boolean") setShowBotIcon(data.show_bot_icon);
         if (Array.isArray(data.suggestions))          setSuggestions(data.suggestions);
@@ -532,18 +572,12 @@ function ChatWidget({
           applyPrimaryColor(data.primary_color);
         }
         if (typeof data.launcher_label === "string") setLauncherLabel(data.launcher_label);
-        // Nombre y welcome desde el backend — sobreescriben los valores que
-        // el script tag pasó como prop. Si el welcome cambió y el chat aún
-        // no inició (solo está la welcome bubble inicial), regenerarla.
         if (typeof data.chatbot_name === "string" && data.chatbot_name) {
           setActiveChatbotName(data.chatbot_name);
         }
         if (typeof data.welcome_message === "string" && data.welcome_message) {
           setActiveWelcome(data.welcome_message);
           setMessages((prev) => {
-            // Solo reemplazar si el chat es virgen (1 sola burbuja del bot
-            // que es exactamente el welcome viejo). No tocar conversaciones
-            // en curso.
             if (prev.length === 1 && prev[0].role === "assistant" && prev[0].content === welcomeMessage) {
               return [{ ...prev[0], content: data.welcome_message }];
             }
@@ -556,40 +590,31 @@ function ChatWidget({
         setOfflineMode(true);
       });
     return () => { cancelled = true; };
-  }, [apiUrl, apiKey]);
+  }, [apiUrl, apiKey, retryTick]);
 
-  // Auto-scroll: solo al enviar un mensaje o al terminar el streaming,
-  // no token a token (evita arrastrar al usuario mientras lee hacia arriba).
   const prevBusyRef = useRef(false);
   useEffect(() => {
     const justFinished = prevBusyRef.current && !busy;
     prevBusyRef.current = busy;
-    // Scroll al enviar (messages crece con el nuevo par usuario+asistente)
-    // o al terminar de streamear.
     if (!busy || justFinished) {
       bottomRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages, busy]);
 
-  // Persistir historial
+  // Persistir historial (incluye conversationId - ver PersistedHistory)
   useEffect(() => {
-    saveHistory(apiUrl, messages);
-  }, [messages, apiUrl]);
+    saveHistory(apiUrl, apiKey, messages, conversationId);
+  }, [messages, apiUrl, apiKey, conversationId]);
 
   // Focus al abrir
   useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 50);
   }, [open]);
 
-  // Minimizar: solo oculta el panel, la conversación sigue activa.
-  // Si hay un request en vuelo continúa en background — el badge
-  // aparecerá cuando llegue la respuesta.
   function handleMinimize() {
     setOpen(false);
   }
 
-  // Finalizar chat: muestra CSAT si está configurado, luego minimiza.
-  // No cancela el request en vuelo.
   function handleEndChat() {
     setKebabOpen(false);
     if (settings.enable_csat && conversationId && csatState === "hidden") {
@@ -602,12 +627,14 @@ function ChatWidget({
   function handleClearConversation() {
     abortRef.current?.abort();
     abortRef.current = null;
-    clearHistory(apiUrl);
+    clearHistory(apiUrl, apiKey);
+    resetSessionId(apiUrl, apiKey);
     setMessages([{ id: uid(), role: "assistant", content: activeWelcome }]);
     setBusy(false);
     setCsatState("hidden");
     setCsatScore(null);
     setCsatComment("");
+    setCsatReasons([]);
     setConversationId(null);
     setEscalState("hidden");
     setEscalConvId(null);
@@ -617,7 +644,6 @@ function ChatWidget({
 
   function handleCsatStarClick(score: number) {
     setCsatScore(score);
-    setCsatState("comment");
   }
 
   async function handleCsatSubmit() {
@@ -629,7 +655,12 @@ function ChatWidget({
       await fetch(`${apiUrl}/api/v1/widget/public/csat`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Widget-Key": apiKey },
-        body: JSON.stringify({ conversation_id: conversationId, score: csatScore, ...(comment ? { comment } : {}) }),
+        body: JSON.stringify({
+          conversation_id: conversationId,
+          score: csatScore,
+          ...(comment ? { comment } : {}),
+          ...(csatReasons.length ? { reasons: csatReasons } : {}),
+        }),
       });
     } catch { /* fire and forget */ }
   }
@@ -670,16 +701,10 @@ function ChatWidget({
       synth.speak(utter);
     } catch { setSpeakingId(null); }
   }
-
-  // TTS disponible = el navegador lo soporta Y el admin lo habilitó Y el menú
-  // de accesibilidad (que lo contiene) no está desactivado por completo.
   const ttsSupported =
     typeof window !== "undefined" && !!window.speechSynthesis
     && settings.enable_tts !== false && settings.enable_accessibility !== false;
 
-  // Cierra la conversación mostrando primero la encuesta CSAT si está
-  // habilitada; si no, minimiza directamente. Reutilizada por el final del
-  // flujo de escalamiento y por "no deseo continuar".
   function closeWithCsat() {
     if (settings.enable_csat && conversationId && csatState === "hidden") {
       setCsatState("pending");
@@ -688,8 +713,6 @@ function ChatWidget({
     }
   }
 
-  // Valida el contacto según el tipo elegido. Devuelve "" si es válido, o el
-  // mensaje de error a mostrar.
   function validateContact(type: "email" | "whatsapp", value: string): string {
     const v = value.trim();
     if (!v) return type === "email" ? "Ingrese su correo electrónico." : "Ingrese su número de WhatsApp.";
@@ -708,11 +731,13 @@ function ChatWidget({
     const val = escalValue.trim();
     const err = validateContact(escalType, val);
     if (err) { setEscalError(err); return; }
-    if (!escalConvId) return;
+    if (!escalConvId) {
+      setEscalError("Escribe primero tu consulta para poder contactarte.");
+      return;
+    }
     setEscalError("");
-    setEscalState("submitted");
     try {
-      await fetch(`${apiUrl}/api/v1/widget/public/escalation/contact`, {
+      const resp = await fetch(`${apiUrl}/api/v1/widget/public/escalation/contact`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Widget-Key": apiKey },
         body: JSON.stringify({
@@ -721,11 +746,15 @@ function ChatWidget({
           contact_value: val,
         }),
       });
-    } catch { /* fire and forget */ }
-    // Tras confirmar el contacto: la conversación queda escalada. Se da un
-    // momento para que el usuario lea la confirmación y luego se ofrece la
-    // encuesta de satisfacción (o se cierra si no está habilitada).
-    setTimeout(() => { closeWithCsat(); }, 2200);
+      if (!resp.ok) {
+        setEscalState("error");
+        return;
+      }
+      setEscalState("submitted");
+      setTimeout(() => { closeWithCsat(); }, 2200);
+    } catch {
+      setEscalState("error");
+    }
   }
 
   async function handleSend() {
@@ -797,7 +826,7 @@ function ChatWidget({
           abortRef.current = null;
         },
       },
-      abort.signal, history, apiKey, getSessionId(apiUrl),
+      abort.signal, history, apiKey, getSessionId(apiUrl, apiKey),
     );
   }
 
@@ -849,7 +878,7 @@ function ChatWidget({
             </span>
           </div>
 
-          {/* Menú kebab (⋮) — agrupa "Nueva conversación" y "Finalizar chat" */}
+          {/* Menú kebab (⋮) - agrupa "Nueva conversación" y "Finalizar chat" */}
           {hasKebabActions && (
             <div class="kebab-wrapper" ref={kebabRef}>
               <button
@@ -902,7 +931,7 @@ function ChatWidget({
             </div>
           )}
 
-          {/* Botón cerrar (✕) — oculta el panel sin destruir la conversación */}
+          {/* Botón cerrar (✕) - oculta el panel sin destruir la conversación */}
           <button
             class="close-btn"
             onClick={handleMinimize}
@@ -976,6 +1005,13 @@ function ChatWidget({
             </svg>
             <p class="offline-title">Sin conexión</p>
             <p class="offline-desc">{SERVICE_UNAVAILABLE_MESSAGE}</p>
+            <button
+              type="button"
+              class="offline-retry-btn"
+              onClick={() => setRetryTick((t) => t + 1)}
+            >
+              Reintentar
+            </button>
           </div>
         ) : (
           <>
@@ -999,6 +1035,7 @@ function ChatWidget({
                           <MessageActions
                             content={msg.content}
                             backendId={msg.backendId}
+                            conversationId={conversationId}
                             apiUrl={apiUrl}
                             apiKey={apiKey}
                             settings={settings}
@@ -1013,7 +1050,7 @@ function ChatWidget({
                 </div>
               ))}
 
-              {/* Tarjeta de contacto — aparece como burbuja del bot en el flujo */}
+              {/* Tarjeta de contacto - aparece como burbuja del bot en el flujo */}
               {escalState !== "hidden" && (
                 <div class="msg-row msg-row-assistant">
                   {showBotIcon && (
@@ -1118,6 +1155,18 @@ function ChatWidget({
                         ✓ Listo. La universidad se pondrá en contacto con usted pronto.
                       </p>
                     )}
+                    {escalState === "error" && (
+                      <>
+                        <p class="escal-error" role="alert">
+                          No se pudo enviar su solicitud. Intente de nuevo.
+                        </p>
+                        <div class="escal-btn-row">
+                          <button class="escal-yes-btn" onClick={() => setEscalState("form")}>
+                            Reintentar
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               )}
@@ -1144,7 +1193,7 @@ function ChatWidget({
               </div>
             )}
 
-            {/* CSAT — paso 1: seleccionar estrellas */}
+            {/* CSAT - pantalla única: estrellas + motivos + comentario */}
             {settings.enable_csat && csatState === "pending" && (
               <div class="csat-panel" role="group" aria-label="Valoración de la conversación">
                 <p class="csat-question">{settings.csat_question}</p>
@@ -1152,47 +1201,60 @@ function ChatWidget({
                   {[1, 2, 3, 4, 5].map((n) => (
                     <button
                       key={n}
-                      class="csat-star"
+                      class={`csat-star ${n <= (csatScore ?? 0) ? "csat-star-filled" : ""}`}
                       onClick={() => handleCsatStarClick(n)}
                       aria-label={`${n} estrella${n !== 1 ? "s" : ""}`}
                       title={["", "Muy malo", "Malo", "Regular", "Bueno", "Excelente"][n]}
                     >★</button>
                   ))}
                 </div>
-                <button class="csat-skip" onClick={() => setCsatState("submitted")}>Omitir valoración</button>
-              </div>
-            )}
-            {/* CSAT — paso 2: comentario opcional */}
-            {settings.enable_csat && csatState === "comment" && (
-              <div class="csat-panel" role="group" aria-label="Comentario sobre la conversación">
-                <p class="csat-question">¿Quieres agregar un comentario? <span class="csat-optional">(opcional)</span></p>
-                <div class="csat-stars csat-stars-preview">
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <span
-                      key={n}
-                      class={`csat-star-preview ${n <= (csatScore ?? 0) ? "csat-star-filled" : ""}`}
-                      aria-hidden="true"
-                    >★</span>
-                  ))}
+                <div class="csat-star-labels">
+                  <span>Muy disconforme</span>
+                  <span>Muy conforme</span>
                 </div>
+                {Object.keys(settings.csat_reasons).length > 0 && (
+                  <div class="csat-reasons" role="group" aria-label="Motivo de la calificación">
+                    {Object.entries(settings.csat_reasons).map(([key, label]) => (
+                      <label key={key} class={`csat-reason-item ${csatReasons.includes(key) ? "csat-reason-item-checked" : ""}`}>
+                        <input
+                          type="checkbox"
+                          checked={csatReasons.includes(key)}
+                          onChange={() => setCsatReasons((prev) =>
+                            prev.includes(key) ? prev.filter((r) => r !== key) : [...prev, key]
+                          )}
+                        />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                )}
                 <textarea
                   class="csat-comment"
-                  placeholder="Cuéntenos su experiencia…"
+                  placeholder="Cuéntenos su experiencia (opcional)…"
                   maxLength={300}
                   value={csatComment}
                   onInput={(e) => setCsatComment((e.target as HTMLTextAreaElement).value)}
-                  rows={3}
+                  rows={2}
                 />
-                <p class="csat-char-count">{csatComment.length}/300</p>
                 <div class="csat-actions">
                   <button class="csat-skip" onClick={() => setCsatState("submitted")}>Omitir</button>
-                  <button class="csat-submit-btn" onClick={handleCsatSubmit}>Enviar valoración</button>
+                  <button
+                    class="csat-submit-btn"
+                    onClick={handleCsatSubmit}
+                    disabled={!csatScore}
+                  >Finalizar</button>
                 </div>
               </div>
             )}
             {settings.enable_csat && csatState === "submitted" && (
               <div class="csat-thanks-wrap">
-                <div class="csat-thanks">¡Gracias por su valoración!</div>
+                <div class="csat-thanks-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="26" height="26">
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="8 12.5 10.8 15.5 16 9" />
+                  </svg>
+                </div>
+                <div class="csat-thanks">¡Muchas gracias!</div>
                 {(settings.show_new_chat_button || settings.show_end_chat_button) && (
                   <div class="csat-thanks-actions">
                     {settings.show_new_chat_button && messages.length > 1 && (
@@ -1213,8 +1275,9 @@ function ChatWidget({
           </>
         )}
 
-        {/* Enlace de contacto manual — siempre visible mientras la tarjeta no esté activa */}
-        {!offlineMode && escalState === "hidden" && (
+        {/* Enlace de contacto manual - visible mientras la tarjeta no esté
+            activa, salvo que el admin haya desactivado el escalamiento. */}
+        {settings.enable_escalation && !offlineMode && escalState === "hidden" && (
           <div class="escal-footer">
             <button
               class="escal-footer-btn"
@@ -1238,6 +1301,7 @@ function ChatWidget({
             onInput={handleInput}
             onKeyDown={handleKeyDown}
             rows={1}
+            maxLength={settings.max_input_chars}
             disabled={busy || offlineMode}
             aria-label="Pregunta"
           />

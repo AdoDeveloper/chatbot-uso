@@ -1,7 +1,7 @@
 /**
  * Chat client for the chatbot API.
  *
- * The backend responds with a single complete JSON message (no streaming) —
+ * The backend responds with a single complete JSON message (no streaming) -
  * the caller shows a "typing..." indicator while awaiting this response, then
  * renders the full message at once (similar to WhatsApp/Messenger, not a
  * token-by-token typewriter effect).

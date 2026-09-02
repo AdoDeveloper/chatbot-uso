@@ -16,7 +16,7 @@ export default defineConfig({
       external: [],
       output: {
         inlineDynamicImports: true,
-        // Force output as widget.js (not widget.iife.js)
+        // Fuerza la salida como widget.js (no widget.iife.js)
         entryFileNames: "widget.js",
       },
     },

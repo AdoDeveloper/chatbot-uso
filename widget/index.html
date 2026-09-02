@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Chatbot Widget — Demo</title>
+  <title>Chatbot Widget - Demo</title>
   <style>
     * { box-sizing: border-box; }
     body {
@@ -117,7 +117,7 @@
       status.textContent = "✓ Api-key configurada (guardada en localStorage).";
     } else {
       status.className = "key-status err";
-      status.textContent = "⚠ Sin api-key — las peticiones fallarán con 403.";
+      status.textContent = "⚠ Sin api-key - las peticiones fallarán con 403.";
     }
     document.getElementById("keySave").addEventListener("click", () => {
       const v = input.value.trim();

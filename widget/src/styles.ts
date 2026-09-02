@@ -1,8 +1,8 @@
 /**
- * CSS injected into the Shadow DOM — fully isolated from the host page.
- * Variables at top for easy theming:
- *   --color-primary  main brand blue
- *   --color-bubble   bubble button background
+ * CSS inyectado en el Shadow DOM - completamente aislado de la página anfitriona.
+ * Variables al inicio para facilitar el theming:
+ *   --color-primary  azul principal de marca
+ *   --color-bubble   fondo del botón burbuja
  */
 
 export const STYLES = `
@@ -22,7 +22,7 @@ export const STYLES = `
   box-sizing: border-box;
 }
 
-/* ── Root wrapper ─────────────────────────────────────────────────────── */
+/* ── Contenedor raíz ─────────────────────────────────────────────────────── */
 
 .root {
   position: fixed;
@@ -37,7 +37,7 @@ export const STYLES = `
 .root[data-position="top-right"]    { top: 1.5rem;    right: 1.5rem; flex-direction: column;         align-items: flex-end; }
 .root[data-position="top-left"]     { top: 1.5rem;    left: 1.5rem;  flex-direction: column;         align-items: flex-start; }
 
-/* ── Bubble ──────────────────────────────────────────────────────────── */
+/* ── Burbuja ──────────────────────────────────────────────────────────── */
 
 .bubble {
   width: 56px;
@@ -90,7 +90,7 @@ export const STYLES = `
   pointer-events: all;
 }
 
-/* ── Header ──────────────────────────────────────────────────────────── */
+/* ── Encabezado ──────────────────────────────────────────────────────────── */
 
 .header {
   background: linear-gradient(135deg, var(--color-primary) 0%, #2563eb 100%);
@@ -150,13 +150,13 @@ export const STYLES = `
   background: rgba(255,255,255,0.15);
 }
 
-/* El botón de vaciar es secundario al de cerrar — un toque más sutil. */
+/* El botón de vaciar es secundario al de cerrar - un toque más sutil. */
 .header-btn {
   margin-right: 2px;
   opacity: 0.85;
 }
 
-/* ── Messages area ───────────────────────────────────────────────────── */
+/* ── Área de mensajes ───────────────────────────────────────────────────── */
 
 .messages {
   flex: 1;
@@ -172,7 +172,7 @@ export const STYLES = `
 .messages::-webkit-scrollbar-track { background: transparent; }
 .messages::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
 
-/* ── Message rows ────────────────────────────────────────────────────── */
+/* ── Filas de mensaje ────────────────────────────────────────────────────── */
 
 .msg-row {
   display: flex;
@@ -220,7 +220,7 @@ export const STYLES = `
 .msg-user  { align-self: flex-end; }
 .msg-assistant { align-self: flex-start; }
 
-/* User bubble */
+/* Burbuja del usuario */
 .user-text {
   background: var(--color-primary);
   color: #fff;
@@ -232,7 +232,7 @@ export const STYLES = `
   white-space: pre-wrap;
 }
 
-/* ── Markdown output (assistant) ─────────────────────────────────────── */
+/* ── Salida markdown (asistente) ─────────────────────────────────────── */
 
 .md {
   background: #f3f4f6;
@@ -334,11 +334,17 @@ export const STYLES = `
   border-radius: 0 6px 6px 0;
 }
 
-.md table {
-  width: 100%;
+.md .table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 6px 0;
+}
+
+.md .table-wrap table {
+  width: auto;
   border-collapse: collapse;
   font-size: 13px;
-  margin: 6px 0;
+  white-space: nowrap;
 }
 
 .md th {
@@ -360,7 +366,7 @@ export const STYLES = `
   margin: 8px 0;
 }
 
-/* Streaming cursor */
+/* Cursor de streaming */
 .cursor {
   display: inline-block;
   animation: blink 0.9s step-end infinite;
@@ -369,7 +375,7 @@ export const STYLES = `
 }
 @keyframes blink { 50% { opacity: 0; } }
 
-/* Typing indicator (3 dots — visible while waiting for first token) */
+/* Indicador de escritura (3 puntos - visible mientras se espera el primer token) */
 .typing-dots {
   display: inline-flex;
   align-items: center;
@@ -393,7 +399,7 @@ export const STYLES = `
   40%           { transform: translateY(-5px); opacity: 1; }
 }
 
-/* ── Sources ─────────────────────────────────────────────────────────── */
+/* ── Fuentes ─────────────────────────────────────────────────────────── */
 
 .sources { margin-top: 6px; }
 
@@ -464,7 +470,7 @@ export const STYLES = `
   overflow: hidden;
 }
 
-/* ── Input row ───────────────────────────────────────────────────────── */
+/* ── Fila de entrada ───────────────────────────────────────────────────────── */
 
 .input-row {
   display: flex;
@@ -506,7 +512,7 @@ export const STYLES = `
   cursor: not-allowed;
 }
 
-/* ── Send button ─────────────────────────────────────────────────────── */
+/* ── Botón de enviar ─────────────────────────────────────────────────────── */
 
 .send-btn {
   width: 38px;
@@ -540,7 +546,7 @@ export const STYLES = `
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ── Message action buttons ────────────────────────────────────────── */
+/* ── Botones de acción del mensaje ────────────────────────────────────────── */
 
 .msg-actions {
   display: flex;
@@ -586,7 +592,7 @@ export const STYLES = `
   color: #ef4444 !important;
 }
 
-/* ── Quick replies (conversation starters) ──────────── */
+/* ── Respuestas rápidas (sugerencias de conversación) ──────────── */
 
 .suggestions {
   display: flex;
@@ -620,7 +626,7 @@ export const STYLES = `
   transform: scale(0.97);
 }
 
-/* ── Bubble wrapper (necesario para posicionar el badge) ────────────── */
+/* ── Burbuja wrapper (necesario para posicionar el badge) ────────────── */
 
 .bubble-wrap {
   position: relative;
@@ -768,6 +774,23 @@ export const STYLES = `
   max-width: 240px;
 }
 
+.offline-retry-btn {
+  margin-top: 4px;
+  background: var(--color-primary);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.offline-retry-btn:hover {
+  opacity: 0.9;
+}
+
 /* ── Proactive bubble (mensaje sobre el launcher cerrado) ──────────── */
 
 .proactive-bubble {
@@ -803,11 +826,11 @@ export const STYLES = `
 
 .csat-panel {
   border-top: 1px solid #f0f0f0;
-  padding: 10px 14px 8px;
+  padding: 12px 12px 10px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   background: #fafafa;
   flex-shrink: 0;
 }
@@ -822,7 +845,9 @@ export const STYLES = `
 
 .csat-stars {
   display: flex;
-  gap: 4px;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 220px;
 }
 
 .csat-star {
@@ -838,8 +863,22 @@ export const STYLES = `
 
 .csat-star:hover,
 .csat-star:focus-visible {
-  color: #f59e0b;
+  color: #ca8a04;
   transform: scale(1.15);
+}
+
+.csat-star-filled {
+  color: #ca8a04;
+}
+
+.csat-star-labels {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: -4px;
+  font-size: 11px;
+  color: #6b7280;
 }
 
 .csat-optional {
@@ -848,19 +887,43 @@ export const STYLES = `
   font-size: 11.5px;
 }
 
-.csat-stars-preview {
-  pointer-events: none;
+.csat-reasons {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  margin: 2px 0 4px;
 }
 
-.csat-star-preview {
-  font-size: 22px;
-  color: #d1d5db;
-  padding: 0 2px;
-  line-height: 1;
+.csat-reason-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: #374151;
+  cursor: pointer;
+  padding: 8px 10px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 9px;
+  background: #fff;
+  transition: border-color 0.12s, background 0.12s;
 }
 
-.csat-star-filled {
-  color: #f59e0b;
+.csat-reason-item:hover {
+  border-color: #d1d5db;
+}
+
+.csat-reason-item-checked {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+}
+
+.csat-reason-item input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+  flex-shrink: 0;
 }
 
 .csat-comment {
@@ -879,7 +942,7 @@ export const STYLES = `
 }
 
 .csat-comment:focus {
-  border-color: #2563eb;
+  border-color: var(--color-primary);
 }
 
 .csat-comment::placeholder {
@@ -917,33 +980,53 @@ export const STYLES = `
 .csat-skip:hover { color: #374151; }
 
 .csat-submit-btn {
-  background: #1e3a8a;
+  background: var(--color-primary);
   color: #fff;
   border: none;
-  border-radius: 8px;
-  padding: 7px 14px;
+  border-radius: 999px;
+  padding: 8px 18px;
   font-size: 12.5px;
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background 0.15s, opacity 0.15s;
 }
 
 .csat-submit-btn:hover {
-  background: #1d4ed8;
+  background: var(--color-primary-hover);
+}
+
+.csat-submit-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .csat-thanks-wrap {
   border-top: 1px solid #f0f0f0;
   background: #f0fdf4;
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px;
+}
+
+.csat-thanks-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 2.5px solid #15803d;
+  color: #15803d;
 }
 
 .csat-thanks {
-  padding: 8px 14px;
   font-size: 13px;
-  color: #166534;
-  font-weight: 500;
+  color: #15803d;
+  font-weight: 600;
   text-align: center;
 }
 
@@ -952,14 +1035,14 @@ export const STYLES = `
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 0 14px 10px;
+  margin-top: 4px;
   flex-wrap: wrap;
 }
 
 .csat-thanks-btn {
   background: #fff;
   border: 1px solid #bbf7d0;
-  color: #166534;
+  color: #15803d;
   border-radius: 8px;
   padding: 6px 12px;
   font-size: 12px;
@@ -974,7 +1057,7 @@ export const STYLES = `
   border-color: #86efac;
 }
 
-/* ── Escalamiento — solicitud de contacto ────────────────────────────── */
+/* ── Escalamiento - solicitud de contacto ────────────────────────────── */
 
 .escal-card {
   display: flex;
@@ -1033,17 +1116,18 @@ export const STYLES = `
 }
 
 .escal-yes-btn {
+  flex: 1;
+  text-align: center;
   background: var(--color-primary);
   color: #fff;
   border: none;
-  border-radius: 8px;
+  border-radius: 999px;
   padding: 7px 14px;
   font-size: 12.5px;
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
   transition: background 0.15s;
-  flex: 1;
 }
 
 .escal-yes-btn:hover {
@@ -1051,10 +1135,12 @@ export const STYLES = `
 }
 
 .escal-no-btn {
+  flex: 1;
+  text-align: center;
   background: transparent;
   color: #6b7280;
   border: 1px solid #d1d5db;
-  border-radius: 8px;
+  border-radius: 999px;
   padding: 7px 12px;
   font-size: 12px;
   font-family: inherit;
@@ -1113,7 +1199,7 @@ export const STYLES = `
   background: transparent;
   color: #6b7280;
   border: 1px solid #d1d5db;
-  border-radius: 8px;
+  border-radius: 999px;
   padding: 6px 12px;
   font-size: 12px;
   font-family: inherit;
@@ -1128,7 +1214,7 @@ export const STYLES = `
   background: var(--color-primary);
   color: #fff;
   border: none;
-  border-radius: 8px;
+  border-radius: 999px;
   padding: 6px 16px;
   font-size: 12.5px;
   font-weight: 600;
@@ -1149,7 +1235,7 @@ export const STYLES = `
 .escal-done {
   margin: 0;
   font-size: 13px;
-  color: #065f46;
+  color: #15803d;
   font-weight: 600;
   line-height: 1.5;
   display: flex;
