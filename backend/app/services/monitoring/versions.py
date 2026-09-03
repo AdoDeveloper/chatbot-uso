@@ -8,7 +8,7 @@ from __future__ import annotations
 import uuid
 
 import structlog
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy import func as sa_func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -288,10 +288,18 @@ async def _next_version(db: AsyncSession) -> int:
 
 
 async def _get_active_version(db: AsyncSession) -> ConfigVersion | None:
+    """Versión activa más reciente.
+
+    Se ordena de forma explícita: sin ORDER BY, un `limit(1)` devuelve una fila
+    arbitraria si por cualquier motivo hay más de una marcada como activa.
+    """
     result = await db.execute(
-        select(ConfigVersion).where(ConfigVersion.is_active.is_(True)).limit(1)
+        select(ConfigVersion)
+        .where(ConfigVersion.is_active.is_(True))
+        .order_by(ConfigVersion.version_number.desc())
+        .limit(1)
     )
-    return result.scalar_one_or_none()
+    return result.scalars().first()
 
 
 class _VersioningLock:
@@ -338,7 +346,14 @@ async def capture_snapshot(
     trigger_source: str = "manual",
     force: bool = False,
 ) -> ConfigVersion | None:
-    async with _VersioningLock():
+    async with _VersioningLock() as acquired:
+        # Sin el lock, dos capturas concurrentes leen el mismo número de
+        # versión y desactivan cada una a un padre distinto: quedan dos
+        # versiones con el mismo number y ambas activas.
+        if not acquired:
+            log.warning("versioning.skipped_no_lock", trigger_source=trigger_source)
+            return None
+
         snapshot = await _collect_all(db)
 
         parent = await _get_active_version(db)
@@ -354,9 +369,13 @@ async def capture_snapshot(
         if not description:
             description = summary
 
-        # Desactiva la versión activa anterior
-        if parent:
-            parent.is_active = False
+        # Desactiva todas las anteriores, no solo el padre: si quedara más de
+        # una activa, apagar una sola dejaría el resto activas para siempre.
+        await db.execute(
+            update(ConfigVersion)
+            .where(ConfigVersion.is_active.is_(True))
+            .values(is_active=False)
+        )
 
         version = ConfigVersion(
             version_number=await _next_version(db),
@@ -385,6 +404,13 @@ MAX_AUTO_SNAPSHOTS = 50
 
 async def _prune_auto_snapshots(db: AsyncSession) -> int:
     """Elimina los snapshots automáticos más antiguos que excedan el límite.
+
+    No se excluyen las versiones referenciadas como padre: como cada versión
+    apunta a la anterior, esa condición bloqueaba la cadena entera y la poda
+    no borraba nada. La FK es ON DELETE SET NULL, así que los hijos quedan sin
+    padre en vez de con una referencia rota, y el diff cae al comportamiento
+    que ya usa para las versiones sin padre: comparar contra la anterior por
+    número de versión.
     """
     candidates = list(await db.scalars(
         select(ConfigVersion.id)
@@ -393,15 +419,6 @@ async def _prune_auto_snapshots(db: AsyncSession) -> int:
         .order_by(ConfigVersion.created_at.desc())
     ))
     stale_ids = set(candidates[MAX_AUTO_SNAPSHOTS:])
-    if not stale_ids:
-        return 0
-
-    referenced_as_parent = set(await db.scalars(
-        select(ConfigVersion.parent_version_id)
-        .where(ConfigVersion.id.not_in(stale_ids))
-        .where(ConfigVersion.parent_version_id.is_not(None))
-    ))
-    stale_ids -= referenced_as_parent
     if not stale_ids:
         return 0
 
@@ -548,9 +565,11 @@ async def restore_snapshot(
 
     # Crea la versión de rollback
     new_snapshot = await _collect_all(db)
-    parent = await _get_active_version(db)
-    if parent:
-        parent.is_active = False
+    await db.execute(
+        update(ConfigVersion)
+        .where(ConfigVersion.is_active.is_(True))
+        .values(is_active=False)
+    )
 
     rollback_version = ConfigVersion(
         version_number=await _next_version(db),

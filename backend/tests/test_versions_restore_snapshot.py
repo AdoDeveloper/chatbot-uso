@@ -105,6 +105,56 @@ class TestEphemeralLocksExcludedFromSnapshots:
         assert restored.value == 0.9
 
 
+class TestPruneAutoSnapshots:
+    async def test_prunes_chained_versions_and_orphans_children(self, db_session):
+        """Cada versión apunta a la anterior como padre. Excluir de la poda a
+        las referenciadas como padre bloqueaba la cadena entera y no se
+        borraba nada; los hijos deben quedar sin padre, no con una referencia
+        rota."""
+        from app.services.monitoring.versions import MAX_AUTO_SNAPSHOTS, _prune_auto_snapshots
+
+        total = MAX_AUTO_SNAPSHOTS + 5
+        previous_id = None
+        ids: list[uuid.UUID] = []
+        for i in range(total):
+            v = ConfigVersion(
+                id=uuid.uuid4(),
+                version_number=1000 + i,
+                description=f"encadenada {i}",
+                config_snapshot={"schema_version": SCHEMA_VERSION, "sections": {}},
+                is_active=False,
+                snapshot_schema_version=SCHEMA_VERSION,
+                trigger_source="settings",
+                parent_version_id=previous_id,
+            )
+            db_session.add(v)
+            await db_session.flush()
+            ids.append(v.id)
+            previous_id = v.id
+        await db_session.commit()
+
+        removed = await _prune_auto_snapshots(db_session)
+        await db_session.commit()
+
+        assert removed > 0, "la poda debe borrar aunque las versiones formen una cadena"
+
+        # Las mas antiguas se fueron; ninguna quedó apuntando a una borrada.
+        supervivientes = await _fetch_all(db_session, ids)
+        vivos = {v.id for v in supervivientes}
+        for v in supervivientes:
+            if v.parent_version_id is not None:
+                assert v.parent_version_id in vivos, "referencia a una version borrada"
+        assert len(vivos) < total
+
+
+async def _fetch_all(db_session, ids: list[uuid.UUID]) -> list[ConfigVersion]:
+    from sqlalchemy import select as sa_select
+    result = await db_session.execute(
+        sa_select(ConfigVersion).where(ConfigVersion.id.in_(ids))
+    )
+    return list(result.scalars().all())
+
+
 class TestRestoreSnapshotSecretMasking:
     async def test_masked_secret_value_is_not_overwritten(self, db_session, admin_user):
         """El snapshot nunca contiene el secreto real, solo el string literal
