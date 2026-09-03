@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ConversacionesTabs } from "../_components/ConversacionesTabs";
 import { SegmentedControl } from "@/components/composed/segmented-control";
+import { DateRangeFilter } from "@/components/composed/date-range-filter";
 import { TablePagination } from "@/components/composed/table-pagination";
 import { StatCard } from "@/components/composed/stat-card";
 import { PageHeader } from "@/components/ui/page-header";
@@ -263,6 +264,8 @@ export default function EscalamientosPage() {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkTagInput, setBulkTagInput] = useState("");
   const [tagFilter, setTagFilter] = useState<string>("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [resolvingIds, setResolvingIds] = useState<Set<string>>(new Set());
 
   const { data: knownTagsData, refetch: refetchTags } = useApi<ConversationTag[]>("/conversations/tags");
@@ -274,9 +277,16 @@ export default function EscalamientosPage() {
   const csatReasonLabels = csatReasonLabelsData ?? {};
 
   const baseQuery = useMemo(() => {
-    const tagParam = tagFilter ? `&tag=${encodeURIComponent(tagFilter)}` : "";
-    return `page=${page}&page_size=${pageSize}&source=production${tagParam}`;
-  }, [page, pageSize, tagFilter]);
+    const params = new URLSearchParams({
+      page: String(page),
+      page_size: String(pageSize),
+      source: "production",
+    });
+    if (tagFilter) params.set("tag", tagFilter);
+    if (dateFrom) params.set("date_from", new Date(dateFrom).toISOString());
+    if (dateTo) params.set("date_to", new Date(dateTo + "T23:59:59").toISOString());
+    return params.toString();
+  }, [page, pageSize, tagFilter, dateFrom, dateTo]);
 
   const primaryQ = useApi<ConversationPage>(
     `/conversations?status=${filter}&${baseQuery}`,
@@ -299,7 +309,7 @@ export default function EscalamientosPage() {
   // Limpia la selección al cambiar de filtro: evita bulk actions sobre IDs ya no visibles.
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [filter, tagFilter]);
+  }, [filter, tagFilter, dateFrom, dateTo]);
 
   async function load() {
     await Promise.all([primaryQ.refetch(), refetchMetrics()]);
@@ -435,20 +445,28 @@ export default function EscalamientosPage() {
             />
           </div>
 
-          {knownTags.length > 0 && (
-            <div className="grid grid-cols-1 gap-2 sm:flex sm:justify-end">
+          <div className="grid grid-cols-1 gap-2 sm:flex sm:items-center sm:justify-end">
+            <DateRangeFilter
+              size="sm"
+              from={dateFrom}
+              to={dateTo}
+              onFromChange={(v) => { setDateFrom(v); setPage(1); }}
+              onToChange={(v) => { setDateTo(v); setPage(1); }}
+            />
+            {knownTags.length > 0 && (
               <Select
                 value={tagFilter}
                 onChange={(e) => { setTagFilter(e.target.value); setPage(1); }}
                 className="h-8 text-13 min-w-0"
+                aria-label="Filtrar por tag"
               >
                 <SelectOption value="">Todos los tags</SelectOption>
                 {knownTags.slice(0, 30).map((t) => (
                   <SelectOption key={t.tag} value={t.tag}>#{t.tag} ({t.count})</SelectOption>
                 ))}
               </Select>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Lista */}
