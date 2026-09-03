@@ -13,12 +13,9 @@ from sqlalchemy import func as sa_func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.config_version import ConfigVersion
-from app.models.escalation_rule import EscalationRule
-from app.models.faq_entry import FAQEntry
 from app.models.global_setting import GlobalSetting
 from app.models.llm_provider import LLMProvider
 from app.models.notification_rule import NotificationRule
-from app.models.source import Source
 from app.models.widget_config import WidgetConfig
 
 log = structlog.get_logger()
@@ -29,6 +26,27 @@ SCHEMA_VERSION = 2
 # bucket temporal, así que aparecen y desaparecen solos: si entran al snapshot
 # ensucian cada diff de configuración con entradas que nadie modificó.
 _EPHEMERAL_KEY_PREFIX = "scheduler:"
+
+# Claves de global_settings que definen el comportamiento del asistente. El
+# resto de la tabla (rate limits, caché, agenda de reportes, OAuth) es
+# operativo y no se versiona.
+_ASSISTANT_SETTING_KEYS = frozenset({
+    "system_prompt",
+    "greeting_response",
+    "temperature",
+    "top_k",
+    "max_tokens",
+    "max_output_tokens",
+    "max_input_chars",
+    "score_threshold",
+    "use_corrective_rag",
+    "guardrails_enabled",
+    "guardrail_blocked_message",
+    "injection_patterns_custom",
+    "pii_entities",
+    "no_providers_message",
+    "csat_reasons",
+})
 
 # Claves de configuración que contienen secretos - se enmascaran en los snapshots
 _SECRET_KEYS = frozenset({
@@ -71,6 +89,8 @@ async def _collect_global_settings(db: AsyncSession) -> dict:
     )
     settings = {}
     for row in result.scalars().all():
+        if row.key not in _ASSISTANT_SETTING_KEYS:
+            continue
         if row.key in _SECRET_KEYS:
             settings[row.key] = "[CONFIGURED]" if row.value else None
         else:
@@ -128,83 +148,19 @@ async def _collect_widget(db: AsyncSession) -> dict:
     }
 
 
-async def _collect_escalation_rules(db: AsyncSession) -> list[dict]:
-    result = await db.execute(select(EscalationRule))
-    return [
-        {
-            "id": str(r.id),
-            "name": r.name,
-            "description": r.description,
-            "trigger_type": r.trigger_type.value if hasattr(r.trigger_type, "value") else str(r.trigger_type),
-            "trigger_config": r.trigger_config if hasattr(r, "trigger_config") else {},
-            "enabled": r.enabled,
-        }
-        for r in result.scalars().all()
-    ]
-
-
-async def _collect_notification_rules(db: AsyncSession) -> list[dict]:
-    result = await db.execute(select(NotificationRule))
-    return [
-        {
-            "id": str(r.id),
-            "event": r.event.value if hasattr(r.event, "value") else str(r.event),
-            "channel": r.channel.value if hasattr(r.channel, "value") else str(r.channel),
-            "enabled": r.enabled,
-            "target": r.target,
-            "config_json": r.config_json or {},
-        }
-        for r in result.scalars().all()
-    ]
-
-
-async def _collect_sources(db: AsyncSession) -> list[dict]:
-    result = await db.execute(
-        select(Source).where(Source.deleted_at.is_(None)).order_by(Source.created_at)
-    )
-    return [
-        {
-            "id": str(s.id),
-            "name": s.name,
-            "type": s.type.value if hasattr(s.type, "value") else str(s.type),
-            "status": s.status.value if hasattr(s.status, "value") else str(s.status),
-            "chunk_count": s.chunk_count,
-            "meta": s.meta or {},
-            "created_by_id": str(s.created_by_id) if s.created_by_id else None,
-        }
-        for s in result.scalars().all()
-    ]
-
-
-async def _collect_faq_entries(db: AsyncSession) -> list[dict]:
-    result = await db.execute(
-        select(FAQEntry).where(FAQEntry.deleted_at.is_(None)).order_by(FAQEntry.created_at)
-    )
-    return [
-        {
-            "id": str(f.id),
-            "question": f.question,
-            "answer": f.answer,
-            "tags": f.tags or [],
-            "is_active": f.is_active,
-            "source_id": str(f.source_id) if f.source_id else None,
-            "created_by_id": str(f.created_by_id) if f.created_by_id else None,
-        }
-        for f in result.scalars().all()
-    ]
-
-
 async def _collect_all(db: AsyncSession) -> dict:
+    """Snapshot de la configuración del asistente.
+
+    Se limita a lo que define cómo responde el chatbot. Quedan fuera los
+    documentos y las FAQ (el rollback nunca los revirtió: solo avisaba) y las
+    reglas de escalamiento y notificación, que son operativas.
+    """
     return {
         "schema_version": SCHEMA_VERSION,
         "sections": {
             "global_settings": await _collect_global_settings(db),
             "llm_providers": await _collect_providers(db),
             "widget_config": await _collect_widget(db),
-            "escalation_rules": await _collect_escalation_rules(db),
-            "notification_rules": await _collect_notification_rules(db),
-            "sources": await _collect_sources(db),
-            "faq_entries": await _collect_faq_entries(db),
         },
     }
 
@@ -584,7 +540,7 @@ async def restore_snapshot(
                     config_json=nr_data.get("config_json") or {},
                 ))
         if sections.get("escalation_rules"):
-            warnings.append("Las reglas de escalamiento no se revierten - solo configuración, widget, proveedores y notificaciones")
+            warnings.append("Las reglas de escalamiento no se revierten - solo configuración del asistente, widget y proveedores")
         if sections.get("sources"):
             warnings.append("Las fuentes de conocimiento no se revierten - el rollback no elimina ni restaura documentos")
         if sections.get("faq_entries"):

@@ -23,6 +23,11 @@ log = structlog.get_logger()
 _background_tasks: set[asyncio.Task] = set()
 
 # Mapea (método HTTP, prefijo de path) → etiqueta trigger_source
+#
+# Solo se versiona la configuración del asistente: lo que define cómo responde
+# el chatbot. Quedan fuera a propósito la gestión de contenido (documentos y
+# FAQ, que el rollback nunca revierte) y los ajustes operativos del sistema
+# (cache, rate limits, notificaciones, integraciones).
 _VERSIONED_ROUTES: list[tuple[str, str, str]] = [
     ("PUT",    "/api/v1/settings",                      "settings"),
     ("POST",   "/api/v1/providers",                     "providers"),
@@ -30,21 +35,6 @@ _VERSIONED_ROUTES: list[tuple[str, str, str]] = [
     ("DELETE", "/api/v1/providers/",                     "providers"),
     ("PUT",    "/api/v1/widget/config",                 "widget"),
     ("PATCH",  "/api/v1/guardrails/config",             "guardrails"),
-    ("PATCH",  "/api/v1/cache/config",                  "cache"),
-    ("PUT",    "/api/v1/rate-limits/config",            "rate_limits"),
-    ("POST",   "/api/v1/escalation/rules",              "escalation"),
-    ("PATCH",  "/api/v1/escalation/rules/",             "escalation"),
-    ("DELETE", "/api/v1/escalation/rules/",             "escalation"),
-    ("PUT",    "/api/v1/escalation/channels/",          "escalation"),
-    ("PUT",    "/api/v1/notifications/rules/",          "notifications"),
-    ("POST",   "/api/v1/sources/upload",                "sources"),
-    ("PATCH",  "/api/v1/sources/",                      "sources"),
-    ("DELETE", "/api/v1/sources/",                      "sources"),
-    ("POST",   "/api/v1/sources/bulk/",                 "sources"),
-    ("POST",   "/api/v1/faq",                           "faq"),
-    ("PATCH",  "/api/v1/faq/",                          "faq"),
-    ("DELETE", "/api/v1/faq/",                          "faq"),
-    ("PUT",    "/api/v1/integrations/oauth",            "integrations"),
 ]
 
 

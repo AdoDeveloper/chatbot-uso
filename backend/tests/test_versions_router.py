@@ -56,11 +56,11 @@ class TestListVersions:
         assert body["page_size"] == 20
 
     async def test_lists_created_versions_ordered_desc(self, client, admin_user, auth_headers, db_session):
-        await _add_setting(db_session, "chatbot_name", "Bot A")
+        await _add_setting(db_session, "greeting_response", "Bot A")
         r1 = await client.post("/api/v1/versions", json={"description": "v1"}, headers=auth_headers(admin_user))
         assert r1.status_code == 201
 
-        await _add_setting(db_session, "chatbot_name", "Bot B")
+        await _add_setting(db_session, "greeting_response", "Bot B")
         r2 = await client.post("/api/v1/versions", json={"description": "v2"}, headers=auth_headers(admin_user))
         assert r2.status_code == 201
 
@@ -73,7 +73,7 @@ class TestListVersions:
 
     async def test_respects_pagination(self, client, admin_user, auth_headers, db_session):
         for i in range(3):
-            await _add_setting(db_session, "chatbot_name", f"Bot {i}")
+            await _add_setting(db_session, "greeting_response", f"Bot {i}")
             r = await client.post(
                 "/api/v1/versions", json={"description": f"v{i}"}, headers=auth_headers(admin_user),
             )
@@ -101,7 +101,7 @@ class TestListVersions:
         from sqlalchemy.orm import load_only, selectinload
         from app.models.config_version import ConfigVersion
 
-        await _add_setting(db_session, "chatbot_name", "Bot A")
+        await _add_setting(db_session, "greeting_response", "Bot A")
         r = await client.post("/api/v1/versions", json={"description": "v1"}, headers=auth_headers(admin_user))
         assert r.status_code == 201
 
@@ -142,7 +142,7 @@ class TestCreateVersion:
         assert r.status_code == 409
 
     async def test_creates_version_with_changes(self, client, admin_user, auth_headers, db_session):
-        await _add_setting(db_session, "chatbot_name", "Bot Nuevo")
+        await _add_setting(db_session, "greeting_response", "Bot Nuevo")
 
         r = await client.post(
             "/api/v1/versions", json={"description": "Cambio de nombre"}, headers=auth_headers(admin_user),
@@ -155,7 +155,7 @@ class TestCreateVersion:
         assert body["created_by_name"] is not None
 
     async def test_uses_default_description_when_blank(self, client, admin_user, auth_headers, db_session):
-        await _add_setting(db_session, "chatbot_name", "Bot X")
+        await _add_setting(db_session, "greeting_response", "Bot X")
         r = await client.post("/api/v1/versions", json={}, headers=auth_headers(admin_user))
         assert r.status_code == 201
         assert r.json()["description"] == "Snapshot manual"
@@ -175,7 +175,7 @@ class TestGetVersion:
         assert r.status_code == 404
 
     async def test_returns_detail_with_snapshot(self, client, admin_user, auth_headers, db_session):
-        await _add_setting(db_session, "chatbot_name", "Bot Detalle")
+        await _add_setting(db_session, "greeting_response", "Bot Detalle")
         created = await client.post(
             "/api/v1/versions", json={"description": "detalle"}, headers=auth_headers(admin_user),
         )
@@ -203,10 +203,10 @@ class TestDiffVersion:
         assert r.status_code == 404
 
     async def test_diff_against_previous_version(self, client, admin_user, auth_headers, db_session):
-        await _add_setting(db_session, "chatbot_name", "Bot Uno")
+        await _add_setting(db_session, "greeting_response", "Bot Uno")
         v1 = await client.post("/api/v1/versions", json={"description": "v1"}, headers=auth_headers(admin_user))
 
-        await _add_setting(db_session, "chatbot_name", "Bot Dos")
+        await _add_setting(db_session, "greeting_response", "Bot Dos")
         v2 = await client.post("/api/v1/versions", json={"description": "v2"}, headers=auth_headers(admin_user))
         v2_id = v2.json()["id"]
 
@@ -216,18 +216,18 @@ class TestDiffVersion:
         assert body["version_number"] == v2.json()["version_number"]
         assert "global_settings" in body["sections"]
         changes = body["sections"]["global_settings"]
-        assert any(c["key"] == "chatbot_name" for c in changes)
+        assert any(c["key"] == "greeting_response" for c in changes)
 
     async def test_diff_for_first_version_has_no_parent(self, client, admin_user, auth_headers, db_session):
-        await _add_setting(db_session, "chatbot_name", "Bot Solo")
+        await _add_setting(db_session, "greeting_response", "Bot Solo")
         v1 = await client.post("/api/v1/versions", json={"description": "v1"}, headers=auth_headers(admin_user))
         v1_id = v1.json()["id"]
 
         r = await client.get(f"/api/v1/versions/{v1_id}/diff", headers=auth_headers(admin_user))
         assert r.status_code == 200
-        # Sin padre, se compara contra estado vacío: chatbot_name aparece como "added".
+        # Sin padre, se compara contra estado vacío: greeting_response aparece como "added".
         changes = r.json()["sections"]["global_settings"]
-        assert any(c["key"] == "chatbot_name" and c["action"] == "added" for c in changes)
+        assert any(c["key"] == "greeting_response" and c["action"] == "added" for c in changes)
 
 
 class TestDeployStatus:
@@ -250,7 +250,7 @@ class TestDeployStatus:
         assert body["pending_sources"] == 0
 
     async def test_after_deploy_reflects_state(self, client, admin_user, auth_headers, db_session):
-        await _add_setting(db_session, "chatbot_name", "Bot Deploy")
+        await _add_setting(db_session, "greeting_response", "Bot Deploy")
         deployed = await client.post("/api/v1/versions/deploy", json={}, headers=auth_headers(admin_user))
         assert deployed.status_code == 201
 
@@ -301,7 +301,7 @@ class TestDeploy:
         assert r.status_code == 403
 
     async def test_deploy_creates_version_tagged_deploy(self, client, admin_user, auth_headers, db_session):
-        await _add_setting(db_session, "chatbot_name", "Bot A")
+        await _add_setting(db_session, "greeting_response", "Bot A")
         r = await client.post(
             "/api/v1/versions/deploy", json={"description": "primer deploy"}, headers=auth_headers(admin_user),
         )
@@ -313,7 +313,7 @@ class TestDeploy:
     async def test_deploy_returns_409_when_no_changes_since_last_deploy(
         self, client, admin_user, auth_headers, db_session,
     ):
-        await _add_setting(db_session, "chatbot_name", "Bot A")
+        await _add_setting(db_session, "greeting_response", "Bot A")
         first = await client.post("/api/v1/versions/deploy", json={}, headers=auth_headers(admin_user))
         assert first.status_code == 201
 
@@ -323,11 +323,11 @@ class TestDeploy:
     async def test_deploy_succeeds_again_after_further_changes(
         self, client, admin_user, auth_headers, db_session,
     ):
-        await _add_setting(db_session, "chatbot_name", "Bot A")
+        await _add_setting(db_session, "greeting_response", "Bot A")
         first = await client.post("/api/v1/versions/deploy", json={}, headers=auth_headers(admin_user))
         assert first.status_code == 201
 
-        await _add_setting(db_session, "chatbot_name", "Bot B")
+        await _add_setting(db_session, "greeting_response", "Bot B")
         second = await client.post("/api/v1/versions/deploy", json={}, headers=auth_headers(admin_user))
         assert second.status_code == 201
         assert second.json()["version"]["version_number"] > first.json()["version"]["version_number"]

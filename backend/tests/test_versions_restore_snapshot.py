@@ -52,14 +52,14 @@ class TestRestoreSnapshotV1Legacy:
         """Snapshots viejos (schema_version != SCHEMA_VERSION actual, formato
         plano key-value sin 'sections') deben restaurarse igual, con aviso
         explícito de que solo se restauró configuración básica."""
-        v1_snapshot = {"schema_version": 1, "chatbot_name": "Bot Legado", "max_input_chars": 500}
+        v1_snapshot = {"schema_version": 1, "greeting_response": "Bot Legado", "max_input_chars": 500}
         target = await _make_version(db_session, v1_snapshot, schema_version=1)
 
         new_version, warnings = await restore_snapshot(db_session, version_id=target.id, user_id=admin_user.id)
         await db_session.commit()
 
         assert any("v1" in w.lower() for w in warnings)
-        restored = await db_session.get(GlobalSetting, "chatbot_name")
+        restored = await db_session.get(GlobalSetting, "greeting_response")
         assert restored.value == "Bot Legado"
         assert new_version.trigger_source == "rollback"
 
@@ -126,19 +126,19 @@ class TestRestoreSnapshotSecretMasking:
         assert setting.value == "real-secret-value", "el valor enmascarado no debe sobrescribir el secreto real"
 
     async def test_non_masked_global_setting_is_restored_normally(self, db_session, admin_user):
-        db_session.add(GlobalSetting(key="chatbot_name", value="Nombre Nuevo"))
+        db_session.add(GlobalSetting(key="greeting_response", value="Nombre Nuevo"))
         await db_session.commit()
 
         snapshot = {
             "schema_version": SCHEMA_VERSION,
-            "sections": {"global_settings": {"chatbot_name": "Nombre Original"}},
+            "sections": {"global_settings": {"greeting_response": "Nombre Original"}},
         }
         target = await _make_version(db_session, snapshot)
 
         await restore_snapshot(db_session, version_id=target.id, user_id=admin_user.id)
         await db_session.commit()
 
-        setting = await db_session.get(GlobalSetting, "chatbot_name")
+        setting = await db_session.get(GlobalSetting, "greeting_response")
         assert setting.value == "Nombre Original"
 
 
