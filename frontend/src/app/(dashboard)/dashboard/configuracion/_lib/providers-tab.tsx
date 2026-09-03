@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, forwardRef, useImperativeHandle } from "react";
+import { useEffect, useState, useRef, useCallback, forwardRef, useImperativeHandle } from "react";
 import {
  Loader2, Save, Plus, Pencil, Trash2, Eye, EyeOff,
  Minus, Zap, AlertCircle, CheckCircle2, X, ExternalLink, RefreshCw,
@@ -70,7 +70,6 @@ const ProviderPanel = forwardRef<ProviderPanelHandle, {
 }>(function ProviderPanel({ editing, onClose, onSaved, onSavingChange }, ref) {
  const { toast } = useToast();
  const [form, setForm] = useState<ProviderForm>(emptyForm);
- const [saving, setSaving] = useState(false);
  const [showKey, setShowKey] = useState(false);
  const [testState, setTestState] = useState<TestState>("idle");
  const [testMsg, setTestMsg] = useState("");
@@ -152,12 +151,12 @@ const ProviderPanel = forwardRef<ProviderPanelHandle, {
   } catch { setTestState("fail"); setTestMsg("Error al contactar el servidor"); }
  }
 
- async function handleSave() {
+ const handleSave = useCallback(async () => {
   if (!form.name.trim() || !form.model_name.trim() || !resolvedType.trim()) {
    toast({ type: "warning", title: "Campos requeridos", message: "Nombre, proveedor y modelo son obligatorios." });
    return;
   }
-  setSaving(true); onSavingChange(true);
+  onSavingChange(true);
   try {
    const payload: Record<string, unknown> = {
     name: form.name, provider_type: resolvedType, model_name: form.model_name,
@@ -172,8 +171,8 @@ const ProviderPanel = forwardRef<ProviderPanelHandle, {
     onSaved(); onClose();
   } catch (err) {
    toast({ type: "error", message: getErrorMessage(err, "No se pudo guardar.") });
-  } finally { setSaving(false); onSavingChange(false); }
- }
+  } finally { onSavingChange(false); }
+ }, [form, resolvedType, editing, onClose, onSaved, onSavingChange, toast]);
 
  useImperativeHandle(ref, () => ({ save: handleSave }), [handleSave]);
 
