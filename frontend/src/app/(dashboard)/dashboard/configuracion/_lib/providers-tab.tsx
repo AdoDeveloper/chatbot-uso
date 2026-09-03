@@ -22,6 +22,7 @@ import { Select, SelectOption } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 
 const SUGGESTED_PROVIDERS = [
  { value: "openai", label: "OpenAI" }, { value: "anthropic", label: "Anthropic" },
@@ -437,10 +438,16 @@ export function ProvidersTab() {
       ))}
      </div>
     ) : providers.length === 0 ? (
-     <div className="text-center py-16">
-      <p className="text-sm text-muted-foreground">No hay proveedores configurados.</p>
-      <Button variant="link" size="sm" onClick={() => { setEditing(null); setPanelOpen(true); }} className="mt-3">+ Agregar el primero</Button>
-     </div>
+     <EmptyState
+      icon={Zap}
+      title="Sin proveedores configurados"
+      description="Agregue un proveedor LLM para que el chatbot pueda responder."
+      action={
+       <Button variant="outline" size="sm" className="gap-1.5" onClick={() => { setEditing(null); setPanelOpen(true); }}>
+        <Plus className="w-3.5 h-3.5" /> Agregar el primero
+       </Button>
+      }
+     />
     ) : (
      <div className="overflow-x-auto">
      <Table>

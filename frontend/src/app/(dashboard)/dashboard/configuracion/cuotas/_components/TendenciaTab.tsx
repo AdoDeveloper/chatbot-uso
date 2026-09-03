@@ -6,6 +6,7 @@ import { useApi } from "@/hooks/use-api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PeriodFilter } from "@/components/composed/period-filter";
 import { Loading } from "@/components/ui/loading";
+import { EmptyState } from "@/components/ui/empty-state";
 
 interface UsagePoint { bucket: string; requests: number; throttles: number; }
 interface UsageReport {
@@ -72,7 +73,11 @@ export const TendenciaTab = forwardRef<TendenciaTabHandle>(function TendenciaTab
         </CardHeader>
         <CardContent>
           {!report || report.points.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-8 text-center">Sin tráfico registrado en el periodo.</p>
+            <EmptyState
+              icon={BarChart3}
+              title="Sin tráfico en el periodo"
+              description="Seleccione otro rango de fechas para ver la tendencia."
+            />
           ) : (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">

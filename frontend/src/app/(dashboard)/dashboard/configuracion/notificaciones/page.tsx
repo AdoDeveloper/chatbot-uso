@@ -353,7 +353,7 @@ export default function NotificacionesHistorialPage() {
                       ))}
                     </Select>
                     {draft.unit !== "weekly" && (
-                      <p className="text-2xs text-muted-foreground">Elegí &quot;Semanal&quot; para escoger días específicos de envío.</p>
+                      <p className="text-2xs text-muted-foreground">Elija &quot;Semanal&quot; para escoger días específicos de envío.</p>
                     )}
                   </div>
 

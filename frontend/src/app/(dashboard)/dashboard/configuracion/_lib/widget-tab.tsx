@@ -279,7 +279,7 @@ function SuggestionsEditor({ value, onChange }: { value: string[]; onChange: (v:
   <div className="space-y-2">
    {value.length === 0 ? (
     <p className="text-2xs text-muted-foreground italic py-1">
-     Sin sugerencias. Agregá una para que aparezca como botón en el chat.
+     Sin sugerencias. Agregue una para que aparezca como botón en el chat.
     </p>
    ) : (
     value.map((s, i) => (
