@@ -63,14 +63,20 @@ def build_excel(
     ws = wb.active
     ws.title = sheet_name[:31]
 
-    if not rows:
-        ws.append([BRAND_NAME])
-        ws.append(["Sin datos para mostrar."])
+    first_nonempty = next((r for r in rows if r), None)
+    if first_nonempty is None:
+        # Mismo membrete que el caso con datos, para que ambos se vean igual.
+        ws.cell(row=1, column=1, value=BRAND_NAME).font = Font(bold=True, size=13, color="1E40AF")
+        ws.cell(row=2, column=1, value=title or sheet_name).font = Font(bold=True, size=11, color="111827")
+        ws.cell(row=3, column=1, value=f"Generado el {now_sv().strftime('%d/%m/%Y a las %H:%M')}").font = Font(size=9, color="6B7280")
+        ws.cell(row=4, column=1, value="Total de registros: 0").font = Font(size=9, color="6B7280")
+        ws.cell(row=6, column=1, value="Sin datos para mostrar.").font = Font(size=10, color="6B7280")
+        ws.column_dimensions["A"].width = 48
         buf = io.BytesIO()
         wb.save(buf)
         return buf.getvalue()
 
-    headers = list(rows[0].keys())
+    headers = list(first_nonempty.keys())
     n_cols = len(headers)
 
     # ── Membrete: institución, título y metadatos ──
@@ -139,22 +145,28 @@ def _draw_header_footer(canvas, doc, *, title: str) -> None:
 
     # ── Encabezado: banda con logo + institución ──
     top = page_h - 1.2 * cm
+    logo_h = 1.4 * cm
+    logo_y = top - 0.55 * cm
+    text_x = 1.5 * cm
+    text_y = top + 0.2 * cm
     if LOGO_FILE.exists():
         try:
             canvas.drawImage(
-                str(LOGO_FILE), 1.5 * cm, top - 0.55 * cm,
-                width=1.4 * cm, height=1.4 * cm,
+                str(LOGO_FILE), 1.5 * cm, logo_y,
+                width=1.4 * cm, height=logo_h,
                 preserveAspectRatio=True, mask="auto",
             )
             text_x = 1.5 * cm + 1.7 * cm
+            # Centra la línea base del texto respecto al alto del logo: sin
+            # esto el nombre queda por encima del centro óptico de la imagen.
+            font_size = 12
+            text_y = logo_y + (logo_h - font_size * 0.72) / 2
         except Exception:
-            text_x = 1.5 * cm
-    else:
-        text_x = 1.5 * cm
+            pass
 
     canvas.setFillColor(brand)
     canvas.setFont("Helvetica-Bold", 12)
-    canvas.drawString(text_x, top + 0.2 * cm, BRAND_NAME)
+    canvas.drawString(text_x, text_y, BRAND_NAME)
 
     # Línea divisoria bajo el membrete
     canvas.setStrokeColor(brand)
@@ -475,7 +487,13 @@ def build_pdf_report(
     )
 
     nonempty = [s for s in sections if s.get("rows") or s.get("text")]
-    max_cols = max((len(s["rows"][0]) for s in nonempty if s.get("rows")), default=0)
+    max_cols = max(
+        (
+            len(next((r for r in s["rows"] if r), {}))
+            for s in nonempty if s.get("rows")
+        ),
+        default=0,
+    )
     page_size = landscape(A4) if max_cols > 5 else A4
 
     buf = io.BytesIO()
@@ -505,6 +523,17 @@ def build_pdf_report(
 
     page_width = page_size[0] - 3 * cm
 
+    if not nonempty:
+        story.append(Paragraph("Sin datos en el período", sec_style))
+        story.append(HRFlowable(
+            width="100%", thickness=0.5,
+            color=colors.HexColor("#2563EB"), spaceAfter=3,
+        ))
+        story.append(Paragraph(
+            "No se registró actividad en el rango de fechas seleccionado.",
+            body_style,
+        ))
+
     for section in nonempty:
         sec_title = section.get("title", "")
         story.append(Paragraph(sec_title, sec_style))
@@ -530,7 +559,13 @@ def build_pdf_report(
                 story.append(drawing)
                 story.append(Spacer(1, 0.2 * cm))
 
-        headers = list(rows[0].keys())
+        first_nonempty = next((r for r in rows if r), None)
+        if first_nonempty is None:
+            story.append(Paragraph("Sin datos para mostrar.", body_style))
+            story.append(Spacer(1, 0.3 * cm))
+            continue
+
+        headers = list(first_nonempty.keys())
         col_count = len(headers)
         col_width = page_width / col_count
 

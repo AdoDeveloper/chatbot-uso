@@ -31,6 +31,14 @@ from app.services.ingestion.export import (
 )
 
 
+def _pdf_text(data: bytes) -> str:
+    """Extrae el texto de un PDF para poder afirmar sobre su contenido."""
+    import fitz
+
+    doc = fitz.open(stream=data, filetype="pdf")
+    return "\n".join(page.get_text() for page in doc)
+
+
 # ---------------------------------------------------------------------------
 # _safe_cell / _cell_value / _num
 # ---------------------------------------------------------------------------
@@ -87,13 +95,22 @@ class TestNum:
 # ---------------------------------------------------------------------------
 
 class TestBuildExcel:
-    def test_empty_rows_produces_placeholder_sheet(self):
+    def test_empty_rows_keeps_full_letterhead(self):
         data = build_excel([], sheet_name="VacioSheet", title="Reporte vacio")
         from openpyxl import load_workbook
         wb = load_workbook(io.BytesIO(data))
         ws = wb.active
         assert ws["A1"].value == export_mod.BRAND_NAME
-        assert ws["A2"].value == "Sin datos para mostrar."
+        assert ws["A2"].value == "Reporte vacio"
+        assert "Total de registros: 0" in ws["A4"].value
+        assert ws["A6"].value == "Sin datos para mostrar."
+
+    def test_leading_empty_row_does_not_break_headers(self):
+        data = build_excel([{}, {"Tema": "Becas", "Consultas": 5}], sheet_name="Datos")
+        from openpyxl import load_workbook
+        wb = load_workbook(io.BytesIO(data))
+        ws = wb.active
+        assert [ws.cell(row=6, column=c).value for c in (1, 2)] == ["Tema", "Consultas"]
 
     def test_rows_written_with_header_and_metadata(self):
         rows = [
@@ -331,6 +348,26 @@ class TestBuildPdfReport:
         ]
         data = build_pdf_report(sections, title="Mixto")
         assert data[:4] == b"%PDF"
+
+    def test_report_with_only_empty_rows_in_a_section(self):
+        """Una sección cuyas filas son diccionarios vacíos no debe romper el PDF."""
+        data = build_pdf_report(
+            [{"title": "Sin contenido", "rows": [{}]}], title="Reporte",
+        )
+        assert data[:4] == b"%PDF"
+        text = _pdf_text(data)
+        assert "Sin contenido" in text
+        assert "Sin datos para mostrar" in text
+
+    def test_report_without_any_section_states_it(self):
+        """Sin secciones con datos el PDF debe explicarlo, no quedar en portada."""
+        data = build_pdf_report(
+            [{"title": "A", "rows": []}, {"title": "B", "rows": []}],
+            title="Reporte General", subtitle="Período: 01/01 al 31/01",
+        )
+        text = _pdf_text(data)
+        assert "Sin datos en el período" in text
+        assert "No se registró actividad" in text
 
     def test_report_uses_landscape_when_many_columns(self):
         sections = [
