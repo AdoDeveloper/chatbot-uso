@@ -107,6 +107,14 @@ if (typeof window !== "undefined" && !window.__USOBOT__) {
   Object.defineProperty(window, "UsoBot", { value: ctrl, writable: false, configurable: true });
 }
 
+// El renderer de marked es global y no recibe props, así que el origen del
+// backend se guarda aquí: las rutas relativas de las imágenes apuntan a los
+// archivos servidos por el backend, no al sitio que embebe el widget.
+let _assetBase = "";
+export function setAssetBase(url: string): void {
+  _assetBase = (url || "").replace(/\/+$/, "");
+}
+
 marked.use({ breaks: true, gfm: true });
 marked.use({
   renderer: {
@@ -116,7 +124,15 @@ marked.use({
       return `<a href="${href}" target="_blank" rel="noopener noreferrer"${cls}>${text}</a>`;
     },
     image(href: string, _title: string | null | undefined, text: string) {
-      const src = href.startsWith("http") || href.startsWith("data:") || href.startsWith("/") ? href : `/uploads/${href}`;
+      const raw = href || "";
+      let src: string;
+      if (raw.startsWith("http") || raw.startsWith("data:")) {
+        src = raw;
+      } else if (raw.startsWith("/")) {
+        src = `${_assetBase}${raw}`;
+      } else {
+        src = `${_assetBase}/uploads/${raw}`;
+      }
       return `<img src="${src}" alt="${text || ""}" />`;
     },
   },
@@ -471,6 +487,7 @@ function ChatWidget({
   // prompt: "¿hablar con un humano?" · form: contacto (correo/WhatsApp) · submitted: confirmación
   // continue: "¿continuar con el chatbot?" tras un "No" · error: falló el envío del contacto.
   const [escalState, setEscalState]         = useState<"hidden" | "prompt" | "form" | "submitted" | "continue" | "error">("hidden");
+  const [escalSending, setEscalSending]     = useState(false);
   const [escalConvId, setEscalConvId]       = useState<string | null>(null);
   const [escalType, setEscalType]           = useState<"email" | "whatsapp">("email");
   const [escalValue, setEscalValue]         = useState("");
@@ -541,12 +558,20 @@ function ChatWidget({
 
   // retryTick permite reintentar la carga de config sin recargar la página (botón "Reintentar" del panel offline).
   const [retryTick, setRetryTick] = useState(0);
+  useEffect(() => { setAssetBase(apiUrl); }, [apiUrl]);
+
   useEffect(() => {
     let cancelled = false;
     fetch(`${apiUrl}/api/v1/widget/public/config`, {
       headers: apiKey ? { "X-Widget-Key": apiKey } : {},
     })
-      .then((r) => r.json())
+      .then((r) => {
+        // Los errores del backend traen cuerpo JSON, así que sin este control
+        // r.json() no lanza: el widget se daría por conectado y aplicaría los
+        // valores por defecto en vez de la configuración real.
+        if (!r.ok) throw new Error(`config ${r.status}`);
+        return r.json();
+      })
       .then((data) => {
         if (cancelled) return;
         setOfflineMode(false);
@@ -729,14 +754,16 @@ function ChatWidget({
   }
 
   async function handleEscalationSubmit() {
+    if (escalSending) return;
     const val = escalValue.trim();
     const err = validateContact(escalType, val);
     if (err) { setEscalError(err); return; }
     if (!escalConvId) {
-      setEscalError("Escribe primero tu consulta para poder contactarte.");
+      setEscalError("Escriba primero su consulta para poder contactarle.");
       return;
     }
     setEscalError("");
+    setEscalSending(true);
     try {
       const resp = await fetch(`${apiUrl}/api/v1/widget/public/escalation/contact`, {
         method: "POST",
@@ -755,6 +782,8 @@ function ChatWidget({
       setTimeout(() => { closeWithCsat(); }, 2200);
     } catch {
       setEscalState("error");
+    } finally {
+      setEscalSending(false);
     }
   }
 
@@ -779,15 +808,22 @@ function ChatWidget({
     const abort = new AbortController();
     abortRef.current = abort;
 
+    // "Nueva conversación" limpia abortRef, así que si ya no apunta a esta
+    // petición sus respuestas pertenecen a una conversación abandonada y no
+    // deben tocar el estado actual.
+    const isCurrent = () => abortRef.current === abort;
+
     await streamChat(
       apiUrl, q, null,
       {
         onSources(sources) {
+          if (!isCurrent()) return;
           setMessages((prev) =>
             prev.map((m) => (m.id === assistantId ? { ...m, sources } : m)),
           );
         },
         onToken(token) {
+          if (!isCurrent()) return;
           setMessages((prev) =>
             prev.map((m) =>
               m.id === assistantId ? { ...m, content: m.content + token } : m,
@@ -795,6 +831,7 @@ function ChatWidget({
           );
         },
         onDone(messageId, convId, escalationPrompt) {
+          if (!isCurrent()) return;
           let finalText = "";
           setMessages((prev) => {
             const updated = prev.map((m) =>
@@ -816,6 +853,7 @@ function ChatWidget({
           if (!openRef.current) setUnreadCount((n) => n + 1);
         },
         onError(msg) {
+          if (!isCurrent()) return;
           setMessages((prev) =>
             prev.map((m) =>
               m.id === assistantId
@@ -1145,8 +1183,8 @@ function ChatWidget({
                           <button type="button" class="escal-cancel-btn" onClick={() => { setEscalState("hidden"); setEscalError(""); }}>
                             Cancelar
                           </button>
-                          <button type="submit" class="escal-submit-btn">
-                            Enviar
+                          <button type="submit" class="escal-submit-btn" disabled={escalSending}>
+                            {escalSending ? "Enviando…" : "Enviar"}
                           </button>
                         </div>
                       </form>
