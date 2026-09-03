@@ -22,6 +22,7 @@ _WARMUP_INTERVAL = 240      # seconds between embedding warm-up pings (4 min)
 _STALE_CONV_INTERVAL = 600  # seconds between stale-conversation sweeps (10 min)
 _STALE_CONV_MINUTES = 120  # inactivity threshold before auto-resolving (2h - Zendesk-style default)
 _QDRANT_SYNC_INTERVAL = 3600  # seconds between orphan-vector sweeps (1h)
+_LOCK_RETENTION_HOURS = 48  # margen sobre el TTL más largo (digest, 23h) antes de purgar
 # Identificador estable de este proceso, usado para marcar la adquisición del
 # lock en BD (ayuda a depurar, no es estrictamente necesario para el claim).
 _OWNER_ID = uuid.uuid4().hex
@@ -109,6 +110,40 @@ async def _acquire_once(key: str, ttl: int) -> bool:
         log.warning("scheduler.lock_acquire_failed", key=key)
         return False
 
+
+async def _purge_expired_locks() -> int:
+    """Borra las filas de lock `scheduler:*` cuyo `expires_at` ya pasó.
+
+    La clave de cada lock lleva un bucket temporal (`scheduler:health:<n>`),
+    así que cada ciclo crea una fila nueva que nunca se reutiliza. Sin esta
+    purga `global_settings` crece de forma indefinida (~450 filas al día con
+    los intervalos actuales), mezclando locks efímeros con la configuración
+    real del sistema.
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=_LOCK_RETENTION_HOURS)
+    cutoff_iso = cutoff.isoformat()
+    try:
+        async with AsyncSessionLocal() as db:
+            rows = (
+                await db.execute(
+                    select(GlobalSetting).where(GlobalSetting.key.like("scheduler:%"))
+                )
+            ).scalars().all()
+            stale = [
+                r for r in rows
+                if isinstance(r.value, dict)
+                and str(r.value.get("expires_at", "")) < cutoff_iso
+            ]
+            for row in stale:
+                await db.delete(row)
+            if stale:
+                await db.commit()
+            return len(stale)
+    except Exception:
+        log.warning("scheduler.lock_purge_failed")
+        return 0
+
+
 async def _warmup_loop() -> None:
     """Ejecuta un embedding de prueba cada _WARMUP_INTERVAL segundos para mantener
     activo el thread pool de inferencia de ONNX Runtime.
@@ -144,6 +179,9 @@ async def _health_loop() -> None:
                     await collect_snapshot(db)
                     await run_all_checks(db)
                 log.debug("scheduler.health_snapshot_recorded")
+                purged = await _purge_expired_locks()
+                if purged:
+                    log.info("scheduler.locks_purged", count=purged)
             else:
                 log.debug("scheduler.health_snapshot_skipped_by_lock")
         except Exception:

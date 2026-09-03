@@ -95,6 +95,46 @@ class TestAcquireOnce:
         assert result is False
 
 
+class TestPurgeExpiredLocks:
+    async def test_deletes_only_stale_scheduler_locks(self, db_engine):
+        from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+        Session = async_sessionmaker(db_engine, expire_on_commit=False, class_=AsyncSession)
+
+        now = datetime.now(timezone.utc)
+        stale_key = f"scheduler:health:{uuid4()}"
+        fresh_key = f"scheduler:health:{uuid4()}"
+        config_key = f"cfg-{uuid4()}"
+
+        async with Session() as s:
+            s.add(GlobalSetting(
+                key=stale_key,
+                value={"owner": "x", "expires_at": (now - timedelta(days=10)).isoformat()},
+            ))
+            s.add(GlobalSetting(
+                key=fresh_key,
+                value={"owner": "x", "expires_at": (now + timedelta(hours=1)).isoformat()},
+            ))
+            s.add(GlobalSetting(key=config_key, value={"algo": "importante"}))
+            await s.commit()
+
+        await scheduler._purge_expired_locks()
+
+        async with Session() as s:
+            remaining = set((await s.execute(
+                select(GlobalSetting.key).where(
+                    GlobalSetting.key.in_([stale_key, fresh_key, config_key])
+                )
+            )).scalars().all())
+
+        assert stale_key not in remaining, "el lock caducado debia borrarse"
+        assert fresh_key in remaining, "un lock aun vigente no debe borrarse"
+        assert config_key in remaining, "la configuracion real no debe tocarse"
+
+    async def test_returns_zero_when_db_unavailable(self):
+        with patch("app.services.system.scheduler.AsyncSessionLocal", side_effect=RuntimeError("db down")):
+            assert await scheduler._purge_expired_locks() == 0
+
+
 class TestCumpleAgenda:
     def _dt_utc(self, hour_sv, minute_sv, *, year=2026, month=7, day=16):
         # El Salvador es UTC-6, sin DST: hora UTC = hora_sv + 6
@@ -248,11 +288,10 @@ class TestDigestLoop:
         assert kwargs["payload"] == stats
 
     async def test_does_not_send_when_schedule_does_not_match(self):
-        # Cuando _cumple_agenda es False, el código ahora hace `await
-        # asyncio.sleep(3600)` antes del `continue` (fix del busy-loop que
-        # antes saltaba directo a la siguiente iteración sin esperar). Cortamos
-        # el loop igual que en los demás tests: _sleep_raises_after levanta
-        # _StopLoop en la primera llamada a sleep.
+        # Cuando _cumple_agenda es False, el loop hace `await
+        # asyncio.sleep(3600)` antes del `continue`, evitando un busy-loop.
+        # Cortamos el loop igual que en los demás tests: _sleep_raises_after
+        # levanta _StopLoop en la primera llamada a sleep.
         calls = [0]
         fake_db = AsyncMock()
         fake_db.__aenter__.return_value = fake_db
