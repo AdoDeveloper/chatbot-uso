@@ -570,6 +570,7 @@ export default function EscalamientoConfigPage() {
                   <Label className="text-xs">Segundos sin respuesta</Label>
                   <Input
                     type="number"
+                    min={1}
                     value={ruleTestNoAnswerSec}
                     onChange={(e) => setRuleTestNoAnswerSec(e.target.value)}
                     placeholder="180"

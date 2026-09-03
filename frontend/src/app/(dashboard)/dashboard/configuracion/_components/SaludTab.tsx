@@ -165,6 +165,7 @@ export const SaludTab = forwardRef<SaludTabHandle>(function SaludTab(_props, ref
             onChange={(e) => setAutoRefreshSec(Number(e.target.value))}
             className="h-6 px-2 text-2xs border border-border bg-background rounded-md text-foreground"
             title="Auto-refresh"
+            aria-label="Intervalo de actualización automática"
           >
             {REFRESH_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>↻ {o.label}</option>
