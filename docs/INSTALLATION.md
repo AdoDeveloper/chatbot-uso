@@ -60,7 +60,7 @@ make dev-frontend    # Frontend con hot-reload
 
 ## Opción B - WSL2 manual (sin Docker)
 
-Para desarrollo local en Windows con WSL2 Ubuntu 22.04 sin usar Docker.
+Para desarrollo local en Windows con WSL2 Ubuntu 24.04 sin usar Docker.
 
 ### Requisitos del sistema
 
@@ -68,17 +68,17 @@ Para desarrollo local en Windows con WSL2 Ubuntu 22.04 sin usar Docker.
 | --- | --- |
 | RAM | 8 GB |
 | Disco | 20 GB libres |
-| OS WSL2 | Ubuntu 22.04 LTS |
+| OS WSL2 | Ubuntu 24.04 LTS |
 | Python | 3.12 |
-| Node.js | 20 LTS |
+| Node.js | 24 LTS |
 
 ### 1. Preparar WSL2
 
-Si aún no tiene Ubuntu 22.04 en WSL2:
+Si aún no tiene Ubuntu 24.04 en WSL2:
 
 ```powershell
 # En PowerShell como administrador
-wsl --install -d Ubuntu-22.04
+wsl --install -d Ubuntu-24.04
 wsl --set-default-version 2
 ```
 
@@ -98,21 +98,19 @@ Reiniciar WSL (`wsl --shutdown`) y verificar: `which node` debe dar `/usr/bin/no
 ```bash
 sudo apt update && sudo apt upgrade -y
 
-# Ubuntu 22.04 trae Python 3.10 de fábrica - 3.12 requiere el PPA deadsnakes.
-sudo add-apt-repository -y ppa:deadsnakes/ppa
-sudo apt update
+# Ubuntu 24.04 trae Python 3.12 en el repo nativo - sin PPA necesario.
 sudo apt install -y \
     python3.12 python3.12-venv python3.12-dev python3-pip \
     mysql-server redis-server \
     build-essential git curl wget
 ```
 
-#### Node.js 20
+#### Node.js 24
 
 ```bash
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
 sudo apt install -y nodejs
-node --version  # debe ser v20.x
+node --version  # debe ser v24.x
 ```
 
 ### 3. MySQL
@@ -166,12 +164,12 @@ Reiniciar: `sudo systemctl restart redis-server` y verificar: `redis-cli ping` �
 Qdrant no está en apt. Instalar el binario manualmente:
 
 ```bash
-# Ubuntu 22.04 (GLIBC 2.35): usar v1.12.6 obligatoriamente.
-# Ubuntu 24.04+ puede usar versiones más recientes.
-# Verificar GLIBC: ldd --version
+# Ubuntu 24.04 trae GLIBC 2.39, suficiente para el binario gnu estándar de
+# Qdrant >= 1.13 (requiere GLIBC 2.38+). Versión fijada al mismo valor que
+# docker-compose.yml y qdrant-client en requirements.txt.
 sudo mkdir -p /opt/qdrant/storage
 cd /tmp
-wget https://github.com/qdrant/qdrant/releases/download/v1.12.6/qdrant-x86_64-unknown-linux-gnu.tar.gz
+wget https://github.com/qdrant/qdrant/releases/download/v1.17.1/qdrant-x86_64-unknown-linux-gnu.tar.gz
 sudo tar xzf qdrant-x86_64-unknown-linux-gnu.tar.gz -C /opt/qdrant
 rm qdrant-x86_64-unknown-linux-gnu.tar.gz
 ```

@@ -1,6 +1,6 @@
 # Despliegue en producción - Ubuntu Server
 
-Guía para desplegar el chatbot en un servidor Ubuntu 22.04 LTS sin Docker, accesible por dominio público con HTTPS.
+Guía para desplegar el chatbot en un servidor Ubuntu 24.04 LTS sin Docker, accesible por dominio público con HTTPS.
 
 > **Destinatario:** equipo de TI de la Universidad de Sonsonate.
 
@@ -71,9 +71,7 @@ proveedor de forma independiente.
 ```bash
 sudo apt update && sudo apt upgrade -y
 
-# Ubuntu 22.04 trae Python 3.10 de fábrica - 3.12 requiere el PPA deadsnakes.
-sudo add-apt-repository -y ppa:deadsnakes/ppa
-sudo apt update
+# Ubuntu 24.04 trae Python 3.12 en el repo nativo - sin PPA necesario.
 sudo apt install -y \
     python3.12 python3.12-venv python3.12-dev python3-pip \
     mysql-server redis-server \
@@ -81,12 +79,12 @@ sudo apt install -y \
     build-essential git curl wget
 ```
 
-### 1.2 Node.js 20
+### 1.2 Node.js 24
 
 ```bash
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
 sudo apt install -y nodejs
-node --version  # debe ser v20.x
+node --version  # debe ser v24.x
 ```
 
 ### 1.3 Swap (recomendado con 4 GB de RAM)
@@ -154,12 +152,12 @@ redis-cli -a PASSWORD_REDIS ping  # → PONG
 
 Qdrant no está en apt; se instala su binario y se registra como servicio systemd.
 
-> **Compatibilidad GLIBC:** Ubuntu 22.04 LTS trae GLIBC 2.35. Las versiones de Qdrant ≥ 1.13 requieren GLIBC 2.38 y fallan con `version GLIBC_2.38 not found`. Usar **v1.12.6** en Ubuntu 22.04. En Ubuntu 24.04 (GLIBC 2.39) se puede usar la última versión. Verificar: `ldd --version`.
+> **Compatibilidad GLIBC:** el binario `*-unknown-linux-gnu` de Qdrant ≥ 1.13 requiere GLIBC 2.38+. Ubuntu 24.04 trae GLIBC 2.39, así que no hay restricción de versión. Verificar: `ldd --version`. Versión fijada al mismo valor que `docker-compose.yml` y `qdrant-client` en `requirements.txt`.
 
 ```bash
 sudo mkdir -p /opt/qdrant/storage
 cd /tmp
-wget https://github.com/qdrant/qdrant/releases/download/v1.12.6/qdrant-x86_64-unknown-linux-gnu.tar.gz
+wget https://github.com/qdrant/qdrant/releases/download/v1.17.1/qdrant-x86_64-unknown-linux-gnu.tar.gz
 sudo tar xzf qdrant-x86_64-unknown-linux-gnu.tar.gz -C /opt/qdrant
 rm qdrant-x86_64-unknown-linux-gnu.tar.gz
 ```
@@ -689,7 +687,7 @@ Más `FIRST_ADMIN_PASSWORD` (≥12 chars, mayúscula, minúscula, dígito y sím
 
 ## 18. Entorno de desarrollo (WSL)
 
-Para desarrollo se usa **WSL (Ubuntu 22.04)** sobre Windows, con los mismos servicios (`mysql`, `redis-server`, `qdrant`, `chatbot-backend`, `chatbot-frontend`) gestionados por systemd, con una diferencia respecto a producción:
+Para desarrollo se usa **WSL (Ubuntu 24.04)** sobre Windows, con los mismos servicios (`mysql`, `redis-server`, `qdrant`, `chatbot-backend`, `chatbot-frontend`) gestionados por systemd, con una diferencia respecto a producción:
 
 - **Sin reverse proxy ni HTTPS**: se accede directo a `localhost:3000` (frontend) y `localhost:8000` (backend).
 
