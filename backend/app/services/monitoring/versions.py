@@ -25,6 +25,11 @@ log = structlog.get_logger()
 
 SCHEMA_VERSION = 2
 
+# Los locks del scheduler viven en global_settings con una clave que lleva un
+# bucket temporal, así que aparecen y desaparecen solos: si entran al snapshot
+# ensucian cada diff de configuración con entradas que nadie modificó.
+_EPHEMERAL_KEY_PREFIX = "scheduler:"
+
 # Claves de configuración que contienen secretos - se enmascaran en los snapshots
 _SECRET_KEYS = frozenset({
     "smtp_password",
@@ -59,7 +64,11 @@ _SECTION_LABELS = {
 
 
 async def _collect_global_settings(db: AsyncSession) -> dict:
-    result = await db.execute(select(GlobalSetting))
+    result = await db.execute(
+        select(GlobalSetting).where(
+            ~GlobalSetting.key.like(f"{_EPHEMERAL_KEY_PREFIX}%")
+        )
+    )
     settings = {}
     for row in result.scalars().all():
         if row.key in _SECRET_KEYS:
@@ -484,7 +493,7 @@ async def restore_snapshot(
     if snapshot.get("schema_version") != SCHEMA_VERSION:
         warnings.append("Versión antigua (v1): solo se restaura configuración básica")
         for key, value in snapshot.items():
-            if key == "schema_version":
+            if key == "schema_version" or key.startswith(_EPHEMERAL_KEY_PREFIX):
                 continue
             existing = await db.get(GlobalSetting, key)
             if existing:
@@ -499,6 +508,8 @@ async def restore_snapshot(
         for key, value in sections.get("global_settings", {}).items():
             if value == "[CONFIGURED]":
                 continue  # No sobrescribir secretos con la máscara
+            if key.startswith(_EPHEMERAL_KEY_PREFIX):
+                continue  # Snapshots antiguos pueden traer locks del scheduler
             existing = await db.get(GlobalSetting, key)
             if existing:
                 existing.value = value

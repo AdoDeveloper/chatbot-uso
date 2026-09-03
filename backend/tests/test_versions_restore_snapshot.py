@@ -64,6 +64,47 @@ class TestRestoreSnapshotV1Legacy:
         assert new_version.trigger_source == "rollback"
 
 
+class TestEphemeralLocksExcludedFromSnapshots:
+    async def test_capture_ignores_scheduler_locks(self, db_session):
+        """Los locks del scheduler viven en global_settings pero no son
+        configuración: si entran al snapshot ensucian todos los diffs."""
+        from app.services.monitoring.versions import _collect_global_settings
+
+        db_session.add(GlobalSetting(
+            key=f"scheduler:health:{uuid.uuid4().hex[:8]}",
+            value={"owner": "x", "expires_at": "2026-01-01T00:00:00+00:00"},
+        ))
+        db_session.add(GlobalSetting(key="temperature", value=0.4))
+        await db_session.commit()
+
+        collected = await _collect_global_settings(db_session)
+
+        assert not [k for k in collected if k.startswith("scheduler:")]
+        assert collected["temperature"] == 0.4
+
+    async def test_restore_ignores_locks_from_old_snapshots(self, db_session, admin_user):
+        """Snapshots anteriores al fix guardaron miles de locks: restaurarlos
+        no debe recrearlos en global_settings."""
+        lock_key = f"scheduler:health:{uuid.uuid4().hex[:8]}"
+        snapshot = {
+            "schema_version": SCHEMA_VERSION,
+            "sections": {
+                "global_settings": {
+                    lock_key: {"owner": "x", "expires_at": "2026-01-01T00:00:00+00:00"},
+                    "temperature": 0.9,
+                },
+            },
+        }
+        target = await _make_version(db_session, snapshot)
+
+        await restore_snapshot(db_session, version_id=target.id, user_id=admin_user.id)
+        await db_session.commit()
+
+        assert await db_session.get(GlobalSetting, lock_key) is None
+        restored = await db_session.get(GlobalSetting, "temperature")
+        assert restored.value == 0.9
+
+
 class TestRestoreSnapshotSecretMasking:
     async def test_masked_secret_value_is_not_overwritten(self, db_session, admin_user):
         """El snapshot nunca contiene el secreto real, solo el string literal
