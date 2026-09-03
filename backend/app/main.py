@@ -48,10 +48,10 @@ async def lifespan(app: FastAPI):
 
     async with db_session.AsyncSessionLocal() as db:
         try:
+            await seed_rbac(db)
             await seed_first_admin(db)
             await seed_defaults(db)
             await seed_default_settings(db)
-            await seed_rbac(db)
         except Exception:
             logger.exception("startup.seed_failed - revisar logs anteriores para detalle")
             raise
