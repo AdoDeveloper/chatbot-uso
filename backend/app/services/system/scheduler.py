@@ -7,6 +7,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 import structlog
+from sqlalchemy import delete as sa_delete
 from sqlalchemy import select
 
 from app.core.timezone import now_sv
@@ -23,6 +24,7 @@ _STALE_CONV_INTERVAL = 600  # seconds between stale-conversation sweeps (10 min)
 _STALE_CONV_MINUTES = 120  # inactivity threshold before auto-resolving (2h - Zendesk-style default)
 _QDRANT_SYNC_INTERVAL = 3600  # seconds between orphan-vector sweeps (1h)
 _LOCK_RETENTION_HOURS = 48  # margen sobre el TTL más largo (digest, 23h) antes de purgar
+_SNAPSHOT_RETENTION_DAYS = 45  # 1.5x la ventana máxima consultable (720h) desde la API
 # Identificador estable de este proceso, usado para marcar la adquisición del
 # lock en BD (ayuda a depurar, no es estrictamente necesario para el claim).
 _OWNER_ID = uuid.uuid4().hex
@@ -144,6 +146,28 @@ async def _purge_expired_locks() -> int:
         return 0
 
 
+async def _purge_old_health_snapshots() -> int:
+    """Borra los snapshots de salud anteriores al margen de retención.
+
+    Se toma un snapshot por servicio cada `_HEALTH_INTERVAL`. La ventana máxima
+    consultable desde la API es de 720 horas (30 días), así que lo anterior a
+    `_SNAPSHOT_RETENTION_DAYS` ya no es alcanzable desde el panel.
+    """
+    from app.models.health_snapshot import HealthSnapshot
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=_SNAPSHOT_RETENTION_DAYS)
+    try:
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(
+                sa_delete(HealthSnapshot).where(HealthSnapshot.recorded_at < cutoff)
+            )
+            await db.commit()
+            return result.rowcount or 0
+    except Exception:
+        log.warning("scheduler.snapshot_purge_failed")
+        return 0
+
+
 async def _warmup_loop() -> None:
     """Ejecuta un embedding de prueba cada _WARMUP_INTERVAL segundos para mantener
     activo el thread pool de inferencia de ONNX Runtime.
@@ -182,6 +206,9 @@ async def _health_loop() -> None:
                 purged = await _purge_expired_locks()
                 if purged:
                     log.info("scheduler.locks_purged", count=purged)
+                purged_snapshots = await _purge_old_health_snapshots()
+                if purged_snapshots:
+                    log.info("scheduler.snapshots_purged", count=purged_snapshots)
             else:
                 log.debug("scheduler.health_snapshot_skipped_by_lock")
         except Exception:

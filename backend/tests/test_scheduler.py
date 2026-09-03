@@ -135,6 +135,44 @@ class TestPurgeExpiredLocks:
             assert await scheduler._purge_expired_locks() == 0
 
 
+class TestPurgeOldHealthSnapshots:
+    async def test_deletes_only_snapshots_past_retention(self, db_engine):
+        from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+        from app.models.health_snapshot import HealthSnapshot
+        Session = async_sessionmaker(db_engine, expire_on_commit=False, class_=AsyncSession)
+
+        now = datetime.now(timezone.utc)
+        old_id = uuid4()
+        recent_id = uuid4()
+        service = f"svc-{uuid4().hex[:8]}"
+
+        async with Session() as s:
+            s.add(HealthSnapshot(
+                id=old_id, service_name=service, is_ok=True,
+                recorded_at=now - timedelta(days=scheduler._SNAPSHOT_RETENTION_DAYS + 5),
+            ))
+            s.add(HealthSnapshot(
+                id=recent_id, service_name=service, is_ok=True,
+                recorded_at=now - timedelta(days=1),
+            ))
+            await s.commit()
+
+        await scheduler._purge_old_health_snapshots()
+
+        async with Session() as s:
+            remaining = set((await s.execute(
+                select(HealthSnapshot.id).where(HealthSnapshot.id.in_([old_id, recent_id]))
+            )).scalars().all())
+
+        assert old_id not in remaining, "el snapshot fuera de retencion debia borrarse"
+        assert recent_id in remaining, "un snapshot reciente no debe borrarse"
+
+    async def test_returns_zero_when_db_unavailable(self):
+        with patch("app.services.system.scheduler.AsyncSessionLocal", side_effect=RuntimeError("db down")):
+            assert await scheduler._purge_old_health_snapshots() == 0
+
+
 class TestCumpleAgenda:
     def _dt_utc(self, hour_sv, minute_sv, *, year=2026, month=7, day=16):
         # El Salvador es UTC-6, sin DST: hora UTC = hora_sv + 6
