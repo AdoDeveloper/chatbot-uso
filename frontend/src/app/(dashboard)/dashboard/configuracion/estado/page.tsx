@@ -3,7 +3,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { HeartPulse, Wrench, Loader2, Trash2, BarChart2, Database, Activity, List, X } from "lucide-react";
 import api from "@/lib/api";
-import { useApi, getErrorMessage } from "@/hooks/use-api";
+import { useApi, getErrorMessage, invalidateApiCache } from "@/hooks/use-api";
 import { useToast } from "@/components/ui/toast";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -129,17 +129,18 @@ const CacheConfigCard = forwardRef<CacheConfigCardHandle>(function CacheConfigCa
   async function save() {
     setSaving(true);
     try {
+      invalidateApiCache("/cache/stats");
       await api.patch("/cache/config", {
         enabled,
         ttl_seconds: ttlHours * 3600,
         similarity_threshold: threshold,
       });
+      setSaved({ enabled, ttlHours, threshold });
       toast({ type: "success", message: "Configuración del caché guardada." });
     } catch (err) {
       toast({ type: "error", message: getErrorMessage(err, "No se pudo guardar la configuración del caché.") });
     } finally {
       setSaving(false);
-      setSaved({ enabled, ttlHours, threshold });
     }
   }
 

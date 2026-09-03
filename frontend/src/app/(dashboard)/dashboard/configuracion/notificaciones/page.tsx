@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Bell, FileText, AlertCircle, UserRound, Plug, Inbox, Loader2, Clock, Mail, MailOpen, Check } from "lucide-react";
-import { useApi, getErrorMessage } from "@/hooks/use-api";
+import { useApi, getErrorMessage, invalidateApiCache } from "@/hooks/use-api";
 import { useToast } from "@/components/ui/toast";
 import api from "@/lib/api";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -216,13 +216,14 @@ export default function NotificacionesHistorialPage() {
 
     setSaving(true);
     try {
+      invalidateApiCache("/notifications/report-schedule");
       await api.put<ReportSchedule>("/notifications/report-schedule", payload);
+      setSavedDraft(payload);
       toast({ type: "success", message: "Programación del reporte guardada." });
     } catch (err) {
       toast({ type: "error", message: getErrorMessage(err, "No se pudo guardar la programación.") });
     } finally {
       setSaving(false);
-      setSavedDraft(payload);
     }
   }
 

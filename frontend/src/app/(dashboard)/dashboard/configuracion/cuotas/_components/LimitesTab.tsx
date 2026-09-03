@@ -3,7 +3,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import { Activity, Unlock } from "lucide-react";
 import api from "@/lib/api";
-import { useApi, getErrorMessage } from "@/hooks/use-api";
+import { useApi, getErrorMessage, invalidateApiCache } from "@/hooks/use-api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
@@ -59,10 +59,12 @@ export const LimitesTab = forwardRef<LimitesTabHandle>(function LimitesTab(_prop
     }
     setSaving(true);
     try {
-      await api.patch("/rate-limits/config", config);
+      invalidateApiCache("/rate-limits/config");
+      await api.put("/rate-limits/config", config);
+      setSavedConfig(config);
       toast({ type: "success", message: "Configuración guardada." });
     } catch (err) { toast({ type: "error", message: getErrorMessage(err, "No se pudo guardar la configuración.") }); }
-    finally { setSaving(false); setSavedConfig(config); }
+    finally { setSaving(false); }
   }
 
   async function unblockIp(ip: string) {

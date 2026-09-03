@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
-import { useApi, getErrorMessage } from "@/hooks/use-api";
+import { useApi, getErrorMessage, invalidateApiCache } from "@/hooks/use-api";
 import { usePermission } from "@/hooks/use-permission";
 import { PERM } from "@/lib/permissions";
 import { useToast } from "@/components/ui/toast";
@@ -75,6 +75,7 @@ export default function SsoPage() {
     }
     setSavingCred(true);
     try {
+      invalidateApiCache("/integrations/auth-methods");
       await api.put("/integrations/auth-methods", { credentials_enabled: enabled });
       setCredEnabled(enabled);
       toast({ message: `Inicio con contraseña ${enabled ? "activado" : "desactivado"}.`, type: "success" });
@@ -100,6 +101,7 @@ export default function SsoPage() {
     }
     setSaving(true);
     try {
+      invalidateApiCache("/integrations/oauth");
       const { data } = await api.put<OAuthConfigOut>("/integrations/oauth", {
         allowed_domains: oauth?.allowed_domains ?? [],
         is_active: next,
@@ -118,6 +120,7 @@ export default function SsoPage() {
     setSaving(true);
     try {
       const domains = allowedDomains.split(",").map((d) => d.trim()).filter(Boolean);
+      invalidateApiCache("/integrations/oauth");
       const { data } = await api.put<OAuthConfigOut>("/integrations/oauth", {
         allowed_domains: domains,
         is_active: oauth?.is_active ?? false,
