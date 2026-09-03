@@ -90,7 +90,13 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - run: npm ci
-      - run: npx next lint --no-cache --max-warnings 0 2>/dev/null || echo "Lint warnings found (non-blocking)"
+
+      # Bloqueante, igual que ruff en el backend: las reglas que Next trata
+      # como error (no-unused-vars, entre otras) rompen `npm run build`, y
+      # antes solo se detectaban al construir la imagen en el job de E2E.
+      - name: Lint with ESLint
+        run: npx next lint --no-cache
+
       - run: npm test
 
   frontend-e2e:
