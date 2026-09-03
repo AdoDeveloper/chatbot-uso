@@ -12,7 +12,6 @@ import type { WidgetConfig } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
-import { SegmentedControl } from "@/components/composed/segmented-control";
 import { FloatingSaveBar } from "./save-bar";
 import { Loading } from "@/components/ui/loading";
 import { CsatReasonsManager } from "../_components/CsatReasonsManager";
@@ -342,7 +341,6 @@ interface WidgetTabProps {
 
 export function WidgetTab({ subtab, onPreview, config: configProp, setConfig: setConfigProp }: WidgetTabProps) {
  const { toast } = useToast();
- const [snippetKind, setSnippetKind] = useState<"script" | "iframe">("script");
  const [configOwn, setConfigOwn] = useState<WidgetConfig | null>(null);
  const [savedConfig, setSavedConfig] = useState<WidgetConfig | null>(null);
  const [captacionOpen, setCaptacionOpen] = useState(false);
@@ -354,10 +352,9 @@ export function WidgetTab({ subtab, onPreview, config: configProp, setConfig: se
 
  const { data: widgetData, loading: loadingWidget } = useApi<WidgetConfig>("/widget/config");
  const { data: embedData, loading: loadingEmbed } =
-  useApi<{ script_tag: string; iframe_tag: string }>("/widget/embed-code");
+  useApi<{ script_tag: string }>("/widget/embed-code");
  const loading = loadingWidget || loadingEmbed;
  const scriptTag = embedData?.script_tag ?? "";
- const iframeTag = embedData?.iframe_tag ?? "";
 
  const seededRef = useRef(false);
  useEffect(() => {
@@ -373,7 +370,6 @@ export function WidgetTab({ subtab, onPreview, config: configProp, setConfig: se
   );
  }, [widgetData]);
 
- const currentSnippet = snippetKind === "script" ? scriptTag : iframeTag;
  const isDirty = config !== null && savedConfig !== null &&
   JSON.stringify(config) !== JSON.stringify(savedConfig);
 
@@ -566,29 +562,18 @@ export function WidgetTab({ subtab, onPreview, config: configProp, setConfig: se
        </div>
        <div className="grid grid-cols-1 sm:flex sm:justify-end gap-2">
         <Button variant="outline" size="sm" className="gap-1.5 h-8"
-         onClick={() => { navigator.clipboard.writeText(currentSnippet); setCopied(true); setTimeout(() => setCopied(false), 2000); }}>
+         onClick={() => { navigator.clipboard.writeText(scriptTag); setCopied(true); setTimeout(() => setCopied(false), 2000); }}>
          {copied ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}
          {copied ? "Copiado" : "Copiar"}
         </Button>
        </div>
       </div>
-      <SegmentedControl
-       ariaLabel="Formato del snippet"
-       value={snippetKind}
-       onChange={setSnippetKind}
-       options={[
-        { value: "script", label: "Script tag" },
-        { value: "iframe", label: "iframe" },
-       ]}
-       className="mb-3"
-      />
       <pre className="bg-gray-900 text-gray-300 text-13 p-4 rounded-lg overflow-x-auto font-mono leading-relaxed whitespace-pre-wrap break-all">
-       {currentSnippet || '<script src="/widget/chatbot.js" defer></script>'}
+       {scriptTag || '<script src="/widget/chatbot.js" defer></script>'}
       </pre>
       <p className="text-2xs text-muted-foreground mt-2">
-       {snippetKind === "script"
-        ? "Carga el widget asíncronamente. Detecta automáticamente el dominio y lo valida contra la allowlist."
-        : "Útil cuando su sitio tiene CSP estricto que bloquea scripts externos. El iframe es independiente del DOM padre."}
+       Carga el widget asíncronamente. Detecta automáticamente el dominio y lo valida contra la allowlist.
+       En aplicaciones móviles, cargue este mismo snippet dentro de un WebView.
       </p>
      </div>
      <WidgetApiKey config={config} onRegenerated={(c) => { setConfig(c); setSavedConfig(c); }} />

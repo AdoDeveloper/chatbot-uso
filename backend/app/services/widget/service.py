@@ -57,11 +57,7 @@ def generate_embed_code(cfg: WidgetConfig) -> EmbedCodeOut:
         f'data-show-bot-icon="{show_icon_attr}" '
         f'defer></script>'
     )
-    iframe_tag = (
-        f'<iframe src="{base}/widget/embed?key={cfg.api_key}" '
-        f'width="400" height="600" frameborder="0"></iframe>'
-    )
-    return EmbedCodeOut(script_tag=script_tag, iframe_tag=iframe_tag, api_key=cfg.api_key)
+    return EmbedCodeOut(script_tag=script_tag, api_key=cfg.api_key)
 
 
 async def enforce_widget_caps(widget: WidgetConfig, session_id: str) -> None:

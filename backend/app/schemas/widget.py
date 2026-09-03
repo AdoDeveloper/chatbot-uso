@@ -129,5 +129,4 @@ class WidgetPublicConfigOut(BaseModel):
 
 class EmbedCodeOut(BaseModel):
     script_tag: str
-    iframe_tag: str
     api_key: str

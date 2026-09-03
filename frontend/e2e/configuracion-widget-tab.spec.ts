@@ -180,13 +180,10 @@ test.describe("Configuracion > Asistente > Apariencia", () => {
 });
 
 test.describe("Configuracion > Asistente > Integración", () => {
-  test("snippet script/iframe, copiar codigo, agregar y quitar un dominio permitido, restaurado", async ({ page }) => {
+  test("snippet de script, copiar codigo, agregar y quitar un dominio permitido, restaurado", async ({ page }) => {
     await page.goto("/dashboard/configuracion/asistente?tab=integracion");
     await expect(page.getByRole("heading", { name: /código de integración/i })).toBeVisible({ timeout: 10_000 });
 
-    await page.getByRole("button", { name: "iframe", exact: true }).click();
-    await expect(page.locator("pre")).toContainText("iframe", { timeout: 5_000 });
-    await page.getByRole("button", { name: "Script tag", exact: true }).click();
     await expect(page.locator("pre")).toContainText("script", { timeout: 5_000 });
 
     await page.context().grantPermissions(["clipboard-write", "clipboard-read"]);

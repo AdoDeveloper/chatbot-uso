@@ -194,9 +194,8 @@ class TestEmbedCode:
         assert r.status_code == 200
         body = r.json()
         assert "script_tag" in body
-        assert "iframe_tag" in body
         assert body["api_key"] in body["script_tag"]
-        assert body["api_key"] in body["iframe_tag"]
+        assert "iframe_tag" not in body
 
 
 class TestRegenerateKey:
