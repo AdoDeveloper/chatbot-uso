@@ -146,7 +146,7 @@ class TestRunProactiveChecks:
         from app.models.chat_message import ChatMessage
         from app.models.enums import MessageRole
 
-        r_upd = await client.patch(
+        r_upd = await client.put(
             "/api/v1/rate-limits/config",
             json={"chat_per_min": 10, "chat_per_hour": 10},
             headers=auth_headers(admin_user),
@@ -173,7 +173,7 @@ class TestRunProactiveChecks:
         from app.models.chat_message import ChatMessage
         from app.models.enums import MessageRole
 
-        r_upd = await client.patch(
+        r_upd = await client.put(
             "/api/v1/rate-limits/config",
             json={"chat_per_min": 10, "chat_per_hour": 100},
             headers=auth_headers(admin_user),
@@ -224,7 +224,7 @@ class TestRunProactiveChecks:
         await _add_snapshot(db_session, service="redis", is_ok=False, recorded_at=now, error="conn refused")
         await _enable_rule(db_session, event=NotificationEvent.service_down)
 
-        await client.patch(
+        await client.put(
             "/api/v1/rate-limits/config",
             json={"chat_per_min": 10, "chat_per_hour": 10},
             headers=auth_headers(admin_user),

@@ -302,7 +302,7 @@ común: cada grupo vive en su propia carpeta bajo `backend/app/api/v1/`.
 | DELETE | `/cache/entry/{key}` | Eliminar una entrada |
 | DELETE | `/cache/clear` | Vaciar todo el caché |
 | GET | `/rate-limits/config` | Configuración de límites |
-| PATCH | `/rate-limits/config` | Actualizar límites |
+| PUT | `/rate-limits/config` | Actualizar límites |
 | GET | `/rate-limits/usage` | Uso actual |
 | GET | `/rate-limits/throttled` | IPs cercanas o sobre el límite |
 | DELETE | `/rate-limits/reset/{ip}` | Restablecer los contadores de una IP |

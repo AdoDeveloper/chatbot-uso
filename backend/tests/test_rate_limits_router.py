@@ -52,14 +52,14 @@ class TestGetConfig:
 
 class TestUpdateConfig:
     async def test_requires_auth(self, client):
-        r = await client.patch(
+        r = await client.put(
             "/api/v1/rate-limits/config",
             json={"chat_per_min": 20, "chat_per_hour": 200},
         )
         assert r.status_code == 401
 
     async def test_requires_manage_perm(self, client, viewer_user, auth_headers):
-        r = await client.patch(
+        r = await client.put(
             "/api/v1/rate-limits/config",
             json={"chat_per_min": 20, "chat_per_hour": 200},
             headers=auth_headers(viewer_user),
@@ -67,7 +67,7 @@ class TestUpdateConfig:
         assert r.status_code == 403
 
     async def test_updates_persist_and_are_reflected_in_get(self, client, admin_user, auth_headers):
-        r = await client.patch(
+        r = await client.put(
             "/api/v1/rate-limits/config",
             json={"chat_per_min": 25, "chat_per_hour": 500},
             headers=auth_headers(admin_user),
@@ -82,7 +82,7 @@ class TestUpdateConfig:
         assert body["chat_per_hour"] == 500
 
     async def test_rejects_chat_per_min_below_minimum(self, client, admin_user, auth_headers):
-        r = await client.patch(
+        r = await client.put(
             "/api/v1/rate-limits/config",
             json={"chat_per_min": 0, "chat_per_hour": 100},
             headers=auth_headers(admin_user),
@@ -90,7 +90,7 @@ class TestUpdateConfig:
         assert r.status_code == 422
 
     async def test_rejects_chat_per_min_above_maximum(self, client, admin_user, auth_headers):
-        r = await client.patch(
+        r = await client.put(
             "/api/v1/rate-limits/config",
             json={"chat_per_min": 1001, "chat_per_hour": 100},
             headers=auth_headers(admin_user),
@@ -98,7 +98,7 @@ class TestUpdateConfig:
         assert r.status_code == 422
 
     async def test_rejects_chat_per_hour_above_maximum(self, client, admin_user, auth_headers):
-        r = await client.patch(
+        r = await client.put(
             "/api/v1/rate-limits/config",
             json={"chat_per_min": 10, "chat_per_hour": 100001},
             headers=auth_headers(admin_user),
@@ -106,7 +106,7 @@ class TestUpdateConfig:
         assert r.status_code == 422
 
     async def test_rejects_missing_fields(self, client, admin_user, auth_headers):
-        r = await client.patch(
+        r = await client.put(
             "/api/v1/rate-limits/config",
             json={"chat_per_min": 10},
             headers=auth_headers(admin_user),
@@ -164,7 +164,7 @@ class TestListThrottled:
 
     async def test_reflects_updated_config_limits(self, client, admin_user, auth_headers):
         # Con un límite per_min menor, el mismo conteo debe superar el threshold.
-        await client.patch(
+        await client.put(
             "/api/v1/rate-limits/config",
             json={"chat_per_min": 4, "chat_per_hour": 100},
             headers=auth_headers(admin_user),

@@ -51,7 +51,7 @@ async def get_config(
     )
 
 
-@router.patch("/config", response_model=OperationStatus)
+@router.put("/config", response_model=OperationStatus)
 async def update_config(
     body: RateLimitConfig,
     db: AsyncSession = Depends(get_db),

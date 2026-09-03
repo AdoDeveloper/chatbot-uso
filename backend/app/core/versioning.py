@@ -31,7 +31,7 @@ _VERSIONED_ROUTES: list[tuple[str, str, str]] = [
     ("PUT",    "/api/v1/widget/config",                 "widget"),
     ("PATCH",  "/api/v1/guardrails/config",             "guardrails"),
     ("PATCH",  "/api/v1/cache/config",                  "cache"),
-    ("PATCH",  "/api/v1/rate-limits/config",            "rate_limits"),
+    ("PUT",    "/api/v1/rate-limits/config",            "rate_limits"),
     ("POST",   "/api/v1/escalation/rules",              "escalation"),
     ("PATCH",  "/api/v1/escalation/rules/",             "escalation"),
     ("DELETE", "/api/v1/escalation/rules/",             "escalation"),
