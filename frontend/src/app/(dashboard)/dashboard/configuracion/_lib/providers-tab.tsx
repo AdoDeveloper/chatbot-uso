@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, forwardRef, useImperativeHandle } from "react";
 import {
  Loader2, Save, Plus, Pencil, Trash2, Eye, EyeOff,
  Minus, Zap, AlertCircle, CheckCircle2, X, ExternalLink, RefreshCw,
@@ -61,9 +61,13 @@ const emptyForm = (): ProviderForm => ({
 });
 type TestState = "idle" | "testing" | "ok" | "fail";
 
-function ProviderPanel({ editing, onClose, onSaved }: {
- editing: LLMProvider | null; onClose: () => void; onSaved: () => void;
-}) {
+interface ProviderPanelHandle {
+ save: () => void;
+}
+
+const ProviderPanel = forwardRef<ProviderPanelHandle, {
+ editing: LLMProvider | null; onClose: () => void; onSaved: () => void; onSavingChange: (saving: boolean) => void;
+}>(function ProviderPanel({ editing, onClose, onSaved, onSavingChange }, ref) {
  const { toast } = useToast();
  const [form, setForm] = useState<ProviderForm>(emptyForm);
  const [saving, setSaving] = useState(false);
@@ -153,7 +157,7 @@ function ProviderPanel({ editing, onClose, onSaved }: {
    toast({ type: "warning", title: "Campos requeridos", message: "Nombre, proveedor y modelo son obligatorios." });
    return;
   }
-  setSaving(true);
+  setSaving(true); onSavingChange(true);
   try {
    const payload: Record<string, unknown> = {
     name: form.name, provider_type: resolvedType, model_name: form.model_name,
@@ -168,14 +172,16 @@ function ProviderPanel({ editing, onClose, onSaved }: {
     onSaved(); onClose();
   } catch (err) {
    toast({ type: "error", message: getErrorMessage(err, "No se pudo guardar.") });
-  } finally { setSaving(false); }
+  } finally { setSaving(false); onSavingChange(false); }
  }
+
+ useImperativeHandle(ref, () => ({ save: handleSave }), [handleSave]);
 
  return (
   <div className="space-y-4">
    <div>
     <label className="block text-xs font-medium text-muted-foreground mb-1">Nombre para mostrar</label>
-    <Input value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="ej. GPT-4o Producción" />
+    <Input value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="ej. GPT-4o Producción" autoComplete="off" />
    </div>
    <div>
     <label className="block text-xs font-medium text-muted-foreground mb-1">Proveedor</label>
@@ -225,13 +231,13 @@ function ProviderPanel({ editing, onClose, onSaved }: {
       </Select>
       {!fetchedModels.some((m) => m.id === form.model_name) && (
        <Input value={form.model_name} onChange={(e) => set("model_name", e.target.value)}
-        placeholder={MODEL_HINTS[resolvedType] ?? "nombre-del-modelo"} className="mt-2" />
+        placeholder={MODEL_HINTS[resolvedType] ?? "nombre-del-modelo"} className="mt-2" autoComplete="off" />
       )}
       <p className="text-3xs text-muted-foreground mt-1">{fetchedModels.length} modelos obtenidos del proveedor</p>
      </>
     ) : (
      <Input value={form.model_name} onChange={(e) => set("model_name", e.target.value)}
-      placeholder={MODEL_HINTS[resolvedType] ?? MODEL_HINTS[form.provider_type] ?? "nombre-del-modelo"} />
+      placeholder={MODEL_HINTS[resolvedType] ?? MODEL_HINTS[form.provider_type] ?? "nombre-del-modelo"} autoComplete="off" />
     )}
    </div>
    {!isLocal && (
@@ -243,7 +249,7 @@ function ProviderPanel({ editing, onClose, onSaved }: {
       <Input type={showKey ? "text" : "password"} value={form.api_key}
        onChange={(e) => set("api_key", e.target.value)}
        placeholder={editing?.has_api_key ? "••••••••••••••••" : "sk-..."}
-       className="pr-10" />
+       className="pr-10" autoComplete="new-password" />
       <button type="button" onClick={() => setShowKey((s) => !s)} className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50" aria-label={showKey ? "Ocultar API key" : "Mostrar API key"}>
        {showKey ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
       </button>
@@ -304,16 +310,9 @@ function ProviderPanel({ editing, onClose, onSaved }: {
     {testState === "ok" && <p className="mt-1.5 flex items-center gap-1 text-xs text-success"><CheckCircle2 className="w-3.5 h-3.5" /> Conexión exitosa {testMs !== null && <span className="text-muted-foreground ml-1">({testMs} ms)</span>}</p>}
     {testState === "fail" && <p className="mt-1.5 flex items-start gap-1 text-xs text-destructive"><AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" /><span className="break-all">{testMsg}</span></p>}
    </div>
-   <div className="flex gap-3 pt-2 border-t border-border">
-    <Button variant="outline" className="flex-1 gap-1.5" onClick={onClose}><X className="w-3.5 h-3.5" /> Cancelar</Button>
-    <Button className="flex-1 gap-1.5" onClick={handleSave} disabled={saving}>
-     {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : editing ? <Save className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
-     {editing ? "Guardar" : "Agregar"}
-    </Button>
-   </div>
   </div>
  );
-}
+});
 
 export function ProvidersTab() {
  const { toast, confirm } = useToast();
@@ -324,6 +323,8 @@ export function ProvidersTab() {
  const [editing, setEditing] = useState<LLMProvider | null>(null);
  const [testingId, setTestingId] = useState<string | null>(null);
  const [deletingId, setDeletingId] = useState<string | null>(null);
+ const [panelSaving, setPanelSaving] = useState(false);
+ const panelRef = useRef<ProviderPanelHandle>(null);
 
  const chainCount = providers.filter((p) => p.priority !== null).length;
 
@@ -494,8 +495,21 @@ export function ProvidersTab() {
       </div>
      )}
     </Card>
-   <Modal open={panelOpen} title={editing ? "Editar proveedor" : "Agregar proveedor"} onClose={() => setPanelOpen(false)}>
-    <ProviderPanel editing={editing} onClose={() => setPanelOpen(false)} onSaved={fetchProviders} />
+   <Modal
+    open={panelOpen}
+    title={editing ? "Editar proveedor" : "Agregar proveedor"}
+    onClose={() => setPanelOpen(false)}
+    footer={
+     <>
+      <Button variant="outline" className="flex-1 gap-1.5" onClick={() => setPanelOpen(false)}><X className="w-3.5 h-3.5" /> Cancelar</Button>
+      <Button className="flex-1 gap-1.5" onClick={() => panelRef.current?.save()} disabled={panelSaving}>
+       {panelSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : editing ? <Save className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+       {editing ? "Guardar" : "Agregar"}
+      </Button>
+     </>
+    }
+   >
+    <ProviderPanel ref={panelRef} editing={editing} onClose={() => setPanelOpen(false)} onSaved={fetchProviders} onSavingChange={setPanelSaving} />
    </Modal>
   </div>
  );
