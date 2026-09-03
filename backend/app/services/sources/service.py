@@ -126,7 +126,13 @@ async def upload_source(
 
     from app.services.ingestion.source_quality import file_hash, find_duplicate
     chash = file_hash(content)
-    async with _ContentHashLock(chash):
+    async with _ContentHashLock(chash) as acquired:
+        if not acquired:
+            raise HTTPException(
+                status_code=409,
+                detail="Se está procesando otra subida de este mismo archivo. "
+                       "Espere unos segundos y vuelva a intentarlo.",
+            )
         dup = await find_duplicate(db, chash)
         if dup:
             raise HTTPException(
@@ -207,7 +213,13 @@ async def replace_source_file(
 
     from app.services.ingestion.source_quality import file_hash, find_duplicate
     chash = file_hash(content)
-    async with _ContentHashLock(chash):
+    async with _ContentHashLock(chash) as acquired:
+        if not acquired:
+            raise HTTPException(
+                status_code=409,
+                detail="Se está procesando otra subida de este mismo archivo. "
+                       "Espere unos segundos y vuelva a intentarlo.",
+            )
         dup = await find_duplicate(db, chash, exclude_id=source.id)
         if dup:
             raise HTTPException(
@@ -295,7 +307,13 @@ async def bulk_upload_sources(
                 continue
 
             chash = file_hash(content)
-            async with _ContentHashLock(chash):
+            async with _ContentHashLock(chash) as acquired:
+                if not acquired:
+                    errors.append({
+                        "name": file.filename,
+                        "error": "Otra subida de este mismo archivo está en curso.",
+                    })
+                    continue
                 dup = await find_duplicate(db, chash)
                 if dup:
                     errors.append({"name": file.filename, "error": f"Contenido duplicado: '{dup.name}'."})
