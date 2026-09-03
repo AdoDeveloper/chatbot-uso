@@ -102,12 +102,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(data.user);
     const next = permsFromToken();
     setPermissions((prev) => next ?? prev);
-    if (data.user.must_change_password) {
-      router.push("/cambiar-contrasena");
-    } else {
-      router.push("/dashboard");
-    }
-  }, [router]);
+    // Navegación completa (no router.push): el middleware server-side a veces
+    // no ve la cookie recién seteada por JS en una soft-navigation, dejando
+    // la página en blanco hasta refrescar manualmente. window.location.href
+    // fuerza un request nuevo que sí incluye la cookie fresca.
+    window.location.href = data.user.must_change_password ? "/cambiar-contrasena" : "/dashboard";
+  }, []);
 
   const logout = useCallback(async () => {
     // Revoca los tokens en el backend (denylist) y limpia las cookies httpOnly.
