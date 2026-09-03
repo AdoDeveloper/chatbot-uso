@@ -1,9 +1,9 @@
 """Cobertura de los triggers de escalación no_answer y negative_feedback.
 
-Antes de este fix, pipeline.detect_escalation() mandaba siempre
-no_answer_seconds=None y feedback_negative_ratio=None al motor de reglas,
-por lo que ninguna regla de esos dos tipos podía dispararse jamás,
-sin importar la configuración ni el comportamiento real del chatbot.
+Verifica que pipeline.detect_escalation() calcule y pase al motor de reglas
+valores reales de no_answer_seconds y feedback_negative_ratio, para que las
+reglas de esos dos tipos puedan dispararse según la configuración y el
+comportamiento real del chatbot.
 """
 from __future__ import annotations
 
@@ -133,9 +133,9 @@ async def test_no_answer_rule_does_not_trigger_when_fast(db_session):
 
 @pytest.mark.asyncio
 async def test_recent_assistant_rag_scores_reads_real_history_chronologically(db_session):
-    """confidence_below promete "N respuestas consecutivas" - antes de este
-    fix se evaluaban N chunks de la respuesta actual (una señal distinta),
-    porque no existía ningún acumulador de scores por conversación."""
+    """confidence_below evalúa "N respuestas consecutivas": los scores se leen
+    del historial real de la conversación en orden cronológico, no de los N
+    chunks de la respuesta actual (que es una señal distinta)."""
     conv = await _make_conversation(db_session)
     await _add_assistant_message_with_score(db_session, conv.id, 0.01)
     await _add_assistant_message_with_score(db_session, conv.id, 0.02)
