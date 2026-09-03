@@ -619,8 +619,9 @@ function ChatWidget({
     setKebabOpen(false);
     if (settings.enable_csat && conversationId && csatState === "hidden") {
       setCsatState("pending");
+    } else {
+      setOpen(false);
     }
-    setOpen(false);
   }
 
   // Nueva conversación: cancela el request activo y resetea todo.
