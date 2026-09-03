@@ -85,6 +85,20 @@ const SECTION_LABELS: Record<string, string> = {
   sources: "Fuentes", faq_entries: "FAQ",
 };
 
+/** Los valores de configuración pueden ser listas u objetos: String() los
+ *  convertiría en "[object Object]". */
+function formatDiffValue(value: unknown): string {
+  if (value == null) return "N/A";
+  if (typeof value === "object") {
+    try {
+      return JSON.stringify(value).slice(0, 80);
+    } catch {
+      return "N/A";
+    }
+  }
+  return String(value).slice(0, 80);
+}
+
 function DiffSection({ section, changes }: { section: string; changes: DiffChange[] }) {
   if (!changes.length) return null;
   const isKV = section === "global_settings" || section === "widget_config";
@@ -104,8 +118,8 @@ function DiffSection({ section, changes }: { section: string; changes: DiffChang
               {changes.map((c, i) => (
                 <TableRow key={i} className={c.action === "added" ? "bg-brand-green/10 hover:bg-brand-green/10" : c.action === "removed" ? "bg-destructive/5 hover:bg-destructive/5" : ""}>
                   <TableCell className="font-mono text-xs">{c.key}</TableCell>
-                  <TableCell className="text-muted-foreground max-w-48 truncate">{c.old != null ? String(c.old).slice(0, 80) : "N/A"}</TableCell>
-                  <TableCell className="max-w-48 truncate">{c.new != null ? String(c.new).slice(0, 80) : "N/A"}</TableCell>
+                  <TableCell className="text-muted-foreground max-w-48 truncate">{formatDiffValue(c.old)}</TableCell>
+                  <TableCell className="max-w-48 truncate">{formatDiffValue(c.new)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
