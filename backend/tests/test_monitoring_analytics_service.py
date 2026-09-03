@@ -61,21 +61,33 @@ class TestGetChannels:
         assert result.channels == []
         assert result.days == 7
 
-    async def test_classifies_widget_api_and_playground(self, db_session):
+    async def test_production_excludes_playground(self, db_session):
         widget = _conv(origin_url="https://uso.edu/inicio", browser="Chrome")
         api = _conv(origin_url=None, browser=None)
         playground = _conv(origin_url="https://uso.edu/panel", browser="playground")
         db_session.add_all([widget, api, playground])
         await db_session.commit()
 
-        result = await svc.get_channels(db_session, days=7)
+        result = await svc.get_channels(db_session, days=7, source="production")
         by_channel = {c.channel: c for c in result.channels}
         assert by_channel["widget"].count == 1
         assert by_channel["api"].count == 1
-        assert by_channel["playground"].count == 1
-        # percentages sum to 100 (three equal buckets of 1/3)
+        assert "playground" not in by_channel
         total_pct = sum(c.percentage for c in result.channels)
         assert round(total_pct, 0) == 100
+
+    async def test_playground_source_returns_only_playground(self, db_session):
+        widget = _conv(origin_url="https://uso.edu/inicio", browser="Chrome")
+        api = _conv(origin_url=None, browser=None)
+        playground = _conv(origin_url="https://uso.edu/panel", browser="playground")
+        db_session.add_all([widget, api, playground])
+        await db_session.commit()
+
+        result = await svc.get_channels(db_session, days=7, source="playground")
+        by_channel = {c.channel: c for c in result.channels}
+        assert by_channel["playground"].count == 1
+        assert "widget" not in by_channel
+        assert "api" not in by_channel
 
     async def test_respects_until_and_since_window(self, db_session):
         old = _conv(origin_url="https://uso.edu/x", started_at=NOW - timedelta(days=60))
