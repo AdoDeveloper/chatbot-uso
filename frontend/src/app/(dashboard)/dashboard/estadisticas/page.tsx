@@ -163,7 +163,7 @@ function MetricasTab() {
  const qLatency = useApi<{ points: LatencyPoint[] }>(periodReady ? `/analytics/latency/timeseries?${periodQuery}&${src}` : null);
   const qTimeline = useApi<{ events: ActivityEvent[]; days: number }>(periodReady ? `/analytics/timeline?days=${timelineDays}&limit=40&${src}` : null);
  const qComparison = useApi<PeriodComparison>(periodReady ? `/analytics/comparison?days=${compDays}&${src}` : null);
- const qChannels = useApi<{ channels: ChannelStat[]; days: number }>(periodReady ? `/analytics/channels?days=${compDays}` : null);
+ const qChannels = useApi<{ channels: ChannelStat[]; days: number }>(periodReady ? `/analytics/channels?days=${compDays}&${src}` : null);
  const qCache = useApi<CacheStats>(periodReady ? `/analytics/cache?days=${compDays}&${src}` : null);
  const qPages = useApi<{ pages: PageStat[]; days: number }>(periodReady ? `/analytics/pages?days=${compDays}&${src}` : null);
  const qFeedback = useApi<AnalyticsFeedback>(periodReady ? `/analytics/feedback?days=${compDays}&${src}` : null);

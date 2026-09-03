@@ -184,12 +184,15 @@ async def channels(
     days: int = Query(7, ge=1, le=90),
     date_from: datetime | None = Query(None),
     date_to: datetime | None = Query(None),
+    source: str = _SourceQ,
     db: AsyncSession = Depends(get_db),
     _: object = Depends(require_perm(P.ANALYTICS_READ)),
 ):
-    # get_channels() no filtra playground, lo muestra como categoría propia.
+    # Con source="production" (default) se excluye playground vía _source_filter,
+    # igual que el resto de endpoints - "Previsualizar" solo aparece como
+    # categoría propia si se consulta explícitamente source="playground".
     eff_days, until = _effective_range(days, date_from, date_to)
-    return await svc.get_channels(db, days=eff_days, until=until)
+    return await svc.get_channels(db, days=eff_days, until=until, source=source)
 
 
 @router.get("/pages", response_model=AnalyticsPages)

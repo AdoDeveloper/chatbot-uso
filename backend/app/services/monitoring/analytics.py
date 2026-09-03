@@ -787,9 +787,14 @@ def _classify_channel(origin_url: str | None, browser: str | None) -> str:
 
 
 async def get_channels(
-    db: AsyncSession, days: int = 7, until: datetime | None = None,
+    db: AsyncSession, days: int = 7, until: datetime | None = None, source: str = "production",
 ) -> AnalyticsChannels:
     """Desglosa el tráfico por canal de entrada: widget, api, playground.
+
+    Con source='production' (default) se excluye el tráfico de playground vía
+    _source_filter, igual que el resto de endpoints de analytics - así "playground"
+    solo aparece como categoría propia cuando se consulta explícitamente
+    source='playground'.
     """
     _until = until or datetime.now(timezone.utc)
     since = _until - timedelta(days=days)
@@ -797,6 +802,7 @@ async def get_channels(
         select(ChatConversation.origin_url, ChatConversation.browser)
         .where(ChatConversation.started_at >= since)
         .where(ChatConversation.started_at < _until)
+        .where(_source_filter(source))
     )
     counts: dict[str, int] = {}
     total = 0
