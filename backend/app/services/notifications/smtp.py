@@ -43,8 +43,6 @@ async def send_invitation_email(*, to: str, role: str | None = None, invite_url:
 
     content = tpl.paragraph(intro)
     detail = {}
-    if invited_by:
-        detail["Invitado por"] = invited_by
     if role:
         detail["Rol asignado"] = role
     if detail:
