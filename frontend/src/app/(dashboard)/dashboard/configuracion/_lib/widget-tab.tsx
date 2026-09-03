@@ -73,6 +73,9 @@ function WidgetApiKey({ config, onRegenerated }: {
   setRegenerating(true);
   try {
    invalidateApiCache("/widget/config");
+   // El snippet de integración lleva la clave embebida: sin invalidarlo, el
+   // panel seguiría ofreciendo copiar uno con la clave ya revocada.
+   invalidateApiCache("/widget/embed-code");
     const { data } = await api.post<WidgetConfig>("/widget/regenerate-key");
     onRegenerated(data);
    toast({ type: "success", message: "Clave regenerada correctamente." });
@@ -351,7 +354,7 @@ export function WidgetTab({ subtab, onPreview, config: configProp, setConfig: se
  const setConfig = setConfigProp ?? setConfigOwn;
 
  const { data: widgetData, loading: loadingWidget } = useApi<WidgetConfig>("/widget/config");
- const { data: embedData, loading: loadingEmbed } =
+ const { data: embedData, loading: loadingEmbed, refetch: refetchEmbed } =
   useApi<{ script_tag: string }>("/widget/embed-code");
  const loading = loadingWidget || loadingEmbed;
  const scriptTag = embedData?.script_tag ?? "";
@@ -576,7 +579,10 @@ export function WidgetTab({ subtab, onPreview, config: configProp, setConfig: se
        En aplicaciones móviles, cargue este mismo snippet dentro de un WebView.
       </p>
      </div>
-     <WidgetApiKey config={config} onRegenerated={(c) => { setConfig(c); setSavedConfig(c); }} />
+     <WidgetApiKey
+      config={config}
+      onRegenerated={(c) => { setConfig(c); setSavedConfig(c); refetchEmbed(); }}
+     />
      <DomainAllowlist config={config} setConfig={setConfig} />
     </div>
    )}
