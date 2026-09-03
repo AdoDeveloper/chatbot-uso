@@ -25,6 +25,7 @@ _STALE_CONV_MINUTES = 120  # inactivity threshold before auto-resolving (2h - Ze
 _QDRANT_SYNC_INTERVAL = 3600  # seconds between orphan-vector sweeps (1h)
 _LOCK_RETENTION_HOURS = 48  # margen sobre el TTL más largo (digest, 23h) antes de purgar
 _SNAPSHOT_RETENTION_DAYS = 45  # 1.5x la ventana máxima consultable (720h) desde la API
+_PURGE_LOG_THRESHOLD = 50  # a partir de aquí la purga se registra en info, no en debug
 # Identificador estable de este proceso, usado para marcar la adquisición del
 # lock en BD (ayuda a depurar, no es estrictamente necesario para el claim).
 _OWNER_ID = uuid.uuid4().hex
@@ -203,12 +204,17 @@ async def _health_loop() -> None:
                     await collect_snapshot(db)
                     await run_all_checks(db)
                 log.debug("scheduler.health_snapshot_recorded")
+                # En régimen estacionario cada ciclo purga unas pocas filas, así
+                # que solo se registra en info una limpieza grande; el resto va
+                # a debug para no llenar el journal cada 5 minutos.
                 purged = await _purge_expired_locks()
                 if purged:
-                    log.info("scheduler.locks_purged", count=purged)
+                    _log = log.info if purged >= _PURGE_LOG_THRESHOLD else log.debug
+                    _log("scheduler.locks_purged", count=purged)
                 purged_snapshots = await _purge_old_health_snapshots()
                 if purged_snapshots:
-                    log.info("scheduler.snapshots_purged", count=purged_snapshots)
+                    _log = log.info if purged_snapshots >= _PURGE_LOG_THRESHOLD else log.debug
+                    _log("scheduler.snapshots_purged", count=purged_snapshots)
             else:
                 log.debug("scheduler.health_snapshot_skipped_by_lock")
         except Exception:

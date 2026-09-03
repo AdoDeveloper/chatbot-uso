@@ -326,6 +326,15 @@ case "${PKG_FAMILY}" in
 esac
 systemctl enable nginx
 
+# Límite al journal: por defecto crece hasta el 10% del disco sin techo fijo.
+mkdir -p /etc/systemd/journald.conf.d
+cat > /etc/systemd/journald.conf.d/chatbot.conf <<'EOF'
+[Journal]
+SystemMaxUse=500M
+MaxRetentionSec=1month
+EOF
+systemctl restart systemd-journald
+
 echo "══════════════════════════════════════════════════════════════"
 echo " 8/8 - Usuario de la app y directorios"
 echo "══════════════════════════════════════════════════════════════"
