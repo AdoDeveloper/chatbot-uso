@@ -22,9 +22,9 @@ Chatbot institucional con pipeline RAG (Retrieval-Augmented Generation) y panel 
 | RAM | 8 GB | 16 GB |
 | CPU | 4 cores | 8 cores |
 | Disco | 15 GB | 30 GB |
-| OS | Linux / macOS / Windows 11 con WSL2 | Ubuntu 22.04 LTS |
+| OS | Linux / macOS / Windows 11 con WSL2 | Ubuntu 24.04 LTS |
 | Python | 3.12 | 3.12 |
-| Node.js | 20 LTS | 20 LTS |
+| Node.js | 24 LTS | 24 LTS |
 
 El backend descarga ~2 GB de modelos de embeddings la primera vez.
 
@@ -107,6 +107,7 @@ evite correr `npm install` desde Windows dentro del mismo checkout.
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Diagramas de despliegue, flujo del chat, ingestión, modelo de datos y Adaptive RAG |
 | [docs/INSTALLATION.md](docs/INSTALLATION.md) | Entorno de desarrollo local con Docker Compose o WSL2 manual |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Despliegue en producción en Ubuntu Server sin Docker (systemd, nginx, HTTPS, backups) |
+| [deploy/native/README.md](deploy/native/README.md) | Scripts de despliegue nativo automatizados, multi-distro (apt/dnf/zypper) |
 
 ---
 
