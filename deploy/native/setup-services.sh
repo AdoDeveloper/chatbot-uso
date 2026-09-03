@@ -221,7 +221,10 @@ server {
         proxy_cache     off;
     }
 
-    location /api/ {
+    # Solo /api/v1/ (backend FastAPI) - /api/auth/callback/microsoft es una ruta
+    # de Next.js (frontend/src/app/api/auth/callback/microsoft/route.ts) y debe
+    # caer al location / de más abajo, no aquí.
+    location /api/v1/ {
         proxy_pass         http://chatbot_backend;
         proxy_http_version 1.1;
         proxy_set_header   Connection        "";
