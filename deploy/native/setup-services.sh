@@ -66,6 +66,7 @@ FIRST_ADMIN_EMAIL=admin@${DOMAIN}
 FIRST_ADMIN_PASSWORD=$(openssl rand -hex 12)
 ALLOWED_ORIGINS=["https://${DOMAIN}"]
 WIDGET_BASE_URL=https://${DOMAIN}
+FRONTEND_URL=https://${DOMAIN}
 EOF
     chown "${APP_USER}:${APP_USER}" "${APP_DIR}/backend/.env"
     chmod 600 "${APP_DIR}/backend/.env"
