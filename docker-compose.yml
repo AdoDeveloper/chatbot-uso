@@ -46,6 +46,9 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      # Con appendonly la carga del AOF puede tardar; sin start_period esos
+      # fallos iniciales cuentan como reintentos y pueden marcarlo unhealthy.
+      start_period: 15s
 
   qdrant:
     image: qdrant/qdrant:v1.17.1
