@@ -234,7 +234,7 @@ export const SaludTab = forwardRef<SaludTabHandle>(function SaludTab(_props, ref
                     <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full ${
                       ok ? "bg-brand-green/10 text-brand-green" : "bg-destructive/10 text-destructive"
                     }`}>
-                      {ok ? "Operativo" : service.status}
+                      {ok ? "Operativo" : "Error"}
                     </span>
                   </TableCell>
                   <TableCell className="text-right">
