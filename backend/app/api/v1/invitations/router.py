@@ -7,6 +7,7 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.deps import get_client_ip, require_perm
 from app.core.exceptions import NotFoundError
 from app.core.permissions import P
@@ -29,11 +30,14 @@ log = structlog.get_logger()
 router = APIRouter(tags=["invitations"])
 
 
-def _build_response(inv, request: Request | None = None) -> InvitationResponse:
+def _build_response(inv) -> InvitationResponse:
+    """El panel muestra `invite_url` como enlace de respaldo para compartir a
+    mano, así que debe apuntar a la página de aceptación del frontend, la
+    misma que va en el correo. La ruta equivalente de la API devuelve JSON.
+    """
     data = InvitationResponse.model_validate(inv)
-    if request:
-        base = str(request.base_url).rstrip("/")
-        data.invite_url = f"{base}/api/v1/auth/invite/{inv.token}"
+    frontend = get_settings().FRONTEND_URL.rstrip("/")
+    data.invite_url = f"{frontend}/invite/{inv.token}"
     return data
 
 
@@ -42,14 +46,13 @@ async def list_invitations(
     active_only: bool = False,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    request: Request = None,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_perm(P.USERS_MANAGE)),
 ):
     invs, total = await invitation_service.list_invitations(
         db, active_only=active_only, page=page, page_size=page_size
     )
-    items = [_build_response(inv, request).model_dump(mode="json") for inv in invs]
+    items = [_build_response(inv).model_dump(mode="json") for inv in invs]
     return {"items": items, "total": total, "page": page, "page_size": page_size}
 
 
@@ -79,7 +82,6 @@ async def _send_invitation_email_for(inv: Invitation, invited_by: User) -> bool:
 @router.post("/users/invitations", response_model=InvitationResponse, status_code=status.HTTP_201_CREATED)
 async def create_invitation(
     body: InvitationCreate,
-    request: Request = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_perm(P.USERS_MANAGE)),
 ):
@@ -95,7 +97,7 @@ async def create_invitation(
 
     email_sent = await _send_invitation_email_for(inv, current_user)
 
-    response = _build_response(inv, request)
+    response = _build_response(inv)
     response.email_sent = email_sent
     return response
 
@@ -103,7 +105,6 @@ async def create_invitation(
 @router.post("/users/invitations/{invitation_id}/resend", response_model=InvitationResponse)
 async def resend_invitation(
     invitation_id: uuid.UUID,
-    request: Request = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_perm(P.USERS_MANAGE)),
 ):
@@ -116,7 +117,7 @@ async def resend_invitation(
 
     email_sent = await _send_invitation_email_for(inv, current_user)
 
-    response = _build_response(inv, request)
+    response = _build_response(inv)
     response.email_sent = email_sent
     return response
 

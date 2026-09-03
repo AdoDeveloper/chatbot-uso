@@ -52,7 +52,11 @@ class TestListInvitations:
         assert r.status_code == 200
         body = r.json()
         assert body["total"] == 1
-        assert body["items"][0]["invite_url"].endswith(f"/api/v1/auth/invite/{body['items'][0]['token']}")
+        # El panel ofrece este enlace para compartirlo a mano: debe apuntar a
+        # la página del frontend, no al endpoint de la API que devuelve JSON.
+        invite_url = body["items"][0]["invite_url"]
+        assert invite_url.endswith(f"/invite/{body['items'][0]['token']}")
+        assert "/api/v1/" not in invite_url
 
     async def test_active_only_filter(self, client, admin_user, auth_headers, db_session):
         await _make_invitation(db_session, email="activa@example.com", active=True)
