@@ -113,7 +113,7 @@ async def export_logs(
 
     if format == "pdf":
         return pdf_response(rows, "auditoria", title="Registros de Auditoría")
-    return excel_response(rows, "auditoria", sheet_name="Auditoría")
+    return excel_response(rows, "auditoria", sheet_name="Auditoría", title="Registros de Auditoría")
 
 
 @router.get("/logs/{log_id}", response_model=AuditLogOut)

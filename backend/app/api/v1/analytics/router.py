@@ -257,7 +257,7 @@ async def export_analytics(
     rows = body.get("rows", [])
     if format == "pdf":
         return pdf_response(rows, "estadisticas", title="Estadísticas del Chatbot")
-    return excel_response(rows, "estadisticas", sheet_name="Estadísticas")
+    return excel_response(rows, "estadisticas", sheet_name="Estadísticas", title="Estadísticas del Chatbot")
 
 
 _REPORT_TYPES = Literal["ejecutivo", "uso", "escalamientos", "conocimiento"]

@@ -153,7 +153,7 @@ async def export_conversations(
 
     if format == "pdf":
         return pdf_response(rows, "conversaciones", title="Historial de Conversaciones")
-    return excel_response(rows, "conversaciones", sheet_name="Conversaciones")
+    return excel_response(rows, "conversaciones", sheet_name="Conversaciones", title="Historial de Conversaciones")
 
 
 @router.get("/tags", response_model=list[dict])
