@@ -121,12 +121,12 @@ export function setAssetBase(url: string): void {
 marked.use({ breaks: true, gfm: true });
 marked.use({
   renderer: {
-    link(href: string, _title: string | null | undefined, text: string) {
+    link({ href, text }: { href: string; title?: string | null; text: string }) {
       const isPdf = /\.pdf(\?.*)?$/i.test(href || "");
       const cls = isPdf ? ' class="pdf-link"' : "";
       return `<a href="${href}" target="_blank" rel="noopener noreferrer"${cls}>${text}</a>`;
     },
-    image(href: string, _title: string | null | undefined, text: string) {
+    image({ href, text }: { href: string; title?: string | null; text: string }) {
       const raw = href || "";
       let src: string;
       if (raw.startsWith("http") || raw.startsWith("data:")) {
