@@ -172,7 +172,7 @@ function MetricasTab() {
 
  const queries = [
   qMetrics, qTopics, qActivity, qTimeseries, qRoutes, qLatency,
-  qTimeline, qComparison, qChannels, qCache, qPages, qFeedback, qCsat,
+  qTimeline, qComparison, qChannels, qCache, qPages, qFeedback, qCsat, qQuality,
  ];
  const loading = queries.some((q) => q.loading);
  const refetching = queries.some((q) => q.refetching);

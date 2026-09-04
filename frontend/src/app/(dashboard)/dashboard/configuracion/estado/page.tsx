@@ -226,6 +226,7 @@ function EstadoContent() {
     setSyncing(true);
     try {
       const { data } = await api.post<SyncResult>("/maintenance/sync-qdrant");
+      void saludRef.current?.refetchAll();
       toast({
         type: "success",
         message: `${data.orphan_chunks_deleted} chunks huérfanos eliminados.`,
@@ -252,6 +253,7 @@ function EstadoContent() {
       const { data } = await api.delete<{ deleted: number; threshold_ms: number }>(
         "/maintenance/health-snapshots/outliers"
       );
+      void saludRef.current?.refetchAll();
       toast({ type: "success", message: `${data.deleted} mediciones anómalas eliminadas.` });
     } catch (err) {
       toast({ type: "error", message: getErrorMessage(err, "No se pudo limpiar el historial.") });
@@ -273,6 +275,7 @@ function EstadoContent() {
     setClearing(true);
     try {
       const { data } = await api.delete<{ deleted: number }>("/cache/clear");
+      void cacheRef.current?.refetch();
       toast({ type: "success", message: `${data.deleted} entradas de caché eliminadas.` });
     } catch (err) {
       toast({ type: "error", message: getErrorMessage(err, "No se pudo limpiar el caché.") });

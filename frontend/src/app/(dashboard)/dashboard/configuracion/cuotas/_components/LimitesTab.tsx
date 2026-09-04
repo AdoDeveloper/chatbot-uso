@@ -75,7 +75,7 @@ export const LimitesTab = forwardRef<LimitesTabHandle>(function LimitesTab(_prop
     });
     if (!ok) return;
     try {
-      await api.delete(`/rate-limits/reset/${ip}`);
+      await api.delete(`/rate-limits/reset/${encodeURIComponent(ip)}`);
       setThrottled((prev) => (prev ?? []).filter((t) => t.ip !== ip));
       toast({ type: "success", message: `${ip} desbloqueada.` });
     } catch (err) { toast({ type: "error", message: getErrorMessage(err, "No se pudo desbloquear la IP.") }); }
