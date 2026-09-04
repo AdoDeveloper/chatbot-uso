@@ -995,6 +995,49 @@ async def grade_documents(
         return [True] * len(documents)
 
 
+async def classify_topic(
+    question: str, provider: LLMProvider, api_key: str | None,
+) -> str | None:
+    """Clasifica una pregunta sin respuesta en un tema corto (1-3 palabras),
+    para agrupar "Temas más consultados" en las estadísticas y el resumen
+    semanal. Fail-open a None (no bloquea nada más): sin tema asignado, la
+    fila simplemente no entra en el agrupado por tema.
+    """
+    prompt = (
+        "Clasifica la siguiente pregunta de un estudiante universitario en UN "
+        "solo tema corto de 1 a 3 palabras (ej. Inscripciones, Becas, Horarios, "
+        "Equivalencias, Constancias, Cambio de carrera). Usa un tema existente si "
+        "la pregunta encaja, o crea uno nuevo igual de corto si no encaja en ninguno. "
+        "Responde SOLO con JSON: {\"topic\": \"...\"}"
+    )
+    messages = [
+        {"role": "system", "content": prompt},
+        {"role": "user", "content": f"Pregunta: {question}"},
+    ]
+    adapter = _get_adapter(provider.name, provider.provider_type, provider.model_name, provider.api_base, api_key)
+    reasoning_effort = "low" if provider.provider_type == "groq" else None
+    try:
+        text = await adapter.complete(
+            messages, temperature=0.0, max_tokens=32, reasoning_effort=reasoning_effort,
+        )
+        if not text or not text.strip():
+            return None
+        cleaned = text.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+        try:
+            data = json.loads(cleaned)
+            topic = data.get("topic")
+        except json.JSONDecodeError:
+            match = re.search(r'"topic"\s*:\s*"([^"]{1,60})"', cleaned)
+            topic = match.group(1) if match else None
+        if not topic or not isinstance(topic, str):
+            return None
+        topic = topic.strip().strip(".").title()
+        return topic[:128] if topic else None
+    except Exception as exc:
+        log.warning("llm.topic_classification_failed", error=str(exc))
+        return None
+
+
 async def _extract_statements(
     answer: str, provider: LLMProvider, api_key: str | None,
 ) -> list[str] | None:

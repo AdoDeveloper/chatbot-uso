@@ -763,3 +763,67 @@ class TestCleanRewrite:
 
     def test_plain_text_without_prefix_unchanged(self):
         assert gw._clean_rewrite("consulta de notas") == "consulta de notas"
+
+
+class TestClassifyTopic:
+    async def test_parses_topic_json_response(self, monkeypatch):
+        provider = _make_provider()
+
+        async def fake_complete(self, messages, temperature, max_tokens, response_format=None, reasoning_effort=None):
+            return '{"topic": "becas"}'
+
+        monkeypatch.setattr(gw.OpenAICompatAdapter, "complete", fake_complete)
+        result = await gw.classify_topic("¿hay becas disponibles?", provider, "key")
+        assert result == "Becas"
+
+    async def test_falls_back_to_regex_on_malformed_json(self, monkeypatch):
+        provider = _make_provider()
+
+        async def fake_complete(self, messages, temperature, max_tokens, response_format=None, reasoning_effort=None):
+            return 'claro, el tema es "topic": "Inscripciones" según lo pedido'
+
+        monkeypatch.setattr(gw.OpenAICompatAdapter, "complete", fake_complete)
+        result = await gw.classify_topic("¿cómo me inscribo?", provider, "key")
+        assert result == "Inscripciones"
+
+    async def test_empty_response_returns_none(self, monkeypatch):
+        provider = _make_provider()
+
+        async def fake_complete(self, messages, temperature, max_tokens, response_format=None, reasoning_effort=None):
+            return ""
+
+        monkeypatch.setattr(gw.OpenAICompatAdapter, "complete", fake_complete)
+        result = await gw.classify_topic("pregunta", provider, "key")
+        assert result is None
+
+    async def test_unparseable_response_returns_none(self, monkeypatch):
+        provider = _make_provider()
+
+        async def fake_complete(self, messages, temperature, max_tokens, response_format=None, reasoning_effort=None):
+            return "no puedo ayudar con eso"
+
+        monkeypatch.setattr(gw.OpenAICompatAdapter, "complete", fake_complete)
+        result = await gw.classify_topic("pregunta", provider, "key")
+        assert result is None
+
+    async def test_exception_fails_open_to_none(self, monkeypatch):
+        provider = _make_provider()
+
+        async def failing_complete(self, *a, **k):
+            raise RuntimeError("provider down")
+
+        monkeypatch.setattr(gw.OpenAICompatAdapter, "complete", failing_complete)
+        result = await gw.classify_topic("pregunta", provider, "key")
+        assert result is None
+
+    async def test_truncates_to_128_chars(self, monkeypatch):
+        provider = _make_provider()
+        long_topic = "x" * 200
+
+        async def fake_complete(self, messages, temperature, max_tokens, response_format=None, reasoning_effort=None):
+            return f'{{"topic": "{long_topic}"}}'
+
+        monkeypatch.setattr(gw.OpenAICompatAdapter, "complete", fake_complete)
+        result = await gw.classify_topic("pregunta", provider, "key")
+        assert result is not None
+        assert len(result) == 128

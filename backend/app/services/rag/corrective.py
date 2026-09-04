@@ -4,6 +4,7 @@ Greeting/factual shortcuts skip grading/rewriting. Max 1 rewrite to avoid loops.
 """
 from __future__ import annotations
 
+import asyncio
 from typing import TypedDict
 
 import structlog
@@ -154,7 +155,36 @@ def _build_graph() -> StateGraph:
 _graph = _build_graph()
 
 
-async def _maybe_flag_unanswered(question: str, conversation_id: str | None = None) -> None:
+async def _classify_and_store_topic(
+    question_id, question: str, provider: LLMProvider, api_key: str | None,
+) -> None:
+    """Clasifica el tema en background y lo persiste en una sesión aparte,
+    fuera de la ruta de respuesta al usuario: se dispara fire-and-forget,
+    sin bloquear ni afectar la latencia del turno de chat."""
+    from app.services.ai.llm_gateway import classify_topic
+
+    topic = await classify_topic(question, provider, api_key)
+    if not topic:
+        return
+    try:
+        from app.db.session import AsyncSessionLocal
+        from app.models.unanswered_question import UnansweredQuestion
+        async with AsyncSessionLocal() as db:
+            row = await db.get(UnansweredQuestion, question_id)
+            if row:
+                row.detected_topic = topic
+                await db.commit()
+    except Exception as exc:
+        log.warning("unanswered.topic_persist_failed", error=str(exc))
+
+
+async def _maybe_flag_unanswered(
+    question: str,
+    conversation_id: str | None = None,
+    *,
+    provider: LLMProvider | None = None,
+    api_key: str | None = None,
+) -> None:
     """Persiste una UnansweredQuestion cuando no se encontró contexto. Best-effort, nunca lanza excepción."""
     try:
         from app.db.session import AsyncSessionLocal
@@ -167,7 +197,15 @@ async def _maybe_flag_unanswered(question: str, conversation_id: str | None = No
             )
             db.add(row)
             await db.commit()
+            await db.refresh(row)
         log.info("unanswered.flagged", question=question[:80])
+        if provider is not None:
+            from app.core.versioning import _background_tasks
+            task = asyncio.create_task(
+                _classify_and_store_topic(row.id, question, provider, api_key)
+            )
+            _background_tasks.add(task)
+            task.add_done_callback(_background_tasks.discard)
     except Exception as exc:
         log.warning("unanswered.flag_failed", error=str(exc))
 
@@ -209,7 +247,7 @@ async def run_adaptive_rag(
             api_key=api_key if use_corrective_rag else None,
         )
         if not docs:
-            await _maybe_flag_unanswered(question, conversation_id)
+            await _maybe_flag_unanswered(question, conversation_id, provider=provider, api_key=api_key)
         return docs, ratio
 
     docs, ratio = await run_corrective_rag(
@@ -221,7 +259,7 @@ async def run_adaptive_rag(
         score_threshold=score_threshold,
     )
     if not docs:
-        await _maybe_flag_unanswered(question, conversation_id)
+        await _maybe_flag_unanswered(question, conversation_id, provider=provider, api_key=api_key)
     return docs, ratio
 
 

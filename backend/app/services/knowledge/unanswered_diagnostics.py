@@ -15,7 +15,7 @@ async def root_cause_analysis(db: AsyncSession, *, question_id: uuid.UUID) -> di
     """Análisis automático del motivo por el que el bot no respondió.
 
     Heurísticas:
-    - Si la última respuesta del bot tuvo `rag_route='no_context'` → "Sin cobertura"
+    - Si la última respuesta del bot no tiene fuentes recuperadas → "Sin cobertura"
     - Si tuvo score < 0.3 (chunks de baja confianza) → "Confianza baja en chunks"
     - Si el bot repitió la misma respuesta 2+ veces → "Bucle de respuestas"
     - Si la pregunta ya apareció N veces → "Pregunta recurrente"

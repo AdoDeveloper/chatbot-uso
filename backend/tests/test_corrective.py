@@ -11,6 +11,7 @@ import pytest
 
 from app.services.rag.corrective import (
     MAX_REWRITES,
+    _classify_and_store_topic,
     _decide_after_grade,
     _expand,
     _maybe_flag_unanswered,
@@ -129,6 +130,68 @@ class TestMaybeFlagUnanswered:
     async def test_handles_exception_gracefully(self):
         with patch("app.db.session.AsyncSessionLocal", side_effect=RuntimeError("db down")):
             await _maybe_flag_unanswered("¿test?")
+
+    async def test_schedules_topic_classification_when_provider_given(self):
+        """Con provider, debe programar una tarea de clasificación en
+        background sin esperarla (fire-and-forget)."""
+        import asyncio
+
+        with patch("app.db.session.AsyncSessionLocal") as mock_local, \
+             patch(
+                 "app.services.rag.corrective._classify_and_store_topic",
+                 new=AsyncMock(return_value=None),
+             ) as mock_classify:
+            fake_db = AsyncMock()
+            fake_db.add = MagicMock()
+            fake_db.__aenter__.return_value = fake_db
+            mock_local.return_value = fake_db
+            await _maybe_flag_unanswered(
+                "¿test?", provider=_PROVIDER_STUB, api_key="key-123",
+            )
+            await asyncio.sleep(0)
+            mock_classify.assert_called_once()
+
+    async def test_no_topic_classification_without_provider(self):
+        with patch("app.db.session.AsyncSessionLocal") as mock_local, \
+             patch("app.services.rag.corrective._classify_and_store_topic") as mock_classify:
+            fake_db = AsyncMock()
+            fake_db.add = MagicMock()
+            fake_db.__aenter__.return_value = fake_db
+            mock_local.return_value = fake_db
+            await _maybe_flag_unanswered("¿test?")
+            mock_classify.assert_not_called()
+
+
+class TestClassifyAndStoreTopic:
+    async def test_stores_topic_when_classification_succeeds(self):
+        with patch("app.services.ai.llm_gateway.classify_topic", new=AsyncMock(return_value="Becas")) as mock_cls, \
+             patch("app.db.session.AsyncSessionLocal") as mock_local:
+            fake_row = MagicMock(detected_topic=None)
+            fake_db = AsyncMock()
+            fake_db.get = AsyncMock(return_value=fake_row)
+            fake_db.__aenter__.return_value = fake_db
+            mock_local.return_value = fake_db
+
+            await _classify_and_store_topic("q-1", "¿hay becas?", _PROVIDER_STUB, None)
+
+            mock_cls.assert_awaited_once()
+            assert fake_row.detected_topic == "Becas"
+            fake_db.commit.assert_awaited_once()
+
+    async def test_no_write_when_classification_returns_none(self):
+        with patch("app.services.ai.llm_gateway.classify_topic", new=AsyncMock(return_value=None)), \
+             patch("app.db.session.AsyncSessionLocal") as mock_local:
+            fake_db = AsyncMock()
+            mock_local.return_value = fake_db
+
+            await _classify_and_store_topic("q-1", "¿hay becas?", _PROVIDER_STUB, None)
+
+            mock_local.assert_not_called()
+
+    async def test_handles_exception_gracefully(self):
+        with patch("app.services.ai.llm_gateway.classify_topic", new=AsyncMock(return_value="Becas")), \
+             patch("app.db.session.AsyncSessionLocal", side_effect=RuntimeError("db down")):
+            await _classify_and_store_topic("q-1", "¿hay becas?", _PROVIDER_STUB, None)
 
 
 from app.services.rag.corrective import _retrieve, _grade
