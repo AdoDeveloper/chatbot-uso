@@ -99,6 +99,53 @@ class TestApplyOutputGuardrails:
         assert result == text
 
 
+class TestApplyOutputGuardrailsContextAllowList:
+    """Un correo/teléfono institucional que el admin indexó a propósito en un
+    documento (para que el bot lo comparta) no debe redactarse solo porque
+    el LLM lo repitió textualmente en la respuesta."""
+
+    def test_email_present_in_context_is_not_redacted(self):
+        from app.services.chat.pipeline import apply_output_guardrails
+
+        context = [{"text": "Correo electrónico: internacionalizacionyrrpp@usonsonate.edu.sv"}]
+        text = "Puede escribir a internacionalizacionyrrpp@usonsonate.edu.sv"
+        result = apply_output_guardrails(text, context_chunks=context)
+        assert "internacionalizacionyrrpp@usonsonate.edu.sv" in result
+
+    def test_phone_present_in_context_is_not_redacted(self):
+        from app.services.chat.pipeline import apply_output_guardrails
+
+        context = [{"text": "Teléfono: 7851-7588"}]
+        text = "El teléfono de contacto es 7851-7588."
+        result = apply_output_guardrails(text, context_chunks=context)
+        assert "7851-7588" in result
+
+    def test_email_not_in_any_context_chunk_is_still_redacted(self):
+        from app.services.chat.pipeline import apply_output_guardrails
+
+        context = [{"text": "El horario de clases es de 8am a 5pm."}]
+        text = "Puede escribir a otro-correo@ejemplo.com"
+        result = apply_output_guardrails(text, context_chunks=context)
+        assert "otro-correo@ejemplo.com" not in result
+
+    def test_dui_in_context_is_still_redacted(self):
+        """DUI, tarjeta e IBAN no entran al allow_list aunque estén en el
+        contexto: son datos de una persona, no contacto institucional."""
+        from app.services.chat.pipeline import apply_output_guardrails
+
+        context = [{"text": "El estudiante con DUI 12345678-9 está matriculado."}]
+        text = "El estudiante con DUI 12345678-9 está matriculado."
+        result = apply_output_guardrails(text, context_chunks=context)
+        assert "12345678-9" not in result
+
+    def test_no_context_chunks_behaves_like_before(self):
+        from app.services.chat.pipeline import apply_output_guardrails
+
+        text = "Contacto: internacionalizacionyrrpp@usonsonate.edu.sv"
+        result = apply_output_guardrails(text)
+        assert "internacionalizacionyrrpp@usonsonate.edu.sv" not in result
+
+
 class TestRedactPiiConfigurableEntities:
     """pii_entities era configurable desde el panel (PATCH /guardrails/config)
     y GET /config lo reflejaba, pero redact_pii nunca lo leía - usaba una

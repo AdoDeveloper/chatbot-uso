@@ -322,7 +322,9 @@ async def _run_chat_inner(
 
     final_text = "".join(full_content)
     if not timed_out and overrides["guardrails_enabled"]:
-        final_text = pipeline.apply_output_guardrails(final_text, pii_entities=overrides["pii_entities"])
+        final_text = pipeline.apply_output_guardrails(
+            final_text, pii_entities=overrides["pii_entities"], context_chunks=llm_chunks,
+        )
 
     llm_latency_ms = int((time.monotonic() - t_llm_start) * 1000)
     latency_ms = int((time.monotonic() - t_start) * 1000)

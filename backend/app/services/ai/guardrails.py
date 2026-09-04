@@ -378,7 +378,9 @@ _SV_ENTITIES = ["SV_DUI", "SV_NIT", "SV_NRC", "SV_PHONE"]
 _DEFAULT_PII_ENTITIES = ["PHONE_NUMBER", "EMAIL_ADDRESS", "CREDIT_CARD", "IBAN_CODE"]
 
 
-def redact_pii(text: str, *, entities: list[str] | None = None) -> str:
+def redact_pii(
+    text: str, *, entities: list[str] | None = None, allow_list: list[str] | None = None,
+) -> str:
     analyzer = _get_presidio_analyzer()
     anonymizer = _get_presidio_anonymizer()
     if not analyzer or not anonymizer:
@@ -395,6 +397,7 @@ def redact_pii(text: str, *, entities: list[str] | None = None) -> str:
             language="es",
             entities=active_entities,
             score_threshold=0.7,
+            allow_list=allow_list or None,
         )
         if results:
             anonymized = anonymizer.anonymize(text=text, analyzer_results=results)
@@ -405,8 +408,42 @@ def redact_pii(text: str, *, entities: list[str] | None = None) -> str:
     return text
 
 
-def scan_output(text: str, *, entities: list[str] | None = None) -> str:
-    return redact_pii(text, entities=entities)
+# Tipos de PII que se permiten en la respuesta cuando ya están presentes en
+# el contexto recuperado: contacto institucional que un FAQ publica a
+# propósito (correo/teléfono de una dirección, no de una persona). SV_PHONE
+# es el reconocedor que realmente dispara para números salvadoreños (más
+# específico que el PHONE_NUMBER genérico). El resto (DUI, NIT, NRC, tarjeta,
+# IBAN) sigue redactándose siempre, esté o no en el contexto - un documento
+# indexado por error con datos de una persona no debe hacer que el bot los
+# repita.
+_CONTEXT_ALLOWED_ENTITIES = ["EMAIL_ADDRESS", "PHONE_NUMBER", "SV_PHONE"]
+
+
+def _extract_pii_values(text: str, *, entities: list[str]) -> list[str]:
+    """Detecta valores de `entities` presentes en `text` y devuelve los spans
+    literales encontrados."""
+    analyzer = _get_presidio_analyzer()
+    if not analyzer or not text:
+        return []
+    try:
+        results = analyzer.analyze(
+            text=text, language="es", entities=entities, score_threshold=0.7,
+        )
+        return [text[r.start:r.end] for r in results]
+    except Exception as exc:
+        log.warning("guardrails.pii_context_scan_failed", error=str(exc))
+        return []
+
+
+def scan_output(
+    text: str, *, entities: list[str] | None = None, context_chunks: list[dict] | None = None,
+) -> str:
+    allow_list: list[str] = []
+    for chunk in context_chunks or []:
+        allow_list.extend(
+            _extract_pii_values(chunk.get("text", ""), entities=_CONTEXT_ALLOWED_ENTITIES)
+        )
+    return redact_pii(text, entities=entities, allow_list=allow_list)
 
 
 # Insertado al final de cada system prompt real por llm_gateway.stream_chat.

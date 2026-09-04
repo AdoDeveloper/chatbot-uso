@@ -287,6 +287,22 @@ async def retrieve_context(
     )
 
 
+_SOURCE_TEXT_MAX_LEN = 300
+
+
+def _truncate_at_word_boundary(text: str, max_len: int) -> str:
+    """Corta `text` a lo sumo en max_len caracteres, retrocediendo hasta el
+    último espacio para no partir una palabra o un número (ej. un teléfono)
+    a la mitad."""
+    if len(text) <= max_len:
+        return text
+    cut = text[:max_len]
+    last_space = cut.rfind(" ")
+    if last_space > 0:
+        cut = cut[:last_space]
+    return cut.rstrip() + "…"
+
+
 def format_sources(context_chunks: list[dict]) -> list[dict]:
     """Formatea los chunks recuperados para el evento SSE `sources`, sin duplicados.
 
@@ -305,7 +321,7 @@ def format_sources(context_chunks: list[dict]) -> list[dict]:
         if key:
             seen.add(key)
         result.append({
-            "text": c["text"][:300],
+            "text": _truncate_at_word_boundary(c["text"], _SOURCE_TEXT_MAX_LEN),
             "source_id": c.get("source_id", ""),
             "source_name": c.get("source_name", ""),
             "score": round(c.get("score", 0), 3),
@@ -349,22 +365,20 @@ _SYSTEM_PROMPT_LEAK_MESSAGE = (
 )
 
 
-def apply_output_guardrails(text: str, *, pii_entities: list[str] | None = None) -> str:
+def apply_output_guardrails(
+    text: str, *, pii_entities: list[str] | None = None, context_chunks: list[dict] | None = None,
+) -> str:
     """Detecta fugas del system prompt y BLOQUEA la respuesta si el canario
-    aparece; además redacta PII que el LLM pueda haber repetido del contexto
-    recuperado (documentos indexados nunca pasan por validate_input, a
-    diferencia del input del usuario).
-
-    Antes solo logueaba `guardrails.system_prompt_leak_detected` y devolvía
-    el texto sin tocar - el canario (y potencialmente el system prompt
-    completo, si el modelo lo repitió) se enviaba igual al usuario. El
-    "guardrail" no guardaba nada, solo dejaba una entrada de log para
-    revisión posterior.
+    aparece; además redacta PII que el LLM pueda haber repetido fuera del
+    contexto recuperado (documentos indexados nunca pasan por validate_input,
+    a diferencia del input del usuario). Un correo o teléfono que sí aparece
+    en `context_chunks` no se redacta: es información institucional que el
+    admin indexó a propósito para que el bot la comparta, no PII filtrada.
     """
     if check_system_prompt_leak(text):
         log.warning("guardrails.system_prompt_leak_detected")
         return _SYSTEM_PROMPT_LEAK_MESSAGE
-    return scan_output(text, entities=pii_entities)
+    return scan_output(text, entities=pii_entities, context_chunks=context_chunks)
 
 
 async def _feedback_negative_ratio(db: AsyncSession, conversation_id) -> float | None:
