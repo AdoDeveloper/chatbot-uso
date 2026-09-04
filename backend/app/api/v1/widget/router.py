@@ -261,7 +261,8 @@ async def public_escalation_contact(
     widget: WidgetConfig = Depends(verify_widget_access),
 ):
     """Registra el consentimiento del usuario para ser contactado."""
-    if not widget.enable_escalation:
+    from app.services.monitoring.versions import get_public_widget_flag
+    if not await get_public_widget_flag(db, widget, "enable_escalation"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Escalamiento a un humano no habilitado para este widget.",
@@ -281,7 +282,8 @@ async def public_csat(
     widget: WidgetConfig = Depends(verify_widget_access),
 ):
     """Envía una calificación CSAT desde el widget (sin auth de usuario, solo widget key)."""
-    if not widget.enable_csat:
+    from app.services.monitoring.versions import get_public_widget_flag
+    if not await get_public_widget_flag(db, widget, "enable_csat"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="CSAT no habilitado para este widget.",

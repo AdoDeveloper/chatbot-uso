@@ -445,12 +445,25 @@ async def detect_escalation(
     final_text: str,
     latency_ms: int | None = None,
 ) -> bool:
-    """Evalúa las reglas de escalación activas y marca la conversación si alguna dispara."""
+    """Evalúa las reglas de escalación activas y marca la conversación si alguna dispara.
+
+    Solo se llama para tráfico público real (persist_turn la salta si
+    is_playground) - por eso el check de enable_escalation usa
+    get_public_widget_flag (config publicada, mismo criterio que ve el
+    público en GET /widget/public/config), no la fila viva de WidgetConfig
+    directamente. Sin esto, un admin que cambia el toggle de escalación en
+    el panel sin republicar dejaba al widget anunciando escalación
+    habilitada (lo que sirve /public/config) mientras el backend la evaluaba
+    contra un valor distinto - el botón "¿Necesitas hablar con alguien?" del
+    widget quedaba visible pero sin ningún efecto real.
+    """
     try:
         wc_result = await db.execute(select(WidgetConfig).limit(1))
         widget_cfg = wc_result.scalar_one_or_none()
-        if widget_cfg is not None and not widget_cfg.enable_escalation:
-            return False
+        if widget_cfg is not None:
+            from app.services.monitoring.versions import get_public_widget_flag
+            if not await get_public_widget_flag(db, widget_cfg, "enable_escalation"):
+                return False
 
         rules_result = await db.execute(
             select(EscalationRule).where(EscalationRule.enabled.is_(True))

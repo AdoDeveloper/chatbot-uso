@@ -454,6 +454,22 @@ async def get_published_widget_config(db: AsyncSession) -> dict | None:
     return sections.get("widget_config") or snapshot.get("widget_config") or None
 
 
+async def get_public_widget_flag(db: AsyncSession, live_widget: WidgetConfig, flag: str) -> bool:
+    """Resuelve un flag booleano del widget (enable_escalation, enable_csat,
+    ...) con el mismo criterio que ve el público en GET /widget/public/config:
+    la config PUBLICADA si existe (mismo fallback que public_config: sin
+    deploy previo, usa la fila viva). Evita que el backend evalúe/acepte
+    solicitudes contra un valor distinto al que el widget anuncia - p. ej.
+    un admin que cambia el toggle en vivo sin republicar dejaba el botón del
+    widget visible/oculto según lo publicado, pero el endpoint real
+    aceptaba o rechazaba según la fila viva, desincronizados entre sí.
+    """
+    published = await get_published_widget_config(db)
+    if published is not None:
+        return bool(published.get(flag, True))
+    return bool(getattr(live_widget, flag, True))
+
+
 async def has_config_changed_since(db: AsyncSession, deployed_snapshot: dict) -> bool:
     """Compara la configuración actual con un snapshot desplegado."""
     current = await _collect_all(db)
