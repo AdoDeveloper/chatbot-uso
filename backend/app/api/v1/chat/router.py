@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.core.constants import PLAYGROUND_BROWSERS
+from app.core.constants import PANEL_AUTHENTICATED_BROWSERS
 from app.core.deps import get_client_ip
 from app.core.versioning import _background_tasks
 from app.db import session as db_session
@@ -117,7 +117,10 @@ async def _run_chat_inner(
     settings,
     t_start: float,
 ) -> ChatResponse:
-    is_playground = (request.browser or "").lower() in PLAYGROUND_BROWSERS
+    # True para el borrador Y para el modo "Producción" del previsualizador
+    # (ambos vienen del panel autenticado). use_draft abajo distingue entre
+    # los dos: is_playground por sí solo no dice si el turno usa borrador.
+    is_playground = (request.browser or "").lower() in PANEL_AUTHENTICATED_BROWSERS
     use_draft = is_playground and (request.source_scope != "production")
     cfg = await pipeline.load_chat_config(db, use_draft)
 
@@ -239,6 +242,28 @@ async def _run_chat_inner(
 
     context_chunks, context_relevance_ratio = rag_result
 
+    if not context_chunks:
+        # El grading de relevancia (grade_documents) descartó todos los chunks
+        # recuperados: sin este corte, el LLM generador recibía context_chunks=[]
+        # y dependía solo del system_prompt para no inventar una respuesta.
+        no_context_latency_ms = int((time.monotonic() - t_start) * 1000)
+        return await _persist_and_respond(
+            request,
+            client_ip=client_ip,
+            origin_url=origin_url,
+            is_playground=is_playground,
+            final_text="No tengo información disponible para responder esa pregunta en este momento.",
+            sources=[],
+            latency_ms=no_context_latency_ms,
+            history=history,
+            context_relevance_ratio=context_relevance_ratio,
+            response_kwargs={
+                "rag_route": _detected_route,
+                "provider_name": provider_name,
+                "model_name": model_name,
+            },
+        )
+
     llm_chunks = pipeline.context_for_llm(context_chunks)
     llm_chunks, ctx_budget = pipeline.budget_context(
         llm_chunks,
@@ -324,7 +349,12 @@ async def _run_chat_inner(
             rag_route=_detected_route,
         )
 
-        if assistant_message_id and not is_playground:
+        # is_playground es True también para preview-production (modo
+        # "Producción" del previsualizador): esa respuesta usa el mismo
+        # contexto y config que vería un usuario real, así que su calidad sí
+        # se evalúa. use_draft es el que distingue el borrador, que se omite
+        # a propósito para no generar costo de LLM juez en cada tecla de prueba.
+        if assistant_message_id and not use_draft:
             task = asyncio.create_task(pipeline.evaluate_response_quality(
                 assistant_message_id, request.question, final_text, llm_chunks,
                 primary_provider, primary_key,
@@ -361,7 +391,7 @@ async def chat(
     """Endpoint del chatbot. Responde con el mensaje completo (sin streaming);
     el cliente debe mostrar un indicador de "escribiendo..." mientras espera."""
     is_authenticated_playground = False
-    if (request.browser or "").lower() in PLAYGROUND_BROWSERS:
+    if (request.browser or "").lower() in PANEL_AUTHENTICATED_BROWSERS:
         from app.core.security import decode_token
         auth_header = req.headers.get("Authorization", "")
         token = auth_header.removeprefix("Bearer ").strip()

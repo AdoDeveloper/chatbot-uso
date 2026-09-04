@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.constants import PLAYGROUND_BROWSERS
+from app.core.constants import PLAYGROUND_BROWSERS, PREVIEW_PRODUCTION_BROWSER
 from app.models.audit_log import AuditLog
 from app.models.chat_conversation import ChatConversation
 from app.models.chat_message import ChatMessage
@@ -779,8 +779,11 @@ async def get_period_comparison(
 
 def _classify_channel(origin_url: str | None, browser: str | None) -> str:
     """Clasifica el canal de entrada de una conversación."""
-    if (browser or "").lower() in PLAYGROUND_BROWSERS:
+    normalized = (browser or "").lower()
+    if normalized in PLAYGROUND_BROWSERS:
         return "playground"
+    if normalized == PREVIEW_PRODUCTION_BROWSER:
+        return "preview-production"
     if not origin_url:
         return "api"  # sin origin → API directa
     return "widget"

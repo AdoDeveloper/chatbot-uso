@@ -106,6 +106,73 @@ async def test_factual_route_streams_tokens(client, admin_user, auth_headers, mo
     assert "Sonsonate" in body["content"]
 
 
+async def test_empty_context_after_grading_skips_the_llm(client, admin_user, auth_headers, mock_pipeline, monkeypatch):
+    """Si el grading de relevancia descarta todos los chunks recuperados,
+    responde el mensaje de "sin información" sin invocar stream_chat: la
+    generación nunca depende únicamente del system_prompt para no inventar
+    una respuesta sin contexto real."""
+    async def _retrieve_context(*a, **k):
+        return [], 0.0  # retrieval encontró candidatos, pero ninguno pasó el grading
+
+    stream_chat_called = False
+
+    async def _stream_chat_should_not_run(**kwargs):
+        nonlocal stream_chat_called
+        stream_chat_called = True
+        yield "no debería generarse"  # pragma: no cover
+
+    monkeypatch.setattr(pipeline, "retrieve_context", _retrieve_context)
+    monkeypatch.setattr(chat_router, "stream_chat", _stream_chat_should_not_run)
+
+    body = await _post_playground_chat(
+        client, {"question": "¿Cuál es el horario de un curso que no existe?"}, auth_headers(admin_user)
+    )
+    assert stream_chat_called is False
+    assert body["sources"] == []
+    assert "no tengo información" in body["content"].lower()
+    assert body["message_id"] is not None
+    assert body["conversation_id"] is not None
+
+
+@pytest.mark.parametrize(
+    ("browser", "extra_body", "should_evaluate"),
+    [
+        ("playground", {}, False),  # borrador: se omite para no gastar LLM juez en cada prueba
+        ("preview-production", {"source_scope": "production"}, True),  # usa config/fuentes reales
+    ],
+)
+async def test_quality_evaluation_runs_only_outside_the_draft(
+    client, admin_user, auth_headers, mock_pipeline, monkeypatch, browser, extra_body, should_evaluate,
+):
+    """evaluate_response_quality se dispara para preview-production (misma
+    config/fuentes que ve un usuario real) pero no para el borrador puro."""
+    async def _retrieve_context(*a, **k):
+        return [{"text": "Contenido.", "source_name": "doc.pdf", "score": 0.9,
+                 "parent_text": "Contenido completo."}], 1.0
+
+    async def _fake_stream_chat(**kwargs):
+        yield "Respuesta."
+
+    evaluate_called = False
+
+    async def _fake_evaluate_response_quality(*a, **k):
+        nonlocal evaluate_called
+        evaluate_called = True
+
+    monkeypatch.setattr(pipeline, "retrieve_context", _retrieve_context)
+    monkeypatch.setattr(chat_router, "stream_chat", _fake_stream_chat)
+    monkeypatch.setattr(pipeline, "evaluate_response_quality", _fake_evaluate_response_quality)
+
+    resp = await client.post(
+        "/api/v1/chat",
+        json={"question": "¿Qué es esto?", "browser": browser, **extra_body},
+        headers=auth_headers(admin_user),
+    )
+    assert resp.status_code == 200
+    await asyncio.sleep(0)  # deja correr el asyncio.create_task fire-and-forget
+    assert evaluate_called is should_evaluate
+
+
 async def test_greeting_route_returns_message(client, admin_user, auth_headers, mock_pipeline, monkeypatch):
     """Ruta greeting: retrieve_context devuelve un string directo (sin LLM)."""
     async def _retrieve_context(*a, **k):

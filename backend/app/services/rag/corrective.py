@@ -20,6 +20,18 @@ log = structlog.get_logger()
 MAX_REWRITES = 1
 
 # Scores RRF de este corpus rondan 0.03; por encima de este techo, la escala no aplica.
+#
+# score_threshold no filtra por relevancia semántica de forma confiable, ni en
+# esta escala RRF ni aplicado como coseno puro sobre el prefetch dense (0-1):
+# verificado con multilingual-e5-large y gte-large contra el corpus real, una
+# pregunta totalmente fuera de dominio obtiene coseno ~0.80-0.85, igual o por
+# encima de preguntas relevantes reales - el hueco entre "relevante" e
+# "irrelevante" es de centésimas o directamente inexistente. No es un defecto
+# de un modelo puntual: con textos cortos en español, la similitud coseno
+# entre embeddings de oraciones tiende a ser alta y poco discriminativa en
+# general (anisotropía del espacio vectorial). El filtro de relevancia real de
+# este pipeline es grade_documents (juicio semántico por LLM), no un umbral
+# numérico - ver retrieve_context/_grade más abajo.
 _MAX_SANE_THRESHOLD = 0.05
 
 
