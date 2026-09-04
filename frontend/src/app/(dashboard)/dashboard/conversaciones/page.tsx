@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
  MessageSquare, Search, ThumbsUp, ThumbsDown, Download,
- FileText, Zap, Database, Route, ChevronDown, Trash2,
+ FileText, Zap, Database, Route, ChevronDown, Trash2, Star,
 } from "lucide-react";
 import api from "@/lib/api";
 import { useApi, getErrorMessage } from "@/hooks/use-api";
@@ -91,6 +91,19 @@ function RouteBadge({ route }: { route: string | null }) {
   <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-3xs font-medium ${m.cls}`}>
    <I className="h-3 w-3" aria-hidden="true" />
    {m.label}
+  </span>
+ );
+}
+
+function CsatBadge({ score }: { score: number | null }) {
+ if (score == null) return null;
+ const cls = score >= 4 ? "bg-success/10 text-success border-success/20"
+  : score >= 3 ? "text-warning border-warning/30"
+  : "bg-destructive/10 text-destructive border-destructive/20";
+ return (
+  <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-3xs font-medium shrink-0 ${cls}`}>
+   <Star className="h-3 w-3 fill-current" aria-hidden="true" />
+   {score}/5
   </span>
  );
 }
@@ -334,9 +347,12 @@ export default function HistorialPage() {
           <span className="truncate text-13 text-foreground">
            {c.first_user_message || <em className="text-muted-foreground">(sin mensajes)</em>}
           </span>
-          <Badge variant={statusBadgeVariant(c.status)} className="text-3xs shrink-0">
-           {c.status}
-          </Badge>
+          <div className="flex items-center gap-1.5 shrink-0">
+           <CsatBadge score={c.csat_score} />
+           <Badge variant={statusBadgeVariant(c.status)} className="text-3xs shrink-0">
+            {c.status}
+           </Badge>
+          </div>
          </div>
 <div className="flex items-center gap-2 text-2xs text-muted-foreground min-w-0">
            <span className="shrink-0">{timeAgo(c.last_message_at)}</span>
@@ -367,6 +383,7 @@ export default function HistorialPage() {
         <div className="flex items-center justify-between gap-2 mb-1">
          <div className="flex items-center gap-2 min-w-0">
           <Badge variant={statusBadgeVariant(detail.status)} className="text-3xs">{detail.status}</Badge>
+          <CsatBadge score={detail.csat_score} />
           <p className="text-2xs font-mono text-muted-foreground truncate">{detail.session_id}</p>
          </div>
          {can(PERM.CONVERSATIONS_DELETE) && (
@@ -385,6 +402,16 @@ export default function HistorialPage() {
 <p className="text-2xs text-muted-foreground">
           {timeAgo(detail.last_message_at)} · {detail.browser ?? "Desconocido"} · {detail.message_count} mensajes
          </p>
+         {(detail.csat_comment || detail.csat_reasons.length > 0) && (
+          <p className="text-2xs text-muted-foreground mt-1">
+           {detail.csat_reasons.length > 0 && (
+            <span className="italic">{detail.csat_reasons.join(", ")}</span>
+           )}
+           {detail.csat_comment && (
+            <span>{detail.csat_reasons.length > 0 ? " · " : ""}"{detail.csat_comment}"</span>
+           )}
+          </p>
+         )}
        </div>
        <div className="flex-1 min-h-0 p-4 sm:p-6 space-y-4 overflow-y-auto">
         {detail.messages.map((msg) => (
