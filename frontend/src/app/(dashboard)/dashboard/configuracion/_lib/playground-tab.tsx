@@ -383,7 +383,10 @@ export function PlaygroundTab({
           question: q,
           session_id: sessionIdRef.current,
           messages: history.length > 0 ? history : undefined,
-          browser: "playground",
+          // En modo "deployed" el turno usa la config y las fuentes publicadas
+          // (lo mismo que ve un usuario real), así que debe contar en las
+          // estadísticas de producción: "playground" queda excluido de ellas.
+          browser: mode === "deployed" ? "preview-production" : "playground",
           ...(mode === "deployed" ? { source_scope: "production" } : {}),
         }),
       });
