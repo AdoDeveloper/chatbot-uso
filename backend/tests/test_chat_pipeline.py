@@ -1,7 +1,31 @@
 """Tests para funciones puras de app/services/chat/pipeline.py."""
 from __future__ import annotations
 
-from app.services.chat.pipeline import format_sources
+from app.services.chat.pipeline import _truncate_at_word_boundary, format_sources
+
+
+class TestTruncateAtWordBoundary:
+    def test_no_truncation_needed(self):
+        assert _truncate_at_word_boundary("corto", 300) == "corto"
+
+    def test_cuts_at_last_space_before_limit(self):
+        text = "Teléfono: 7851-7588 y 7841-4724 disponible en horario de oficina"
+        result = _truncate_at_word_boundary(text, 25)
+        assert result == "Teléfono: 7851-7588 y…"
+
+    def test_never_splits_a_long_word_mid_way(self):
+        """Con max_len=15, el corte literal caería a mitad de
+        '78517588extra'; debe retroceder al espacio anterior en vez de
+        partir la palabra."""
+        text = "Teléfono: 78517588extra continúa aquí"
+        result = _truncate_at_word_boundary(text, 15)
+        assert result == "Teléfono:…"
+        assert "7851" not in result
+
+    def test_no_space_within_limit_cuts_at_exact_length(self):
+        text = "x" * 500
+        result = _truncate_at_word_boundary(text, 300)
+        assert result == "x" * 300 + "…"
 
 
 class TestFormatSources:
@@ -51,12 +75,21 @@ class TestFormatSources:
 
         assert len(result) == 1
 
-    def test_truncates_text_to_300_chars(self):
+    def test_truncates_long_text_without_spaces(self):
+        """Sin ningún espacio dentro del límite, corta en el carácter 300 y
+        marca el corte con elipsis."""
         chunk = {"text": "x" * 500, "source_id": "doc-1", "parent_id": "p-1", "score": 0.5}
 
         result = format_sources([chunk])
 
-        assert len(result[0]["text"]) == 300
+        assert result[0]["text"] == "x" * 300 + "…"
+
+    def test_short_text_is_not_truncated(self):
+        chunk = {"text": "Texto corto.", "source_id": "doc-1", "parent_id": "p-1", "score": 0.5}
+
+        result = format_sources([chunk])
+
+        assert result[0]["text"] == "Texto corto."
 
     def test_empty_input_returns_empty_list(self):
         assert format_sources([]) == []
