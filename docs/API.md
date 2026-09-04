@@ -180,9 +180,10 @@ completa de la API. Solo están disponibles en un entorno con
 | POST | `/notifications/inbox/{id}/read` | Marcar una como leída |
 | POST | `/notifications/inbox/mark-all-read` | Marcar todas como leídas |
 
-> `POST /integrations/smtp/test` cubre el envío de un correo de prueba (ver
-> sección Integraciones) — no existe un endpoint de prueba dedicado bajo
-> `/notifications`.
+> `POST /integrations/smtp/test` envía un correo de prueba al destinatario
+> indicado. El panel no lo usa: la acción "Probar SMTP" de Escalamiento llama
+> a `POST /escalation/smtp-ping`, que envía al propio usuario autenticado en
+> vez de a un destinatario arbitrario.
 
 ## Salud del sistema (`/health`)
 
@@ -242,7 +243,7 @@ común: cada grupo vive en su propia carpeta bajo `backend/app/api/v1/`.
 | GET | `/rbac/my-permissions` | Permisos del usuario actual |
 
 > Los roles (`admin`/`editor`/`viewer`) son fijos, definidos en código
-> (`SYSTEM_ROLES`) — no existe un endpoint para crear, editar o eliminar
+> (`SYSTEM_ROLES`) - no existe un endpoint para crear, editar o eliminar
 > roles ni para conceder permisos individuales
 
 ### Proveedores de IA (`providers/`)
