@@ -1351,6 +1351,12 @@ export const STYLES = `
     left: auto;
     width: 100vw;
     width: 100dvw;
+    /* max-width (calc(100dvw - 3rem), fuera de este media query) no se
+       sobrescribe por especificidad: max-width y width son propiedades
+       distintas que se combinan, no compiten - sin anularlo aquí, el panel
+       fullscreen quedaba encogido a 3rem menos de ancho, dejando huecos en
+       los costados y el aspecto de "no expandido". */
+    max-width: none;
     height: 100vh;
     height: 100dvh;
     border-radius: 0;

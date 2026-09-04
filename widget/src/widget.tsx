@@ -497,6 +497,13 @@ function ChatWidget({
   const [input, setInput]     = useState("");
   const [busy, setBusy]       = useState(false);
 
+  // No se renderiza nada (ni la burbuja) hasta tener la config real: sin
+  // esto, el widget aparecía primero con los valores por defecto del
+  // script tag (posición, color, nombre "Asistente Virtual" genérico) y
+  // luego "saltaba" a los reales en cuanto llegaba el fetch - visible como
+  // un flash de la config equivocada, más notorio cuanto más difieran del
+  // valor real configurado en el panel (posición y color, sobre todo).
+  const [configReady, setConfigReady] = useState(false);
   // Badge: mensajes no leídos mientras el panel está cerrado
   const [unreadCount, setUnreadCount]     = useState(0);
   // Menú kebab (⋮) en el header
@@ -650,10 +657,14 @@ function ChatWidget({
             return prev;
           });
         }
+        setConfigReady(true);
       })
       .catch(() => {
         if (cancelled) return;
         setOfflineMode(true);
+        // Aunque falló, ya no queda nada más que esperar: hay que mostrar
+        // el panel offline en vez de ocultar el widget indefinidamente.
+        setConfigReady(true);
       });
     return () => { cancelled = true; };
   }, [apiUrl, apiKey, retryTick]);
@@ -935,6 +946,10 @@ function ChatWidget({
     (settings.show_new_chat_button && messages.length > 1)
     || settings.enable_accessibility !== false
     || settings.show_end_chat_button;
+
+  // Nada se renderiza (ni la burbuja) hasta tener la config real - ver el
+  // comentario en la declaración de configReady más arriba.
+  if (!configReady) return null;
 
   return (
     <div class="root" data-position={position}>
