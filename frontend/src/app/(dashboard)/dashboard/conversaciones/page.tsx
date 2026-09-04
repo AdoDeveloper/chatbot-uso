@@ -408,7 +408,7 @@ export default function HistorialPage() {
             <span className="italic">{detail.csat_reasons.join(", ")}</span>
            )}
            {detail.csat_comment && (
-            <span>{detail.csat_reasons.length > 0 ? " · " : ""}"{detail.csat_comment}"</span>
+            <span>{detail.csat_reasons.length > 0 ? " · " : ""}&ldquo;{detail.csat_comment}&rdquo;</span>
            )}
           </p>
          )}
