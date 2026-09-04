@@ -76,6 +76,9 @@ def embed_texts(texts: list[str], prefix: str = "") -> list[dict]:
             for documents at ingestion time. Omitting degrades performance.
     NOTA: función síncrona - usar embed_texts_async desde contextos async.
     """
+    if not texts:
+        return []
+
     dense_model = _get_dense_model()
     sparse_model = _get_sparse_model()
 
