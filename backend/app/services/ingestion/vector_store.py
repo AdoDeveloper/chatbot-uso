@@ -5,6 +5,7 @@ from functools import lru_cache
 
 import structlog
 from qdrant_client import AsyncQdrantClient
+from qdrant_client.http.exceptions import UnexpectedResponse
 from qdrant_client.models import (
     Distance,
     FieldCondition,
@@ -189,12 +190,21 @@ async def count_chunks(source_id: str) -> int:
 async def get_chunk(point_id: str) -> dict | None:
     """Retrieve a single chunk by its Qdrant point ID."""
     client = _get_client()
-    points = await client.retrieve(
-        collection_name=COLLECTION,
-        ids=[point_id],
-        with_payload=True,
-        with_vectors=False,
-    )
+    try:
+        points = await client.retrieve(
+            collection_name=COLLECTION,
+            ids=[point_id],
+            with_payload=True,
+            with_vectors=False,
+        )
+    except UnexpectedResponse as exc:
+        # Qdrant exige que el id sea UUID o entero; con cualquier otro
+        # formato responde 400 y el cliente lo propaga como excepción en
+        # vez de una lista vacía - sin este catch, un point_id mal formado
+        # (ej. "1" a secas, o cualquier string no-UUID) tumbaba el endpoint
+        # con un 500 genérico en vez de un 404 limpio.
+        log.warning("qdrant.get_chunk_invalid_id", point_id=point_id, error=str(exc))
+        return None
     if not points:
         return None
     p = points[0]

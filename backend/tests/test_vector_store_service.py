@@ -221,6 +221,24 @@ class TestGetChunk:
         assert kwargs["ids"] == ["point-1"]
         assert kwargs["with_vectors"] is False
 
+    async def test_returns_none_on_invalid_point_id_instead_of_500(self, patch_client):
+        """Qdrant exige que el id sea UUID o entero; con cualquier otro
+        formato (ej. "1" a secas, o cualquier string no-UUID) responde 400 y
+        el cliente lo propaga como UnexpectedResponse en vez de una lista
+        vacía. Antes de este fix, eso tumbaba el endpoint con un 500
+        genérico en vez de un 404 limpio."""
+        from qdrant_client.http.exceptions import UnexpectedResponse
+
+        patch_client.retrieve.side_effect = UnexpectedResponse(
+            status_code=400, reason_phrase="Bad Request",
+            content=b'{"status":{"error":"value 1 is not a valid point ID"}}',
+            headers={},
+        )
+
+        result = await vs.get_chunk("1")
+
+        assert result is None
+
 
 class TestDeleteSource:
     async def test_calls_client_delete_with_source_filter(self, patch_client):
