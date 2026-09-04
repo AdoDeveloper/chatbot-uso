@@ -83,6 +83,9 @@ async def export_logs(
     date_from: datetime | None = Query(None),
     date_to: datetime | None = Query(None),
     action: str | None = Query(None),
+    resource_type: str | None = Query(None),
+    actor_id: uuid.UUID | None = Query(None),
+    ip: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_perm(P.AUDIT_READ)),
 ):
@@ -91,6 +94,12 @@ async def export_logs(
     q = select(AuditLog).order_by(AuditLog.created_at.desc())
     if action:
         q = q.where(AuditLog.action.ilike(f"%{action}%"))
+    if resource_type:
+        q = q.where(AuditLog.resource_type == resource_type)
+    if actor_id:
+        q = q.where(AuditLog.actor_id == actor_id)
+    if ip:
+        q = q.where(AuditLog.ip == ip)
     if date_from:
         q = q.where(AuditLog.created_at >= date_from)
     if date_to:
