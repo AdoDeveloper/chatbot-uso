@@ -42,7 +42,7 @@ if [ ! -d "${APP_DIR}/backend/app" ] || [ ! -f "${APP_DIR}/frontend/package.json
 fi
 
 echo "══════════════════════════════════════════════════════════════"
-echo " 1/6 - Backend: venv + dependencias (${PYTHON_BIN})"
+echo " 1/7 - Backend: venv + dependencias (${PYTHON_BIN})"
 echo "══════════════════════════════════════════════════════════════"
 cd "${APP_DIR}/backend"
 sudo -u "${APP_USER}" "${PYTHON_BIN}" -m venv venv
@@ -74,7 +74,7 @@ EOF
 fi
 
 echo "══════════════════════════════════════════════════════════════"
-echo " 2/6 - Migraciones + pre-descarga de modelos de embeddings"
+echo " 2/7 - Migraciones + pre-descarga de modelos de embeddings"
 echo "══════════════════════════════════════════════════════════════"
 sudo -u "${APP_USER}" bash -c "cd '${APP_DIR}/backend' && venv/bin/alembic upgrade head"
 
@@ -90,7 +90,24 @@ print('Modelos descargados.')
 "
 
 echo "══════════════════════════════════════════════════════════════"
-echo " 3/6 - Frontend: build de producción (standalone Next.js)"
+echo " 3/7 - Widget embebible: bundle servido en /widget/widget.js"
+echo "══════════════════════════════════════════════════════════════"
+# El backend sirve este archivo como estático; si falta, /widget responde 404
+# y los sitios que embeben el widget se quedan sin él.
+if [ -f "${APP_DIR}/widget/package.json" ]; then
+    cd "${APP_DIR}/widget"
+    sudo -u "${APP_USER}" npm ci
+    sudo -u "${APP_USER}" npm run build
+    sudo -u "${APP_USER}" mkdir -p "${APP_DIR}/backend/static/widget"
+    sudo -u "${APP_USER}" cp "${APP_DIR}/widget/dist/widget.js" \
+        "${APP_DIR}/backend/static/widget/widget.js"
+    echo "Widget compilado en ${APP_DIR}/backend/static/widget/widget.js"
+else
+    echo "ADVERTENCIA: no se encontró ${APP_DIR}/widget; /widget/widget.js responderá 404"
+fi
+
+echo "══════════════════════════════════════════════════════════════"
+echo " 4/7 - Frontend: build de producción (standalone Next.js)"
 echo "══════════════════════════════════════════════════════════════"
 cd "${APP_DIR}/frontend"
 sudo -u "${APP_USER}" env NEXT_PUBLIC_API_URL="https://${DOMAIN}" \
@@ -101,7 +118,7 @@ sudo -u "${APP_USER}" env NEXT_PUBLIC_API_URL="https://${DOMAIN}" \
     npm run build
 
 echo "══════════════════════════════════════════════════════════════"
-echo " 4/6 - systemd units: backend y frontend"
+echo " 5/7 - systemd units: backend y frontend"
 echo "══════════════════════════════════════════════════════════════"
 cat > /etc/systemd/system/chatbot-backend.service <<EOF
 [Unit]
@@ -161,7 +178,7 @@ systemctl enable --now chatbot-backend
 systemctl enable --now chatbot-frontend
 
 echo "══════════════════════════════════════════════════════════════"
-echo " 5/6 - Nginx (equivalente nativo de nginx/nginx.conf)"
+echo " 6/7 - Nginx (equivalente nativo de nginx/nginx.conf)"
 echo "══════════════════════════════════════════════════════════════"
 case "${PKG_FAMILY}" in
     apt)
@@ -285,7 +302,7 @@ nginx -t
 systemctl reload nginx || systemctl restart nginx
 
 echo "══════════════════════════════════════════════════════════════"
-echo " 6/6 - SSL (Let's Encrypt / certbot)"
+echo " 7/7 - SSL (Let's Encrypt / certbot)"
 echo "══════════════════════════════════════════════════════════════"
 echo " El DNS de ${DOMAIN} debe apuntar YA a la IP de este servidor."
 echo " Ejecutando certbot (modificará el bloque server automáticamente)..."

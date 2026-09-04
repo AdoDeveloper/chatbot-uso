@@ -210,9 +210,6 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(ResponseValidationError)
     async def response_validation_error_handler(req: Request, exc: ResponseValidationError):
-        # Ser defensivo: exc.errors() incluye el valor `input` que causó el error, y
-        # si la sesión ya se cerró, llamar repr() sobre él lanza DetachedInstanceError,
-        # lo que enmascara el problema real de validación de la respuesta en los logs.
         try:
             errors_repr = str(exc.errors())[:1500]
         except Exception as repr_err:
@@ -368,9 +365,12 @@ def create_app() -> FastAPI:
 
     app.include_router(v1_router, prefix="/api/v1")
 
+    # El bundle se genera aparte (widget/: vite build) y se copia aquí
     widget_dir = Path(__file__).parent.parent / "static" / "widget"
-    if widget_dir.is_dir():
+    if (widget_dir / "widget.js").is_file():
         app.mount("/widget", StaticFiles(directory=str(widget_dir)), name="widget-static")
+    else:
+        logger.warning("Widget bundle no encontrado", path=str(widget_dir))
 
     uploads_dir = Path(__file__).parent.parent / settings.UPLOADS_DIR
     if uploads_dir.is_dir():
