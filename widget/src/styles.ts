@@ -1367,6 +1367,12 @@ export const STYLES = `
     transform: scale(1) translateY(0);
   }
   .proactive-bubble { display: none; }
+
+  /* Con el panel a pantalla completa, el header del propio panel ya trae su
+     botón "×" para cerrar (visible desde el primer render) - la burbuja
+     externa quedaba flotando encima del contenido del chat, duplicando el
+     control de cierre y tapando visualmente parte del header. */
+  .bubble-wrap-panel-open { display: none; }
 }
 
 /* Pantallas de poca altura con ancho &gt; 440px: limita el alto del panel. */

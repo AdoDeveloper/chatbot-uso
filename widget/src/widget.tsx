@@ -1445,7 +1445,7 @@ function ChatWidget({
       )}
 
       {/* ── Bubble (launcher) ── */}
-      <div class="bubble-wrap">
+      <div class={`bubble-wrap${open ? " bubble-wrap-panel-open" : ""}`}>
         <button
           class="bubble"
           onClick={() => (open ? handleMinimize() : setOpen(true))}
