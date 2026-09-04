@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
- Copy, Check, Plus, X, ChevronRight, Eye,
+ Copy, Check, Plus, X, ChevronRight, Eye, RefreshCw, Loader2,
 } from "lucide-react";
 
 import api from "@/lib/api";
@@ -100,8 +100,18 @@ function WidgetApiKey({ config, onRegenerated }: {
     <Button variant="outline" size="sm" className="h-9 px-3" onClick={handleCopy}>
      {copying ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}
     </Button>
-    <Button variant="destructive" size="sm" className="h-9 px-3 text-13" onClick={handleRegenerate} disabled={regenerating}>
-     {regenerating ? "Regenerando..." : "Regenerar"}
+    <Button
+     variant="destructive"
+     size="sm"
+     className="h-9 px-3"
+     onClick={handleRegenerate}
+     disabled={regenerating}
+     title="Regenerar clave"
+     aria-label="Regenerar clave"
+    >
+     {regenerating
+      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+      : <RefreshCw className="w-3.5 h-3.5" />}
     </Button>
    </div>
   </div>
