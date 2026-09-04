@@ -37,6 +37,7 @@ interface Message {
 type PlaygroundMode = "draft" | "deployed";
 
 const _PG_STORAGE_KEY = "playground_session";
+const _PG_MODE_STORAGE_KEY = "playground_mode";
 
 function SourceCard({
   source, score, text, index,
@@ -119,7 +120,19 @@ export function PlaygroundTab({
     model?: string;
     latency?: number;
   } | null>(null);
-  const [mode, setMode] = useState<PlaygroundMode>("draft");
+  // El modo debe coincidir con el que se usó para generar la conversación
+  // guardada en sessionStorage: sin esto, tras recargar la página el modo
+  // vuelve a "draft" por defecto pero session_id sigue siendo el de una
+  // conversación de "deployed" (o viceversa), y los mensajes nuevos se
+  // anexan a esa conversación con el browser del modo equivocado.
+  const [mode, setMode] = useState<PlaygroundMode>(() => {
+    try {
+      const stored = sessionStorage.getItem(_PG_MODE_STORAGE_KEY);
+      return stored === "deployed" ? "deployed" : "draft";
+    } catch {
+      return "draft";
+    }
+  });
   const [widgetOpen, setWidgetOpen] = useState(true);
   // CSAT - mismos 3 estados que el widget real para paridad estricta.
   const [csatState, setCsatState] = useState<"hidden" | "pending" | "submitted">(
@@ -257,10 +270,11 @@ export function PlaygroundTab({
     try {
       sessionStorage.setItem(_PG_STORAGE_KEY, JSON.stringify(messages));
       sessionStorage.setItem("playground_session_id", sessionIdRef.current);
+      sessionStorage.setItem(_PG_MODE_STORAGE_KEY, mode);
     } catch {
       /* storage full */
     }
-  }, [messages]);
+  }, [messages, mode]);
 
   const skipModeReset = useRef(true);
   useEffect(() => {
@@ -278,6 +292,8 @@ export function PlaygroundTab({
     sessionIdRef.current = crypto.randomUUID();
     try {
       sessionStorage.removeItem(_PG_STORAGE_KEY);
+      sessionStorage.setItem("playground_session_id", sessionIdRef.current);
+      sessionStorage.setItem(_PG_MODE_STORAGE_KEY, mode);
     } catch {
       /* ignore */
     }
@@ -298,6 +314,8 @@ export function PlaygroundTab({
     sessionIdRef.current = crypto.randomUUID();
     try {
       sessionStorage.removeItem(_PG_STORAGE_KEY);
+      sessionStorage.setItem("playground_session_id", sessionIdRef.current);
+      sessionStorage.setItem(_PG_MODE_STORAGE_KEY, mode);
     } catch {
       /* ignore */
     }
