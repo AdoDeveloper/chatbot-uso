@@ -834,7 +834,7 @@ async def get_cache_stats(
     """Cuenta hits/misses de cache semántica desde `chat_messages.rag_route`.
 
     Convenios actuales:
-    - rag_route LIKE 'cache_%' → hit
+    - rag_route == 'cache' → hit (valor exacto que fija chat/router.py)
     - cualquier otro valor de rag_route → miss
     """
     _until = until or datetime.now(timezone.utc)
@@ -846,7 +846,7 @@ async def get_cache_stats(
         .where(ChatMessage.role == MessageRole.assistant)
         .where(ChatMessage.created_at >= since)
         .where(ChatMessage.created_at < _until)
-        .where(ChatMessage.rag_route.like("cache_%"))
+        .where(ChatMessage.rag_route == "cache")
         .where(_source_filter(source))
     )
     hits = int(hits_q.scalar_one() or 0)
@@ -858,7 +858,7 @@ async def get_cache_stats(
         .where(ChatMessage.created_at >= since)
         .where(ChatMessage.created_at < _until)
         .where(ChatMessage.rag_route.is_not(None))
-        .where(~ChatMessage.rag_route.like("cache_%"))
+        .where(ChatMessage.rag_route != "cache")
         .where(_source_filter(source))
     )
     misses = int(misses_q.scalar_one() or 0)

@@ -108,13 +108,16 @@ class TestGetCacheStats:
         assert result.days == 7
 
     async def test_hits_and_misses_computed(self, db_session):
+        """rag_route se fija a "cache" (valor exacto, sin sufijo) en
+        chat/router.py cuando la respuesta sale del caché semántico;
+        cualquier otro valor no nulo (factual, greeting) es un miss."""
         conv = _conv()
         db_session.add(conv)
         await db_session.flush()
         db_session.add_all([
-            _msg(conv.id, role=MessageRole.assistant, rag_route="cache_semantic"),
-            _msg(conv.id, role=MessageRole.assistant, rag_route="cache_exact"),
-            _msg(conv.id, role=MessageRole.assistant, rag_route="rag_full"),
+            _msg(conv.id, role=MessageRole.assistant, rag_route="cache"),
+            _msg(conv.id, role=MessageRole.assistant, rag_route="cache"),
+            _msg(conv.id, role=MessageRole.assistant, rag_route="factual"),
         ])
         await db_session.commit()
 
@@ -134,6 +137,19 @@ class TestGetCacheStats:
         assert result.hits == 0
         assert result.misses == 0
         assert result.hit_rate == 0.0
+
+    async def test_value_with_cache_prefix_but_not_exact_is_a_miss(self, db_session):
+        """El match es por igualdad exacta con "cache", no por prefijo: un
+        valor que solo empiece con "cache" no debe contar como hit."""
+        conv = _conv()
+        db_session.add(conv)
+        await db_session.flush()
+        db_session.add(_msg(conv.id, role=MessageRole.assistant, rag_route="cachexyz"))
+        await db_session.commit()
+
+        result = await svc.get_cache_stats(db_session, days=7)
+        assert result.hits == 0
+        assert result.misses == 1
 
 
 class TestGetPages:
