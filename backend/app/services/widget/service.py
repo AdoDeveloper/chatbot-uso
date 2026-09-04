@@ -46,15 +46,16 @@ async def regenerate_api_key(db: AsyncSession) -> WidgetConfig:
 
 
 def generate_embed_code(cfg: WidgetConfig) -> EmbedCodeOut:
+    """Posición e ícono no van como atributos data-*: el widget los toma en
+    vivo desde /widget/public/config (igual que el resto de la config), así
+    que incluirlos aquí solo mostraría un valor congelado en el momento en
+    que se copió el snippet, sugiriendo falsamente que se controlan ahí."""
     settings = get_settings()
     base = settings.WIDGET_BASE_URL
-    show_icon_attr = "true" if cfg.show_bot_icon else "false"
     script_tag = (
         f'<script src="{base}/widget/widget.js" '
         f'data-api-url="{base}" '
         f'data-api-key="{cfg.api_key}" '
-        f'data-position="{cfg.position}" '
-        f'data-show-bot-icon="{show_icon_attr}" '
         f'defer></script>'
     )
     return EmbedCodeOut(script_tag=script_tag, api_key=cfg.api_key)

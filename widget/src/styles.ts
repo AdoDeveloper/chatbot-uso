@@ -84,6 +84,26 @@ export const STYLES = `
   transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.18s ease;
 }
 
+/* En posiciones izquierdas el panel debe anclarse al borde izquierdo del
+   contenedor (no al derecho): con right:0 fijo, el panel quedaba pegado al
+   borde derecho de la burbuja en vez de expandirse hacia la izquierda de
+   la pantalla, desbordándose o quedando mal alineado. */
+.root[data-position="bottom-left"] .panel,
+.root[data-position="top-left"] .panel {
+  right: auto;
+  left: 0;
+  transform-origin: bottom left;
+}
+.root[data-position="top-right"] .panel,
+.root[data-position="top-left"] .panel {
+  bottom: auto;
+  top: calc(100% + 12px);
+  transform-origin: top right;
+}
+.root[data-position="top-left"] .panel {
+  transform-origin: top left;
+}
+
 .panel-open {
   transform: scale(1) translateY(0);
   opacity: 1;
@@ -1308,10 +1328,16 @@ export const STYLES = `
   .root[data-position="top-right"]    { top: 1rem; right: 1rem; }
   .root[data-position="top-left"]     { top: 1rem; left: 1rem; }
 
-  /* Panel a pantalla completa en móvil (WhatsApp/Intercom style). */
-  .panel {
+  /* Panel a pantalla completa en móvil (WhatsApp/Intercom style). Selector
+     con la misma especificidad que las reglas de posición (.root[data-position] .panel)
+     para que gane en cualquier orden de cascada, sin importar la esquina. */
+  .root[data-position] .panel {
     position: fixed;
     inset: 0;
+    right: auto;
+    bottom: auto;
+    top: auto;
+    left: auto;
     width: 100vw;
     width: 100dvw;
     height: 100vh;

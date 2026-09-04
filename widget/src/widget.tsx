@@ -9,8 +9,11 @@
  *   data-open-on-load="true"      - abre el panel al cargar
  *   data-suggestions="a,b,c"     - sugerencias iniciales (CSV o JSON array)
  *   data-proactive-message="..."  - burbuja flotante sobre el launcher
- *   data-position="bottom-right"  - esquina del widget
- *   data-show-bot-icon="false"    - ocultar icono SVG del bot
+ *   data-position="bottom-right"  - esquina del widget (valor inicial; se
+ *                                    reemplaza por el de /widget/public/config
+ *                                    en cuanto llega la respuesta)
+ *   data-show-bot-icon="false"    - ocultar icono SVG del bot (idem, valor
+ *                                    inicial hasta que llega la config real)
  *   data-launcher-label="..."     - etiqueta junto al launcher (opcional)
  *
  * API programática (window.UsoBot):
@@ -163,11 +166,12 @@ function BotIcon({ size = 16, logoUrl }: { size?: number; logoUrl?: string | nul
       stroke-linejoin="round"
       aria-hidden="true"
     >
-      <rect x="3" y="6" width="18" height="13" rx="3" />
-      <line x1="12" y1="3" x2="12" y2="6" />
-      <circle cx="9" cy="12" r="1.2" fill="currentColor" />
-      <circle cx="15" cy="12" r="1.2" fill="currentColor" />
-      <path d="M9 16h6" />
+      <path d="M12 8V4H8" />
+      <rect width="16" height="12" x="4" y="8" rx="2" />
+      <path d="M2 14h2" />
+      <path d="M20 14h2" />
+      <path d="M15 13v2" />
+      <path d="M9 13v2" />
     </svg>
   );
 }
@@ -470,13 +474,14 @@ const DEFAULT_SETTINGS: WidgetSettings = {
 function ChatWidget({
   apiUrl, apiKey, chatbotName, welcomeMessage, openOnLoad,
   suggestions: initialSuggestions, proactiveMessage: initialProactive,
-  position, showBotIcon: initialShowBotIcon, launcherLabel,
+  position: initialPosition, showBotIcon: initialShowBotIcon, launcherLabel,
   applyPrimaryColor,
 }: Props) {
 
   const [suggestions, setSuggestions]           = useState<string[]>(initialSuggestions);
   const [proactiveMessage, setProactiveMessage] = useState<string>(initialProactive);
   const [showBotIcon, setShowBotIcon]           = useState<boolean>(initialShowBotIcon);
+  const [position, setPosition]                 = useState<WidgetPosition>(initialPosition);
   const [logoUrl, setLogoUrl]                   = useState<string | null>(null);
   const [activeLauncherLabel, setLauncherLabel] = useState<string>(launcherLabel);
   const [activeChatbotName, setActiveChatbotName] = useState<string>(chatbotName);
@@ -618,6 +623,7 @@ function ChatWidget({
           max_input_chars:       data.max_input_chars       ?? DEFAULT_SETTINGS.max_input_chars,
         });
         if (typeof data.show_bot_icon === "boolean") setShowBotIcon(data.show_bot_icon);
+        if (typeof data.position === "string") setPosition(parsePosition(data.position));
         if (Array.isArray(data.suggestions))          setSuggestions(data.suggestions);
         if (typeof data.proactive_message === "string") setProactiveMessage(data.proactive_message);
         if (typeof data.logo_url === "string" && data.logo_url) setLogoUrl(data.logo_url);
@@ -1424,11 +1430,26 @@ function ChatWidget({
         >
           {open ? (
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="20" height="20">
-              <polyline points="18 15 12 20 6 15" />
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
+          ) : logoUrl ? (
+            <img
+              src={logoUrl}
+              width={28}
+              height={28}
+              style={{ objectFit: "cover", borderRadius: "50%", display: "block" }}
+              alt=""
+              aria-hidden="true"
+            />
           ) : (
-            <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
-              <path d="M12 2C6.48 2 2 6.48 2 12c0 2.22.74 4.27 1.97 5.92L2 22l4.13-1.97C7.73 21.26 9.79 22 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2z" />
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 8V4H8" />
+              <rect width="16" height="12" x="4" y="8" rx="2" />
+              <path d="M2 14h2" />
+              <path d="M20 14h2" />
+              <path d="M15 13v2" />
+              <path d="M9 13v2" />
             </svg>
           )}
         </button>
