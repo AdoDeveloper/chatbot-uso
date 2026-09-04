@@ -370,7 +370,7 @@ def create_app() -> FastAPI:
     if (widget_dir / "widget.js").is_file():
         app.mount("/widget", StaticFiles(directory=str(widget_dir)), name="widget-static")
     else:
-        logger.warning("Widget bundle no encontrado", path=str(widget_dir))
+        logger.warning("startup.widget_bundle_missing", path=str(widget_dir))
 
     uploads_dir = Path(__file__).parent.parent / settings.UPLOADS_DIR
     if uploads_dir.is_dir():
