@@ -226,7 +226,18 @@ async def diff_version(
         raise NotFoundError("Versión no encontrada")
 
     parent_snapshot = None
-    if version.parent_version_id:
+    if version.trigger_source == "deploy":
+        prev_deploy_result = await db.execute(
+            select(ConfigVersion)
+            .where(ConfigVersion.trigger_source == "deploy")
+            .where(ConfigVersion.version_number < version.version_number)
+            .order_by(ConfigVersion.version_number.desc())
+            .limit(1)
+        )
+        prev_deploy = prev_deploy_result.scalar_one_or_none()
+        if prev_deploy:
+            parent_snapshot = prev_deploy.config_snapshot
+    elif version.parent_version_id:
         parent = await db.get(ConfigVersion, version.parent_version_id)
         if parent:
             parent_snapshot = parent.config_snapshot

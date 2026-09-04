@@ -302,6 +302,17 @@ async def _get_active_version(db: AsyncSession) -> ConfigVersion | None:
     return result.scalars().first()
 
 
+async def _get_last_deploy_version(db: AsyncSession) -> ConfigVersion | None:
+    """Última versión con trigger_source='deploy', o None si nunca se publicó."""
+    result = await db.execute(
+        select(ConfigVersion)
+        .where(ConfigVersion.trigger_source == "deploy")
+        .order_by(ConfigVersion.version_number.desc())
+        .limit(1)
+    )
+    return result.scalars().first()
+
+
 class _VersioningLock:
     """Mutex distribuido para toda la sección crítica de capture_snapshot
     """
@@ -357,9 +368,13 @@ async def capture_snapshot(
         snapshot = await _collect_all(db)
 
         parent = await _get_active_version(db)
-        parent_snapshot = parent.config_snapshot if parent else None
 
-        diff = compute_diff(parent_snapshot, snapshot)
+        diff_baseline = parent
+        if trigger_source == "deploy":
+            diff_baseline = await _get_last_deploy_version(db)
+        diff_baseline_snapshot = diff_baseline.config_snapshot if diff_baseline else None
+
+        diff = compute_diff(diff_baseline_snapshot, snapshot)
         has_changes = any(changes for changes in diff.values())
         if not has_changes and not force:
             log.debug("versioning.no_changes", trigger_source=trigger_source)

@@ -229,6 +229,47 @@ class TestDiffVersion:
         changes = r.json()["sections"]["global_settings"]
         assert any(c["key"] == "greeting_response" and c["action"] == "added" for c in changes)
 
+    async def test_deploy_diff_compares_against_previous_deploy_not_intermediate_checkpoint(
+        self, client, admin_user, auth_headers, db_session,
+    ):
+        """Reproduce el bug: si un checkpoint automático (trigger_source
+        distinto de 'deploy', ej. el que dispara VersioningMiddleware al
+        guardar en el panel) queda como padre inmediato del deploy y ya
+        capturó los mismos cambios, comparar el diff contra ese padre da
+        "sin cambios" aunque el deploy sí represente cambios reales desde
+        la última publicación real. El diff debe compararse contra el
+        último trigger_source='deploy', no contra el padre inmediato."""
+        await _add_setting(db_session, "greeting_response", "Bot A")
+        first_deploy = await client.post(
+            "/api/v1/versions/deploy", json={}, headers=auth_headers(admin_user),
+        )
+        assert first_deploy.status_code == 201
+
+        await _add_setting(db_session, "greeting_response", "Bot B")
+        # Checkpoint automático intermedio (mismo patrón que capture_snapshot
+        # dispara vía VersioningMiddleware tras PUT /settings, etc.) - queda
+        # como padre inmediato del siguiente deploy.
+        from app.services.monitoring import versions as svc
+
+        await svc.capture_snapshot(
+            db_session, user_id=admin_user.id, trigger_source="settings",
+        )
+        await db_session.commit()
+
+        second_deploy = await client.post(
+            "/api/v1/versions/deploy", json={}, headers=auth_headers(admin_user),
+        )
+        assert second_deploy.status_code == 201
+        second_id = second_deploy.json()["version"]["id"]
+
+        r = await client.get(f"/api/v1/versions/{second_id}/diff", headers=auth_headers(admin_user))
+        assert r.status_code == 200
+        changes = r.json()["sections"]["global_settings"]
+        assert any(
+            c["key"] == "greeting_response" and c.get("new") == "Bot B"
+            for c in changes
+        ), f"esperaba ver el cambio Bot A -> Bot B, sections={r.json()['sections']}"
+
 
 class TestDeployStatus:
     async def test_requires_auth(self, client):
