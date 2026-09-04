@@ -671,6 +671,7 @@ function ChatWidget({
 
   function handleEndChat() {
     setKebabOpen(false);
+    if (escalState === "prompt" || escalState === "form") setEscalState("hidden");
     if (settings.enable_csat && conversationId && csatState === "hidden") {
       setCsatState("pending");
     } else {
@@ -762,6 +763,7 @@ function ChatWidget({
 
   function closeWithCsat() {
     if (settings.enable_csat && conversationId && csatState === "hidden") {
+      setEscalState("hidden");
       setCsatState("pending");
     } else {
       setOpen(false);
@@ -967,7 +969,7 @@ function ChatWidget({
                 <div class="kebab-menu" role="menu">
                   {settings.show_new_chat_button && messages.length > 1 && (
                     <button class="kebab-item" role="menuitem" onClick={handleClearConversation}>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                         <polyline points="3 6 5 6 21 6" />
                         <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
                         <path d="M10 11v6M14 11v6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
@@ -977,7 +979,7 @@ function ChatWidget({
                   )}
                   {settings.enable_accessibility !== false && (
                     <button class="kebab-item" role="menuitem" onClick={() => { setA11yOpen(true); setKebabOpen(false); }}>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                         <circle cx="12" cy="4" r="1.4" fill="currentColor" stroke="none" />
                         <path d="M5 8h14M12 8v6M12 14l-3 6M12 14l3 6" />
                       </svg>
@@ -986,7 +988,7 @@ function ChatWidget({
                   )}
                   {settings.show_end_chat_button && (
                     <button class="kebab-item kebab-item-end" role="menuitem" onClick={handleEndChat}>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                         <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                         <polyline points="16 17 21 12 16 7" />
                         <line x1="21" y1="12" x2="9" y2="12" />
@@ -1148,20 +1150,16 @@ function ChatWidget({
                   </svg>
                 </div>
                 <div class="csat-thanks">¡Muchas gracias!</div>
-                {(settings.show_new_chat_button || settings.show_end_chat_button) && (
-                  <div class="csat-thanks-actions">
-                    {settings.show_new_chat_button && messages.length > 1 && (
-                      <button class="csat-thanks-btn" onClick={handleClearConversation}>
-                        Nueva conversación
-                      </button>
-                    )}
-                    {settings.show_end_chat_button && (
-                      <button class="csat-thanks-btn" onClick={handleMinimize}>
-                        Cerrar
-                      </button>
-                    )}
-                  </div>
-                )}
+                <div class="csat-thanks-actions">
+                  {settings.show_new_chat_button && messages.length > 1 && (
+                    <button class="csat-thanks-btn" onClick={handleClearConversation}>
+                      Nueva conversación
+                    </button>
+                  )}
+                  <button class="csat-thanks-btn" onClick={handleMinimize}>
+                    Cerrar
+                  </button>
+                </div>
               </div>
             )}
           </div>

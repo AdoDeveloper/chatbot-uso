@@ -100,6 +100,7 @@ async def test_escalation(
         conversation_id="test-conversation",
         question="Esta es una prueba de escalamiento",
         reason="Prueba manual",
+        is_test=True,
     )
     return EscalationTestResult(success=True, message="Prueba enviada a todos los administradores activos.")
 

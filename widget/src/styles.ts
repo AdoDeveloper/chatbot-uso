@@ -142,6 +142,9 @@ export const STYLES = `
   transition: color 0.15s, background 0.15s;
   display: flex;
   align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  min-height: 40px;
 }
 
 .close-btn:hover,
@@ -717,12 +720,13 @@ export const STYLES = `
 .kebab-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
-  padding: 10px 14px;
+  min-height: 44px;
+  padding: 11px 14px;
   background: none;
   border: none;
-  font-size: 13px;
+  font-size: 14px;
   font-family: inherit;
   color: #374151;
   cursor: pointer;
@@ -848,7 +852,7 @@ export const STYLES = `
 
 .csat-question {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   color: #374151;
   font-weight: 500;
   text-align: center;
@@ -910,10 +914,11 @@ export const STYLES = `
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12.5px;
+  min-height: 40px;
+  font-size: 13.5px;
   color: #374151;
   cursor: pointer;
-  padding: 8px 10px;
+  padding: 9px 10px;
   border: 1.5px solid #e5e7eb;
   border-radius: 9px;
   background: #fff;
@@ -941,8 +946,8 @@ export const STYLES = `
   width: 100%;
   border: 1.5px solid #d1d5db;
   border-radius: 8px;
-  padding: 8px 10px;
-  font-size: 13px;
+  padding: 9px 11px;
+  font-size: 14px;
   font-family: inherit;
   line-height: 1.5;
   resize: none;
@@ -980,9 +985,10 @@ export const STYLES = `
   background: none;
   border: none;
   color: #6b7280;
-  font-size: 11.5px;
+  font-size: 13px;
   cursor: pointer;
-  padding: 2px 6px;
+  padding: 9px 6px;
+  min-height: 40px;
   font-family: inherit;
   text-decoration: underline;
   transition: color 0.12s;
@@ -995,8 +1001,9 @@ export const STYLES = `
   color: #fff;
   border: none;
   border-radius: 999px;
-  padding: 8px 18px;
-  font-size: 12.5px;
+  padding: 10px 20px;
+  min-height: 40px;
+  font-size: 13.5px;
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
@@ -1114,7 +1121,7 @@ export const STYLES = `
 
 .escal-question {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   color: #374151;
   font-weight: 500;
   line-height: 1.45;
@@ -1133,8 +1140,9 @@ export const STYLES = `
   color: #fff;
   border: none;
   border-radius: 999px;
-  padding: 7px 14px;
-  font-size: 12.5px;
+  padding: 10px 14px;
+  min-height: 40px;
+  font-size: 13.5px;
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
@@ -1152,8 +1160,9 @@ export const STYLES = `
   color: #6b7280;
   border: 1px solid #d1d5db;
   border-radius: 999px;
-  padding: 7px 12px;
-  font-size: 12px;
+  padding: 10px 12px;
+  min-height: 40px;
+  font-size: 13px;
   font-family: inherit;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
@@ -1173,17 +1182,19 @@ export const STYLES = `
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12.5px;
+  font-size: 13.5px;
   color: #374151;
   cursor: pointer;
+  min-height: 32px;
 }
 
 .escal-input {
   width: 100%;
   border: 1px solid #d1d5db;
   border-radius: 8px;
-  padding: 7px 10px;
-  font-size: 13px;
+  padding: 10px 12px;
+  min-height: 40px;
+  font-size: 14px;
   font-family: inherit;
   color: #111;
   outline: none;
@@ -1211,8 +1222,9 @@ export const STYLES = `
   color: #6b7280;
   border: 1px solid #d1d5db;
   border-radius: 999px;
-  padding: 6px 12px;
-  font-size: 12px;
+  padding: 9px 14px;
+  min-height: 40px;
+  font-size: 13px;
   font-family: inherit;
   cursor: pointer;
 }
@@ -1226,8 +1238,9 @@ export const STYLES = `
   color: #fff;
   border: none;
   border-radius: 999px;
-  padding: 6px 16px;
-  font-size: 12.5px;
+  padding: 9px 18px;
+  min-height: 40px;
+  font-size: 13.5px;
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
@@ -1329,6 +1342,42 @@ export const STYLES = `
 .panel[data-text-scale="lg"] .msg { font-size: 16.5px; line-height: 1.55; }
 .panel[data-text-scale="lg"] .user-text { font-size: 16.5px; }
 
+.panel[data-text-scale="sm"] .escal-question,
+.panel[data-text-scale="sm"] .escal-yes-btn,
+.panel[data-text-scale="sm"] .escal-no-btn,
+.panel[data-text-scale="sm"] .escal-radio-label,
+.panel[data-text-scale="sm"] .escal-input,
+.panel[data-text-scale="sm"] .escal-input-label,
+.panel[data-text-scale="sm"] .escal-cancel-btn,
+.panel[data-text-scale="sm"] .escal-submit-btn,
+.panel[data-text-scale="sm"] .escal-done,
+.panel[data-text-scale="sm"] .csat-question,
+.panel[data-text-scale="sm"] .csat-reason-item,
+.panel[data-text-scale="sm"] .csat-comment,
+.panel[data-text-scale="sm"] .csat-skip,
+.panel[data-text-scale="sm"] .csat-submit-btn,
+.panel[data-text-scale="sm"] .csat-thanks,
+.panel[data-text-scale="sm"] .csat-thanks-btn,
+.panel[data-text-scale="sm"] .kebab-item { font-size: 12.5px; }
+
+.panel[data-text-scale="lg"] .escal-question,
+.panel[data-text-scale="lg"] .escal-yes-btn,
+.panel[data-text-scale="lg"] .escal-no-btn,
+.panel[data-text-scale="lg"] .escal-radio-label,
+.panel[data-text-scale="lg"] .escal-input,
+.panel[data-text-scale="lg"] .escal-input-label,
+.panel[data-text-scale="lg"] .escal-cancel-btn,
+.panel[data-text-scale="lg"] .escal-submit-btn,
+.panel[data-text-scale="lg"] .escal-done,
+.panel[data-text-scale="lg"] .csat-question,
+.panel[data-text-scale="lg"] .csat-reason-item,
+.panel[data-text-scale="lg"] .csat-comment,
+.panel[data-text-scale="lg"] .csat-skip,
+.panel[data-text-scale="lg"] .csat-submit-btn,
+.panel[data-text-scale="lg"] .csat-thanks,
+.panel[data-text-scale="lg"] .csat-thanks-btn,
+.panel[data-text-scale="lg"] .kebab-item { font-size: 16px; line-height: 1.5; }
+
 /* Alto contraste: texto más oscuro, bordes más marcados, burbujas más nítidas. */
 .panel[data-contrast="high"] .md {
   background: #e5e7eb;
@@ -1336,6 +1385,37 @@ export const STYLES = `
   border: 1px solid #6b7280;
 }
 .panel[data-contrast="high"] .messages { color: #000; }
+
+.panel[data-contrast="high"] .escal-card {
+  border: 2px solid #000;
+}
+.panel[data-contrast="high"] .escal-question,
+.panel[data-contrast="high"] .escal-radio-label,
+.panel[data-contrast="high"] .escal-done { color: #000; }
+.panel[data-contrast="high"] .escal-input {
+  border: 2px solid #000;
+  color: #000;
+}
+.panel[data-contrast="high"] .escal-no-btn,
+.panel[data-contrast="high"] .escal-cancel-btn {
+  border: 2px solid #000;
+  color: #000;
+}
+.panel[data-contrast="high"] .csat-panel {
+  background: #fff;
+  border: 2px solid #000;
+}
+.panel[data-contrast="high"] .csat-question { color: #000; }
+.panel[data-contrast="high"] .csat-reason-item {
+  border: 2px solid #000;
+  color: #000;
+}
+.panel[data-contrast="high"] .csat-comment {
+  border: 2px solid #000;
+  color: #000;
+}
+.panel[data-contrast="high"] .kebab-menu { border: 2px solid #000; }
+.panel[data-contrast="high"] .kebab-item { color: #000; }
 .panel[data-contrast="high"] .input {
   border: 2px solid #374151;
   color: #000;

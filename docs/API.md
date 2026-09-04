@@ -117,7 +117,6 @@ completa de la API. Solo están disponibles en un entorno con
 | GET | `/unanswered` | Listar preguntas sin responder (agrupadas) |
 | POST | `/unanswered/{id}/resolve` | Marcar como resuelta |
 | POST | `/unanswered/{id}/create-faq` | Crear una FAQ a partir de la pregunta |
-| GET | `/unanswered/{id}/root-cause` | Análisis de causa raíz |
 
 ## Escalamiento (`/escalation`)
 

@@ -49,6 +49,7 @@ class ConversationStatusUpdate(_BM):
 router = APIRouter(prefix="/conversations", tags=["conversations"])
 
 _SourceQ = Query("production", pattern="^(production|playground)$")
+_OriginQ = Query("all", pattern="^(all|widget|test)$")
 
 
 @router.get("", response_model=dict)
@@ -61,13 +62,14 @@ async def list_conversations(
     status_filter: ConversationStatus | None = Query(None, alias="status"),
     tag: str | None = Query(None),
     source: str = _SourceQ,
+    origin: str = _OriginQ,
     db: AsyncSession = Depends(get_db),
     _: object = Depends(require_perm(P.CONVERSATIONS_READ)),
 ):
     convs, total = await svc.list_conversations(
         db, page=page, page_size=page_size,
         search=search, date_from=date_from, date_to=date_to,
-        status_filter=status_filter, tag=tag, source=source,
+        status_filter=status_filter, tag=tag, source=source, origin=origin,
     )
     conv_ids = [c.id for c in convs]
     first_msgs = await svc.fetch_first_user_messages(db, conv_ids)
@@ -104,6 +106,7 @@ async def export_conversations(
     date_from: datetime | None = Query(None),
     date_to: datetime | None = Query(None),
     source: str = _SourceQ,
+    origin: str = _OriginQ,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_perm(P.CONVERSATIONS_READ)),
 ):
@@ -122,7 +125,7 @@ async def export_conversations(
 
     convs_page, _ = await svc.list_conversations(
         db, page=1, page_size=5000,
-        search=search, date_from=date_from, date_to=date_to, source=source,
+        search=search, date_from=date_from, date_to=date_to, source=source, origin=origin,
     )
     conv_ids = [c.id for c in convs_page]
 

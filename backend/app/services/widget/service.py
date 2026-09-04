@@ -112,6 +112,7 @@ async def handle_escalation_consent(
     """
     from sqlalchemy import select as sa_select
 
+    from app.core.constants import PANEL_AUTHENTICATED_BROWSERS
     from app.models.chat_conversation import ChatConversation
     from app.models.chat_message import ChatMessage
     from app.models.enums import MessageRole
@@ -146,6 +147,7 @@ async def handle_escalation_consent(
             reason=reason,
             trigger_type="user_consent",
             extra={"contact_info": contact_info},
+            is_test=(conv.browser or "") in PANEL_AUTHENTICATED_BROWSERS,
         )
 
         if conv.escalation_pending:

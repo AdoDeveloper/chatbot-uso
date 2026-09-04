@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, CheckCircle, Clock, ExternalLink, Loader2, Search, X } from "lucide-react";
-import type { RootCause, UnansweredGroup, UnansweredQuestion } from "@/types";
+import { Plus, CheckCircle, Clock, ExternalLink, Loader2, X } from "lucide-react";
+import type { UnansweredGroup, UnansweredQuestion } from "@/types";
 import Link from "next/link";
 import api from "@/lib/api";
 import { useApi, getErrorMessage } from "@/hooks/use-api";
@@ -34,29 +34,7 @@ export default function PendientesPage() {
   const { toast, confirm } = useToast();
   const { data, loading, refetch: load } = useApi<UnansweredResponse>("/unanswered");
   const [faqModal, setFaqModal] = useState<FAQDraftModal | null>(null);
-  const [rootCauseByQid, setRootCauseByQid] = useState<Record<string, RootCause | null>>({});
-  const [rootCauseLoading, setRootCauseLoading] = useState<string | null>(null);
   const [resolving, setResolving] = useState<string | null>(null);
-
-  async function loadRootCause(qid: string) {
-    if (rootCauseByQid[qid]) {
-      setRootCauseByQid((prev) => {
-        const next = { ...prev };
-        delete next[qid];
-        return next;
-      });
-      return;
-    }
-    setRootCauseLoading(qid);
-    try {
-      const { data } = await api.get<RootCause>(`/unanswered/${qid}/root-cause`);
-      setRootCauseByQid((prev) => ({ ...prev, [qid]: data }));
-    } catch (err) {
-      toast({ type: "error", message: getErrorMessage(err, "No se pudo analizar la causa raíz.") });
-    } finally {
-      setRootCauseLoading(null);
-    }
-  }
 
   async function handleResolve(questionId: string) {
     const ok = await confirm({
@@ -178,8 +156,6 @@ export default function PendientesPage() {
                 <CardContent>
                   <div className="divide-y">
                     {group.questions.map((q) => {
-                      const rc = rootCauseByQid[q.id];
-                      const isLoadingRC = rootCauseLoading === q.id;
                       return (
                         <div key={q.id} className="py-3 space-y-2">
                           <div className="flex items-start justify-between gap-3">
@@ -204,19 +180,6 @@ export default function PendientesPage() {
                             </div>
                             <div className="flex items-center gap-1 shrink-0">
                               <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => loadRootCause(q.id)}
-                                disabled={isLoadingRC}
-                                className="gap-1.5 text-xs"
-                                title="Analizar por qué el bot no respondió"
-                              >
-                                {isLoadingRC
-                                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                  : <Search className="w-3.5 h-3.5" />}
-                                Causa raíz
-                              </Button>
-                              <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => openFaqModal(q)}
@@ -239,25 +202,6 @@ export default function PendientesPage() {
                               </Button>
                             </div>
                           </div>
-                          {rc && (
-                            <div className="ml-4 pl-3 border-l-2 border-primary/30 bg-muted/30 rounded-r p-2 space-y-1.5">
-                              <p className="text-3xs uppercase tracking-wider text-muted-foreground font-semibold">Análisis automático</p>
-                              {rc.causes.map((c) => (
-                                <div key={c.code} className="text-xs">
-                                  <Badge variant="warning" size="xs" className="mr-2">{c.label}</Badge>
-                                  <span className="text-muted-foreground">{c.detail}</span>
-                                </div>
-                              ))}
-                              {rc.suggestions.length > 0 && (
-                                <div className="pt-1 border-t border-border/50">
-                                  <p className="text-3xs uppercase tracking-wider text-muted-foreground font-semibold mb-1">Sugerencias</p>
-                                  <ul className="text-xs text-foreground space-y-0.5 list-disc pl-4">
-                                    {rc.suggestions.map((s, i) => <li key={i}>{s}</li>)}
-                                  </ul>
-                                </div>
-                              )}
-                            </div>
-                          )}
                         </div>
                       );
                     })}

@@ -162,6 +162,13 @@ class TestMaybeFlagUnanswered:
             mock_classify.assert_not_called()
 
 
+def _fake_topics_result(topics: list[str]):
+    """db.execute(...).all() para la consulta de temas existentes: filas (topic,)."""
+    result = MagicMock()
+    result.all.return_value = [(t,) for t in topics]
+    return result
+
+
 class TestClassifyAndStoreTopic:
     async def test_stores_topic_when_classification_succeeds(self):
         with patch("app.services.ai.llm_gateway.classify_topic", new=AsyncMock(return_value="Becas")) as mock_cls, \
@@ -169,12 +176,14 @@ class TestClassifyAndStoreTopic:
             fake_row = MagicMock(detected_topic=None)
             fake_db = AsyncMock()
             fake_db.get = AsyncMock(return_value=fake_row)
+            fake_db.execute = AsyncMock(return_value=_fake_topics_result(["Becas", "Horarios"]))
             fake_db.__aenter__.return_value = fake_db
             mock_local.return_value = fake_db
 
             await _classify_and_store_topic("q-1", "¿hay becas?", _PROVIDER_STUB, None)
 
             mock_cls.assert_awaited_once()
+            assert mock_cls.await_args.kwargs.get("existing_topics") == ["Becas", "Horarios"]
             assert fake_row.detected_topic == "Becas"
             fake_db.commit.assert_awaited_once()
 
@@ -182,16 +191,34 @@ class TestClassifyAndStoreTopic:
         with patch("app.services.ai.llm_gateway.classify_topic", new=AsyncMock(return_value=None)), \
              patch("app.db.session.AsyncSessionLocal") as mock_local:
             fake_db = AsyncMock()
+            fake_db.execute = AsyncMock(return_value=_fake_topics_result([]))
+            fake_db.__aenter__.return_value = fake_db
             mock_local.return_value = fake_db
 
             await _classify_and_store_topic("q-1", "¿hay becas?", _PROVIDER_STUB, None)
 
-            mock_local.assert_not_called()
+            fake_db.get.assert_not_called()
 
     async def test_handles_exception_gracefully(self):
         with patch("app.services.ai.llm_gateway.classify_topic", new=AsyncMock(return_value="Becas")), \
              patch("app.db.session.AsyncSessionLocal", side_effect=RuntimeError("db down")):
             await _classify_and_store_topic("q-1", "¿hay becas?", _PROVIDER_STUB, None)
+
+    async def test_existing_topics_fetch_failure_still_classifies(self):
+        """Si falla la consulta de temas existentes, se clasifica igual sin hint (fail-open)."""
+        with patch("app.services.ai.llm_gateway.classify_topic", new=AsyncMock(return_value="Becas")) as mock_cls, \
+             patch("app.db.session.AsyncSessionLocal") as mock_local:
+            fake_row = MagicMock(detected_topic=None)
+            fake_db = AsyncMock()
+            fake_db.get = AsyncMock(return_value=fake_row)
+            fake_db.execute = AsyncMock(side_effect=RuntimeError("db down"))
+            fake_db.__aenter__.return_value = fake_db
+            mock_local.return_value = fake_db
+
+            await _classify_and_store_topic("q-1", "¿hay becas?", _PROVIDER_STUB, None)
+
+            assert mock_cls.await_args.kwargs.get("existing_topics") == []
+            assert fake_row.detected_topic == "Becas"
 
 
 from app.services.rag.corrective import _retrieve, _grade

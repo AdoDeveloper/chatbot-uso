@@ -8,7 +8,7 @@ import structlog
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.constants import PLAYGROUND_BROWSERS
+from app.core.constants import PANEL_AUTHENTICATED_BROWSERS, PLAYGROUND_BROWSERS
 from app.models.chat_conversation import ChatConversation
 from app.models.chat_message import ChatMessage
 from app.models.enums import ConversationStatus, MessageRole
@@ -166,6 +166,7 @@ async def list_conversations(
     status_filter: ConversationStatus | None = None,
     tag: str | None = None,
     source: str = "production",
+    origin: str = "all",
 ) -> tuple[list[ChatConversation], int]:
     offset = (page - 1) * page_size
 
@@ -183,6 +184,18 @@ async def list_conversations(
         playground_filter = ChatConversation.browser.in_(PLAYGROUND_BROWSERS)
         base = base.where(playground_filter)
         count_base = count_base.where(playground_filter)
+
+    if origin == "widget":
+        widget_filter = or_(
+            ChatConversation.browser.is_(None),
+            ChatConversation.browser.notin_(PANEL_AUTHENTICATED_BROWSERS),
+        )
+        base = base.where(widget_filter)
+        count_base = count_base.where(widget_filter)
+    elif origin == "test":
+        test_filter = ChatConversation.browser.in_(PANEL_AUTHENTICATED_BROWSERS)
+        base = base.where(test_filter)
+        count_base = count_base.where(test_filter)
 
     if status_filter is not None:
         base = base.where(ChatConversation.status == status_filter)

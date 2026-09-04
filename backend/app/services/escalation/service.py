@@ -21,6 +21,7 @@ async def dispatch_escalation(
     reason: str,
     trigger_type: str | None = None,
     extra: dict[str, Any] | None = None,
+    is_test: bool = False,
 ) -> None:
     if conversation_id:
         try:
@@ -44,5 +45,5 @@ async def dispatch_escalation(
         key = "contact_email" if contact_info.get("type") == "email" else "contact_whatsapp"
         payload = {key: str(contact_info.get("value", "")), **payload}
 
-    await send_notification(db, event=NotificationEvent.escalation, payload=payload)
-    log.info("escalation.dispatched", reason=reason)
+    await send_notification(db, event=NotificationEvent.escalation, payload=payload, is_test=is_test)
+    log.info("escalation.dispatched", reason=reason, is_test=is_test)

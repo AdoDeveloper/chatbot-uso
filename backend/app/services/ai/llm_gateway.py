@@ -997,18 +997,26 @@ async def grade_documents(
 
 async def classify_topic(
     question: str, provider: LLMProvider, api_key: str | None,
+    existing_topics: list[str] | None = None,
 ) -> str | None:
     """Clasifica una pregunta sin respuesta en un tema corto (1-3 palabras),
     para agrupar "Temas más consultados" en las estadísticas y el resumen
     semanal. Fail-open a None (no bloquea nada más): sin tema asignado, la
     fila simplemente no entra en el agrupado por tema.
     """
+    topics_hint = (
+        f"\n\nTemas ya existentes (usa uno de estos EXACTAMENTE igual si la "
+        f"pregunta encaja en alguno, en vez de crear una variante nueva): "
+        f"{', '.join(existing_topics[:40])}."
+        if existing_topics else ""
+    )
     prompt = (
         "Clasifica la siguiente pregunta de un estudiante universitario en UN "
         "solo tema corto de 1 a 3 palabras (ej. Inscripciones, Becas, Horarios, "
         "Equivalencias, Constancias, Cambio de carrera). Usa un tema existente si "
-        "la pregunta encaja, o crea uno nuevo igual de corto si no encaja en ninguno. "
-        "Responde SOLO con JSON: {\"topic\": \"...\"}"
+        "la pregunta encaja, o crea uno nuevo igual de corto si no encaja en ninguno."
+        f"{topics_hint}"
+        " Responde SOLO con JSON: {\"topic\": \"...\"}"
     )
     messages = [
         {"role": "system", "content": prompt},

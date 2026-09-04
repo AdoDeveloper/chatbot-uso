@@ -827,3 +827,32 @@ class TestClassifyTopic:
         result = await gw.classify_topic("pregunta", provider, "key")
         assert result is not None
         assert len(result) == 128
+
+    async def test_existing_topics_included_in_prompt(self, monkeypatch):
+        provider = _make_provider()
+        captured = {}
+
+        async def fake_complete(self, messages, temperature, max_tokens, response_format=None, reasoning_effort=None):
+            captured["system_prompt"] = messages[0]["content"]
+            return '{"topic": "Inscripciones"}'
+
+        monkeypatch.setattr(gw.OpenAICompatAdapter, "complete", fake_complete)
+        result = await gw.classify_topic(
+            "¿cómo me inscribo?", provider, "key",
+            existing_topics=["Inscripciones", "Becas"],
+        )
+        assert result == "Inscripciones"
+        assert "Inscripciones" in captured["system_prompt"]
+        assert "Becas" in captured["system_prompt"]
+
+    async def test_no_existing_topics_omits_hint(self, monkeypatch):
+        provider = _make_provider()
+        captured = {}
+
+        async def fake_complete(self, messages, temperature, max_tokens, response_format=None, reasoning_effort=None):
+            captured["system_prompt"] = messages[0]["content"]
+            return '{"topic": "Becas"}'
+
+        monkeypatch.setattr(gw.OpenAICompatAdapter, "complete", fake_complete)
+        await gw.classify_topic("pregunta", provider, "key")
+        assert "Temas ya existentes" not in captured["system_prompt"]

@@ -146,13 +146,6 @@ export interface ConversationTag {
   count: number;
 }
 
-export interface RootCause {
-  question_id: string;
-  detected_topic: string | null;
-  causes: { code: string; label: string; detail: string }[];
-  suggestions: string[];
-}
-
 export interface ChatConversationDetail extends ChatConversationOut {
   messages: ChatMessageOut[];
 }

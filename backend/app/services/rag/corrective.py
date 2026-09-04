@@ -163,7 +163,24 @@ async def _classify_and_store_topic(
     sin bloquear ni afectar la latencia del turno de chat."""
     from app.services.ai.llm_gateway import classify_topic
 
-    topic = await classify_topic(question, provider, api_key)
+    existing_topics: list[str] = []
+    try:
+        from sqlalchemy import select as _select
+
+        from app.db.session import AsyncSessionLocal
+        from app.models.unanswered_question import UnansweredQuestion as _UQ
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(
+                _select(_UQ.detected_topic)
+                .where(_UQ.detected_topic.is_not(None))
+                .distinct()
+                .limit(40)
+            )
+            existing_topics = [t for (t,) in result.all() if t]
+    except Exception as exc:
+        log.warning("unanswered.existing_topics_fetch_failed", error=str(exc))
+
+    topic = await classify_topic(question, provider, api_key, existing_topics=existing_topics)
     if not topic:
         return
     try:

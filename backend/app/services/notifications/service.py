@@ -51,6 +51,7 @@ async def send_notification(
     *,
     event: NotificationEvent,
     payload: dict[str, Any],
+    is_test: bool = False,
 ) -> None:
     result = await db.execute(
         select(NotificationRule)
@@ -66,6 +67,8 @@ async def send_notification(
         return
 
     subject = _subject_for_event(event)
+    if is_test:
+        subject = f"[PRUEBA] {subject}"
     body_html = _html_body(event, payload)
     body_text = _text_body(event, payload)
 

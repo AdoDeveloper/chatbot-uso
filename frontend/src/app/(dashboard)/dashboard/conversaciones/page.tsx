@@ -95,6 +95,27 @@ function RouteBadge({ route }: { route: string | null }) {
  );
 }
 
+const _PANEL_BROWSERS = new Set(["playground", "panel", "admin", "preview-production"]);
+
+function originMeta(browser: string | null): { label: string; cls: string } {
+ if (browser === "preview-production") {
+  return { label: "Previsualizador", cls: "bg-info/10 text-info border-info/20" };
+ }
+ if (browser && _PANEL_BROWSERS.has(browser)) {
+  return { label: "Panel (prueba)", cls: "bg-muted text-muted-foreground border-border" };
+ }
+ return { label: "Widget", cls: "bg-success/10 text-success border-success/20" };
+}
+
+function OriginBadge({ browser }: { browser: string | null }) {
+ const m = originMeta(browser);
+ return (
+  <span className={`inline-flex items-center px-1.5 py-0.5 rounded border text-3xs font-medium shrink-0 ${m.cls}`}>
+   {m.label}
+  </span>
+ );
+}
+
 function CsatBadge({ score }: { score: number | null }) {
  if (score == null) return null;
  const cls = score >= 4 ? "bg-success/10 text-success border-success/20"
@@ -149,6 +170,13 @@ const STATUS_CHIPS: { value: StatusFilter; label: string }[] = [
  { value: "resolved", label: "Resueltas" },
 ];
 
+type OriginFilter = "all" | "widget" | "test";
+const ORIGIN_CHIPS: { value: OriginFilter; label: string }[] = [
+ { value: "all", label: "Todos los orígenes" },
+ { value: "widget", label: "Solo widget" },
+ { value: "test", label: "Solo pruebas" },
+];
+
 function statusBadgeVariant(s: ConversationStatus): "success" | "destructive" | "secondary" {
  if (s === "active") return "success";
  if (s === "escalated") return "destructive";
@@ -171,17 +199,18 @@ export default function HistorialPage() {
  const [dateFrom, setDateFrom] = useState("");
  const [dateTo, setDateTo] = useState("");
  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+ const [originFilter, setOriginFilter] = useState<OriginFilter>("all");
  const [exporting, setExporting] = useState(false);
  const [pageSize, setPageSize] = useState(20);
 
  const listQuery = useMemo(() => {
-  const params = new URLSearchParams({ page: String(page), page_size: String(pageSize), source: "production" });
+  const params = new URLSearchParams({ page: String(page), page_size: String(pageSize), source: "production", origin: originFilter });
   if (search.trim()) params.set("search", search.trim());
   if (dateFrom) params.set("date_from", new Date(dateFrom).toISOString());
   if (dateTo) params.set("date_to", new Date(dateTo + "T23:59:59").toISOString());
   if (statusFilter !== "all") params.set("status", statusFilter);
   return params.toString();
- }, [page, pageSize, search, dateFrom, dateTo, statusFilter]);
+ }, [page, pageSize, search, dateFrom, dateTo, statusFilter, originFilter]);
 
  const { data: listData, loading, error: listError, refetch: refetchList } =
   useApi<{ items: ChatConversationOut[]; total: number }>(`/conversations?${listQuery}`);
@@ -204,7 +233,7 @@ export default function HistorialPage() {
  async function handleExport(format: string) {
   if (exporting) return;
   setExporting(true);
-  const params = new URLSearchParams({ format, source: "production" });
+  const params = new URLSearchParams({ format, source: "production", origin: originFilter });
   if (search.trim()) params.set("search", search.trim());
   if (dateFrom) params.set("date_from", new Date(dateFrom).toISOString());
   if (dateTo) params.set("date_to", new Date(dateTo + "T23:59:59").toISOString());
@@ -315,6 +344,25 @@ export default function HistorialPage() {
         );
        })}
       </div>
+      <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="Filtrar por origen">
+       {ORIGIN_CHIPS.map((chip) => {
+        const active = originFilter === chip.value;
+        return (
+         <Button
+          key={chip.value}
+          type="button"
+          role="tab"
+          aria-selected={active}
+          variant={active ? "default" : "outline"}
+          size="xs"
+          onClick={() => { setOriginFilter(chip.value); setPage(1); }}
+          className="h-6 px-2.5 text-2xs rounded-full"
+         >
+          {chip.label}
+         </Button>
+        );
+       })}
+      </div>
      </div>
 
      <div className="flex-1 overflow-y-auto divide-y max-h-[60vh] lg:max-h-none min-h-0">
@@ -348,6 +396,7 @@ export default function HistorialPage() {
            {c.first_user_message || <em className="text-muted-foreground">(sin mensajes)</em>}
           </span>
           <div className="flex items-center gap-1.5 shrink-0">
+           <OriginBadge browser={c.browser} />
            <CsatBadge score={c.csat_score} />
            <Badge variant={statusBadgeVariant(c.status)} className="text-3xs shrink-0">
             {c.status}
@@ -383,6 +432,7 @@ export default function HistorialPage() {
         <div className="flex items-center justify-between gap-2 mb-1">
          <div className="flex items-center gap-2 min-w-0">
           <Badge variant={statusBadgeVariant(detail.status)} className="text-3xs">{detail.status}</Badge>
+          <OriginBadge browser={detail.browser} />
           <CsatBadge score={detail.csat_score} />
           <p className="text-2xs font-mono text-muted-foreground truncate">{detail.session_id}</p>
          </div>

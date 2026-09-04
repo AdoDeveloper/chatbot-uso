@@ -129,16 +129,3 @@ async def create_faq_from_unanswered(
     q.resolved_at = datetime.now(timezone.utc)
     await db.commit()
     return {"faq_id": str(entry.id)}
-
-
-
-@router.get("/{question_id}/root-cause", response_model=dict)
-async def root_cause(
-    question_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_perm(P.CONVERSATIONS_READ)),
-):
-    """Análisis automático del motivo por el que el bot no respondió."""
-    from app.services.knowledge import unanswered_diagnostics
-
-    return await unanswered_diagnostics.root_cause_analysis(db, question_id=question_id)
