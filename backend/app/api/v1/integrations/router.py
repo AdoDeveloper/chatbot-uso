@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel, EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.deps import require_perm
+from app.core.deps import get_client_ip, require_perm
 from app.core.permissions import P
+from app.core.rate_limit import RateLimitExceeded, check_rate_limit
 from app.db.session import get_db
 from app.models.global_setting import GlobalSetting
 from app.services.notifications import smtp
@@ -39,7 +40,7 @@ class SMTPConfigOut(BaseModel):
 
 
 class SMTPTestRequest(BaseModel):
-    to: str
+    to: EmailStr
 
 
 class SMTPTestResult(BaseModel):
@@ -166,8 +167,23 @@ async def update_oauth(
 @router.post("/smtp/test", response_model=SMTPTestResult)
 async def test_smtp(
     body: SMTPTestRequest,
+    request: Request,
     _: object = Depends(_admin),
 ):
+    # El destinatario es libre, asi que se acota el ritmo de envio para que
+    # la prueba no sirva como via de reenvio hacia direcciones externas.
+    try:
+        await check_rate_limit(
+            "integrations:smtp_test", get_client_ip(request),
+            max_requests=5, window_seconds=60,
+        )
+    except RateLimitExceeded as exc:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Demasiadas pruebas de correo. Espere un momento y vuelva a intentarlo.",
+            headers={"Retry-After": str(exc.retry_after)},
+        ) from exc
+
     cfg = await smtp.get_smtp_config()
     if not cfg:
         return SMTPTestResult(success=False, message="SMTP no configurado en el servidor.")
