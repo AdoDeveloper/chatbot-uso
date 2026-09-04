@@ -288,11 +288,18 @@ async def retrieve_context(
 
 
 def format_sources(context_chunks: list[dict]) -> list[dict]:
-    """Formatea los chunks recuperados para el evento SSE `sources`, sin duplicados por fuente."""
+    """Formatea los chunks recuperados para el evento SSE `sources`, sin duplicados.
+
+    Dedup por parent_id (sección/sub-sección), no por source_id: un documento
+    tipo FAQ trae muchas preguntas independientes bajo un único source_id, y
+    deduplicar a ese nivel oculta de qué sección específica salió cada dato
+    citado en la respuesta - el usuario ve una sola fuente aunque el LLM haya
+    usado varias secciones distintas del mismo documento.
+    """
     seen: set[str] = set()
     result = []
     for c in context_chunks:
-        key = c.get("source_id") or c.get("source_name", "")
+        key = c.get("parent_id") or c.get("source_id") or c.get("source_name", "")
         if key and key in seen:
             continue
         if key:
