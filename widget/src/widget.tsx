@@ -180,6 +180,11 @@ interface PersistedHistory {
   messages: Message[];
   updatedAt: number;
   conversationId?: string | null;
+  // Estado de la tarjeta de escalación pendiente: sin esto, cerrar o recargar
+  // el widget mientras el formulario de contacto está abierto lo hace
+  // desaparecer sin aviso, aunque el backend siga esperando el consentimiento.
+  escalState?: "hidden" | "prompt" | "form";
+  escalConvId?: string | null;
 }
 function _apiKeyFingerprint(apiKey: string): string {
   let h = 0;
@@ -195,7 +200,12 @@ function storageKey(apiUrl: string, apiKey: string): string {
   return `usobot:history:${host}:${_apiKeyFingerprint(apiKey)}`;
 }
 
-function loadHistory(apiUrl: string, apiKey: string): { messages: Message[]; conversationId: string | null } | null {
+function loadHistory(apiUrl: string, apiKey: string): {
+  messages: Message[];
+  conversationId: string | null;
+  escalState: "hidden" | "prompt" | "form";
+  escalConvId: string | null;
+} | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = window.localStorage.getItem(storageKey(apiUrl, apiKey));
@@ -205,17 +215,29 @@ function loadHistory(apiUrl: string, apiKey: string): { messages: Message[]; con
     return {
       messages: parsed.messages.map((m) => ({ ...m, streaming: false, error: false })),
       conversationId: parsed.conversationId ?? null,
+      escalState: parsed.escalState ?? "hidden",
+      escalConvId: parsed.escalConvId ?? null,
     };
   } catch { return null; }
 }
 
-function saveHistory(apiUrl: string, apiKey: string, messages: Message[], conversationId: string | null): void {
+function saveHistory(
+  apiUrl: string, apiKey: string, messages: Message[], conversationId: string | null,
+  escalState: "hidden" | "prompt" | "form" | "submitted" | "continue" | "error" = "hidden",
+  escalConvId: string | null = null,
+): void {
   if (typeof window === "undefined") return;
   try {
     const clean = messages
       .filter((m) => !m.streaming && !m.error && m.content.trim().length > 0)
       .slice(-MAX_PERSISTED_MESSAGES);
-    const payload: PersistedHistory = { v: STORAGE_VERSION, messages: clean, updatedAt: Date.now(), conversationId };
+    // "submitted"/"continue"/"error" no son estados recuperables (son
+    // transitorios de una sola interacción): se persisten como "hidden".
+    const persistableEscalState = (escalState === "prompt" || escalState === "form") ? escalState : "hidden";
+    const payload: PersistedHistory = {
+      v: STORAGE_VERSION, messages: clean, updatedAt: Date.now(), conversationId,
+      escalState: persistableEscalState, escalConvId: persistableEscalState === "hidden" ? null : escalConvId,
+    };
     window.localStorage.setItem(storageKey(apiUrl, apiKey), JSON.stringify(payload));
   } catch { /* quota exceeded o incógnito - falla silenciosamente */ }
 }
@@ -486,9 +508,15 @@ function ChatWidget({
   const [csatReasons, setCsatReasons]       = useState<string[]>([]);
   // prompt: "¿hablar con un humano?" · form: contacto (correo/WhatsApp) · submitted: confirmación
   // continue: "¿continuar con el chatbot?" tras un "No" · error: falló el envío del contacto.
-  const [escalState, setEscalState]         = useState<"hidden" | "prompt" | "form" | "submitted" | "continue" | "error">("hidden");
+  // Se recupera de localStorage (ver saveHistory) para que cerrar o recargar
+  // el widget con el formulario a medio llenar no lo haga desaparecer.
+  const [escalState, setEscalState]         = useState<"hidden" | "prompt" | "form" | "submitted" | "continue" | "error">(
+    () => initialHistoryRef.current?.escalState ?? "hidden",
+  );
   const [escalSending, setEscalSending]     = useState(false);
-  const [escalConvId, setEscalConvId]       = useState<string | null>(null);
+  const [escalConvId, setEscalConvId]       = useState<string | null>(
+    () => initialHistoryRef.current?.escalConvId ?? null,
+  );
   const [escalType, setEscalType]           = useState<"email" | "whatsapp">("email");
   const [escalValue, setEscalValue]         = useState("");
   const [escalError, setEscalError]         = useState("");
@@ -626,10 +654,11 @@ function ChatWidget({
     }
   }, [messages, busy]);
 
-  // Persistir historial (incluye conversationId - ver PersistedHistory)
+  // Persistir historial (incluye conversationId y la tarjeta de escalación
+  // pendiente - ver PersistedHistory)
   useEffect(() => {
-    saveHistory(apiUrl, apiKey, messages, conversationId);
-  }, [messages, apiUrl, apiKey, conversationId]);
+    saveHistory(apiUrl, apiKey, messages, conversationId, escalState, escalConvId);
+  }, [messages, apiUrl, apiKey, conversationId, escalState, escalConvId]);
 
   // Focus al abrir
   useEffect(() => {
