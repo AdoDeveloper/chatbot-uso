@@ -480,13 +480,19 @@ async def run_ingestion(source_id: uuid.UUID) -> None:
                 _log.error("ingestion.background_failed", source_id=str(source_id), error=str(exc))
                 # Marca la fuente como error para que el UI muestre el fallo en vez de quedarse colgado.
                 try:
+                    # La sesión viene de una excepción: sin rollback previo la
+                    # escritura falla y la fuente queda en `processing` para siempre.
+                    await db.rollback()
                     result2 = await db.execute(select(Source).where(Source.id == source_id))
                     src = result2.scalar_one_or_none()
                     if src:
                         src.status = SourceStatus.error
                         src.error_message = str(exc)[:500]
                         await db.commit()
-                except Exception:
-                    pass
+                except Exception as mark_exc:
+                    _log.error(
+                        "ingestion.error_status_not_persisted",
+                        source_id=str(source_id), error=str(mark_exc),
+                    )
     finally:
         await _release_ingestion_lock(source_id)
