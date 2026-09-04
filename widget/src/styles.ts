@@ -563,7 +563,9 @@ export const STYLES = `
 
 .send-btn:hover:not(:disabled) { background: var(--color-primary-hover); }
 .send-btn:active:not(:disabled) { transform: scale(0.9); }
-.send-btn:disabled { background: #93c5fd; cursor: not-allowed; }
+/* Opacidad reducida sobre el color real (igual que el previsualizador:
+   disabled:opacity-40), no un azul fijo ajeno a la config. */
+.send-btn:disabled { background: var(--color-primary); opacity: 0.4; cursor: not-allowed; }
 
 /* ── Spinner ─────────────────────────────────────────────────────────── */
 

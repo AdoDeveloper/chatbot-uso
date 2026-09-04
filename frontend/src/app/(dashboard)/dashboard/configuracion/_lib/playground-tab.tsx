@@ -1147,6 +1147,20 @@ export function PlaygroundTab({
                   </div>
                 )}
 
+                {/* Enlace de contacto manual - paridad con el widget real
+                    (escal-footer): mismas condiciones de visibilidad. */}
+                {enableEscalation && escalState === "hidden" && csatState === "hidden" && (
+                  <div className="border-t border-border bg-background px-3 py-1.5 shrink-0 text-center">
+                    <button
+                      type="button"
+                      onClick={() => setEscalState("prompt")}
+                      className="text-3xs underline text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      ¿Necesitas hablar con alguien?
+                    </button>
+                  </div>
+                )}
+
                 {/* Sugerencias rápidas */}
                 {showSuggestions && csatState === "hidden" && escalState === "hidden" && (
                   <div className="border-t border-border bg-background px-2.5 pt-2 pb-1.5 shrink-0 flex flex-wrap gap-1">
