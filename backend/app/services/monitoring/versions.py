@@ -145,6 +145,9 @@ async def _collect_widget(db: AsyncSession) -> dict:
         "enable_csat": w.enable_csat,
         "csat_question": w.csat_question,
         "launcher_label": w.launcher_label or "",
+        "enable_escalation": w.enable_escalation,
+        "enable_tts": w.enable_tts,
+        "enable_accessibility": w.enable_accessibility,
     }
 
 

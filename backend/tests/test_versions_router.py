@@ -351,6 +351,27 @@ class TestDeploy:
         assert body["version"]["description"] == "primer deploy"
         assert "pending_sources" in body
 
+    async def test_deploy_snapshot_includes_enable_escalation(
+        self, client, admin_user, auth_headers, db_session,
+    ):
+        """_collect_widget() omitía enable_escalation (y enable_tts,
+        enable_accessibility) del snapshot capturado - así, el toggle en el
+        panel nunca tenía efecto real sobre lo publicado: cualquier consumidor
+        que leyera la config publicada con .get("enable_escalation", True)
+        siempre caía al default True, sin importar el valor real guardado."""
+        from app.models.widget_config import WidgetConfig
+
+        widget = WidgetConfig(chatbot_name="Bot Widget", enable_escalation=False)
+        db_session.add(widget)
+        await db_session.commit()
+
+        deployed = await client.post("/api/v1/versions/deploy", json={}, headers=auth_headers(admin_user))
+        assert deployed.status_code == 201
+
+        r = await client.get("/api/v1/versions/deploy/config", headers=auth_headers(admin_user))
+        assert r.status_code == 200
+        assert r.json().get("enable_escalation") is False
+
     async def test_deploy_returns_409_when_no_changes_since_last_deploy(
         self, client, admin_user, auth_headers, db_session,
     ):
