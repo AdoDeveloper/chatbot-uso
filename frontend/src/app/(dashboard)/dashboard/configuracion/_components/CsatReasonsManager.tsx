@@ -4,7 +4,7 @@ import { useState } from "react";
 import { GripVertical, Loader2, Plus, Trash2 } from "lucide-react";
 
 import api from "@/lib/api";
-import { useApi, getErrorMessage } from "@/hooks/use-api";
+import { useApi, getErrorMessage, invalidateApiCache } from "@/hooks/use-api";
 import { useToast } from "@/components/ui/toast";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -33,6 +33,7 @@ export function CsatReasonsManager() {
     setCreating(true);
     try {
       const { data: created } = await api.post<CsatReason>("/widget/csat-reasons", { label });
+      invalidateApiCache("/widget/csat-reasons");
       setData((prev) => [...(prev ?? []), created]);
       setNewLabel("");
       toast({ type: "success", message: "Motivo creado." });
@@ -49,6 +50,7 @@ export function CsatReasonsManager() {
       const { data: updated } = await api.patch<CsatReason>(
         `/widget/csat-reasons/${reason.id}`, { enabled: !reason.enabled }
       );
+      invalidateApiCache("/widget/csat-reasons");
       setData((prev) => (prev ?? []).map((r) => (r.id === reason.id ? updated : r)));
       toast({ type: "success", message: `Motivo ${updated.enabled ? "activado" : "desactivado"}.`, duration: 1500 });
     } catch (err) {
@@ -72,6 +74,7 @@ export function CsatReasonsManager() {
       const { data: updated } = await api.patch<CsatReason>(
         `/widget/csat-reasons/${reason.id}`, { label }
       );
+      invalidateApiCache("/widget/csat-reasons");
       setData((prev) => (prev ?? []).map((r) => (r.id === reason.id ? updated : r)));
       toast({ type: "success", message: "Motivo actualizado.", duration: 1500 });
     } catch (err) {
@@ -92,6 +95,7 @@ export function CsatReasonsManager() {
     setSavingId(reason.id);
     try {
       await api.delete(`/widget/csat-reasons/${reason.id}`);
+      invalidateApiCache("/widget/csat-reasons");
       setData((prev) => (prev ?? []).filter((r) => r.id !== reason.id));
       toast({ type: "success", message: "Motivo eliminado." });
     } catch (err) {
@@ -106,6 +110,7 @@ export function CsatReasonsManager() {
       await api.put<CsatReason[]>("/widget/csat-reasons/reorder", {
         ordered_ids: ordered.map((r) => r.id),
       });
+      invalidateApiCache("/widget/csat-reasons");
     } catch (err) {
       toast({ type: "error", title: "No se pudo guardar el orden", message: getErrorMessage(err) });
     }

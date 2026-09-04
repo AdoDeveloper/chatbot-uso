@@ -218,6 +218,7 @@ export default function NotificacionesHistorialPage() {
     try {
       invalidateApiCache("/notifications/report-schedule");
       await api.put<ReportSchedule>("/notifications/report-schedule", payload);
+      setDraft(payload);
       setSavedDraft(payload);
       toast({ type: "success", message: "Programación del reporte guardada." });
     } catch (err) {
