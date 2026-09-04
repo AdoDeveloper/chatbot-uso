@@ -1333,7 +1333,15 @@ export const STYLES = `
 
 /* ── Responsive (small screens) ─────────────────────────────────────── */
 
-  @media (max-width: 440px) {
+/* 480px, no 440px: la investigación real de dispositivos (2026) reporta que
+   incluso los flagships Android más anchos rara vez superan ~430px de
+   ancho lógico CSS - pero un teléfono real de esta prueba reportó 448-460px
+   (probablemente por el "zoom de pantalla" reducido de Android, que aumenta
+   el ancho lógico reportado), y ahí 440px dejaba el panel en modo "ventana
+   flotante de escritorio" en pleno móvil, con el hueco y desalineación
+   correspondientes. 480px da margen sin acercarse al rango típico de
+   tablet (768px+), donde sí tiene sentido el modo ventana flotante. */
+  @media (max-width: 480px) {
   .root[data-position="bottom-right"] { bottom: 1rem; right: 1rem; }
   .root[data-position="bottom-left"]  { bottom: 1rem; left: 1rem; }
   .root[data-position="top-right"]    { top: 1rem; right: 1rem; }
@@ -1375,8 +1383,8 @@ export const STYLES = `
   .bubble-wrap-panel-open { display: none; }
 }
 
-/* Pantallas de poca altura con ancho &gt; 440px: limita el alto del panel. */
-@media (max-height: 600px) and (min-width: 441px) {
+/* Pantallas de poca altura con ancho &gt; 480px: limita el alto del panel. */
+@media (max-height: 600px) and (min-width: 481px) {
   .panel {
     height: min(520px, calc(100vh - 90px));
     height: min(520px, calc(100dvh - 90px));
