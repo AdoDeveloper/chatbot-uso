@@ -70,6 +70,12 @@ export const STYLES = `
   bottom: calc(100% + 12px);
   right: 0;
   width: 380px;
+  /* Nunca más ancho que el viewport menos el margen del root a ambos lados:
+     sin esto, en cualquier ventana más angosta que ~380px + los márgenes
+     (no solo por debajo del breakpoint de mobile-fullscreen) el panel se
+     desbordaba fuera de la pantalla por el lado contrario a data-position. */
+  max-width: calc(100vw - 3rem);
+  max-width: calc(100dvw - 3rem);
   height: 520px;
   background: #fff;
   border-radius: 16px;
