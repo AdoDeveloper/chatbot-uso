@@ -119,7 +119,10 @@ export const STYLES = `
 /* ── Encabezado ──────────────────────────────────────────────────────────── */
 
 .header {
-  background: linear-gradient(135deg, var(--color-primary) 0%, #2563eb 100%);
+  /* Color sólido, igual que el previsualizador del panel (backgroundColor:
+     primaryColor) - el gradiente hacia un azul hardcodeado (#2563eb) hacía
+     que el header se viera con un color distinto al configurado. */
+  background: var(--color-primary);
   color: #fff;
   padding: 14px 16px;
   display: flex;
