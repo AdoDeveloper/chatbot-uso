@@ -1,7 +1,7 @@
 """Cache management endpoints - view stats, list entries, clear, configure."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -69,7 +69,11 @@ async def clear_cache(_=Depends(_admin)) -> DeletedCount:
 @router.delete("/entry/{key}", response_model=OperationStatus)
 async def delete_entry(key: str, _=Depends(_admin)) -> OperationStatus:
     """Borra una entrada específica del caché por su key Redis."""
-    await cache_svc.delete_entry(key)
+    if not await cache_svc.delete_entry(key):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La clave indicada no pertenece al caché de respuestas.",
+        )
     return OperationStatus()
 
 

@@ -240,13 +240,22 @@ async def list_entries(limit: int = 20) -> list[dict]:
         return []
 
 
-async def delete_entry(key: str) -> None:
-    """Delete a specific cache entry by Redis key."""
+async def delete_entry(key: str) -> bool:
+    """Borra una entrada del caché semántico.
+
+    La clave llega desde el path del endpoint, así que se exige el prefijo del
+    caché: el mismo Redis aloja los locks de ingesta, los contadores de rate
+    limit y los cooldowns de alertas, y borrar cualquiera de ellos tendría
+    efectos muy distintos a "limpiar una respuesta guardada".
+    """
+    if not key.startswith(CACHE_PREFIX):
+        return False
     try:
         redis = get_redis()
         await redis.delete(key)
     except Exception:
         pass
+    return True
 
 
 async def clear_all() -> int:

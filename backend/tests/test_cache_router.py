@@ -187,6 +187,16 @@ class TestDeleteEntry:
         assert r.status_code == 200
         assert r.json()["ok"] is True
 
+    async def test_rejects_key_outside_the_cache(self, client, admin_user, auth_headers):
+        await _seed_cache_entry("ingestion_lock:abc", question="lock de ingesta")
+
+        r = await client.delete("/api/v1/cache/entry/ingestion_lock:abc", headers=auth_headers(admin_user))
+        assert r.status_code == 400
+
+        from app.services.ai import semantic_cache as cache_svc
+
+        assert await cache_svc.get_redis().exists("ingestion_lock:abc")
+
 
 class TestUpdateConfig:
     async def test_requires_auth(self, client):
