@@ -889,6 +889,12 @@ function FeedbackPanel({ feedback, loading }: { feedback: AnalyticsFeedback | nu
  );
 }
 
+// Por debajo de este número de muestras, el promedio no es representativo:
+// una sola respuesta mala o buena mueve el porcentaje entero. Se muestra el
+// progreso hacia el mínimo en vez del porcentaje, para no leerse como un
+// dato confiable que todavía no lo es.
+const MIN_QUALITY_SAMPLES = 10;
+
 function ResponseQualityPanel({ quality, loading }: { quality: AnalyticsResponseQuality | null; loading: boolean }) {
  const hasData = (
   (quality?.context_relevance_sample_size ?? 0) +
@@ -923,39 +929,70 @@ function ResponseQualityPanel({ quality, loading }: { quality: AnalyticsResponse
     ) : (
      <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-       <div className="flex flex-col gap-2 rounded-xl border border-border bg-muted/30 p-3">
-        <div className="flex items-center gap-1">
-         <span className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">Contexto relevante</span>
-         <HelpTip description="De los fragmentos que el sistema recuperó para responder, qué porción resultó realmente relevante para la pregunta." side="bottom" align="start" />
-        </div>
-        <span className="text-2xl font-bold tabular-nums">{pct(quality!.avg_context_relevance_ratio)}</span>
-        <Progress value={(quality!.avg_context_relevance_ratio ?? 0) * 100} className="h-1.5" />
-        <span className="text-3xs text-muted-foreground">{n(quality!.context_relevance_sample_size)}</span>
-       </div>
-       <div className="flex flex-col gap-2 rounded-xl border border-border bg-muted/30 p-3">
-        <div className="flex items-center gap-1">
-         <span className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">Fidelidad al contenido</span>
-         <HelpTip description="Qué proporción de las afirmaciones de la respuesta están respaldadas por el contenido cargado, en vez de inventadas por el modelo." side="bottom" align="start" />
-        </div>
-        <span className="text-2xl font-bold tabular-nums">{pct(quality!.avg_faithfulness_score)}</span>
-        <Progress value={(quality!.avg_faithfulness_score ?? 0) * 100} className="h-1.5" />
-        <span className="text-3xs text-muted-foreground">{n(quality!.faithfulness_sample_size)}</span>
-       </div>
-       <div className="flex flex-col gap-2 rounded-xl border border-border bg-muted/30 p-3">
-        <div className="flex items-center gap-1">
-         <span className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">Relevancia de la respuesta</span>
-         <HelpTip description="Qué tan directamente la respuesta aborda lo que la persona preguntó." side="bottom" align="start" />
-        </div>
-        <span className="text-2xl font-bold tabular-nums">{pct(quality!.avg_answer_relevance_score)}</span>
-        <Progress value={(quality!.avg_answer_relevance_score ?? 0) * 100} className="h-1.5" />
-        <span className="text-3xs text-muted-foreground">{n(quality!.answer_relevance_sample_size)}</span>
-       </div>
+       <QualityMetricCard
+        label="Contexto relevante"
+        help="De los fragmentos que el sistema recuperó para responder, qué porción resultó realmente relevante para la pregunta."
+        value={quality!.avg_context_relevance_ratio}
+        sampleSize={quality!.context_relevance_sample_size}
+        pct={pct}
+        n={n}
+       />
+       <QualityMetricCard
+        label="Fidelidad al contenido"
+        help="Qué proporción de las afirmaciones de la respuesta están respaldadas por el contenido cargado, en vez de inventadas por el modelo."
+        value={quality!.avg_faithfulness_score}
+        sampleSize={quality!.faithfulness_sample_size}
+        pct={pct}
+        n={n}
+       />
+       <QualityMetricCard
+        label="Relevancia de la respuesta"
+        help="Qué tan directamente la respuesta aborda lo que la persona preguntó."
+        value={quality!.avg_answer_relevance_score}
+        sampleSize={quality!.answer_relevance_sample_size}
+        pct={pct}
+        n={n}
+       />
       </div>
       <p className="text-2xs text-muted-foreground">Cada métrica se evalúa sobre una muestra propia de respuestas en los últimos {quality!.days} días.</p>
      </div>
     )}
    </CardContent>
   </Card>
+ );
+}
+
+function QualityMetricCard({
+ label, help, value, sampleSize, pct, n,
+}: {
+ label: string;
+ help: string;
+ value: number | null;
+ sampleSize: number;
+ pct: (v: number | null) => string;
+ n: (count: number) => string;
+}) {
+ const enough = sampleSize >= MIN_QUALITY_SAMPLES;
+ return (
+  <div className="flex flex-col gap-2 rounded-xl border border-border bg-muted/30 p-3">
+   <div className="flex items-center gap-1">
+    <span className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</span>
+    <HelpTip description={help} side="bottom" align="start" />
+   </div>
+   {enough ? (
+    <>
+     <span className="text-2xl font-bold tabular-nums">{pct(value)}</span>
+     <Progress value={(value ?? 0) * 100} className="h-1.5" />
+     <span className="text-3xs text-muted-foreground">{n(sampleSize)}</span>
+    </>
+   ) : (
+    <>
+     <span className="text-13 font-medium text-muted-foreground">Necesita más datos</span>
+     <Progress value={(sampleSize / MIN_QUALITY_SAMPLES) * 100} className="h-1.5" indicatorClassName="bg-muted-foreground/40" />
+     <span className="text-3xs text-muted-foreground">{sampleSize} de {MIN_QUALITY_SAMPLES} muestras mínimas</span>
+    </>
+   )}
+  </div>
  );
 }
 
