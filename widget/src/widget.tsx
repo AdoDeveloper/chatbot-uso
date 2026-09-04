@@ -1052,6 +1052,90 @@ function ChatWidget({
               Reintentar
             </button>
           </div>
+        ) : settings.enable_csat && csatState !== "hidden" ? (
+          /* CSAT ocupa el cuerpo completo del panel (mismo espacio que
+             mensajes + input) en vez de aparecer como una franja al fondo
+             del scroll, donde competía por atención con el historial y el
+             usuario podía seguir escribiendo mientras calificaba. */
+          <div class="csat-fullscreen">
+            {csatState === "pending" && (
+              <div class="csat-panel" role="group" aria-label="Valoración de la conversación">
+                <p class="csat-question">{settings.csat_question}</p>
+                <div class="csat-stars">
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <button
+                      key={n}
+                      class={`csat-star ${n <= (csatScore ?? 0) ? "csat-star-filled" : ""}`}
+                      onClick={() => handleCsatStarClick(n)}
+                      aria-label={`${n} estrella${n !== 1 ? "s" : ""}`}
+                      title={["", "Muy malo", "Malo", "Regular", "Bueno", "Excelente"][n]}
+                    >★</button>
+                  ))}
+                </div>
+                <div class="csat-star-labels">
+                  <span>Muy disconforme</span>
+                  <span>Muy conforme</span>
+                </div>
+                {Object.keys(settings.csat_reasons).length > 0 && (
+                  <div class="csat-reasons" role="group" aria-label="Motivo de la calificación">
+                    {Object.entries(settings.csat_reasons).map(([key, label]) => (
+                      <label key={key} class={`csat-reason-item ${csatReasons.includes(key) ? "csat-reason-item-checked" : ""}`}>
+                        <input
+                          type="checkbox"
+                          checked={csatReasons.includes(key)}
+                          onChange={() => setCsatReasons((prev) =>
+                            prev.includes(key) ? prev.filter((r) => r !== key) : [...prev, key]
+                          )}
+                        />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                )}
+                <textarea
+                  class="csat-comment"
+                  placeholder="Cuéntenos su experiencia (opcional)…"
+                  maxLength={300}
+                  value={csatComment}
+                  onInput={(e) => setCsatComment((e.target as HTMLTextAreaElement).value)}
+                  rows={2}
+                />
+                <div class="csat-actions">
+                  <button class="csat-skip" onClick={() => setCsatState("submitted")}>Omitir</button>
+                  <button
+                    class="csat-submit-btn"
+                    onClick={handleCsatSubmit}
+                    disabled={!csatScore}
+                  >Finalizar</button>
+                </div>
+              </div>
+            )}
+            {csatState === "submitted" && (
+              <div class="csat-thanks-wrap">
+                <div class="csat-thanks-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="26" height="26">
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="8 12.5 10.8 15.5 16 9" />
+                  </svg>
+                </div>
+                <div class="csat-thanks">¡Muchas gracias!</div>
+                {(settings.show_new_chat_button || settings.show_end_chat_button) && (
+                  <div class="csat-thanks-actions">
+                    {settings.show_new_chat_button && messages.length > 1 && (
+                      <button class="csat-thanks-btn" onClick={handleClearConversation}>
+                        Nueva conversación
+                      </button>
+                    )}
+                    {settings.show_end_chat_button && (
+                      <button class="csat-thanks-btn" onClick={handleMinimize}>
+                        Cerrar
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         ) : (
           <>
             {/* Mensajes */}
@@ -1232,91 +1316,15 @@ function ChatWidget({
               </div>
             )}
 
-            {/* CSAT - pantalla única: estrellas + motivos + comentario */}
-            {settings.enable_csat && csatState === "pending" && (
-              <div class="csat-panel" role="group" aria-label="Valoración de la conversación">
-                <p class="csat-question">{settings.csat_question}</p>
-                <div class="csat-stars">
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <button
-                      key={n}
-                      class={`csat-star ${n <= (csatScore ?? 0) ? "csat-star-filled" : ""}`}
-                      onClick={() => handleCsatStarClick(n)}
-                      aria-label={`${n} estrella${n !== 1 ? "s" : ""}`}
-                      title={["", "Muy malo", "Malo", "Regular", "Bueno", "Excelente"][n]}
-                    >★</button>
-                  ))}
-                </div>
-                <div class="csat-star-labels">
-                  <span>Muy disconforme</span>
-                  <span>Muy conforme</span>
-                </div>
-                {Object.keys(settings.csat_reasons).length > 0 && (
-                  <div class="csat-reasons" role="group" aria-label="Motivo de la calificación">
-                    {Object.entries(settings.csat_reasons).map(([key, label]) => (
-                      <label key={key} class={`csat-reason-item ${csatReasons.includes(key) ? "csat-reason-item-checked" : ""}`}>
-                        <input
-                          type="checkbox"
-                          checked={csatReasons.includes(key)}
-                          onChange={() => setCsatReasons((prev) =>
-                            prev.includes(key) ? prev.filter((r) => r !== key) : [...prev, key]
-                          )}
-                        />
-                        {label}
-                      </label>
-                    ))}
-                  </div>
-                )}
-                <textarea
-                  class="csat-comment"
-                  placeholder="Cuéntenos su experiencia (opcional)…"
-                  maxLength={300}
-                  value={csatComment}
-                  onInput={(e) => setCsatComment((e.target as HTMLTextAreaElement).value)}
-                  rows={2}
-                />
-                <div class="csat-actions">
-                  <button class="csat-skip" onClick={() => setCsatState("submitted")}>Omitir</button>
-                  <button
-                    class="csat-submit-btn"
-                    onClick={handleCsatSubmit}
-                    disabled={!csatScore}
-                  >Finalizar</button>
-                </div>
-              </div>
-            )}
-            {settings.enable_csat && csatState === "submitted" && (
-              <div class="csat-thanks-wrap">
-                <div class="csat-thanks-icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="26" height="26">
-                    <circle cx="12" cy="12" r="10" />
-                    <polyline points="8 12.5 10.8 15.5 16 9" />
-                  </svg>
-                </div>
-                <div class="csat-thanks">¡Muchas gracias!</div>
-                {(settings.show_new_chat_button || settings.show_end_chat_button) && (
-                  <div class="csat-thanks-actions">
-                    {settings.show_new_chat_button && messages.length > 1 && (
-                      <button class="csat-thanks-btn" onClick={handleClearConversation}>
-                        Nueva conversación
-                      </button>
-                    )}
-                    {settings.show_end_chat_button && (
-                      <button class="csat-thanks-btn" onClick={handleMinimize}>
-                        Cerrar
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
           </>
         )}
 
         {/* Enlace de contacto manual - visible mientras la tarjeta no esté
-            activa, salvo que el admin haya desactivado el escalamiento. */}
-        {settings.enable_escalation && !offlineMode && escalState === "hidden" && (
+            activa, salvo que el admin haya desactivado el escalamiento.
+            Oculto también durante CSAT: no tiene sentido ofrecer escalar
+            mientras el usuario está cerrando/calificando la conversación. */}
+        {settings.enable_escalation && !offlineMode && escalState === "hidden" &&
+          !(settings.enable_csat && csatState !== "hidden") && (
           <div class="escal-footer">
             <button
               class="escal-footer-btn"
@@ -1330,7 +1338,9 @@ function ChatWidget({
           </div>
         )}
 
-        {/* Input */}
+        {/* Input - oculto durante CSAT: el usuario está calificando/cerrando
+            la conversación, no debería poder seguir escribiendo mensajes. */}
+        {!(settings.enable_csat && csatState !== "hidden") && (
         <div class="input-row">
           <textarea
             ref={inputRef}
@@ -1360,6 +1370,7 @@ function ChatWidget({
             )}
           </button>
         </div>
+        )}
       </div>
 
       {/* ── Mensaje proactivo (sobre el launcher cerrado) ── */}

@@ -824,15 +824,26 @@ export const STYLES = `
 
 /* ── CSAT survey ─────────────────────────────────────────────────────── */
 
+/* Ocupa el cuerpo completo del panel (reemplaza mensajes + input mientras
+   la encuesta está activa), con scroll propio si el contenido no cabe en
+   pantallas bajas. */
+.csat-fullscreen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow-y: auto;
+}
+
 .csat-panel {
-  border-top: 1px solid #f0f0f0;
-  padding: 12px 12px 10px;
+  padding: 20px 20px 16px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   background: #fafafa;
-  flex-shrink: 0;
+  border-radius: 12px;
+  margin: 12px;
 }
 
 .csat-question {
@@ -1002,14 +1013,14 @@ export const STYLES = `
 }
 
 .csat-thanks-wrap {
-  border-top: 1px solid #f0f0f0;
   background: #f0fdf4;
-  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
   padding: 14px;
+  border-radius: 12px;
+  margin: 0 12px;
 }
 
 .csat-thanks-icon {
