@@ -83,7 +83,8 @@ export default function InvitePage() {
         password: values.password,
       });
       tokenStore.set(data.access_token, data.refresh_token);
-      router.push("/dashboard");
+
+      window.location.href = "/dashboard";
     } catch (err: unknown) {
       setServerError(getErrorMessage(err, "No se pudo completar el registro"));
     }

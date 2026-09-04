@@ -297,23 +297,22 @@ async def test_delete_user_not_found(db_session, make_user):
         await user_service.delete_user(db_session, user_id=uuid.uuid4(), current_user=admin, ip=None)
 
 
-async def test_delete_user_admin_cannot_delete_admin(db_session, make_user):
+async def test_delete_user_admin_can_delete_admin(db_session, make_user):
+    """Un admin tiene todos los permisos, incluido eliminar a otro admin -
+    la única guarda real es no dejar el sistema sin admins activos (ver
+    test_delete_user_last_active_admin_blocked_even_for_non_admin_actor)."""
     actor_admin = await make_user(role=UserRole.admin)
     target_admin = await make_user(role=UserRole.admin)
 
-    with pytest.raises(HTTPException) as exc_info:
-        await user_service.delete_user(db_session, user_id=target_admin.id, current_user=actor_admin, ip=None)
-    assert exc_info.value.status_code == 403
-    assert "no pueden eliminar a otro admin" in exc_info.value.detail
+    await user_service.delete_user(db_session, user_id=target_admin.id, current_user=actor_admin, ip=None)
+    assert await user_service.get_by_id(db_session, target_admin.id) is None
 
 
 async def test_delete_user_last_active_admin_blocked_even_for_non_admin_actor(db_session, make_user):
     """Mismo espíritu que la guarda de update_user (líneas 88-93): sin esto,
     un actor no-admin con el permiso users.delete (p. ej. vía un rol
     dinámico personalizado, que el sistema RBAC ya soporta) podría eliminar
-    al único admin del sistema. La guarda de update_user existente
-    ('admin no puede eliminar a otro admin') no cubre este caso porque el
-    actor de esta prueba no es admin."""
+    al único admin del sistema."""
     from sqlalchemy import update
     from app.models.user import User
 

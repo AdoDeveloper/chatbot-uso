@@ -199,9 +199,6 @@ async def delete_user(
     if not user:
         raise NotFoundError("Usuario no encontrado")
 
-    if current_user.role == UserRole.admin and user.role == UserRole.admin:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Los admin no pueden eliminar a otro admin")
-
     # No permitir eliminar al único admin activo del sistema.
     if user.role == UserRole.admin and user.is_active:
         active_admins = await db.scalar(

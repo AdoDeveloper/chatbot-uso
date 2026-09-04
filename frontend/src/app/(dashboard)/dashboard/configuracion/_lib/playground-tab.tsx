@@ -975,13 +975,19 @@ export function PlaygroundTab({
                           {logoUrl ? <img src={logoUrl} alt="" className="w-full h-full object-cover" /> : <Bot className="w-3.5 h-3.5 text-white" />}
                         </div>
                       )}
-                      <div className={`max-w-[90%] border px-3.5 py-3 rounded-2xl text-xs leading-relaxed space-y-2 shadow-sm ${escalState === "submitted" ? "bg-brand-green/10 border-brand-green/30 text-foreground" : "bg-background border-border text-foreground"}`}>
+                      <div className={`max-w-[90%] border px-3.5 py-3 rounded-2xl leading-relaxed space-y-2 shadow-sm ${msgScaleClass} ${
+                        highContrast
+                          ? "bg-black text-white border-white/40"
+                          : escalState === "submitted"
+                            ? "bg-brand-green/10 border-brand-green/30 text-foreground"
+                            : "bg-background border-border text-foreground"
+                      }`}>
                         {escalState === "prompt" && (
                           <>
                             <p className="font-medium">¿Desea que la universidad se ponga en contacto con usted?</p>
                             <div className="flex gap-1.5">
                               <button type="button" onClick={() => setEscalState("form")} className="flex-1 py-1.5 rounded-full text-white text-2xs font-medium" style={{ backgroundColor: primaryColor }}>Sí</button>
-                              <button type="button" onClick={() => setEscalState("continue")} className="flex-1 py-1.5 rounded-full border border-border bg-background text-2xs font-medium hover:bg-muted-foreground/10">No</button>
+                              <button type="button" onClick={() => setEscalState("continue")} className={`flex-1 py-1.5 rounded-full border text-2xs font-medium ${highContrast ? "border-white/40 hover:bg-white/10" : "border-border bg-background hover:bg-muted-foreground/10"}`}>No</button>
                             </div>
                           </>
                         )}
@@ -990,7 +996,7 @@ export function PlaygroundTab({
                             <p className="font-medium">¿Desea continuar con el asistente virtual?</p>
                             <div className="flex gap-1.5">
                               <button type="button" onClick={() => setEscalState("hidden")} className="flex-1 py-1.5 rounded-full text-white text-2xs font-medium" style={{ backgroundColor: primaryColor }}>Sí, continuar</button>
-                              <button type="button" onClick={() => { setEscalState("hidden"); if (enableCsat) setCsatState("pending"); }} className="flex-1 py-1.5 rounded-full border border-border bg-background text-2xs font-medium hover:bg-muted-foreground/10">No, finalizar</button>
+                              <button type="button" onClick={() => { setEscalState("hidden"); if (enableCsat) setCsatState("pending"); }} className={`flex-1 py-1.5 rounded-full border text-2xs font-medium ${highContrast ? "border-white/40 hover:bg-white/10" : "border-border bg-background hover:bg-muted-foreground/10"}`}>No, finalizar</button>
                             </div>
                           </>
                         )}
@@ -1007,14 +1013,14 @@ export function PlaygroundTab({
                                 WhatsApp
                               </label>
                             </div>
-                            <label htmlFor="pg-escal-input" className="block text-3xs font-semibold text-muted-foreground mt-2 mb-0.5">
+                            <label htmlFor="pg-escal-input" className={`block text-3xs font-semibold mt-2 mb-0.5 ${highContrast ? "text-white/80" : "text-muted-foreground"}`}>
                               {escalType === "email" ? "Su correo electrónico" : "Su número de WhatsApp"}
                             </label>
                             <input
                               id="pg-escal-input"
                               type={escalType === "email" ? "email" : "tel"}
                               inputMode={escalType === "email" ? "email" : "tel"}
-                              className={`w-full h-8 bg-background rounded-lg px-2.5 text-xs outline-none border placeholder:text-muted-foreground/70 ${escalError ? "border-destructive" : "border-border"}`}
+                              className={`w-full h-8 rounded-lg px-2.5 text-xs outline-none border ${highContrast ? "bg-black text-white placeholder:text-white/50" : "bg-background placeholder:text-muted-foreground/70"} ${escalError ? "border-destructive" : highContrast ? "border-white/40" : "border-border"}`}
                               placeholder={escalType === "email" ? "tucorreo@ejemplo.com" : "+503 7777 7777"}
                               value={escalValue}
                               onChange={(e) => { setEscalValue(e.target.value); if (escalError) setEscalError(""); }}
@@ -1026,7 +1032,7 @@ export function PlaygroundTab({
                               <p id="pg-escal-error" role="alert" className="text-3xs text-destructive font-medium mt-1">{escalError}</p>
                             )}
                             <div className="flex gap-1.5 justify-end mt-2">
-                              <button type="button" onClick={() => { setEscalState("hidden"); setEscalError(""); }} className="text-2xs px-3 py-1.5 rounded-full border border-border text-muted-foreground hover:bg-muted-foreground/10">Cancelar</button>
+                              <button type="button" onClick={() => { setEscalState("hidden"); setEscalError(""); }} className={`text-2xs px-3 py-1.5 rounded-full border ${highContrast ? "border-white/40 text-white hover:bg-white/10" : "border-border text-muted-foreground hover:bg-muted-foreground/10"}`}>Cancelar</button>
                               <button
                                 type="submit"
                                 className="text-2xs px-3.5 py-1.5 rounded-full text-white"
@@ -1036,7 +1042,7 @@ export function PlaygroundTab({
                           </form>
                         )}
                         {escalState === "submitted" && (
-                          <p className="text-success font-medium">✓ Listo. La universidad se pondrá en contacto con usted pronto.</p>
+                          <p className={highContrast ? "text-white font-medium" : "text-success font-medium"}>✓ Listo. La universidad se pondrá en contacto con usted pronto.</p>
                         )}
                       </div>
                     </div>
@@ -1045,8 +1051,8 @@ export function PlaygroundTab({
 
                 {/* CSAT - pantalla única: estrellas + motivos + comentario (paridad con widget real) */}
                 {enableCsat && csatState === "pending" && (
-                  <div className="border-t border-border bg-muted/40 px-3 py-3 shrink-0 flex flex-col items-center gap-2">
-                    <p className="text-xs font-medium text-foreground text-center">
+                  <div className={`border-t px-3 py-3 shrink-0 flex flex-col items-center gap-2 ${highContrast ? "bg-black border-white/40" : "border-border bg-muted/40"}`}>
+                    <p className={`font-medium text-center ${msgScaleClass} ${highContrast ? "text-white" : "text-foreground"}`}>
                       {csatQuestion}
                     </p>
                     <div className="flex items-center justify-between w-full max-w-55">
@@ -1062,7 +1068,7 @@ export function PlaygroundTab({
                         </button>
                       ))}
                     </div>
-                    <div className="flex items-center justify-between w-full text-3xs text-muted-foreground -mt-1">
+                    <div className={`flex items-center justify-between w-full text-3xs -mt-1 ${highContrast ? "text-white/70" : "text-muted-foreground"}`}>
                       <span>Muy disconforme</span>
                       <span>Muy conforme</span>
                     </div>
@@ -1074,7 +1080,9 @@ export function PlaygroundTab({
                             className={`flex items-center gap-2 text-2xs rounded-lg border px-2.5 py-2 cursor-pointer transition-colors ${
                               csatReasons.includes(key)
                                 ? ""
-                                : "border-border bg-background hover:border-muted-foreground/40"
+                                : highContrast
+                                  ? "border-white/40 bg-black text-white hover:border-white/60"
+                                  : "border-border bg-background hover:border-muted-foreground/40"
                             }`}
                             style={csatReasons.includes(key) ? {
                               borderColor: primaryColor,
@@ -1096,7 +1104,7 @@ export function PlaygroundTab({
                       </div>
                     )}
                     <textarea
-                      className="w-full bg-background rounded-lg px-2.5 py-2 text-xs outline-none border border-border resize-none placeholder:text-muted-foreground mt-1 focus:border-(--csat-focus-color)"
+                      className={`w-full rounded-lg px-2.5 py-2 text-xs outline-none border resize-none mt-1 focus:border-(--csat-focus-color) ${highContrast ? "bg-black text-white border-white/40 placeholder:text-white/50" : "bg-background border-border placeholder:text-muted-foreground"}`}
                       placeholder="Cuéntenos su experiencia (opcional)…"
                       maxLength={300}
                       rows={2}
@@ -1105,7 +1113,7 @@ export function PlaygroundTab({
                       style={{ "--csat-focus-color": primaryColor } as React.CSSProperties}
                     />
                     <div className="flex items-center gap-2 self-stretch justify-between">
-                      <button type="button" onClick={() => setCsatState("submitted")} className="text-2xs text-muted-foreground hover:text-foreground">Omitir</button>
+                      <button type="button" onClick={() => setCsatState("submitted")} className={`text-2xs ${highContrast ? "text-white/70 hover:text-white" : "text-muted-foreground hover:text-foreground"}`}>Omitir</button>
                       <button
                         type="button"
                         onClick={() => setCsatState("submitted")}
@@ -1119,20 +1127,20 @@ export function PlaygroundTab({
                   </div>
                 )}
                 {enableCsat && csatState === "submitted" && (
-                  <div className="border-t border-border bg-muted/40 px-3 py-3 shrink-0 flex flex-col items-center gap-1.5">
+                  <div className={`border-t px-3 py-3 shrink-0 flex flex-col items-center gap-1.5 ${highContrast ? "bg-black border-white/40" : "border-border bg-muted/40"}`}>
                     <div className="flex items-center justify-center w-10 h-10 rounded-full border-2 border-success text-success">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} width={22} height={22}>
                         <circle cx="12" cy="12" r="10" />
                         <polyline points="8 12.5 10.8 15.5 16 9" />
                       </svg>
                     </div>
-                    <p className="text-xs font-semibold text-foreground">
+                    <p className={`text-xs font-semibold ${highContrast ? "text-white" : "text-foreground"}`}>
                       ¡Muchas gracias!
                     </p>
                     <button
                       type="button"
                       onClick={resetConversation}
-                      className="text-2xs px-2.5 py-1 rounded border border-border hover:bg-muted-foreground/10 text-foreground"
+                      className={`text-2xs px-2.5 py-1 rounded border ${highContrast ? "border-white/40 text-white hover:bg-white/10" : "border-border hover:bg-muted-foreground/10 text-foreground"}`}
                     >
                       Nueva conversación
                     </button>
