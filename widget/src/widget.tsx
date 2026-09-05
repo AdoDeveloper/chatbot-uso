@@ -556,6 +556,8 @@ function ChatWidget({
   const bottomRef  = useRef<HTMLDivElement>(null);
   const inputRef   = useRef<HTMLTextAreaElement>(null);
   const abortRef   = useRef<AbortController | null>(null);
+  const lastQuestionRef = useRef<string>("");
+  const [networkDown, setNetworkDown] = useState(false);
   const openRef    = useRef(open);
   openRef.current  = open;
   const sendRef    = useRef<() => void>(() => {});
@@ -765,6 +767,19 @@ function ChatWidget({
   useEffect(() => { saveA11yPrefs(apiUrl, a11y); }, [a11y, apiUrl]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    const goOffline = () => setNetworkDown(true);
+    const goOnline = () => setNetworkDown(false);
+    setNetworkDown(navigator.onLine === false);
+    window.addEventListener("offline", goOffline);
+    window.addEventListener("online", goOnline);
+    return () => {
+      window.removeEventListener("offline", goOffline);
+      window.removeEventListener("online", goOnline);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!open) {
       try { window.speechSynthesis?.cancel(); } catch { /* noop */ }
       setSpeakingId(null);
@@ -853,10 +868,11 @@ function ChatWidget({
     }
   }
 
-  async function handleSend() {
-    const q = input.trim();
+  async function handleSend(retryText?: string) {
+    const q = (retryText ?? input).trim();
     if (!q || busy || offlineMode) return;
-    setInput("");
+    if (!retryText) setInput("");
+    lastQuestionRef.current = q;
 
     const userMsg: Message    = { id: uid(), role: "user", content: q, ts: Date.now() };
     const assistantId         = uid();
@@ -867,7 +883,13 @@ function ChatWidget({
       .slice(-10)
       .map((m) => ({ role: m.role, content: m.content }));
 
-    setMessages((prev) => [...prev, userMsg, assistantMsg]);
+    setMessages((prev) => {
+      let base = prev;
+      if (retryText && prev.length >= 2 && prev[prev.length - 1].error) {
+        base = prev.slice(0, -2);
+      }
+      return [...base, userMsg, assistantMsg];
+    });
     setBusy(true);
     emit("message:sent", { text: q, context: contextRef.current });
 
@@ -979,7 +1001,7 @@ function ChatWidget({
           <div class="header-info">
             <span class="header-name">{activeChatbotName}</span>
             <span class="header-status">
-              {offlineMode ? "Sin conexión" : busy ? "Escribiendo…" : "En línea"}
+              {offlineMode || networkDown ? "Sin conexión" : busy ? "Escribiendo…" : "En línea"}
             </span>
           </div>
 
@@ -1260,6 +1282,14 @@ function ChatWidget({
                           ts={msg.ts}
                         />
                       )}
+                      {msg.error && !busy && lastQuestionRef.current && (
+                        <button
+                          class="retry-btn"
+                          onClick={() => handleSend(lastQuestionRef.current)}
+                        >
+                          Reintentar
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1429,7 +1459,7 @@ function ChatWidget({
           />
           <button
             class="send-btn"
-            onClick={handleSend}
+            onClick={() => handleSend()}
             disabled={busy || !input.trim() || offlineMode}
             aria-label="Enviar"
           >

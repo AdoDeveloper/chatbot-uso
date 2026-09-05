@@ -808,6 +808,31 @@ export const STYLES = `
   opacity: 0.9;
 }
 
+.retry-btn {
+  align-self: flex-start;
+  margin-top: 8px;
+  background: none;
+  border: 1px solid var(--color-primary);
+  border-radius: 8px;
+  color: var(--color-primary);
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .retry-btn:hover {
+    background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  }
+}
+
+.panel[data-contrast="high"] .retry-btn {
+  border-color: #000;
+  color: #000;
+}
+
 .proactive-bubble {
   position: absolute;
   bottom: 8px;
