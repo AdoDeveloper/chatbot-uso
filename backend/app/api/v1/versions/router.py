@@ -16,8 +16,6 @@ from app.core.exceptions import NotFoundError
 from app.core.permissions import P
 from app.db.session import get_db
 from app.models.config_version import ConfigVersion
-from app.models.enums import ReviewStatus, SourceStatus
-from app.models.source import Source
 from app.models.user import User
 from app.services.monitoring import versions as svc
 
@@ -56,19 +54,6 @@ class VersionListOut(BaseModel):
 class RollbackResult(BaseModel):
     version: VersionOut
     warnings: list[str]
-
-
-class DeployResult(BaseModel):
-    version: VersionOut
-    pending_sources: int
-
-
-class DeployStatus(BaseModel):
-    last_deployed_at: datetime | None = None
-    last_deployed_version: int | None = None
-    pending_sources: int
-    config_changed_since_deploy: bool
-    never_deployed: bool = False
 
 
 class VersionDiff(BaseModel):
@@ -156,52 +141,6 @@ async def create_version(
     return _to_out(version)
 
 
-@router.get("/deploy/status", response_model=DeployStatus)
-async def deploy_status(
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(_reader),
-):
-    """Devuelve lo que está pendiente desde el último deploy a producción."""
-    from app.services.system.settings import _latest_deploy_version
-    deployed = await _latest_deploy_version(db)
-
-    pending_q = await db.execute(
-        select(sa_func.count(Source.id))
-        .where(Source.status == SourceStatus.ready)
-        .where(Source.review_status == ReviewStatus.pendiente_revision)
-        .where(Source.deleted_at.is_(None))
-    )
-    pending_sources = int(pending_q.scalar_one() or 0)
-
-    if deployed:
-        config_changed = await svc.has_config_changed_since(db, deployed.config_snapshot)
-    else:
-        config_changed = True
-
-    return DeployStatus(
-        last_deployed_at=deployed.created_at if deployed else None,
-        last_deployed_version=deployed.version_number if deployed else None,
-        pending_sources=pending_sources,
-        config_changed_since_deploy=config_changed,
-        never_deployed=deployed is None,
-    )
-
-
-@router.get("/deploy/config")
-async def deploy_config(
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(_reader),
-):
-    from app.services.system.settings import _latest_deploy_version
-    version = await _latest_deploy_version(db)
-    if version is None:
-        return {}
-    snapshot = version.config_snapshot or {}
-    sections = snapshot.get("sections", {})
-    widget = sections.get("widget_config") or snapshot.get("widget_config") or {}
-    return widget
-
-
 @router.get("/{version_id}", response_model=VersionDetailOut)
 async def get_version(
     version_id: uuid.UUID,
@@ -258,46 +197,6 @@ async def diff_version(
         change_summary=version.change_summary,
         sections=diff,
     )
-
-
-@router.post("/deploy", response_model=DeployResult, status_code=status.HTTP_201_CREATED)
-async def deploy(
-    body: VersionCreate,
-    db: AsyncSession = Depends(get_db),
-    user: User = Depends(_admin),
-):
-    pending_q = await db.execute(
-        select(sa_func.count(Source.id))
-        .where(Source.status == SourceStatus.ready)
-        .where(Source.review_status == ReviewStatus.pendiente_revision)
-        .where(Source.deleted_at.is_(None))
-    )
-    pending_sources = int(pending_q.scalar_one() or 0)
-
-    from app.services.system.settings import _latest_deploy_version
-    last_deployed = await _latest_deploy_version(db)
-    if last_deployed and not await svc.has_config_changed_since(db, last_deployed.config_snapshot):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Sin cambios de configuración desde el último despliegue",
-        )
-
-    version = await svc.capture_snapshot(
-        db,
-        user_id=user.id,
-        description=body.description or "Publicación a producción",
-        trigger_source="deploy",
-        force=True,
-    )
-    if not version:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="No se pudo crear la versión de despliegue",
-        )
-    await db.commit()
-    await db.refresh(version)
-    await db.refresh(version, ["created_by"])
-    return DeployResult(version=_to_out(version), pending_sources=pending_sources)
 
 
 @router.post("/{version_id}/rollback", response_model=RollbackResult)

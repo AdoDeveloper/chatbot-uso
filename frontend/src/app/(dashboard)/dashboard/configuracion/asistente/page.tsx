@@ -13,7 +13,7 @@ import { UnderlineTabs } from "@/components/composed/underline-tabs";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import {
- PromptTab, ParamsTab, PlaygroundTab, WidgetTab, FloatingSaveBar, SETTINGS_DEFAULTS, UnpublishedBanner,
+ PromptTab, ParamsTab, PlaygroundTab, WidgetTab, FloatingSaveBar, SETTINGS_DEFAULTS,
 } from "../_lib/tabs";
 
 const TABS = [
@@ -39,8 +39,6 @@ export default function AsistentePage() {
 
   const { data: settings, loading: loadingSettings, refetch: refetchSettings } = useApi<ChatbotSettings>("/settings");
   const { data: widgetConfig, loading: loadingWidget } = useApi<WidgetConfig>("/widget/config");
-  const { data: deployedData, loading: loadingDeployed } = useApi<WidgetConfig>("/versions/deploy/config");
-  const deployedWidgetConfig = deployedData && Object.keys(deployedData).length > 0 ? deployedData : null;
   const loading = loadingSettings;
  const [form, setForm] = useState<ChatbotSettings>(SETTINGS_DEFAULTS);
  const [savedForm, setSavedForm] = useState<ChatbotSettings | null>(null);
@@ -134,7 +132,6 @@ export default function AsistentePage() {
 
  return (
   <div>
-   <UnpublishedBanner />
    <PageHeader
     icon={Bot}
     title="Asistente"
@@ -164,13 +161,10 @@ export default function AsistentePage() {
    />
 
     {tab === "previsualizar" ? (
-      loadingWidget || loadingDeployed ? (
+      loadingWidget ? (
        <Skeleton className="h-[580px] w-full" />
       ) : (
-     <PlaygroundTab
-      widgetConfig={widgetForm ?? widgetConfig}
-      deployedWidgetConfig={deployedWidgetConfig}
-     />
+     <PlaygroundTab widgetConfig={widgetForm ?? widgetConfig} />
       )
     ) : tab === "prompt" ? (
       loadingSettings ? (

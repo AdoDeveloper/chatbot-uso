@@ -183,12 +183,9 @@ async def public_config(
     widget: WidgetConfig = Depends(require_widget_key),
 ):
     response.headers["Cache-Control"] = "no-store"
-    from app.services.monitoring.versions import get_published_widget_config
     from app.services.system.settings import get_runtime_overrides
-    published = await get_published_widget_config(db)
-    source = published if published else widget  # sin deploy previo: usa la config en vivo
 
-    out = WidgetPublicConfigOut.model_validate(source, from_attributes=True)
+    out = WidgetPublicConfigOut.model_validate(widget, from_attributes=True)
     enabled = await csat_reasons_svc.list_reasons(db, only_enabled=True)
     out.csat_reasons = {str(r["id"]): r["label"] for r in enabled}
     overrides = await get_runtime_overrides(db)
@@ -261,8 +258,7 @@ async def public_escalation_contact(
     widget: WidgetConfig = Depends(verify_widget_access),
 ):
     """Registra el consentimiento del usuario para ser contactado."""
-    from app.services.monitoring.versions import get_public_widget_flag
-    if not await get_public_widget_flag(db, widget, "enable_escalation"):
+    if not widget.enable_escalation:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Escalamiento a un humano no habilitado para este widget.",
@@ -282,8 +278,7 @@ async def public_csat(
     widget: WidgetConfig = Depends(verify_widget_access),
 ):
     """Envía una calificación CSAT desde el widget (sin auth de usuario, solo widget key)."""
-    from app.services.monitoring.versions import get_public_widget_flag
-    if not await get_public_widget_flag(db, widget, "enable_csat"):
+    if not widget.enable_csat:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="CSAT no habilitado para este widget.",

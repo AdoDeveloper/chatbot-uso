@@ -8,7 +8,6 @@ import { Mail, Plus, Send, Loader2, Pencil, X, Check, UserRound, Beaker, Trash2,
 import api from "@/lib/api";
 import { useApi, getErrorMessage } from "@/hooks/use-api";
 import { useToast } from "@/components/ui/toast";
-import { UnpublishedBanner } from "../_lib/tabs";
 import type { EscalationRule, EscalationTrigger, RuleTestResult, TriggerSchemaOut } from "@/types";
 import { TRIGGER_LABEL_LONG } from "@/lib/escalation-labels";
 
@@ -237,7 +236,6 @@ export default function EscalamientoConfigPage() {
 
   return (
     <div>
-      <UnpublishedBanner />
       <PageHeader
         icon={UserRound}
         title="Escalamiento"

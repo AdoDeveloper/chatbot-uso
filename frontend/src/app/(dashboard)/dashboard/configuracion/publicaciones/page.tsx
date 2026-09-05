@@ -2,15 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  Rocket, CheckCircle2, AlertTriangle, Clock, FileText,
-  Loader2, Settings2, CheckCheck, Ban, X,
+  Rocket, CheckCircle2, Clock, FileText,
+  Loader2, CheckCheck, Ban, X,
   History, RotateCcw, Save, ChevronDown, ChevronRight,
   Eye, EyeOff, Settings, Cpu, Palette, Bell, Database,
   HelpCircle, Shield, Zap,
 } from "lucide-react";
 import api from "@/lib/api";
 import { useApi, getErrorMessage, invalidateApiCache } from "@/hooks/use-api";
-import { useAuth } from "@/contexts/auth-context";
 import { useToast } from "@/components/ui/toast";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/composed/stat-card";
@@ -27,19 +26,6 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Source } from "@/types";
 import { formatInProjectTz } from "@/lib/datetime";
-
-interface DeployStatus {
-  last_deployed_at: string | null;
-  last_deployed_version: number | null;
-  pending_sources: number;
-  config_changed_since_deploy: boolean;
-  never_deployed: boolean;
-}
-
-interface DeployResult {
-  version: { id: string; version_number: number; description: string; created_at: string };
-  pending_sources: number;
-}
 
 interface VersionOut {
   id: string;
@@ -202,12 +188,9 @@ function PendingSourcesList({
 }
 
 export default function PublicacionesPage() {
-  const { user } = useAuth();
-  const { toast, confirm } = useToast();
-  const canDeploy = !!user;
+  const { toast } = useToast();
 
   const [, setRefreshing] = useState(false);
-  const [deploying, setDeploying] = useState(false);
   const [reviewing, setReviewing] = useState<string | null>(null);
   const [rejectTarget, setRejectTarget] = useState<{ source: Source; reason: string } | null>(null);
 
@@ -223,8 +206,6 @@ export default function PublicacionesPage() {
   const [rolling, setRolling] = useState(false);
   const [rollbackWarnings, setRollbackWarnings] = useState<string[]>([]);
 
-  const { data: status, loading: loadingStatus, error: statusError, refetch: refetchStatus } =
-    useApi<DeployStatus>("/versions/deploy/status");
   const { data: sourcesData, loading: loadingSources, error: sourcesError, refetch: refetchSources, setData: setSources } =
     useApi<Source[]>("/sources");
   const { data: versionsData, loading: loadingVersions, error: versionsError, refetch: refetchVersions } =
@@ -235,9 +216,9 @@ export default function PublicacionesPage() {
     [sourcesData],
   );
   const versions = versionsData?.versions ?? [];
-  const loading = loadingStatus || loadingSources || loadingVersions;
+  const loading = loadingSources || loadingVersions;
 
-  const loadError = statusError || sourcesError || versionsError;
+  const loadError = sourcesError || versionsError;
   useEffect(() => {
     if (loadError) toast({ type: "error", message: "No se pudo cargar el estado de publicaciones." });
   }, [loadError, toast]);
@@ -245,8 +226,8 @@ export default function PublicacionesPage() {
   async function load() {
     setRefreshing(true);
     try {
-      await Promise.all([refetchStatus(), refetchSources(), refetchVersions()]);
-      toast({ type: "success", message: "Publicaciones actualizadas.", duration: 2000 });
+      await Promise.all([refetchSources(), refetchVersions()]);
+      toast({ type: "success", message: "Historial actualizado.", duration: 2000 });
     } finally {
       setRefreshing(false);
     }
@@ -283,33 +264,6 @@ export default function PublicacionesPage() {
     } finally { setReviewing(null); }
   }
 
-  const handleDeploy = async () => {
-    const ok = await confirm({
-      title: "¿Publicar a producción?",
-      message: `Se publicará la configuración actual como la nueva versión de producción.${status?.pending_sources ? ` Hay ${status.pending_sources} fuente(s) pendientes que no estarán disponibles hasta ser aprobadas.` : ""}`,
-      confirmText: "Publicar",
-    });
-    if (!ok) return;
-
-    setDeploying(true);
-    try {
-      const { data } = await api.post<DeployResult>("/versions/deploy", {
-        description: "Publicación a producción",
-      });
-      toast({ type: "success", message: `Versión v${data.version.version_number} publicada correctamente.` });
-      load();
-    } catch (err: unknown) {
-      const httpStatus = (err as { response?: { status?: number } })?.response?.status;
-      if (httpStatus === 409) {
-        toast({ type: "info", message: "La producción ya está al día. No hay cambios que publicar." });
-        load();
-      } else if (httpStatus === 403) {
-        toast({ type: "error", message: "No tiene permisos para publicar." });
-      } else {
-        toast({ type: "error", message: getErrorMessage(err, "No se pudo publicar. Intente nuevamente.") });
-      }
-    } finally { setDeploying(false); }
-  };
 
   async function handleSaveSnapshot() {
     setSaving(true);
@@ -355,64 +309,34 @@ export default function PublicacionesPage() {
     } finally { setRolling(false); }
   }
 
-  const lastDeployedAt = status?.last_deployed_at
-    ? formatInProjectTz(status.last_deployed_at, { dateStyle: "medium", timeStyle: "short" })
-    : null;
-
-  const neverDeployed = !!status?.never_deployed;
-  const hasConfigChanges = !!status?.config_changed_since_deploy;
   const hasPendingSources = pendingSources.length > 0;
 
   const latestDeployId = versions.find((v) => v.is_active)?.id;
-  const displayed = showAllSnapshots ? versions : versions.filter((v) => v.trigger_source === "deploy");
+  const displayed = showAllSnapshots ? versions : versions.slice(0, 10);
   const activeSections = diff ? Object.entries(diff.sections).filter(([, changes]) => changes.length > 0) : [];
 
   return (
     <div className="space-y-6">
       <PageHeader
-        icon={Rocket}
-        title="Publicaciones"
+        icon={History}
+        title="Historial de cambios"
         tip={
           <>
-            Revise los cambios en borrador, apruebe fuentes y publique a producción. El widget
-            siempre usa la última versión publicada; la vista previa refleja la configuración
-            actual en tiempo real. Puede restaurar cualquier versión anterior sin perder los
-            cambios pendientes.
+            La configuración se aplica de inmediato. Aquí queda registrado cada cambio, con
+            su autor y el detalle de lo modificado, y puede restaurar cualquier versión
+            anterior. Las fuentes pendientes requieren aprobación antes de que el chatbot
+            las consulte.
           </>
         }
       />
 
-      {/* Advertencia sin desplegar - el widget usa configuración borrador */}
-      {!loading && neverDeployed && (
-        <Alert variant="warning">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle className="text-sm font-semibold">
-            Sin versión publicada
-          </AlertTitle>
-          <AlertDescription className="text-xs mt-1">
-            El chatbot está usando la configuración actual sin revisión previa.{" "}
-            <strong>Publica la primera versión</strong> para estabilizar el entorno de producción
-            y controlar qué cambios llegan al widget.
-          </AlertDescription>
-        </Alert>
-      )}
-
       {/* Tarjetas de estadísticas */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <StatCard
-          title="Última publicación"
-          value={lastDeployedAt ?? "Nunca publicado"}
-          description={status?.last_deployed_version ? `v${status.last_deployed_version}` : undefined}
+          title="Versiones registradas"
+          value={`${versions.length}`}
           loading={loading}
           compact
-        />
-
-        <StatCard
-          title="Estado"
-          value={neverDeployed ? "Sin publicar" : hasConfigChanges ? "Cambios pendientes" : "Publicado"}
-          valueIcon={neverDeployed || hasConfigChanges ? AlertTriangle : CheckCircle2}
-          accent={neverDeployed || hasConfigChanges ? "amber" : "green"}
-          loading={loading}
         />
 
         <StatCard
@@ -424,39 +348,14 @@ export default function PublicacionesPage() {
         />
       </div>
 
-      {/* Verificación previa */}
+      {/* Revisión de fuentes */}
       <Card>
         <CardHeader className="pb-4 border-b">
-          <CardTitle className="text-15 font-semibold">Validación previa</CardTitle>
-          <p className="text-2xs text-muted-foreground mt-0.5">Revise y apruebe los cambios antes de publicar a producción.</p>
+          <CardTitle className="text-15 font-semibold">Fuentes por aprobar</CardTitle>
+          <p className="text-2xs text-muted-foreground mt-0.5">El chatbot solo consulta las fuentes aprobadas.</p>
         </CardHeader>
 
         {/* Fila de configuración */}
-        <div className="px-5 py-3 border-b border-border/60">
-          <div className="flex items-center gap-3">
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${hasConfigChanges ? "bg-warning/10" : "bg-success/10"}`}>
-              <Settings2 className={`w-4 h-4 ${hasConfigChanges ? "text-warning" : "text-success"}`} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-13 font-medium">Configuración</p>
-              {loading ? <Skeleton className="h-3 w-52 mt-1.5" /> : (
-                <p className="text-2xs text-muted-foreground mt-0.5">
-                  {neverDeployed
-                    ? "Primera publicación · se publicará la configuración inicial del chatbot."
-                    : hasConfigChanges
-                      ? "Hay cambios sin publicar en ajustes del asistente, widget o proveedores LLM."
-                      : "Sin cambios desde la última publicación."}
-                </p>
-              )}
-            </div>
-            {!loading && (
-              <span className={`text-3xs px-2 py-0.5 rounded-full font-medium border shrink-0 ${hasConfigChanges ? "bg-warning/10 text-warning border-warning/30" : "bg-success/10 text-success border-success/30"}`}>
-                {neverDeployed ? "Primera vez" : hasConfigChanges ? "Pendiente" : "Publicado"}
-              </span>
-            )}
-          </div>
-        </div>
-
         {/* Fila de fuentes */}
         <div className="px-5 py-3 border-b border-border/60">
           <div className="flex items-center gap-3 mb-3">
@@ -491,52 +390,6 @@ export default function PublicacionesPage() {
           )}
         </div>
 
-      </Card>
-
-      {/* Acción de publicar */}
-      <Card>
-        <CardHeader className="pb-4 border-b">
-          <CardTitle className="text-15 font-semibold">Publicar versión</CardTitle>
-          <p className="text-2xs text-muted-foreground mt-0.5">
-            El widget activo usará esta versión. La vista previa refleja los cambios en tiempo real.
-          </p>
-        </CardHeader>
-        <CardContent className="pt-5">
-          {loading ? (
-            <Skeleton className="h-9 w-32" />
-          ) : !hasConfigChanges && !neverDeployed ? (
-            <div className="flex items-center justify-between gap-4 flex-wrap">
-              <div className="flex items-center gap-2 text-sm text-success">
-                <CheckCircle2 className="w-4 h-4 shrink-0" />
-                Producción al día, sin cambios pendientes
-              </div>
-              <Button variant="ghost" size="xs" onClick={() => setSnapshotOpen(true)} className="text-muted-foreground shrink-0">
-                <Save /> Guardar punto de restauración
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {hasPendingSources && (
-                <div className="flex items-center gap-2 rounded-lg border border-warning/20 bg-warning/5 px-3.5 py-2.5 text-xs text-warning">
-                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                  {pendingSources.length} fuente(s) aún pendientes de aprobación: no estarán disponibles en producción hasta ser aprobadas arriba
-                </div>
-              )}
-              <div className="flex items-center gap-3 flex-wrap">
-                <Button onClick={handleDeploy} disabled={deploying || !canDeploy} className="gap-1.5">
-                  {deploying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Rocket className="w-4 h-4" />}
-                  {deploying ? "Publicando..." : "Publicar a producción"}
-                </Button>
-                <Button variant="ghost" size="xs" onClick={() => setSnapshotOpen(true)} className="text-muted-foreground">
-                  <Save /> Guardar punto de restauración
-                </Button>
-                {!canDeploy && (
-                  <p className="text-2xs text-muted-foreground">Debe iniciar sesión para publicar.</p>
-                )}
-              </div>
-            </div>
-          )}
-        </CardContent>
       </Card>
 
       {/* Historial */}

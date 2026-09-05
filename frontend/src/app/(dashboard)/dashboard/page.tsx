@@ -55,20 +55,12 @@ export default function DashboardPage() {
    useApi<SecuritySummary>(isAdmin ? "/security/summary?days=7" : null, [isAdmin]);
  const { data: health, loading: loadingHealth } =
    useApi<HealthDetailed>(isAdmin ? "/health/detailed" : null, [isAdmin]);
- const { data: deployStatus, loading: loadingDeploy } =
-  useApi<{
-   last_deployed_at: string | null;
-   pending_sources: number;
-   config_changed_since_deploy: boolean;
-   never_deployed: boolean;
-  }>(isAdmin ? "/versions/deploy/status" : null, [isAdmin]);
-
  const providers = providersData ?? [];
  const sources = sourcesData ?? [];
  const escalations = escalationsData?.items ?? [];
  // Carga granular por sección - cada una se revela de forma independiente al resolverse sus llamadas
  const loadingContent = loadingSources || loadingEscalations;
- const loadingAdmin = loadingProviders || loadingSecurity || loadingHealth || loadingDeploy;
+ const loadingAdmin = loadingProviders || loadingSecurity || loadingHealth;
 
  useEffect(() => {
   if (metricsError) toast({ type: "error", message: "No se pudieron cargar las métricas." });
@@ -118,11 +110,11 @@ export default function DashboardPage() {
     </div>
    )}
 
-   {/* Ciclo de trabajo: documentos → pruebas → publicación */}
+   {/* Ciclo de trabajo: documentos → pruebas */}
    {can(PERM.SYSTEM_MANAGE) && (
     <WorkflowCycle
      providers={providers}
-     deployStatus={deployStatus}
+     pendingSources={sources.filter((x) => x.review_status === "pendiente_revision").length}
      loading={loadingContent || loadingAdmin}
     />
    )}
@@ -448,36 +440,26 @@ function SecurityRow({
  );
 }
 
-type CyclePhase = "docs" | "test" | "deploy";
+type CyclePhase = "docs" | "test";
 type PhaseState = "ok" | "pending" | "unavailable";
 
 function WorkflowCycle({
  providers,
- deployStatus,
+ pendingSources,
  loading,
 }: {
  providers: LLMProvider[];
- deployStatus: {
-  last_deployed_at: string | null;
-  pending_sources: number;
-  config_changed_since_deploy: boolean;
-  never_deployed: boolean;
- } | null;
+ pendingSources: number;
  loading: boolean;
 }) {
  const hasActiveProvider = providers.some((p) => p.is_active && p.priority !== null);
 
  const phaseState: Record<CyclePhase, PhaseState> = {
-  docs:   deployStatus
-   ? (deployStatus.pending_sources > 0 ? "pending" : "ok")
-   : "unavailable",
-  test:   hasActiveProvider ? "ok" : "pending",
-  deploy: deployStatus
-   ? (deployStatus.config_changed_since_deploy || deployStatus.pending_sources > 0 ? "pending" : "ok")
-   : "unavailable",
+  docs: pendingSources > 0 ? "pending" : "ok",
+  test: hasActiveProvider ? "ok" : "pending",
  };
 
- const allOk = !loading && deployStatus && Object.values(phaseState).every((s) => s === "ok");
+ const allOk = !loading && Object.values(phaseState).every((s) => s === "ok");
  const hasPending = Object.values(phaseState).some((s) => s === "pending");
 
  const phases: { key: CyclePhase; label: string; hintOk: string; hintPending: string; href: string }[] = [
@@ -485,7 +467,7 @@ function WorkflowCycle({
    key: "docs",
    label: "Documentos",
    hintOk: "Base de conocimiento al día",
-   hintPending: `${deployStatus?.pending_sources ?? 0} doc${(deployStatus?.pending_sources ?? 0) !== 1 ? "s" : ""} sin publicar`,
+   hintPending: `${pendingSources} doc${pendingSources !== 1 ? "s" : ""} por aprobar`,
    href: "/dashboard/conocimiento/documentos",
   },
   {
@@ -494,15 +476,6 @@ function WorkflowCycle({
    hintOk: "Servicio de IA activo",
    hintPending: "Sin servicio de IA activo",
     href: "/dashboard/configuracion/playground",
-  },
-  {
-   key: "deploy",
-   label: "Publicación",
-   hintOk: deployStatus?.last_deployed_at
-    ? `Publicado ${new Date(deployStatus.last_deployed_at).toLocaleDateString("es", { day: "numeric", month: "short" })}`
-    : "Sin despliegues",
-   hintPending: "Hay cambios sin publicar",
-   href: "/dashboard/configuracion/publicaciones",
   },
  ];
 

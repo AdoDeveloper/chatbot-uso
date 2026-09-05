@@ -19,7 +19,6 @@ import Link from "next/link";
 import api from "@/lib/api";
 import { useApi, getErrorMessage } from "@/hooks/use-api";
 import { useToast } from "@/components/ui/toast";
-import { UnpublishedBanner } from "../_lib/tabs";
 import { FloatingSaveBar } from "../_lib/save-bar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -252,7 +251,6 @@ const KNOWN_PATTERN_CATEGORIES = [
 
   return (
     <div>
-      <UnpublishedBanner />
       <PageHeader
         icon={Shield}
         title="Filtros de seguridad"

@@ -162,10 +162,8 @@ function SourceCard({
 // Tab: Previsualizar
 export function PlaygroundTab({
   widgetConfig,
-  deployedWidgetConfig,
 }: {
   widgetConfig: WidgetConfig | null;
-  deployedWidgetConfig?: WidgetConfig | null;
 }) {
   const { toast } = useToast();
   const { logout } = useAuth();
@@ -315,10 +313,7 @@ export function PlaygroundTab({
     }, 2200);
   }
 
-  const activeWidgetConfig =
-    mode === "deployed" && deployedWidgetConfig
-      ? deployedWidgetConfig
-      : widgetConfig;
+  const activeWidgetConfig = widgetConfig;
 
   const primaryColor = activeWidgetConfig?.primary_color ?? "#1C386D";
   const chatbotName = activeWidgetConfig?.chatbot_name ?? "Asistente";
@@ -659,12 +654,12 @@ export function PlaygroundTab({
         <span className="text-13 font-medium text-foreground">Vista previa</span>
         <div className="ml-auto flex items-center gap-2.5">
           <SegmentedControl
-            ariaLabel="Entorno de vista previa"
+            ariaLabel="Documentos a consultar"
             value={mode}
             onChange={setMode}
             options={[
-              { value: "draft", label: "Pruebas", icon: GitBranch },
-              { value: "deployed", label: "Producción", icon: Rocket },
+              { value: "draft", label: "Todos", icon: GitBranch },
+              { value: "deployed", label: "Aprobados", icon: Rocket },
             ]}
           />
           <Badge
@@ -677,8 +672,8 @@ export function PlaygroundTab({
             }`}
           >
             {mode === "draft"
-              ? "Entorno de pruebas"
-              : "Entorno de producción"}
+              ? "Incluye borradores"
+              : "Solo aprobados"}
           </Badge>
         </div>
       </div>

@@ -124,12 +124,8 @@ async def _run_chat_inner(
     use_draft = is_playground and (request.source_scope != "production")
     cfg = await pipeline.load_chat_config(db, use_draft)
 
-    if use_draft:
-        from app.services.system.settings import get_runtime_overrides
-        overrides = await get_runtime_overrides(db)
-    else:
-        from app.services.system.settings import get_deployed_runtime_overrides
-        overrides = await get_deployed_runtime_overrides(db)
+    from app.services.system.settings import get_runtime_overrides
+    overrides = await get_runtime_overrides(db)
 
     guard_error, request.question = await pipeline.run_input_guardrails(
         db, request.question, client_ip, cfg

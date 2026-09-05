@@ -165,9 +165,9 @@ async def health_detailed(_: object = Depends(_system_read)):
         services.append(ServiceStatus(name="Índice Qdrant↔MySQL", status="error", detail=str(exc)[:128]))
 
     try:
-        from app.services.system.settings import get_deployed_chain
+        from app.services.system.settings import get_active_chain
         async with db_session.AsyncSessionLocal() as db:
-            chain = await get_deployed_chain(db)
+            chain = await get_active_chain(db)
         if chain:
             services.append(ServiceStatus(name="Proveedor LLM", status="ok"))
         else:

@@ -70,52 +70,6 @@ async def get_settings(db: AsyncSession) -> ChatbotSettings:
     return ChatbotSettings(**{k: merged[k] for k in ChatbotSettings.model_fields if k in merged})
 
 
-async def _latest_deploy_version(db: AsyncSession):
-    """Última versión con trigger_source='deploy', o None si no hay ninguna.
-
-    """
-    from app.models.config_version import ConfigVersion
-    version_id = await db.scalar(
-        select(ConfigVersion.id)
-        .where(ConfigVersion.trigger_source == "deploy")
-        .order_by(ConfigVersion.created_at.desc())
-        .limit(1)
-    )
-    if version_id is None:
-        return None
-    return await db.get(ConfigVersion, version_id)
-
-
-async def get_deployed_settings(db: AsyncSession) -> ChatbotSettings:
-    """Lee los ajustes efectivos del último deploy (snapshot de global_settings)."""
-    version = await _latest_deploy_version(db)
-    if version is None:
-        return await get_settings(db)
-    snapshot = version.config_snapshot or {}
-    sections = snapshot.get("sections", {})
-    raw = sections.get("global_settings") or snapshot.get("global_settings") or {}
-    merged = {**_DEFAULTS, **raw}
-    return ChatbotSettings(**{k: merged[k] for k in ChatbotSettings.model_fields if k in merged})
-
-
-async def get_deployed_runtime_overrides(db: AsyncSession) -> dict:
-    """Espejo de get_deployed_settings() para las claves de RUNTIME_DEFAULTS
-    (guardrails_enabled, max_input_chars, etc.).
-    """
-    version = await _latest_deploy_version(db)
-    if version is None:
-        return await get_runtime_overrides(db)
-    snapshot = version.config_snapshot or {}
-    sections = snapshot.get("sections", {})
-    raw = sections.get("global_settings") or snapshot.get("global_settings") or {}
-    effective = dict(RUNTIME_DEFAULTS)
-    for key, default in effective.items():
-        if key in raw and raw[key] is not None:
-            value = raw[key]
-            effective[key] = value if isinstance(value, type(default)) else type(default)(value)
-    return effective
-
-
 async def update_settings(db: AsyncSession, data: ChatbotSettings, user_id: uuid.UUID) -> ChatbotSettings:
     # El auto-snapshot lo maneja VersioningMiddleware (después de la respuesta)
     for key, value in data.model_dump().items():
@@ -249,50 +203,6 @@ async def _safe_decrypt(encrypted: str | None, provider_name: str = "?") -> str 
         log.warning("settings.decrypt_key_failed", provider=provider_name,
                     hint="Re-save the API key in Configuración → Proveedores")
         return None
-
-
-async def get_deployed_chain(db: AsyncSession) -> list[tuple[LLMProvider, str | None]]:
-    """Cadena de proveedores según el último snapshot de deploy.
-
-    Lee qué proveedores estaban activos y en qué prioridad al momento del
-    último deploy. Las API keys se obtienen del registro vivo en DB (no del
-    snapshot, donde están enmascaradas). Si un proveedor fue eliminado de DB
-    después del deploy se omite; si la key no puede descifrarse también.
-
-    Fallback: si no hay ningún deploy previo, delega a get_active_chain().
-    """
-    version = await _latest_deploy_version(db)
-    if version is None:
-        return await get_active_chain(db)
-
-    snapshot = version.config_snapshot or {}
-    sections = snapshot.get("sections", {})
-    snap_providers = [
-        p for p in sections.get("llm_providers", [])
-        if p.get("is_active") and p.get("priority") is not None
-    ]
-    if not snap_providers:
-        return []
-
-    snap_providers.sort(key=lambda p: p["priority"])
-    snap_ids = [uuid.UUID(p["id"]) for p in snap_providers]
-
-    db_result = await db.execute(
-        select(LLMProvider).where(LLMProvider.id.in_(snap_ids))
-    )
-    db_map = {str(p.id): p for p in db_result.scalars().all()}
-
-    chain = []
-    for snap in snap_providers:
-        p = db_map.get(snap["id"])
-        if p is None:
-            log.warning("settings.deployed_provider_missing", provider_id=snap["id"], name=snap.get("name"))
-            continue
-        key = await _safe_decrypt(p.api_key_encrypted, p.name)
-        if p.api_key_encrypted and key is None:
-            continue  # key cifrada con SECRET_KEY distinto - saltar
-        chain.append((p, key))
-    return chain
 
 
 async def get_active_chain(db: AsyncSession) -> list[tuple[LLMProvider, str | None]]:
