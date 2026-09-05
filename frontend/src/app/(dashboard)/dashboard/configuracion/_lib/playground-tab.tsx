@@ -642,7 +642,7 @@ export function PlaygroundTab({
                     <button
                       type="button"
                       onClick={() => setKebabOpen((v) => !v)}
-                      className="w-7 h-7 flex items-center justify-center rounded text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+                      className="w-7 h-7 flex items-center justify-center rounded text-white hover:bg-white/10 transition-colors"
                       aria-label="Más opciones"
                       aria-expanded={kebabOpen}
                       aria-haspopup="menu"
@@ -674,7 +674,7 @@ export function PlaygroundTab({
                   <button
                     type="button"
                     onClick={() => setWidgetOpen(false)}
-                    className="w-7 h-7 flex items-center justify-center rounded text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+                    className="w-7 h-7 flex items-center justify-center rounded text-white hover:bg-white/10 transition-colors"
                     title="Cerrar"
                     aria-label="Cerrar"
                   >

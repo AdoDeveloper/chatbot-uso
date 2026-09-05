@@ -162,13 +162,13 @@ export const STYLES = `
 .header-btn {
   background: none;
   border: none;
-  color: rgba(255,255,255,0.75);
+  color: #fff;
   cursor: pointer;
   font-size: 18px;
   line-height: 1;
   padding: 4px 7px;
   border-radius: 6px;
-  transition: color 0.15s, background 0.15s;
+  transition: background 0.15s;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -178,14 +178,7 @@ export const STYLES = `
 
 .close-btn:hover,
 .header-btn:hover {
-  color: #fff;
   background: rgba(255,255,255,0.15);
-}
-
-/* El botón de vaciar es secundario al de cerrar - un toque más sutil. */
-.header-btn {
-  margin-right: 2px;
-  opacity: 0.85;
 }
 
 /* ── Área de mensajes ───────────────────────────────────────────────────── */
@@ -746,7 +739,10 @@ export const STYLES = `
   border: 1px solid #e5e7eb;
   border-radius: 10px;
   box-shadow: 0 4px 16px rgba(0,0,0,0.12);
-  min-width: 180px;
+  /* 180px no alcanzaba para "Nueva conversación" (ítem más largo) sin
+     partirse en dos líneas junto al ícono - se ajusta al ancho real del
+     contenido en vez de forzar un mínimo fijo insuficiente. */
+  width: max-content;
   overflow: hidden;
   z-index: 10;
   animation: kebab-in 0.14s ease;
@@ -771,6 +767,7 @@ export const STYLES = `
   color: #374151;
   cursor: pointer;
   text-align: left;
+  white-space: nowrap;
   transition: background 0.12s;
 }
 
