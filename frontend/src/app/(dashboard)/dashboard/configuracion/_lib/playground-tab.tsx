@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import {
   Loader2, Send, RotateCcw, FileText, Copy, Check, X, Bot,
   ThumbsUp, ThumbsDown, GitBranch, Rocket, Globe, Zap,
-  MessageSquare, Monitor, MoreVertical, Volume2, Square, Accessibility, LogOut,
+  MessageSquare, Monitor, List, Volume2, Square, Accessibility, LogOut,
 } from "lucide-react";
 import api, { tokenStore } from "@/lib/api";
 import { getErrorMessage } from "@/hooks/use-api";
@@ -703,7 +703,7 @@ export function PlaygroundTab({
                       aria-expanded={kebabOpen}
                       aria-haspopup="menu"
                     >
-                      <MoreVertical className="w-5 h-5" />
+                      <List className="w-5 h-5" />
                     </button>
                     {kebabOpen && (
                       <div role="menu" className="absolute right-0 top-7 z-10 min-w-[170px] bg-popover border border-border rounded-lg shadow-lg py-1 text-foreground">

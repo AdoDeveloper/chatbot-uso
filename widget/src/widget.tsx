@@ -217,7 +217,16 @@ function loadHistory(apiUrl: string, apiKey: string): {
     const parsed = JSON.parse(raw) as PersistedHistory;
     if (parsed.v !== STORAGE_VERSION || !Array.isArray(parsed.messages)) return null;
     return {
-      messages: parsed.messages.map((m) => ({ ...m, streaming: false, error: false })),
+      // `ts` es posterior al formato original del historial: los mensajes
+      // guardados antes no lo traen y se quedaban sin hora al restaurarlos.
+      // Se rellenan con updatedAt (lo mas cercano que se guardo de cuando
+      // ocurrio la conversacion) en vez de dejarlos en blanco.
+      messages: parsed.messages.map((m) => ({
+        ...m,
+        streaming: false,
+        error: false,
+        ts: m.ts ?? parsed.updatedAt,
+      })),
       conversationId: parsed.conversationId ?? null,
       escalState: parsed.escalState ?? "hidden",
       escalConvId: parsed.escalConvId ?? null,
@@ -1051,7 +1060,7 @@ function ChatWidget({
             </span>
           </div>
 
-          {/* Menú kebab (⋮) - agrupa "Nueva conversación" y "Finalizar chat" */}
+          {/* Menú de opciones - agrupa "Nueva conversación" y "Finalizar chat" */}
           {hasKebabActions && (
             <div class="kebab-wrapper" ref={kebabRef}>
               <button
@@ -1062,10 +1071,13 @@ function ChatWidget({
                 aria-expanded={kebabOpen}
                 aria-haspopup="menu"
               >
-                <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-                  <circle cx="12" cy="5"  r="1.7" />
-                  <circle cx="12" cy="12" r="1.7" />
-                  <circle cx="12" cy="19" r="1.7" />
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+                  <path d="M3 5h.01" />
+                  <path d="M3 12h.01" />
+                  <path d="M3 19h.01" />
+                  <path d="M8 5h13" />
+                  <path d="M8 12h13" />
+                  <path d="M8 19h13" />
                 </svg>
               </button>
               {kebabOpen && (
