@@ -309,6 +309,17 @@ interface Message {
   streaming?: boolean;
   error?: boolean;
   backendId?: string;
+  /** Epoch ms del turno; se persiste para que la hora sobreviva a recargas. */
+  ts?: number;
+}
+
+function formatTime(ts?: number): string {
+  if (!ts) return "";
+  try {
+    // hour12:false fuerza 24h: con el default del locale (es-419 y varios
+    // mas) salia "08:51 a. m.", demasiado largo junto a los iconos.
+    return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+  } catch { return ""; }
 }
 
 interface WidgetSettings {
@@ -378,9 +389,9 @@ function Sources({ sources }: { sources: SourceChunk[] }) {
   );
 }
 
-function MessageActions({ content, backendId, conversationId, apiUrl, apiKey, settings, ttsSupported, isSpeaking, onSpeak }: {
+function MessageActions({ content, backendId, conversationId, apiUrl, apiKey, settings, ttsSupported, isSpeaking, onSpeak, ts }: {
   content: string; backendId?: string; conversationId?: string | null; apiUrl: string; apiKey: string; settings: WidgetSettings;
-  ttsSupported?: boolean; isSpeaking?: boolean; onSpeak?: () => void;
+  ttsSupported?: boolean; isSpeaking?: boolean; onSpeak?: () => void; ts?: number;
 }) {
   const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState<"positive" | "negative" | null>(null);
@@ -404,7 +415,8 @@ function MessageActions({ content, backendId, conversationId, apiUrl, apiKey, se
     } catch { /* fire and forget */ }
   }
 
-  if (!settings.enable_copy_action && !settings.enable_feedback_icons && !ttsSupported) return null;
+  const time = formatTime(ts);
+  if (!settings.enable_copy_action && !settings.enable_feedback_icons && !ttsSupported && !time) return null;
 
   return (
     <div class="msg-actions">
@@ -436,6 +448,38 @@ function MessageActions({ content, backendId, conversationId, apiUrl, apiKey, se
           </button>
         </>
       )}
+      {time && <span class="msg-time">{time}</span>}
+    </div>
+  );
+}
+
+/** Acciones bajo el mensaje del usuario: copiar (si el panel lo habilita) y hora. */
+function UserMessageActions({ content, settings, ts }: {
+  content: string; settings: WidgetSettings; ts?: number;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopy() {
+    try { await navigator.clipboard.writeText(content); } catch { /* ignore */ }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  const time = formatTime(ts);
+  if (!settings.enable_copy_action && !time) return null;
+
+  return (
+    <div class="msg-actions msg-actions-user">
+      {settings.enable_copy_action && (
+        <button class={`action-btn ${copied ? "action-active" : ""}`} onClick={handleCopy} title="Copiar" aria-label="Copiar mensaje">
+          {copied ? (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><polyline points="20 6 9 17 4 12"/></svg>
+          ) : (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          )}
+        </button>
+      )}
+      {time && <span class="msg-time">{time}</span>}
     </div>
   );
 }
@@ -492,7 +536,7 @@ function ChatWidget({
   const [messages, setMessages]                 = useState<Message[]>(() => {
     const persisted = initialHistoryRef.current;
     if (persisted && persisted.messages.length > 0) return persisted.messages;
-    return [{ id: uid(), role: "assistant", content: welcomeMessage }];
+    return [{ id: uid(), role: "assistant", content: welcomeMessage, ts: Date.now() }];
   });
   const [input, setInput]     = useState("");
   const [busy, setBusy]       = useState(false);
@@ -737,7 +781,7 @@ function ChatWidget({
     abortRef.current = null;
     clearHistory(apiUrl, apiKey);
     resetSessionId(apiUrl, apiKey);
-    setMessages([{ id: uid(), role: "assistant", content: activeWelcome }]);
+    setMessages([{ id: uid(), role: "assistant", content: activeWelcome, ts: Date.now() }]);
     setBusy(false);
     setCsatState("hidden");
     setCsatScore(null);
@@ -875,7 +919,7 @@ function ChatWidget({
     if (!q || busy || offlineMode) return;
     setInput("");
 
-    const userMsg: Message    = { id: uid(), role: "user", content: q };
+    const userMsg: Message    = { id: uid(), role: "user", content: q, ts: Date.now() };
     const assistantId         = uid();
     const assistantMsg: Message = { id: assistantId, role: "assistant", content: "", streaming: true };
 
@@ -918,7 +962,7 @@ function ChatWidget({
           let finalText = "";
           setMessages((prev) => {
             const updated = prev.map((m) =>
-              m.id === assistantId ? { ...m, streaming: false, backendId: messageId } : m,
+              m.id === assistantId ? { ...m, streaming: false, backendId: messageId, ts: Date.now() } : m,
             );
             finalText = updated.find((m) => m.id === assistantId)?.content ?? "";
             return updated;
@@ -940,7 +984,7 @@ function ChatWidget({
           setMessages((prev) =>
             prev.map((m) =>
               m.id === assistantId
-                ? { ...m, content: msg, streaming: false, error: true }
+                ? { ...m, content: msg, streaming: false, error: true, ts: Date.now() }
                 : m,
             ),
           );
@@ -1033,7 +1077,7 @@ function ChatWidget({
                     </button>
                   )}
                   {settings.enable_accessibility !== false && (
-                    <button class="kebab-item" role="menuitem" onClick={() => { setA11yOpen(true); setKebabOpen(false); }}>
+                    <button class="kebab-item" role="menuitem" aria-expanded={a11yOpen} onClick={() => { setA11yOpen((v) => !v); setKebabOpen(false); }}>
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
                         <circle cx="16" cy="4" r="1" />
                         <path d="m18 19 1-7-6 1" />
@@ -1253,29 +1297,35 @@ function ChatWidget({
                       <BotIcon size={14} logoUrl={logoUrl} />
                     </div>
                   )}
-                  <div class={`msg msg-${msg.role}`}>
-                    {msg.role === "user" ? (
-                      <span class="user-text">{msg.content}</span>
-                    ) : (
-                      <>
-                        <MarkdownContent content={msg.content} streaming={msg.streaming} />
-                        {settings.show_sources && msg.sources && <Sources sources={msg.sources} />}
-                        {!msg.streaming && !msg.error && msg.content && (
-                          <MessageActions
-                            content={msg.content}
-                            backendId={msg.backendId}
-                            conversationId={conversationId}
-                            apiUrl={apiUrl}
-                            apiKey={apiKey}
-                            settings={settings}
-                            ttsSupported={ttsSupported}
-                            isSpeaking={speakingId === msg.id}
-                            onSpeak={() => speakMessage(msg.id, msg.content)}
-                          />
-                        )}
-                      </>
-                    )}
-                  </div>
+                  {msg.role === "user" ? (
+                    /* Las acciones del usuario van FUERA de la burbuja (debajo):
+                       dentro quedarían sobre el color sólido de la burbuja. */
+                    <div class="msg-user-col">
+                      <div class="msg msg-user">
+                        <span class="user-text">{msg.content}</span>
+                      </div>
+                      <UserMessageActions content={msg.content} settings={settings} ts={msg.ts} />
+                    </div>
+                  ) : (
+                    <div class="msg msg-assistant">
+                      <MarkdownContent content={msg.content} streaming={msg.streaming} />
+                      {settings.show_sources && msg.sources && <Sources sources={msg.sources} />}
+                      {!msg.streaming && !msg.error && msg.content && (
+                        <MessageActions
+                          content={msg.content}
+                          backendId={msg.backendId}
+                          conversationId={conversationId}
+                          apiUrl={apiUrl}
+                          apiKey={apiKey}
+                          settings={settings}
+                          ttsSupported={ttsSupported}
+                          isSpeaking={speakingId === msg.id}
+                          onSpeak={() => speakMessage(msg.id, msg.content)}
+                          ts={msg.ts}
+                        />
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
 

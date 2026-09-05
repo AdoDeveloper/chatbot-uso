@@ -32,6 +32,16 @@ interface Message {
   feedback?: "positive" | "negative";
   sources?: { source: string; score: number; text: string }[];
   copied?: boolean;
+  /** Epoch ms del turno, para mostrar la hora bajo el mensaje. */
+  ts?: number;
+}
+
+function formatTime(ts?: number): string {
+  if (!ts) return "";
+  try {
+    // hour12:false: mismo formato compacto de 24h que el widget real.
+    return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+  } catch { return ""; }
 }
 
 type PlaygroundMode = "draft" | "deployed";
@@ -373,6 +383,20 @@ export function PlaygroundTab({
     }
   }
 
+  /* Los mensajes del usuario no tienen `id` (solo lo trae el backend para los
+     del asistente), asi que el estado "copiado" se marca por indice. */
+  async function copyUserMessage(index: number, content: string) {
+    try {
+      await navigator.clipboard.writeText(content);
+      setMessages((prev) => prev.map((m, i) => (i === index ? { ...m, copied: true } : m)));
+      setTimeout(() => {
+        setMessages((prev) => prev.map((m, i) => (i === index ? { ...m, copied: false } : m)));
+      }, 1500);
+    } catch {
+      /* clipboard blocked */
+    }
+  }
+
   async function handleFeedback(msgId: string, value: "positive" | "negative") {
     try {
       await api.patch(`/conversations/messages/${msgId}/feedback`, {
@@ -392,7 +416,7 @@ export function PlaygroundTab({
 
     // Simulación visual del prompt de escalamiento; no despacha nada al backend.
     if (enableEscalation && escalState === "hidden" && /humano|persona|agente|asesor|alguien real/i.test(q)) {
-      setMessages((prev) => [...prev, { role: "user", content: q }]);
+      setMessages((prev) => [...prev, { role: "user", content: q, ts: Date.now() }]);
       setInput("");
       setEscalState("prompt");
       return;
@@ -402,7 +426,7 @@ export function PlaygroundTab({
       .slice(-10)
       .map((m) => ({ role: m.role, content: m.content }));
 
-    setMessages((prev) => [...prev, { role: "user", content: q }]);
+    setMessages((prev) => [...prev, { role: "user", content: q, ts: Date.now() }]);
     setInput("");
     setLoading(true);
     setLastSources([]);
@@ -456,7 +480,7 @@ export function PlaygroundTab({
         const msg = event.message ?? "Error desconocido";
         setMessages((prev) => {
           const u = [...prev];
-          u[u.length - 1] = { role: "assistant", content: msg };
+          u[u.length - 1] = { role: "assistant", content: msg, ts: Date.now() };
           return u;
         });
       } else {
@@ -475,6 +499,7 @@ export function PlaygroundTab({
             content: event.content ?? "",
             sources: mapped,
             id: event.message_id,
+            ts: Date.now(),
           };
           return u;
         });
@@ -685,7 +710,7 @@ export function PlaygroundTab({
                           </button>
                         )}
                         {enableAccessibility && (
-                          <button type="button" role="menuitem" onClick={() => { setA11yOpen(true); setKebabOpen(false); }} className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-muted-foreground/10 text-left">
+                          <button type="button" role="menuitem" aria-expanded={a11yOpen} onClick={() => { setA11yOpen((v) => !v); setKebabOpen(false); }} className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-muted-foreground/10 text-left">
                             <Accessibility className="w-3.5 h-3.5" /> Accesibilidad
                           </button>
                         )}
@@ -919,11 +944,11 @@ export function PlaygroundTab({
                           </div>
                         )}
 
-                      {/* Copy + feedback */}
+                      {/* Copy + feedback + hora */}
                       {msg.role === "assistant" &&
                         msg.id &&
                         msg.content &&
-                        (ttsSupported || enableCopyAction || enableFeedbackIcons) && (
+                        (ttsSupported || enableCopyAction || enableFeedbackIcons || !!msg.ts) && (
                           <div
                             className={`flex items-center gap-0.5 ${showBotIcon ? "pl-7" : "pl-1"}`}
                           >
@@ -991,8 +1016,39 @@ export function PlaygroundTab({
                                 </button>
                               </>
                             )}
+                            {msg.ts && (
+                              <span className={`text-3xs whitespace-nowrap px-1 ${highContrast ? "text-white/70" : "text-muted-foreground/70"}`}>
+                                {formatTime(msg.ts)}
+                              </span>
+                            )}
                           </div>
                         )}
+
+                      {/* Copiar + hora bajo el mensaje del usuario */}
+                      {msg.role === "user" && msg.content && (enableCopyAction || !!msg.ts) && (
+                        <div className="flex items-center gap-0.5 justify-end pr-1">
+                          {enableCopyAction && (
+                            <button
+                              type="button"
+                              onClick={() => copyUserMessage(i, msg.content)}
+                              className="p-1.5 -m-1 rounded text-muted-foreground/60 hover:text-foreground hover:bg-muted-foreground/10 transition-colors"
+                              title={msg.copied ? "Copiado" : "Copiar"}
+                              aria-label="Copiar mensaje"
+                            >
+                              {msg.copied ? (
+                                <Check className="w-3.5 h-3.5 text-brand-green" />
+                              ) : (
+                                <Copy className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          )}
+                          {msg.ts && (
+                            <span className={`text-3xs whitespace-nowrap px-1 ${highContrast ? "text-white/70" : "text-muted-foreground/70"}`}>
+                              {formatTime(msg.ts)}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
 

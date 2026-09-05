@@ -586,14 +586,45 @@ export const STYLES = `
 
 .msg-actions {
   display: flex;
+  align-items: center;
   gap: 2px;
   margin-top: 6px;
-  opacity: 0;
-  transition: opacity 0.15s ease;
 }
 
-.msg-assistant:hover .msg-actions {
-  opacity: 1;
+/* Aparecer al pasar el puntero solo donde hay puntero: en tactil no existe
+   hover, y las acciones (y la hora) quedaban invisibles salvo por el hover
+   "pegado" tras tocar la burbuja - de ahi que se vieran de forma
+   intermitente en el telefono. */
+@media (hover: hover) {
+  .msg-actions {
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+  .msg-assistant:hover .msg-actions,
+  .msg-actions:focus-within,
+  .msg-user-col:hover .msg-actions-user {
+    opacity: 1;
+  }
+}
+
+/* Columna del mensaje del usuario: burbuja arriba, acciones + hora debajo,
+   alineadas a la derecha como la propia burbuja. */
+.msg-user-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 0;
+}
+
+.msg-actions-user {
+  justify-content: flex-end;
+}
+
+.msg-time {
+  font-size: 10.5px;
+  color: #9ca3af;
+  white-space: nowrap;
+  margin-left: 4px;
 }
 
 .action-btn {
@@ -962,8 +993,10 @@ export const STYLES = `
   transition: border-color 0.12s, background 0.12s;
 }
 
-.csat-reason-item:hover {
-  border-color: #d1d5db;
+@media (hover: hover) {
+  .csat-reason-item:not(.csat-reason-item-checked):hover {
+    border-color: #d1d5db;
+  }
 }
 
 .csat-reason-item-checked {
@@ -1428,12 +1461,28 @@ export const STYLES = `
 /* Alto contraste: enmarca las burbujas de chat y refuerza el texto, sin
    cambiar el fondo general del panel - más discreto, mantiene la apariencia
    base del widget en vez de convertirlo en un panel oscuro aparte. */
+/* Burbuja del bot en negativo (fondo negro, texto blanco), igual que el
+   previsualizador: sobre gris claro el contraste real era ~12:1, aqui es
+   21:1, el maximo posible. Solo la burbuja, no el fondo del panel. */
 .panel[data-contrast="high"] .md {
-  background: #e5e7eb;
-  color: #000;
-  border: 1px solid #6b7280;
+  background: #000;
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.4);
+}
+.panel[data-contrast="high"] .md a { color: #93c5fd; }
+.panel[data-contrast="high"] .md code,
+.panel[data-contrast="high"] .md pre {
+  background: #1f2937;
+  color: #fff;
+}
+.panel[data-contrast="high"] .md th,
+.panel[data-contrast="high"] .md td { border-color: rgba(255,255,255,0.4); }
+.panel[data-contrast="high"] .md blockquote {
+  border-left-color: rgba(255,255,255,0.5);
+  color: #e5e7eb;
 }
 .panel[data-contrast="high"] .messages { color: #000; }
+.panel[data-contrast="high"] .msg-time { color: #000; }
 
 .panel[data-contrast="high"] .escal-card {
   border: 2px solid #000;
@@ -1566,7 +1615,13 @@ export const STYLES = `
   align-items: center;
   justify-content: center;
 }
-.a11y-scale-btn:hover { background: #f3f4f6; }
+/* El hover solo aplica a punteros reales y nunca al botón ya seleccionado:
+   en táctil el :hover queda "pegado" tras el toque, y siendo más específico
+   (clase + pseudo-clase) que .a11y-scale-active pintaba gris encima del
+   color activo - el botón parecía no cambiar de estado al tocarlo. */
+@media (hover: hover) {
+  .a11y-scale-btn:not(.a11y-scale-active):hover { background: #f3f4f6; }
+}
 .a11y-scale-active {
   border-color: var(--color-primary);
   background: var(--color-primary);
