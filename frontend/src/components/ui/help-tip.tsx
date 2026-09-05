@@ -56,10 +56,9 @@ export function HelpTip({
   }, [open]);
 
   // El popover se posiciona con CSS puro (left-0/right-0) relativo al botón
-  // ⓘ - si el trigger está cerca de un borde de pantalla, un panel de w-72
-  // (288px) fácilmente se sale del viewport en mobile. Corregimos midiendo
-  // el overflow real tras montar y aplicando un translateX de vuelta a
-  // pantalla, igual que en el dropdown de notificaciones.
+  // ⓘ, así que cerca de un borde de pantalla un panel de w-72 (288px) se sale
+  // del viewport en mobile: se mide el overflow real tras montar y se aplica
+  // un translateX de vuelta a pantalla.
   React.useLayoutEffect(() => {
     if (!open || !popRef.current) { setShift(0); return; }
     const rect = popRef.current.getBoundingClientRect();

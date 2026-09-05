@@ -1,29 +1,3 @@
-/**
- * Chatbot Widget - Preact + Shadow DOM
- *
- * Atributos del script tag (auto-init):
- *   data-api-url="..."            - URL del backend
- *   data-api-key="..."            - API key del widget
- *   data-chatbot-name="..."       - nombre del bot
- *   data-greeting-message="..."  - mensaje de bienvenida
- *   data-open-on-load="true"      - abre el panel al cargar
- *   data-suggestions="a,b,c"     - sugerencias iniciales (CSV o JSON array)
- *   data-proactive-message="..."  - burbuja flotante sobre el launcher
- *   data-position="bottom-right"  - esquina del widget (valor inicial; se
- *                                    reemplaza por el de /widget/public/config
- *                                    en cuanto llega la respuesta)
- *   data-show-bot-icon="false"    - ocultar icono SVG del bot (idem, valor
- *                                    inicial hasta que llega la config real)
- *   data-launcher-label="..."     - etiqueta junto al launcher (opcional)
- *
- * API programática (window.UsoBot):
- *   open() / close() / toggle() / isOpen()
- *   showNewMessage(text) / startConversation(text)
- *   setContext(meta)
- *   on(event, fn) / off(event, fn)
- *   Eventos: 'open' | 'close' | 'message:sent' | 'message:received' | 'ready'
- */
-
 import { render } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { marked } from "marked";
@@ -32,7 +6,6 @@ import { streamChat, SERVICE_UNAVAILABLE_MESSAGE } from "./chat";
 import type { SourceChunk, ChatHistoryMessage } from "./chat";
 import { STYLES } from "./styles";
 
-// Mitigación de reverse tabnabbing: todo <a target> recibe rel="noopener noreferrer nofollow".
 DOMPurify.addHook("afterSanitizeAttributes", (node) => {
   if (node.tagName === "A" && node.hasAttribute("target")) {
     node.setAttribute("rel", "noopener noreferrer nofollow");
@@ -106,13 +79,10 @@ function createController(): WidgetController {
 if (typeof window !== "undefined" && !window.__USOBOT__) {
   const ctrl = createController();
   window.__USOBOT__ = ctrl;
-  // Alias para integraciones existentes que referencian window.UsoBot.
+
   Object.defineProperty(window, "UsoBot", { value: ctrl, writable: false, configurable: true });
 }
 
-// El renderer de marked es global y no recibe props, así que el origen del
-// backend se guarda aquí: las rutas relativas de las imágenes apuntan a los
-// archivos servidos por el backend, no al sitio que embebe el widget.
 let _assetBase = "";
 export function setAssetBase(url: string): void {
   _assetBase = (url || "").replace(/\/+$/, "");
@@ -184,9 +154,7 @@ interface PersistedHistory {
   messages: Message[];
   updatedAt: number;
   conversationId?: string | null;
-  // Estado de la tarjeta de escalación pendiente: sin esto, cerrar o recargar
-  // el widget mientras el formulario de contacto está abierto lo hace
-  // desaparecer sin aviso, aunque el backend siga esperando el consentimiento.
+
   escalState?: "hidden" | "prompt" | "form";
   escalConvId?: string | null;
 }
@@ -217,14 +185,6 @@ function loadHistory(apiUrl: string, apiKey: string): {
     const parsed = JSON.parse(raw) as PersistedHistory;
     if (parsed.v !== STORAGE_VERSION || !Array.isArray(parsed.messages)) return null;
     return {
-      // `ts` es posterior al formato original del historial: los mensajes
-      // guardados antes no lo traen y se quedaban sin hora al restaurarlos.
-      // Se rellenan con updatedAt (lo mas cercano que se guardo de cuando
-      // ocurrio la conversacion) en vez de dejarlos en blanco.
-      // Los ids se reasignan al restaurar. Un historial guardado por una
-      // version anterior trae ids del contador viejo ("1", "2", ...), que
-      // uid() ya no emite pero que quedarian conviviendo con los nuevos;
-      // reasignarlos garantiza que todos provengan del mismo generador.
       messages: parsed.messages.map((m) => ({
         ...m,
         id: uid(),
@@ -249,8 +209,7 @@ function saveHistory(
     const clean = messages
       .filter((m) => !m.streaming && !m.error && m.content.trim().length > 0)
       .slice(-MAX_PERSISTED_MESSAGES);
-    // "submitted"/"continue"/"error" no son estados recuperables (son
-    // transitorios de una sola interacción): se persisten como "hidden".
+
     const persistableEscalState = (escalState === "prompt" || escalState === "form") ? escalState : "hidden";
     const payload: PersistedHistory = {
       v: STORAGE_VERSION, messages: clean, updatedAt: Date.now(), conversationId,
@@ -285,8 +244,6 @@ function resetSessionId(apiUrl: string, apiKey: string): void {
   try { window.localStorage.removeItem(`${storageKey(apiUrl, apiKey)}:sid`); } catch { /* ignore */ }
 }
 
-// Preferencias de accesibilidad - persistidas por navegador. Se guardan
-// aparte del historial para que sobrevivan a "nueva conversación".
 type TextScale = "sm" | "md" | "lg";
 interface A11yPrefs { textScale: TextScale; highContrast: boolean; }
 const A11Y_DEFAULTS: A11yPrefs = { textScale: "md", highContrast: false };
@@ -323,15 +280,13 @@ interface Message {
   streaming?: boolean;
   error?: boolean;
   backendId?: string;
-  /** Epoch ms del turno; se persiste para que la hora sobreviva a recargas. */
+
   ts?: number;
 }
 
 function formatTime(ts?: number): string {
   if (!ts) return "";
   try {
-    // hour12:false fuerza 24h: con el default del locale (es-419 y varios
-    // mas) salia "08:51 a. m.", demasiado largo junto a los iconos.
     return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
   } catch { return ""; }
 }
@@ -351,18 +306,6 @@ interface WidgetSettings {
   max_input_chars: number;
 }
 
-/* Antes era un contador en memoria ("1", "2", ...) que reiniciaba en cada
-   carga mientras el historial restaurado conservaba esos mismos ids: el
-   primer mensaje nuevo colisionaba con uno viejo y, como el streaming
-   localiza su burbuja por `m.id === assistantId`, la respuesta del bot se
-   escribia dentro del mensaje del usuario que compartia id.
-
-   crypto.randomUUID() es la via estandar, pero solo existe en contexto
-   seguro (HTTPS o localhost) y el widget se embebe en sitios de terceros
-   que podrian servirse por HTTP plano; ahi la API es undefined mientras
-   crypto.getRandomValues() si sigue disponible, de modo que ese es el
-   primer respaldo. Math.random queda como ultimo recurso: no es
-   criptografico, pero para distinguir burbujas en pantalla basta. */
 function uid(): string {
   try {
     if (typeof crypto !== "undefined") {
@@ -489,7 +432,6 @@ function MessageActions({ content, backendId, conversationId, apiUrl, apiKey, se
   );
 }
 
-/** Acciones bajo el mensaje del usuario: copiar (si el panel lo habilita) y hora. */
 function UserMessageActions({ content, settings, ts }: {
   content: string; settings: WidgetSettings; ts?: number;
 }) {
@@ -557,7 +499,6 @@ function ChatWidget({
   position: initialPosition, showBotIcon: initialShowBotIcon, launcherLabel,
   applyPrimaryColor,
 }: Props) {
-
   const [suggestions, setSuggestions]           = useState<string[]>(initialSuggestions);
   const [proactiveMessage, setProactiveMessage] = useState<string>(initialProactive);
   const [showBotIcon, setShowBotIcon]           = useState<boolean>(initialShowBotIcon);
@@ -577,20 +518,14 @@ function ChatWidget({
   const [input, setInput]     = useState("");
   const [busy, setBusy]       = useState(false);
 
-  // No se renderiza nada (ni la burbuja) hasta tener la config real: sin
-  // esto, el widget aparecía primero con los valores por defecto del
-  // script tag (posición, color, nombre "Asistente Virtual" genérico) y
-  // luego "saltaba" a los reales en cuanto llegaba el fetch - visible como
-  // un flash de la config equivocada, más notorio cuanto más difieran del
-  // valor real configurado en el panel (posición y color, sobre todo).
   const [configReady, setConfigReady] = useState(false);
-  // Badge: mensajes no leídos mientras el panel está cerrado
+
   const [unreadCount, setUnreadCount]     = useState(0);
-  // Menú kebab (⋮) en el header
+
   const [kebabOpen, setKebabOpen]         = useState(false);
-  // Modo offline: el backend no respondió al cargar
+
   const [offlineMode, setOfflineMode]     = useState(false);
-  // CSAT: se activa cuando el usuario pulsa "Finalizar chat"
+
   const [conversationId, setConversationId] = useState<string | null>(
     () => initialHistoryRef.current?.conversationId ?? null,
   );
@@ -598,10 +533,7 @@ function ChatWidget({
   const [csatScore, setCsatScore]           = useState<number | null>(null);
   const [csatComment, setCsatComment]       = useState("");
   const [csatReasons, setCsatReasons]       = useState<string[]>([]);
-  // prompt: "¿hablar con un humano?" · form: contacto (correo/WhatsApp) · submitted: confirmación
-  // continue: "¿continuar con el chatbot?" tras un "No" · error: falló el envío del contacto.
-  // Se recupera de localStorage (ver saveHistory) para que cerrar o recargar
-  // el widget con el formulario a medio llenar no lo haga desaparecer.
+
   const [escalState, setEscalState]         = useState<"hidden" | "prompt" | "form" | "submitted" | "continue" | "error">(
     () => initialHistoryRef.current?.escalState ?? "hidden",
   );
@@ -612,16 +544,14 @@ function ChatWidget({
   const [escalType, setEscalType]           = useState<"email" | "whatsapp">("email");
   const [escalValue, setEscalValue]         = useState("");
   const [escalError, setEscalError]         = useState("");
-  // Accesibilidad: tamaño de texto, alto contraste, y estado del sub-panel.
+
   const [a11y, setA11y]                     = useState<A11yPrefs>(() => loadA11yPrefs(apiUrl));
   const [a11yOpen, setA11yOpen]             = useState(false);
-  // TTS: id del mensaje que se está leyendo en voz alta (o null).
+
   const [speakingId, setSpeakingId]         = useState<string | null>(null);
-  // Mensaje cuyas acciones estan reveladas por click/tap (en tactil no hay
-  // hover); solo uno a la vez, para no llenar el hilo de iconos.
+
   const [revealedId, setRevealedId]         = useState<string | null>(null);
 
-  // Refs
   const contextRef = useRef<Record<string, unknown>>({});
   const bottomRef  = useRef<HTMLDivElement>(null);
   const inputRef   = useRef<HTMLTextAreaElement>(null);
@@ -645,17 +575,10 @@ function ChatWidget({
 
   useEffect(() => { emit(open ? "open" : "close"); }, [open]);
 
-  // Al abrir el panel: limpiar badge de no leídos
   useEffect(() => {
     if (open) setUnreadCount(0);
   }, [open]);
 
-  // Con el panel a pantalla completa en móvil, el <body> de la página
-  // anfitriona seguía siendo scrolleable detrás del panel (position:fixed
-  // no lo bloquea por sí solo) - el navegador reservaba espacio para su
-  // barra de scroll nativa sobre ese body, visible como una franja gris
-  // vertical superpuesta al panel, que cubría en apariencia toda la
-  // pantalla pero no en los px reales que el sistema operativo pintaba.
   useEffect(() => {
     if (!open) return;
     if (!window.matchMedia("(max-width: 480px)").matches) return;
@@ -678,13 +601,6 @@ function ChatWidget({
     };
   }, [open]);
 
-  // Cerrar kebab si se hace click fuera, o con Escape (navegación por teclado).
-  // e.target de un evento disparado dentro del Shadow DOM llega "retargeted"
-  // al host (<chatbot-widget>) cuando se escucha desde document - nunca es
-  // un nodo real dentro del shadow, así que kebabRef.contains(e.target)
-  // daba siempre false y cerraba el menú en cualquier click interno, antes
-  // de que el onClick del botón llegara a disparar su acción (mousedown
-  // ocurre antes que click). composedPath() sí resuelve el target real.
   useEffect(() => {
     if (!kebabOpen) return;
     function onOutsideClick(e: MouseEvent) {
@@ -704,7 +620,6 @@ function ChatWidget({
     };
   }, [kebabOpen]);
 
-  // Cerrar panel de accesibilidad con Escape (solo tenía el botón "×" interno)
   useEffect(() => {
     if (!a11yOpen) return;
     function onKeyDown(e: KeyboardEvent) {
@@ -714,7 +629,6 @@ function ChatWidget({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [a11yOpen]);
 
-  // retryTick permite reintentar la carga de config sin recargar la página (botón "Reintentar" del panel offline).
   const [retryTick, setRetryTick] = useState(0);
   useEffect(() => { setAssetBase(apiUrl); }, [apiUrl]);
 
@@ -724,9 +638,6 @@ function ChatWidget({
       headers: apiKey ? { "X-Widget-Key": apiKey } : {},
     })
       .then((r) => {
-        // Los errores del backend traen cuerpo JSON, así que sin este control
-        // r.json() no lanza: el widget se daría por conectado y aplicaría los
-        // valores por defecto en vez de la configuración real.
         if (!r.ok) throw new Error(`config ${r.status}`);
         return r.json();
       })
@@ -773,8 +684,7 @@ function ChatWidget({
       .catch(() => {
         if (cancelled) return;
         setOfflineMode(true);
-        // Aunque falló, ya no queda nada más que esperar: hay que mostrar
-        // el panel offline en vez de ocultar el widget indefinidamente.
+
         setConfigReady(true);
       });
     return () => { cancelled = true; };
@@ -789,13 +699,10 @@ function ChatWidget({
     }
   }, [messages, busy]);
 
-  // Persistir historial (incluye conversationId y la tarjeta de escalación
-  // pendiente - ver PersistedHistory)
   useEffect(() => {
     saveHistory(apiUrl, apiKey, messages, conversationId, escalState, escalConvId);
   }, [messages, apiUrl, apiKey, conversationId, escalState, escalConvId]);
 
-  // Focus al abrir
   useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 50);
   }, [open]);
@@ -814,7 +721,6 @@ function ChatWidget({
     }
   }
 
-  // Nueva conversación: cancela el request activo y resetea todo.
   function handleClearConversation() {
     abortRef.current?.abort();
     abortRef.current = null;
@@ -856,10 +762,8 @@ function ChatWidget({
     } catch { /* fire and forget */ }
   }
 
-  // Persistir preferencias de accesibilidad cuando cambian.
   useEffect(() => { saveA11yPrefs(apiUrl, a11y); }, [a11y, apiUrl]);
 
-  // Detener la lectura en voz alta al desmontar o cerrar el panel.
   useEffect(() => {
     if (!open) {
       try { window.speechSynthesis?.cancel(); } catch { /* noop */ }
@@ -874,15 +778,13 @@ function ChatWidget({
     setA11y((p) => ({ ...p, highContrast: !p.highContrast }));
   }
 
-  // Lee/detiene un mensaje del bot con la síntesis de voz nativa del
-  // navegador. Sin dependencias externas; falla en silencio si no existe.
   function speakMessage(id: string, text: string) {
     try {
       const synth = window.speechSynthesis;
       if (!synth) return;
       if (speakingId === id) { synth.cancel(); setSpeakingId(null); return; }
       synth.cancel();
-      // Quita marcas de markdown básicas para que no las lea literalmente.
+
       const clean = text.replace(/[*_`#>]/g, "").replace(/\[(.*?)\]\(.*?\)/g, "$1");
       const utter = new SpeechSynthesisUtterance(clean);
       utter.lang = "es-ES";
@@ -909,10 +811,8 @@ function ChatWidget({
     const v = value.trim();
     if (!v) return type === "email" ? "Ingrese su correo electrónico." : "Ingrese su número de WhatsApp.";
     if (type === "email") {
-      // Validación de correo pragmática (no RFC completo, pero atrapa errores comunes).
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v)) return "Ingrese un correo electrónico válido.";
     } else {
-      // WhatsApp: 8 a 15 dígitos, admite +, espacios y guiones como separadores.
       const digits = v.replace(/[\s\-()]/g, "");
       if (!/^\+?\d{8,15}$/.test(digits)) return "Ingrese un número de WhatsApp válido (8 a 15 dígitos).";
     }
@@ -974,9 +874,6 @@ function ChatWidget({
     const abort = new AbortController();
     abortRef.current = abort;
 
-    // "Nueva conversación" limpia abortRef, así que si ya no apunta a esta
-    // petición sus respuestas pertenecen a una conversación abandonada y no
-    // deben tocar el estado actual.
     const isCurrent = () => abortRef.current === abort;
 
     await streamChat(
@@ -1010,12 +907,12 @@ function ChatWidget({
           abortRef.current = null;
           emit("message:received", { text: finalText, messageId });
           if (convId) setConversationId(convId);
-          // Mostrar prompt de escalamiento si el backend lo solicita
+
           if (escalationPrompt && convId) {
             setEscalConvId(convId);
             setEscalState("prompt");
           }
-          // Badge: si el panel está cerrado, incrementar no leídos
+
           if (!openRef.current) setUnreadCount((n) => n + 1);
         },
         onError(msg) {
@@ -1051,15 +948,11 @@ function ChatWidget({
     ta.style.height = Math.min(ta.scrollHeight, 120) + "px";
   }
 
-  // El kebab solo aparece si tiene al menos un ítem que mostrar: alguna
-  // acción de conversación habilitada, o el menú de accesibilidad.
   const hasKebabActions =
     (settings.show_new_chat_button && messages.length > 1)
     || settings.enable_accessibility !== false
     || settings.show_end_chat_button;
 
-  // Nada se renderiza (ni la burbuja) hasta tener la config real - ver el
-  // comentario en la declaración de configReady más arriba.
   if (!configReady) return null;
 
   return (
@@ -1249,10 +1142,6 @@ function ChatWidget({
             </button>
           </div>
         ) : settings.enable_csat && csatState !== "hidden" ? (
-          /* CSAT ocupa el cuerpo completo del panel (mismo espacio que
-             mensajes + input) en vez de aparecer como una franja al fondo
-             del scroll, donde competía por atención con el historial y el
-             usuario podía seguir escribiendo mientras calificaba. */
           <div class="csat-fullscreen">
             {csatState === "pending" && (
               <div class="csat-panel" role="group" aria-label="Valoración de la conversación">
@@ -1344,8 +1233,6 @@ function ChatWidget({
                     </div>
                   )}
                   {msg.role === "user" ? (
-                    /* Las acciones del usuario van FUERA de la burbuja (debajo):
-                       dentro quedarían sobre el color sólido de la burbuja. */
                     <div class="msg-user-col">
                       <div class="msg msg-user">
                         <span class="user-text">{msg.content}</span>
@@ -1620,7 +1507,7 @@ class ChatbotWidgetElement extends HTMLElement {
   connectedCallback() {
     if (this._mounted) return;
     this._mounted = true;
-    // Regla cardinal: fallar en silencio, nunca romper la página anfitriona.
+
     try {
       this._mount();
     } catch (err) {

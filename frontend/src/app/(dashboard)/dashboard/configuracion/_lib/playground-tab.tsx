@@ -39,7 +39,7 @@ interface Message {
 function formatTime(ts?: number): string {
   if (!ts) return "";
   try {
-    // hour12:false: mismo formato compacto de 24h que el widget real.
+    // hour12:false: formato compacto de 24h.
     return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
   } catch { return ""; }
 }
@@ -53,9 +53,8 @@ const _PG_A11Y_STORAGE_KEY = "playground_a11y";
 type TextScale = "sm" | "md" | "lg";
 interface A11yPrefs { textScale: TextScale; highContrast: boolean; }
 
-// Clave propia, separada de la del widget real (usobot:history:<host>:a11y):
-// son contextos distintos y el panel no debe pisar la preferencia que el
-// visitante haya elegido en el widget embebido de este mismo dominio.
+// Clave propia del panel: no debe pisar la preferencia que el visitante haya
+// elegido en el widget embebido de este mismo dominio.
 function loadA11yPrefs(): A11yPrefs {
   const fallback: A11yPrefs = { textScale: "md", highContrast: false };
   if (typeof window === "undefined") return fallback;
@@ -146,7 +145,6 @@ export function PlaygroundTab({
   });
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  // Paridad con el widget real: fallo de backend muestra panel "Sin conexión".
   const [offlineMode, setOfflineMode] = useState(false);
   const [lastSources, setLastSources] = useState<
     { source: string; score: number; text: string }[]
@@ -156,11 +154,9 @@ export function PlaygroundTab({
     model?: string;
     latency?: number;
   } | null>(null);
-  // El modo debe coincidir con el que se usó para generar la conversación
-  // guardada en sessionStorage: sin esto, tras recargar la página el modo
-  // vuelve a "draft" por defecto pero session_id sigue siendo el de una
-  // conversación de "deployed" (o viceversa), y los mensajes nuevos se
-  // anexan a esa conversación con el browser del modo equivocado.
+  // El modo se persiste junto a la conversación: session_id pertenece a un
+  // modo concreto, y retomarlo desde el otro anexaría los mensajes nuevos con
+  // el browser equivocado.
   const [mode, setMode] = useState<PlaygroundMode>(() => {
     try {
       const stored = sessionStorage.getItem(_PG_MODE_STORAGE_KEY);
@@ -170,7 +166,6 @@ export function PlaygroundTab({
     }
   });
   const [widgetOpen, setWidgetOpen] = useState(true);
-  // CSAT - mismos 3 estados que el widget real para paridad estricta.
   const [csatState, setCsatState] = useState<"hidden" | "pending" | "submitted">(
     "hidden",
   );
@@ -178,19 +173,18 @@ export function PlaygroundTab({
   const [csatComment, setCsatComment] = useState("");
   const [csatReasons, setCsatReasons] = useState<string[]>([]);
   const [csatReasonOptions, setCsatReasonOptions] = useState<Record<string, string>>({});
-  // Escalamiento simulado: replica el flujo visual del widget real sin despachar nada al backend.
+  // Escalamiento simulado: flujo visual, sin despachar nada al backend.
   const [escalState, setEscalState] = useState<"hidden" | "prompt" | "form" | "submitted" | "continue">("hidden");
   const [escalType, setEscalType] = useState<"email" | "whatsapp">("email");
   const [escalValue, setEscalValue] = useState("");
   const [escalError, setEscalError] = useState("");
-  // Header kebab + accesibilidad (paridad con el widget real).
   const [kebabOpen, setKebabOpen] = useState(false);
   const [a11yOpen, setA11yOpen] = useState(false);
   const [textScale, setTextScale] = useState<"sm" | "md" | "lg">(() => loadA11yPrefs().textScale);
   const [highContrast, setHighContrast] = useState(() => loadA11yPrefs().highContrast);
   const [speakingId, setSpeakingId] = useState<string | null>(null);
-  // Indice del mensaje cuyas acciones estan reveladas por click/tap (en
-  // tactil no hay hover); solo uno a la vez.
+  // Índice del mensaje cuyas acciones están reveladas por click o tap; en
+  // táctil no hay hover, y solo se revela uno a la vez.
   const [revealedIdx, setRevealedIdx] = useState<number | null>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
 
@@ -235,7 +229,6 @@ export function PlaygroundTab({
   }
   const msgScaleClass = textScale === "sm" ? "text-2xs" : textScale === "lg" ? "text-sm leading-relaxed" : "text-xs";
 
-  // Misma validación que el widget real (paridad estricta).
   function validateContact(type: "email" | "whatsapp", value: string): string {
     const v = value.trim();
     if (!v) return type === "email" ? "Ingrese su correo electrónico." : "Ingrese su número de WhatsApp.";
@@ -275,14 +268,14 @@ export function PlaygroundTab({
   const enableCopyAction = activeWidgetConfig?.enable_copy_action ?? true;
   const enableFeedbackIcons = activeWidgetConfig?.enable_feedback_icons ?? true;
   const enableAccessibility = activeWidgetConfig?.enable_accessibility ?? true;
-  // Esquina donde se ancla el widget flotante (paridad con data-position del
-  // widget real: bottom-right, bottom-left, top-right, top-left).
+  // Esquina donde se ancla el widget flotante: bottom-right, bottom-left,
+  // top-right o top-left.
   const widgetPosition = activeWidgetConfig?.position ?? "bottom-right";
   const isTopPosition = widgetPosition.startsWith("top-");
   const isLeftPosition = widgetPosition.endsWith("-left");
   const widgetCornerClass = `${isTopPosition ? "md:top-4" : "md:bottom-4"} ${isLeftPosition ? "md:left-4 md:items-start" : "md:right-4 md:items-end"}`;
   // TTS efectivo = el navegador lo soporta Y el admin lo habilitó Y el menú
-  // de accesibilidad no está desactivado (paridad con el widget).
+  // de accesibilidad no está desactivado.
   const ttsSupported = ttsBrowserSupported && (activeWidgetConfig?.enable_tts ?? true) && enableAccessibility;
   const showEndChatButton = activeWidgetConfig?.show_end_chat_button ?? true;
   const showNewChatButton = activeWidgetConfig?.show_new_chat_button ?? true;
@@ -629,8 +622,8 @@ export function PlaygroundTab({
             </div>
           </div>
 
-          {/* ── Widget: pantalla completa en mobile, flotante en la esquina
-              configurada desde md: (paridad con data-position del widget real). ── */}
+          {/* ── Widget: pantalla completa en mobile, flotante desde md: en la
+              esquina configurada. ── */}
           <div className={`flex-1 min-h-0 flex flex-col items-center justify-center md:justify-start md:absolute md:inset-auto md:flex-none gap-2.5 ${widgetCornerClass}`}>
             {/* En mobile, con el chat cerrado, se muestra un estado vacío
                 claro en vez de dejar solo el fondo gris con un botón
@@ -690,9 +683,8 @@ export function PlaygroundTab({
                     </p>
                     <p className="text-3xs text-white/70">En línea</p>
                   </div>
-                  {/* Kebab (⋮) - paridad con el widget real: agrupa Nueva
-                      conversación, Accesibilidad y Finalizar chat. Se oculta
-                      si no hay ningún ítem que mostrar. */}
+                  {/* Agrupa Nueva conversación, Accesibilidad y Finalizar
+                      chat. Se oculta si no hay ningún ítem que mostrar. */}
                   {(showNewChatButton || enableAccessibility || showEndChatButton) && (
                   <div className="relative">
                     <button
@@ -726,7 +718,6 @@ export function PlaygroundTab({
                     )}
                   </div>
                   )}
-                  {/* Cerrar el simulador (paridad con el botón ✕ del widget real). */}
                   <button
                     type="button"
                     onClick={() => setWidgetOpen(false)}
@@ -738,7 +729,6 @@ export function PlaygroundTab({
                   </button>
                 </div>
 
-                {/* Panel de accesibilidad (paridad con el widget real) */}
                 {a11yOpen && (
                   <div className="border-b border-border bg-muted/40 px-3 py-2.5 space-y-2.5">
                     <div className="flex items-center justify-between">
@@ -798,10 +788,8 @@ export function PlaygroundTab({
                   </div>
                 )}
 
-                {/* Modo offline - paridad con widget/src/widget.tsx: un fallo
-                    de red/backend reemplaza TODO el cuerpo del chat (mensajes,
-                    CSAT, sugerencias) por este panel, en vez de mezclarse con
-                    la conversación existente. */}
+                {/* Un fallo de red o backend reemplaza todo el cuerpo del chat
+                    (mensajes, CSAT, sugerencias) por este panel. */}
                 {offlineMode ? (
                   <div className="flex-1 flex flex-col items-center justify-center gap-2 px-6 py-8 text-center">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} width={36} height={36} className="text-muted-foreground/40">
@@ -1057,7 +1045,6 @@ export function PlaygroundTab({
                     </div>
                   ))}
 
-                  {/* Escalamiento simulado - burbuja del bot (paridad con widget real) */}
                   {escalState !== "hidden" && (
                     <div className="flex items-end gap-1.5">
                       {showBotIcon && (
@@ -1139,7 +1126,7 @@ export function PlaygroundTab({
                   )}
                 </div>
 
-                {/* CSAT - pantalla única: estrellas + motivos + comentario (paridad con widget real) */}
+                {/* CSAT - pantalla única: estrellas + motivos + comentario */}
                 {enableCsat && csatState === "pending" && (
                   <div className={`border-t px-3 py-3 shrink-0 flex flex-col items-center gap-2 ${highContrast ? "bg-black border-white/40" : "border-border bg-muted/40"}`}>
                     <p className={`font-medium text-center ${msgScaleClass} ${highContrast ? "text-white" : "text-foreground"}`}>
@@ -1252,7 +1239,6 @@ export function PlaygroundTab({
                   </div>
                 )}
 
-                {/* Input bar - estilo "pill" (paridad con el widget). */}
                 {csatState === "hidden" && (
                   <div className={`bg-background px-2.5 py-2.5 shrink-0 ${showSuggestions ? "" : "border-t border-border"}`}>
                     <div className="flex gap-1.5 items-center">

@@ -1,10 +1,3 @@
-/**
- * CSS inyectado en el Shadow DOM - completamente aislado de la página anfitriona.
- * Variables al inicio para facilitar el theming:
- *   --color-primary  azul principal de marca
- *   --color-bubble   fondo del botón burbuja
- */
-
 export const STYLES = `
 :host {
   --color-primary: #1e3a8a;
@@ -22,8 +15,6 @@ export const STYLES = `
   box-sizing: border-box;
 }
 
-/* ── Contenedor raíz ─────────────────────────────────────────────────────── */
-
 .root {
   position: fixed;
   display: flex;
@@ -36,8 +27,6 @@ export const STYLES = `
 .root[data-position="bottom-left"]  { bottom: 1.5rem; left: 1.5rem;  flex-direction: column-reverse; align-items: flex-start; }
 .root[data-position="top-right"]    { top: 1.5rem;    right: 1.5rem; flex-direction: column;         align-items: flex-end; }
 .root[data-position="top-left"]     { top: 1.5rem;    left: 1.5rem;  flex-direction: column;         align-items: flex-start; }
-
-/* ── Burbuja ──────────────────────────────────────────────────────────── */
 
 .bubble {
   width: 56px;
@@ -63,17 +52,12 @@ export const STYLES = `
   transform: scale(0.94);
 }
 
-/* ── Panel ────────────────────────────────────────────────────────────── */
-
 .panel {
   position: absolute;
   bottom: calc(100% + 12px);
   right: 0;
   width: 380px;
-  /* Nunca más ancho que el viewport menos el margen del root a ambos lados:
-     sin esto, en cualquier ventana más angosta que ~380px + los márgenes
-     (no solo por debajo del breakpoint de mobile-fullscreen) el panel se
-     desbordaba fuera de la pantalla por el lado contrario a data-position. */
+
   max-width: calc(100vw - 3rem);
   max-width: calc(100dvw - 3rem);
   height: 520px;
@@ -90,10 +74,6 @@ export const STYLES = `
   transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.18s ease;
 }
 
-/* En posiciones izquierdas el panel debe anclarse al borde izquierdo del
-   contenedor (no al derecho): con right:0 fijo, el panel quedaba pegado al
-   borde derecho de la burbuja en vez de expandirse hacia la izquierda de
-   la pantalla, desbordándose o quedando mal alineado. */
 .root[data-position="bottom-left"] .panel,
 .root[data-position="top-left"] .panel {
   right: auto;
@@ -116,12 +96,7 @@ export const STYLES = `
   pointer-events: all;
 }
 
-/* ── Encabezado ──────────────────────────────────────────────────────────── */
-
 .header {
-  /* Color sólido, igual que el previsualizador del panel (backgroundColor:
-     primaryColor) - el gradiente hacia un azul hardcodeado (#2563eb) hacía
-     que el header se viera con un color distinto al configurado. */
   background: var(--color-primary);
   color: #fff;
   padding: 14px 16px;
@@ -181,16 +156,9 @@ export const STYLES = `
   background: rgba(255,255,255,0.15);
 }
 
-/* Mismo criterio que .msg-actions: iconos de 20px en cajas de 40px dejaban
-   30px de aire entre ellos (10px de gap del header + 20px de las cajas).
-   Se solapan las cajas contiguas manteniendo los 40x40 de area tactil.
-   El hermano de .close-btn es .kebab-wrapper, no .header-btn: este ultimo
-   va dentro del wrapper (que ancla el menu desplegable). */
 .kebab-wrapper + .close-btn {
   margin-left: -12px;
 }
-
-/* ── Área de mensajes ───────────────────────────────────────────────────── */
 
 .messages {
   flex: 1;
@@ -205,8 +173,6 @@ export const STYLES = `
 .messages::-webkit-scrollbar { width: 4px; }
 .messages::-webkit-scrollbar-track { background: transparent; }
 .messages::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
-
-/* ── Filas de mensaje ────────────────────────────────────────────────────── */
 
 .msg-row {
   display: flex;
@@ -248,13 +214,12 @@ export const STYLES = `
 .msg {
   display: flex;
   flex-direction: column;
-  min-width: 0;  /* permite que el contenido truncate sin desbordar el row */
+  min-width: 0;
 }
 
 .msg-user  { align-self: flex-end; }
 .msg-assistant { align-self: flex-start; }
 
-/* Burbuja del usuario */
 .user-text {
   background: var(--color-primary);
   color: #fff;
@@ -265,8 +230,6 @@ export const STYLES = `
   word-break: break-word;
   white-space: pre-wrap;
 }
-
-/* ── Salida markdown (asistente) ─────────────────────────────────────── */
 
 .md {
   background: #f3f4f6;
@@ -400,7 +363,6 @@ export const STYLES = `
   margin: 8px 0;
 }
 
-/* Cursor de streaming */
 .cursor {
   display: inline-block;
   animation: blink 0.9s step-end infinite;
@@ -409,7 +371,6 @@ export const STYLES = `
 }
 @keyframes blink { 50% { opacity: 0; } }
 
-/* Indicador de escritura (3 puntos - visible mientras se espera el primer token) */
 .typing-dots {
   display: inline-flex;
   align-items: center;
@@ -432,8 +393,6 @@ export const STYLES = `
   0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
   40%           { transform: translateY(-5px); opacity: 1; }
 }
-
-/* ── Fuentes ─────────────────────────────────────────────────────────── */
 
 .sources { margin-top: 6px; }
 
@@ -504,8 +463,6 @@ export const STYLES = `
   overflow: hidden;
 }
 
-/* ── Fila de entrada ───────────────────────────────────────────────────────── */
-
 .input-row {
   display: flex;
   align-items: flex-end;
@@ -531,10 +488,7 @@ export const STYLES = `
   background: #fff;
   transition: border-color 0.15s, box-shadow 0.15s;
   color: #1a1a1a;
-  /* Con rows=1 y overflow-y:auto, Chrome Android dibuja su scrollbar nativa
-     dentro del textarea incluso sin desbordamiento real de texto, dando el
-     aspecto de un contorno grueso doble junto al border-radius. Se oculta
-     visualmente sin quitar el scroll (sí útil cuando el texto crece). */
+
   scrollbar-width: none;
 }
 
@@ -555,8 +509,6 @@ export const STYLES = `
   cursor: not-allowed;
 }
 
-/* ── Botón de enviar ─────────────────────────────────────────────────────── */
-
 .send-btn {
   width: 38px;
   height: 38px;
@@ -574,11 +526,8 @@ export const STYLES = `
 
 .send-btn:hover:not(:disabled) { background: var(--color-primary-hover); }
 .send-btn:active:not(:disabled) { transform: scale(0.9); }
-/* Opacidad reducida sobre el color real (igual que el previsualizador:
-   disabled:opacity-40), no un azul fijo ajeno a la config. */
-.send-btn:disabled { background: var(--color-primary); opacity: 0.4; cursor: not-allowed; }
 
-/* ── Spinner ─────────────────────────────────────────────────────────── */
+.send-btn:disabled { background: var(--color-primary); opacity: 0.4; cursor: not-allowed; }
 
 .spinner {
   width: 16px;
@@ -591,17 +540,6 @@ export const STYLES = `
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ── Botones de acción del mensaje ────────────────────────────────────────── */
-
-/* Ocultas por defecto; se revelan al pasar el puntero (donde lo hay) o al
-   tocar/hacer clic en el mensaje (.msg-revealed, que pone el propio
-   componente): en tactil no existe hover, y sin eso quedaban invisibles
-   salvo por el hover "pegado" tras tocar la burbuja - de ahi que se vieran
-   de forma intermitente en el telefono. */
-/* gap negativo: la caja de cada boton (28px) es el doble que su icono
-   (14px), asi que con gap positivo quedaban ~16px de aire entre iconos.
-   Se solapan las cajas para juntar los iconos sin reducir el area tactil,
-   que sigue por encima del minimo de 24x24 de WCAG 2.5.8. */
 .msg-actions {
   display: flex;
   align-items: center;
@@ -628,8 +566,6 @@ export const STYLES = `
   }
 }
 
-/* Columna del mensaje del usuario: burbuja arriba, acciones + hora debajo,
-   alineadas a la derecha como la propia burbuja. */
 .msg-user-col {
   display: flex;
   flex-direction: column;
@@ -641,12 +577,6 @@ export const STYLES = `
   justify-content: flex-end;
 }
 
-/* 12px con line-height 14px alinea la cifra con el centro de los iconos
-   (14px sobre caja de 28px). El color NO es el de los iconos (#9ca3af):
-   sobre blanco eso da 2.5:1, por debajo del 4.5:1 que WCAG pide para
-   texto, y se leia apagado. #6b7280 da 4.8:1 y ya es un gris de la propia
-   paleta del widget. Un icono puede ser mas tenue que su etiqueta porque
-   se apoya en la forma, no en la lectura. */
 .msg-time {
   font-size: 12px;
   line-height: 14px;
@@ -688,8 +618,6 @@ export const STYLES = `
   color: #ef4444 !important;
 }
 
-/* ── Respuestas rápidas (sugerencias de conversación) ──────────── */
-
 .suggestions {
   display: flex;
   flex-wrap: wrap;
@@ -722,8 +650,6 @@ export const STYLES = `
   transform: scale(0.97);
 }
 
-/* ── Burbuja wrapper (necesario para posicionar el badge) ────────────── */
-
 .bubble-wrap {
   position: relative;
   display: inline-flex;
@@ -731,8 +657,6 @@ export const STYLES = `
   justify-content: center;
   flex-shrink: 0;
 }
-
-/* ── Badge de no leídos ──────────────────────────────────────────────── */
 
 .badge {
   position: absolute;
@@ -760,8 +684,6 @@ export const STYLES = `
   to   { transform: scale(1);   opacity: 1; }
 }
 
-/* ── Launcher label (etiqueta junto al launcher) ─────────────────────── */
-
 .launcher-label-wrap {
   display: flex;
   align-items: center;
@@ -785,8 +707,6 @@ export const STYLES = `
   background: #f3f4f6;
 }
 
-/* ── Kebab menu (⋮) ──────────────────────────────────────────────────── */
-
 .kebab-wrapper {
   position: relative;
 }
@@ -799,9 +719,7 @@ export const STYLES = `
   border: 1px solid #e5e7eb;
   border-radius: 10px;
   box-shadow: 0 4px 16px rgba(0,0,0,0.12);
-  /* 180px no alcanzaba para "Nueva conversación" (ítem más largo) sin
-     partirse en dos líneas junto al ícono - se ajusta al ancho real del
-     contenido en vez de forzar un mínimo fijo insuficiente. */
+
   width: max-content;
   overflow: hidden;
   z-index: 10;
@@ -847,8 +765,6 @@ export const STYLES = `
   background: #fef2f2;
 }
 
-/* ── Modo offline ────────────────────────────────────────────────────── */
-
 .offline-panel {
   flex: 1;
   display: flex;
@@ -892,8 +808,6 @@ export const STYLES = `
   opacity: 0.9;
 }
 
-/* ── Proactive bubble (mensaje sobre el launcher cerrado) ──────────── */
-
 .proactive-bubble {
   position: absolute;
   bottom: 8px;
@@ -923,11 +837,6 @@ export const STYLES = `
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-/* ── CSAT survey ─────────────────────────────────────────────────────── */
-
-/* Ocupa el cuerpo completo del panel (reemplaza mensajes + input mientras
-   la encuesta está activa), con scroll propio si el contenido no cabe en
-   pantallas bajas. */
 .csat-fullscreen {
   flex: 1;
   display: flex;
@@ -1174,8 +1083,6 @@ export const STYLES = `
   border-color: #86efac;
 }
 
-/* ── Escalamiento - solicitud de contacto ────────────────────────────── */
-
 .escal-card {
   display: flex;
   flex-direction: column;
@@ -1187,7 +1094,6 @@ export const STYLES = `
   box-shadow: 0 1px 3px rgba(0,0,0,0.06);
 }
 
-/* Estado de confirmación: la tarjeta se tiñe de verde suave. */
 .escal-card-done {
   background: #f0fdf4;
   border-color: #bbf7d0;
@@ -1356,7 +1262,6 @@ export const STYLES = `
   font-weight: 500;
 }
 
-/* Input inválido: borde rojo para reforzar el mensaje de error. */
 .escal-input[aria-invalid="true"] {
   border-color: #b91c1c;
 }
@@ -1366,7 +1271,6 @@ export const STYLES = `
   box-shadow: 0 0 0 2px rgba(185, 28, 28, 0.15);
 }
 
-/* Foco visible en radios y botones para navegación por teclado. */
 .escal-radio-label input:focus-visible,
 .escal-submit-btn:focus-visible,
 .escal-cancel-btn:focus-visible {
@@ -1374,44 +1278,22 @@ export const STYLES = `
   outline-offset: 2px;
 }
 
-/* ── Responsive (small screens) ─────────────────────────────────────── */
-
-/* 480px, no 440px: la investigación real de dispositivos (2026) reporta que
-   incluso los flagships Android más anchos rara vez superan ~430px de
-   ancho lógico CSS - pero un teléfono real de esta prueba reportó 448-460px
-   (probablemente por el "zoom de pantalla" reducido de Android, que aumenta
-   el ancho lógico reportado), y ahí 440px dejaba el panel en modo "ventana
-   flotante de escritorio" en pleno móvil, con el hueco y desalineación
-   correspondientes. 480px da margen sin acercarse al rango típico de
-   tablet (768px+), donde sí tiene sentido el modo ventana flotante. */
   @media (max-width: 480px) {
   .root[data-position="bottom-right"] { bottom: 1rem; right: 1rem; }
   .root[data-position="bottom-left"]  { bottom: 1rem; left: 1rem; }
   .root[data-position="top-right"]    { top: 1rem; right: 1rem; }
   .root[data-position="top-left"]     { top: 1rem; left: 1rem; }
 
-  /* Panel a pantalla completa en móvil (WhatsApp/Intercom style). Selector
-     con la misma especificidad que las reglas de posición (.root[data-position] .panel)
-     para que gane en cualquier orden de cascada, sin importar la esquina. */
   .root[data-position] .panel {
     position: fixed;
-    /* Los 4 offsets explícitos en 0, no el shorthand inset:0 combinado con
-       longhands en auto: esa combinación (probada en producción) resuelve
-       el inset entero como "auto" - el panel queda sin ancla al viewport y
-       cae en su posición estática dentro de .root (que en bottom-right/
-       bottom-left/top-right/top-left tiene su propio right/left/top/bottom
-       de 1rem), dejando una franja del ancho de ese margen sin cubrir. */
+
     top: 0;
     right: 0;
     bottom: 0;
     left: 0;
     width: 100vw;
     width: 100dvw;
-    /* max-width (calc(100dvw - 3rem), fuera de este media query) no se
-       sobrescribe por especificidad: max-width y width son propiedades
-       distintas que se combinan, no compiten - sin anularlo aquí, el panel
-       fullscreen quedaba encogido a 3rem menos de ancho, dejando huecos en
-       los costados y el aspecto de "no expandido". */
+
     max-width: none;
     height: 100vh;
     height: 100dvh;
@@ -1424,14 +1306,9 @@ export const STYLES = `
   }
   .proactive-bubble { display: none; }
 
-  /* Con el panel a pantalla completa, el header del propio panel ya trae su
-     botón "×" para cerrar (visible desde el primer render) - la burbuja
-     externa quedaba flotando encima del contenido del chat, duplicando el
-     control de cierre y tapando visualmente parte del header. */
   .bubble-wrap-panel-open { display: none; }
 }
 
-/* Pantallas de poca altura con ancho &gt; 480px: limita el alto del panel. */
 @media (max-height: 600px) and (min-width: 481px) {
   .panel {
     height: min(520px, calc(100vh - 90px));
@@ -1439,13 +1316,6 @@ export const STYLES = `
   }
 }
 
-/* ── Accesibilidad ──────────────────────────────────────────────────── */
-
-/* Escala de texto: afecta el contenido de los mensajes y las burbujas. */
-/* .md y .user-text tienen su propio font-size fijo (14px) para el texto real
-   del mensaje - .msg es solo el contenedor flex, sin texto propio. Aplicar
-   la escala solo a .msg no tenía ningún efecto visible; hay que tocar .md
-   y .user-text directamente. */
 .panel[data-text-scale="sm"] .md,
 .panel[data-text-scale="sm"] .user-text { font-size: 12.5px; }
 .panel[data-text-scale="lg"] .md { font-size: 16.5px; line-height: 1.75; }
@@ -1487,12 +1357,6 @@ export const STYLES = `
 .panel[data-text-scale="lg"] .csat-thanks-btn,
 .panel[data-text-scale="lg"] .kebab-item { font-size: 16px; line-height: 1.5; }
 
-/* Alto contraste: enmarca las burbujas de chat y refuerza el texto, sin
-   cambiar el fondo general del panel - más discreto, mantiene la apariencia
-   base del widget en vez de convertirlo en un panel oscuro aparte. */
-/* Burbuja del bot en negativo (fondo negro, texto blanco), igual que el
-   previsualizador: sobre gris claro el contraste real era ~12:1, aqui es
-   21:1, el maximo posible. Solo la burbuja, no el fondo del panel. */
 .panel[data-contrast="high"] .md {
   background: #000;
   color: #fff;
@@ -1644,10 +1508,7 @@ export const STYLES = `
   align-items: center;
   justify-content: center;
 }
-/* El hover solo aplica a punteros reales y nunca al botón ya seleccionado:
-   en táctil el :hover queda "pegado" tras el toque, y siendo más específico
-   (clase + pseudo-clase) que .a11y-scale-active pintaba gris encima del
-   color activo - el botón parecía no cambiar de estado al tocarlo. */
+
 @media (hover: hover) {
   .a11y-scale-btn:not(.a11y-scale-active):hover { background: #f3f4f6; }
 }

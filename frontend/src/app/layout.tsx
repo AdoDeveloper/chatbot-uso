@@ -5,7 +5,7 @@ import "./globals.css";
 import { AuthProvider } from "@/contexts/auth-context";
 import { ProgressBarProvider } from "@/components/composed/progress-bar-provider";
 
-// Weights explícitos: el variable font sin array de weight fallaba a serif (Times New Roman) en este setup.
+// La fuente variable requiere el array de weights explícito; sin él resuelve a serif.
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
