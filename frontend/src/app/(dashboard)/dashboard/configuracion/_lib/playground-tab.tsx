@@ -34,6 +34,8 @@ interface Message {
   copied?: boolean;
   /** Epoch ms del turno, para mostrar la hora bajo el mensaje. */
   ts?: number;
+  /** El turno termino en fallo: se ofrece reintentar en lugar de acciones. */
+  error?: boolean;
 }
 
 function formatTime(ts?: number): string {
@@ -49,6 +51,52 @@ type PlaygroundMode = "draft" | "deployed";
 const _PG_STORAGE_KEY = "playground_session";
 const _PG_MODE_STORAGE_KEY = "playground_mode";
 const _PG_A11Y_STORAGE_KEY = "playground_a11y";
+
+const SERVICE_UNAVAILABLE_MESSAGE =
+  "En este momento el asistente no está disponible. Por favor, inténtelo más tarde.";
+const EMPTY_RESPONSE_MESSAGE =
+  "No se recibió respuesta. Por favor, vuelva a enviar su pregunta.";
+const OFFLINE_MESSAGE =
+  "Parece que no hay conexión a internet. Revise su red y vuelva a intentarlo.";
+const TIMEOUT_MESSAGE =
+  "El asistente está tardando más de lo normal. Por favor, vuelva a intentarlo.";
+const BUSY_MESSAGE =
+  "El asistente está atendiendo muchas consultas. Espere unos segundos e inténtelo de nuevo.";
+
+const REQUEST_TIMEOUT_MS = 45000;
+const MAX_ATTEMPTS = 3;
+const BASE_BACKOFF_MS = 800;
+const MAX_BACKOFF_MS = 8000;
+
+function backoffDelay(attempt: number, retryAfterSeconds?: number): number {
+  if (retryAfterSeconds && retryAfterSeconds > 0) {
+    return Math.min(retryAfterSeconds * 1000, MAX_BACKOFF_MS);
+  }
+  const exponential = Math.min(BASE_BACKOFF_MS * 2 ** attempt, MAX_BACKOFF_MS);
+  return exponential / 2 + Math.random() * (exponential / 2);
+}
+
+function parseRetryAfter(resp: Response): number | undefined {
+  const raw = resp.headers.get("Retry-After");
+  if (!raw) return undefined;
+  const seconds = Number(raw);
+  return Number.isFinite(seconds) && seconds >= 0 ? seconds : undefined;
+}
+
+function wait(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) { reject(new DOMException("Aborted", "AbortError")); return; }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    function onAbort() {
+      clearTimeout(timer);
+      reject(new DOMException("Aborted", "AbortError"));
+    }
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
 
 type TextScale = "sm" | "md" | "lg";
 interface A11yPrefs { textScale: TextScale; highContrast: boolean; }
@@ -186,9 +234,23 @@ export function PlaygroundTab({
   // Índice del mensaje cuyas acciones están reveladas por click o tap; en
   // táctil no hay hover, y solo se revela uno a la vez.
   const [revealedIdx, setRevealedIdx] = useState<number | null>(null);
+  const [networkDown, setNetworkDown] = useState(false);
+  const lastQuestionRef = useRef<string>("");
   const chatScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { saveA11yPrefs({ textScale, highContrast }); }, [textScale, highContrast]);
+
+  useEffect(() => {
+    const goOffline = () => setNetworkDown(true);
+    const goOnline = () => setNetworkDown(false);
+    setNetworkDown(navigator.onLine === false);
+    window.addEventListener("offline", goOffline);
+    window.addEventListener("online", goOnline);
+    return () => {
+      window.removeEventListener("offline", goOffline);
+      window.removeEventListener("online", goOnline);
+    };
+  }, []);
 
   // Mismo breakpoint que las clases `md:` (768px): en mobile el chat abierto pasa a overlay full-screen.
   const [isMobilePreview, setIsMobilePreview] = useState(false);
@@ -418,11 +480,19 @@ export function PlaygroundTab({
       return;
     }
 
+    lastQuestionRef.current = q;
+
     const history = messages
+      .filter((m) => !m.error && m.content)
       .slice(-10)
       .map((m) => ({ role: m.role, content: m.content }));
 
-    setMessages((prev) => [...prev, { role: "user", content: q, ts: Date.now() }]);
+    setMessages((prev) => {
+      const base = question && prev.length >= 2 && prev[prev.length - 1].error
+        ? prev.slice(0, -2)
+        : prev;
+      return [...base, { role: "user" as const, content: q, ts: Date.now() }];
+    });
     setInput("");
     setLoading(true);
     setLastSources([]);
@@ -433,86 +503,144 @@ export function PlaygroundTab({
     // Instancia local a esta invocación: distingue "me abortaron por ya no
     // ser la request vigente" (ignorar) de "fallo de red real" (mostrar error).
     const controller = new AbortController();
-    try {
-      const accessToken = tokenStore.getAccess();
-      abortRef.current?.abort();
-      abortRef.current = controller;
+    abortRef.current?.abort();
+    abortRef.current = controller;
 
-      const response = await fetch(CHAT_API_URL, {
-        method: "POST",
-        signal: controller.signal,
-        headers: {
-          "Content-Type": "application/json",
-          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-        },
-        body: JSON.stringify({
-          question: q,
-          session_id: sessionIdRef.current,
-          messages: history.length > 0 ? history : undefined,
-          // En modo "deployed" el turno usa la config y las fuentes publicadas
-          // (lo mismo que ve un usuario real), así que debe contar en las
-          // estadísticas de producción: "playground" queda excluido de ellas.
-          browser: mode === "deployed" ? "preview-production" : "playground",
-          ...(mode === "deployed" ? { source_scope: "production" } : {}),
-        }),
+    const isCurrent = () => abortRef.current === controller && !controller.signal.aborted;
+    const failWith = (msg: string) => {
+      if (!isCurrent()) return;
+      setMessages((prev) => {
+        const u = [...prev];
+        u[u.length - 1] = { role: "assistant", content: msg, error: true, ts: Date.now() };
+        return u;
       });
+    };
 
-      if (response.status === 401) {
-        setMessages((prev) => prev.filter((m) => !(m.role === "assistant" && m.content === "")));
-        setLoading(false);
-        await logout();
-        return;
-      }
-      if (!response.ok)
-        throw new Error(`HTTP ${response.status}`);
+    const body = JSON.stringify({
+      question: q,
+      session_id: sessionIdRef.current,
+      messages: history.length > 0 ? history : undefined,
+      // En modo "deployed" el turno usa la config y las fuentes publicadas
+      // (lo mismo que ve un usuario real), así que debe contar en las
+      // estadísticas de producción: "playground" queda excluido de ellas.
+      browser: mode === "deployed" ? "preview-production" : "playground",
+      ...(mode === "deployed" ? { source_scope: "production" } : {}),
+    });
 
-      // Sin streaming: la burbuja queda con content: "" (indicador "escribiendo...") hasta que llega la respuesta completa.
-      const event = await response.json();
+    let lastMessage = TIMEOUT_MESSAGE;
 
-      // No pisar el historial vigente con el resultado de una request obsoleta.
-      if (abortRef.current !== controller || controller.signal.aborted) return;
+    try {
+      for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+        if (!isCurrent()) return;
 
-      if (event.type === "error") {
-        const msg = event.message ?? "Error desconocido";
-        setMessages((prev) => {
-          const u = [...prev];
-          u[u.length - 1] = { role: "assistant", content: msg, ts: Date.now() };
-          return u;
-        });
-      } else {
-        const mapped = (event.sources ?? []).map(
-          (s: { source_name: string; score: number; text: string }) => ({
-            source: s.source_name,
-            score: s.score,
-            text: s.text,
-          }),
+        if (typeof navigator !== "undefined" && navigator.onLine === false) {
+          failWith(OFFLINE_MESSAGE);
+          return;
+        }
+
+        const timeoutCtl = new AbortController();
+        const onOuterAbort = () => timeoutCtl.abort();
+        controller.signal.addEventListener("abort", onOuterAbort, { once: true });
+        let timedOut = false;
+        const timer = setTimeout(() => { timedOut = true; timeoutCtl.abort(); }, REQUEST_TIMEOUT_MS);
+        const cleanup = () => {
+          clearTimeout(timer);
+          controller.signal.removeEventListener("abort", onOuterAbort);
+        };
+
+        let response: Response;
+        try {
+          const accessToken = tokenStore.getAccess();
+          response = await fetch(CHAT_API_URL, {
+            method: "POST",
+            signal: timeoutCtl.signal,
+            headers: {
+              "Content-Type": "application/json",
+              ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+            },
+            body,
+          });
+        } catch {
+          cleanup();
+          if (!isCurrent()) return;
+          lastMessage = timedOut ? TIMEOUT_MESSAGE : OFFLINE_MESSAGE;
+          if (attempt < MAX_ATTEMPTS - 1) {
+            try { await wait(backoffDelay(attempt), controller.signal); } catch { return; }
+            continue;
+          }
+          failWith(lastMessage);
+          return;
+        }
+        cleanup();
+        if (!isCurrent()) return;
+
+        if (response.status === 401) {
+          setMessages((prev) => prev.filter((m) => !(m.role === "assistant" && m.content === "")));
+          setLoading(false);
+          await logout();
+          return;
+        }
+
+        if (response.status === 429 || response.status >= 500) {
+          lastMessage = response.status === 429 ? BUSY_MESSAGE : SERVICE_UNAVAILABLE_MESSAGE;
+          if (attempt < MAX_ATTEMPTS - 1) {
+            try { await wait(backoffDelay(attempt, parseRetryAfter(response)), controller.signal); } catch { return; }
+            continue;
+          }
+          failWith(lastMessage);
+          return;
+        }
+
+        if (!response.ok) {
+          failWith(SERVICE_UNAVAILABLE_MESSAGE);
+          return;
+        }
+
+        // Sin streaming: la burbuja queda con content: "" (indicador
+        // "escribiendo...") hasta que llega la respuesta completa.
+        let event: Record<string, unknown>;
+        try {
+          event = await response.json();
+        } catch {
+          failWith(SERVICE_UNAVAILABLE_MESSAGE);
+          return;
+        }
+        if (!isCurrent()) return;
+
+        if (event.type === "error") {
+          failWith((event.message as string) ?? SERVICE_UNAVAILABLE_MESSAGE);
+          return;
+        }
+
+        const mapped = ((event.sources as { source_name: string; score: number; text: string }[]) ?? []).map(
+          (s) => ({ source: s.source_name, score: s.score, text: s.text }),
         );
+        const content = (event.content as string) ?? "";
+        if (!content) {
+          failWith(EMPTY_RESPONSE_MESSAGE);
+          return;
+        }
+
         setLastSources(mapped);
         setMessages((prev) => {
           const u = [...prev];
           u[u.length - 1] = {
             role: "assistant",
-            content: event.content ?? "",
+            content,
             sources: mapped,
-            id: event.message_id,
+            id: event.message_id as string | undefined,
             ts: Date.now(),
           };
           return u;
         });
         setMeta({
-          provider: event.provider_name,
-          model: event.model_name,
-          latency: event.latency_ms,
+          provider: event.provider_name as string | undefined,
+          model: event.model_name as string | undefined,
+          latency: event.latency_ms as number | undefined,
         });
-      }
-    } catch {
-      if (controller.signal.aborted) {
-        // Request cancelada por un mensaje nuevo: la request vigente controla el estado.
         return;
       }
-      // Mismo criterio que el widget real: fallo de red activa "Sin conexión".
-      setMessages((prev) => prev.slice(0, -2));
-      setOfflineMode(true);
+      failWith(lastMessage);
     } finally {
       // Solo la request vigente apaga el spinner de carga.
       if (abortRef.current === controller) {
@@ -681,7 +809,9 @@ export function PlaygroundTab({
                     <p className="text-xs font-semibold text-white truncate">
                       {chatbotName}
                     </p>
-                    <p className="text-3xs text-white/70">En línea</p>
+                    <p className="text-3xs text-white/70">
+                      {offlineMode || networkDown ? "Sin conexión" : loading ? "Escribiendo…" : "En línea"}
+                    </p>
                   </div>
                   {/* Agrupa Nueva conversación, Accesibilidad y Finalizar
                       chat. Se oculta si no hay ningún ítem que mostrar. */}
@@ -914,6 +1044,20 @@ export function PlaygroundTab({
                           )}
                         </div>
                       </div>
+
+                      {msg.role === "assistant" && msg.error && !loading && lastQuestionRef.current && (
+                        <button
+                          type="button"
+                          onClick={() => handleSend(lastQuestionRef.current)}
+                          className={`self-start ml-7 mt-1 text-2xs font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
+                            highContrast
+                              ? "border-white text-white hover:bg-white/10"
+                              : "border-brand-green text-brand-green hover:bg-brand-green/10"
+                          }`}
+                        >
+                          Reintentar
+                        </button>
+                      )}
 
                       {/* Pills de fuentes bajo el mensaje del asistente */}
                       {msg.role === "assistant" &&
