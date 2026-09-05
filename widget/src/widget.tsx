@@ -2,7 +2,7 @@ import { render } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
-import { streamChat, SERVICE_UNAVAILABLE_MESSAGE } from "./chat";
+import { streamChat, SERVICE_UNAVAILABLE_MESSAGE, EMPTY_RESPONSE_MESSAGE } from "./chat";
 import type { SourceChunk, ChatHistoryMessage } from "./chat";
 import { STYLES } from "./styles";
 
@@ -897,9 +897,12 @@ function ChatWidget({
           if (!isCurrent()) return;
           let finalText = "";
           setMessages((prev) => {
-            const updated = prev.map((m) =>
-              m.id === assistantId ? { ...m, streaming: false, backendId: messageId, ts: Date.now() } : m,
-            );
+            const updated = prev.map((m) => {
+              if (m.id !== assistantId) return m;
+              const done = { ...m, streaming: false, backendId: messageId, ts: Date.now() };
+              if (m.content) return done;
+              return { ...done, content: EMPTY_RESPONSE_MESSAGE, error: true };
+            });
             finalText = updated.find((m) => m.id === assistantId)?.content ?? "";
             return updated;
           });

@@ -17,7 +17,10 @@ export interface ChatHistoryMessage {
 }
 
 export const SERVICE_UNAVAILABLE_MESSAGE =
-  "En este momento el asistente no está disponible. Por favor, inténtalo más tarde.";
+  "En este momento el asistente no está disponible. Por favor, inténtelo más tarde.";
+
+export const EMPTY_RESPONSE_MESSAGE =
+  "No se recibió respuesta. Por favor, vuelva a enviar su pregunta.";
 
 interface ChatApiResponse {
   type?: string;
