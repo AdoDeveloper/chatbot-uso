@@ -1131,31 +1131,6 @@ export const STYLES = `
   border-color: #bbf7d0;
 }
 
-.escal-footer {
-  display: flex;
-  justify-content: center;
-  padding: 4px 14px 6px;
-  flex-shrink: 0;
-}
-
-.escal-footer-btn {
-  background: none;
-  border: none;
-  color: var(--color-primary);
-  font-size: 12px;
-  font-family: inherit;
-  cursor: pointer;
-  padding: 2px 4px;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  opacity: 0.8;
-  transition: opacity 0.15s;
-}
-
-.escal-footer-btn:hover {
-  opacity: 1;
-}
-
 .escal-question {
   margin: 0;
   font-size: 14px;

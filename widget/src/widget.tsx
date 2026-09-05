@@ -1404,25 +1404,6 @@ function ChatWidget({
           </>
         )}
 
-        {/* Enlace de contacto manual - visible mientras la tarjeta no esté
-            activa, salvo que el admin haya desactivado el escalamiento.
-            Oculto también durante CSAT: no tiene sentido ofrecer escalar
-            mientras el usuario está cerrando/calificando la conversación. */}
-        {settings.enable_escalation && !offlineMode && escalState === "hidden" &&
-          !(settings.enable_csat && csatState !== "hidden") && (
-          <div class="escal-footer">
-            <button
-              class="escal-footer-btn"
-              onClick={() => {
-                setEscalConvId(conversationId);
-                setEscalState("prompt");
-              }}
-            >
-              ¿Necesitas hablar con alguien?
-            </button>
-          </div>
-        )}
-
         {/* Input - oculto durante CSAT: el usuario está calificando/cerrando
             la conversación, no debería poder seguir escribiendo mensajes. */}
         {!(settings.enable_csat && csatState !== "hidden") && (
