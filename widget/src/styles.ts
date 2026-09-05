@@ -529,6 +529,15 @@ export const STYLES = `
   background: #fff;
   transition: border-color 0.15s, box-shadow 0.15s;
   color: #1a1a1a;
+  /* Con rows=1 y overflow-y:auto, Chrome Android dibuja su scrollbar nativa
+     dentro del textarea incluso sin desbordamiento real de texto, dando el
+     aspecto de un contorno grueso doble junto al border-radius. Se oculta
+     visualmente sin quitar el scroll (sí útil cuando el texto crece). */
+  scrollbar-width: none;
+}
+
+.input::-webkit-scrollbar {
+  display: none;
 }
 
 .input:focus {

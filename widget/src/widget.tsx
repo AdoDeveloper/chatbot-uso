@@ -567,6 +567,34 @@ function ChatWidget({
     if (open) setUnreadCount(0);
   }, [open]);
 
+  // Con el panel a pantalla completa en móvil, el <body> de la página
+  // anfitriona seguía siendo scrolleable detrás del panel (position:fixed
+  // no lo bloquea por sí solo) - el navegador reservaba espacio para su
+  // barra de scroll nativa sobre ese body, visible como una franja gris
+  // vertical superpuesta al panel, que cubría en apariencia toda la
+  // pantalla pero no en los px reales que el sistema operativo pintaba.
+  useEffect(() => {
+    if (!open) return;
+    if (!window.matchMedia("(max-width: 480px)").matches) return;
+    const body = document.body;
+    const scrollY = window.scrollY;
+    const prevOverflow = body.style.overflow;
+    const prevPosition = body.style.position;
+    const prevWidth = body.style.width;
+    const prevTop = body.style.top;
+    body.style.overflow = "hidden";
+    body.style.position = "fixed";
+    body.style.width = "100%";
+    body.style.top = `-${scrollY}px`;
+    return () => {
+      body.style.overflow = prevOverflow;
+      body.style.position = prevPosition;
+      body.style.width = prevWidth;
+      body.style.top = prevTop;
+      window.scrollTo(0, scrollY);
+    };
+  }, [open]);
+
   // Cerrar kebab si se hace click fuera, o con Escape (navegación por teclado).
   // e.target de un evento disparado dentro del Shadow DOM llega "retargeted"
   // al host (<chatbot-widget>) cuando se escucha desde document - nunca es
