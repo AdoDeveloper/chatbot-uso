@@ -730,7 +730,7 @@ export function PlaygroundTab({
                   <button
                     type="button"
                     onClick={() => setWidgetOpen(false)}
-                    className="w-7 h-7 flex items-center justify-center rounded text-white hover:bg-white/10 transition-colors"
+                    className="w-7 h-7 -ml-1.5 flex items-center justify-center rounded text-white hover:bg-white/10 transition-colors"
                     title="Cerrar"
                     aria-label="Cerrar"
                   >
@@ -955,7 +955,7 @@ export function PlaygroundTab({
                         (ttsSupported || enableCopyAction || enableFeedbackIcons || !!msg.ts) && (
                           <div
                             onClick={(e) => e.stopPropagation()}
-                            className={`flex items-center gap-0.5 transition-opacity [@media(hover:hover)]:group-hover:opacity-100 ${revealedIdx === i ? "opacity-100" : "opacity-0"} ${showBotIcon ? "pl-7" : "pl-1"}`}
+                            className={`flex items-center -space-x-1 transition-opacity [@media(hover:hover)]:group-hover:opacity-100 ${revealedIdx === i ? "opacity-100" : "opacity-0"} ${showBotIcon ? "pl-7" : "pl-1"}`}
                           >
                             {ttsSupported && (
                               <button
@@ -1022,7 +1022,7 @@ export function PlaygroundTab({
                               </>
                             )}
                             {msg.ts && (
-                              <span className={`text-2xs leading-[14px] tabular-nums whitespace-nowrap ml-1 ${highContrast ? "text-white/60" : "text-muted-foreground/60"}`}>
+                              <span className={`text-2xs leading-[14px] tabular-nums whitespace-nowrap ml-1.5 ${highContrast ? "text-white" : "text-muted-foreground"}`}>
                                 {formatTime(msg.ts)}
                               </span>
                             )}
@@ -1031,7 +1031,7 @@ export function PlaygroundTab({
 
                       {/* Copiar + hora bajo el mensaje del usuario */}
                       {msg.role === "user" && msg.content && (enableCopyAction || !!msg.ts) && (
-                        <div onClick={(e) => e.stopPropagation()} className={`flex items-center gap-0.5 justify-end pr-1 transition-opacity [@media(hover:hover)]:group-hover:opacity-100 ${revealedIdx === i ? "opacity-100" : "opacity-0"}`}>
+                        <div onClick={(e) => e.stopPropagation()} className={`flex items-center -space-x-1 justify-end pr-1 transition-opacity [@media(hover:hover)]:group-hover:opacity-100 ${revealedIdx === i ? "opacity-100" : "opacity-0"}`}>
                           {enableCopyAction && (
                             <button
                               type="button"
@@ -1048,7 +1048,7 @@ export function PlaygroundTab({
                             </button>
                           )}
                           {msg.ts && (
-                            <span className={`text-2xs leading-[14px] tabular-nums whitespace-nowrap ml-1 ${highContrast ? "text-white/60" : "text-muted-foreground/60"}`}>
+                            <span className={`text-2xs leading-[14px] tabular-nums whitespace-nowrap ml-1.5 ${highContrast ? "text-white" : "text-muted-foreground"}`}>
                               {formatTime(msg.ts)}
                             </span>
                           )}

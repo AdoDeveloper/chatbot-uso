@@ -181,6 +181,15 @@ export const STYLES = `
   background: rgba(255,255,255,0.15);
 }
 
+/* Mismo criterio que .msg-actions: iconos de 20px en cajas de 40px dejaban
+   30px de aire entre ellos (10px de gap del header + 20px de las cajas).
+   Se solapan las cajas contiguas manteniendo los 40x40 de area tactil.
+   El hermano de .close-btn es .kebab-wrapper, no .header-btn: este ultimo
+   va dentro del wrapper (que ancla el menu desplegable). */
+.kebab-wrapper + .close-btn {
+  margin-left: -12px;
+}
+
 /* ── Área de mensajes ───────────────────────────────────────────────────── */
 
 .messages {
@@ -589,13 +598,22 @@ export const STYLES = `
    componente): en tactil no existe hover, y sin eso quedaban invisibles
    salvo por el hover "pegado" tras tocar la burbuja - de ahi que se vieran
    de forma intermitente en el telefono. */
+/* gap negativo: la caja de cada boton (28px) es el doble que su icono
+   (14px), asi que con gap positivo quedaban ~16px de aire entre iconos.
+   Se solapan las cajas para juntar los iconos sin reducir el area tactil,
+   que sigue por encima del minimo de 24x24 de WCAG 2.5.8. */
 .msg-actions {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 0;
   margin-top: 6px;
+  margin-left: -4px;
   opacity: 0;
   transition: opacity 0.15s ease;
+}
+
+.msg-actions .action-btn + .action-btn {
+  margin-left: -4px;
 }
 
 .msg-revealed .msg-actions,
@@ -623,15 +641,18 @@ export const STYLES = `
   justify-content: flex-end;
 }
 
-/* Mismo color y peso optico que .action-btn (14px de icono sobre una caja
-   de 28px): 12px de texto con line-height 14px alinea la cifra con el
-   centro de los iconos en vez de flotar mas pequena y mas abajo. */
+/* 12px con line-height 14px alinea la cifra con el centro de los iconos
+   (14px sobre caja de 28px). El color NO es el de los iconos (#9ca3af):
+   sobre blanco eso da 2.5:1, por debajo del 4.5:1 que WCAG pide para
+   texto, y se leia apagado. #6b7280 da 4.8:1 y ya es un gris de la propia
+   paleta del widget. Un icono puede ser mas tenue que su etiqueta porque
+   se apoya en la forma, no en la lectura. */
 .msg-time {
   font-size: 12px;
   line-height: 14px;
-  color: #9ca3af;
+  color: #6b7280;
   white-space: nowrap;
-  margin-left: 4px;
+  margin-left: 6px;
   font-variant-numeric: tabular-nums;
 }
 
