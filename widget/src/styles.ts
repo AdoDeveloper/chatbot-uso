@@ -1513,6 +1513,9 @@ export const STYLES = `
 }
 
 .a11y-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 13px;
   font-weight: 700;
   color: #111827;
@@ -1604,5 +1607,11 @@ export const STYLES = `
   font-size: 11px;
   color: #6b7280;
   line-height: 1.4;
+}
+
+.a11y-hint-icon {
+  display: inline;
+  vertical-align: text-bottom;
+  margin: 0 2px;
 }
 `;

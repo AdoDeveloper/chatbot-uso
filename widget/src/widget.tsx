@@ -1077,7 +1077,16 @@ function ChatWidget({
         {a11yOpen && (
           <div class="a11y-panel" role="region" aria-label="Opciones de accesibilidad">
             <div class="a11y-panel-head">
-              <span class="a11y-panel-title">Accesibilidad</span>
+              <span class="a11y-panel-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                  <circle cx="16" cy="4" r="1" />
+                  <path d="m18 19 1-7-6 1" />
+                  <path d="m5 8 3-3 5.5 3-2.36 3.5" />
+                  <path d="M4.24 14.5a5 5 0 0 0 6.88 6" />
+                  <path d="M13.76 17.5a5 5 0 0 0-6.88-6" />
+                </svg>
+                Accesibilidad
+              </span>
               <button class="a11y-close" onClick={() => setA11yOpen(false)} aria-label="Cerrar accesibilidad" title="Cerrar">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14">
                   <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
@@ -1087,13 +1096,17 @@ function ChatWidget({
             {/* Tamaño de texto */}
             <div class="a11y-row">
               <span class="a11y-label">Tamaño del texto</span>
-              <div class="a11y-scale" role="group" aria-label="Tamaño del texto">
+              {/* radiogroup/radio + aria-checked, no aria-pressed: es una
+                  selección única entre opciones excluyentes, no un botón de
+                  encendido/apagado (WAI-ARIA APG, patrón Radio Group). */}
+              <div class="a11y-scale" role="radiogroup" aria-label="Tamaño del texto">
                 {(["sm", "md", "lg"] as TextScale[]).map((s, i) => (
                   <button
                     key={s}
                     class={`a11y-scale-btn ${a11y.textScale === s ? "a11y-scale-active" : ""}`}
                     onClick={() => setTextScale(s)}
-                    aria-pressed={a11y.textScale === s}
+                    role="radio"
+                    aria-checked={a11y.textScale === s}
                     aria-label={["Texto pequeño", "Texto normal", "Texto grande"][i]}
                     style={{ fontSize: [12, 14, 17][i] + "px" }}
                   >A</button>
@@ -1114,7 +1127,15 @@ function ChatWidget({
               </button>
             </div>
             {ttsSupported && (
-              <p class="a11y-hint">Toca el ícono de altavoz en cada respuesta para escucharla en voz alta.</p>
+              <p class="a11y-hint">
+                Use el botón
+                <svg class="a11y-hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12">
+                  <path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z" />
+                  <path d="M16 9a5 5 0 0 1 0 6" />
+                  <path d="M19.364 18.364a9 9 0 0 0 0-12.728" />
+                </svg>
+                {" en cada respuesta para escucharla en voz alta."}
+              </p>
             )}
           </div>
         )}

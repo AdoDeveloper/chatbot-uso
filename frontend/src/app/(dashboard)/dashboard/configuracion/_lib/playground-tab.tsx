@@ -38,6 +38,32 @@ type PlaygroundMode = "draft" | "deployed";
 
 const _PG_STORAGE_KEY = "playground_session";
 const _PG_MODE_STORAGE_KEY = "playground_mode";
+const _PG_A11Y_STORAGE_KEY = "playground_a11y";
+
+type TextScale = "sm" | "md" | "lg";
+interface A11yPrefs { textScale: TextScale; highContrast: boolean; }
+
+// Clave propia, separada de la del widget real (usobot:history:<host>:a11y):
+// son contextos distintos y el panel no debe pisar la preferencia que el
+// visitante haya elegido en el widget embebido de este mismo dominio.
+function loadA11yPrefs(): A11yPrefs {
+  const fallback: A11yPrefs = { textScale: "md", highContrast: false };
+  if (typeof window === "undefined") return fallback;
+  try {
+    const raw = window.localStorage.getItem(_PG_A11Y_STORAGE_KEY);
+    if (!raw) return fallback;
+    const p = JSON.parse(raw) as Partial<A11yPrefs>;
+    return {
+      textScale: p.textScale === "sm" || p.textScale === "lg" ? p.textScale : "md",
+      highContrast: !!p.highContrast,
+    };
+  } catch { return fallback; }
+}
+
+function saveA11yPrefs(prefs: A11yPrefs): void {
+  if (typeof window === "undefined") return;
+  try { window.localStorage.setItem(_PG_A11Y_STORAGE_KEY, JSON.stringify(prefs)); } catch { /* ignore */ }
+}
 
 function SourceCard({
   source, score, text, index,
@@ -150,10 +176,12 @@ export function PlaygroundTab({
   // Header kebab + accesibilidad (paridad con el widget real).
   const [kebabOpen, setKebabOpen] = useState(false);
   const [a11yOpen, setA11yOpen] = useState(false);
-  const [textScale, setTextScale] = useState<"sm" | "md" | "lg">("md");
-  const [highContrast, setHighContrast] = useState(false);
+  const [textScale, setTextScale] = useState<"sm" | "md" | "lg">(() => loadA11yPrefs().textScale);
+  const [highContrast, setHighContrast] = useState(() => loadA11yPrefs().highContrast);
   const [speakingId, setSpeakingId] = useState<string | null>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { saveA11yPrefs({ textScale, highContrast }); }, [textScale, highContrast]);
 
   // Mismo breakpoint que las clases `md:` (768px): en mobile el chat abierto pasa a overlay full-screen.
   const [isMobilePreview, setIsMobilePreview] = useState(false);
@@ -699,23 +727,24 @@ export function PlaygroundTab({
                       </button>
                     </div>
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-2xs text-muted-foreground">Tamaño de texto</span>
-                      <div role="radiogroup" aria-label="Tamaño de texto" className="flex items-center gap-1">
-                        {([["sm", "A", "text-2xs"], ["md", "A", "text-xs"], ["lg", "A", "text-sm"]] as const).map(([val, label, cls]) => (
+                      <span className="text-2xs text-muted-foreground">Tamaño del texto</span>
+                      <div role="radiogroup" aria-label="Tamaño del texto" className="flex items-center gap-1">
+                        {([["sm", 12, "Texto pequeño"], ["md", 14, "Texto normal"], ["lg", 17, "Texto grande"]] as const).map(([val, px, aria]) => (
                           <button
                             key={val}
                             type="button"
                             role="radio"
                             aria-checked={textScale === val}
+                            aria-label={aria}
                             onClick={() => setTextScale(val)}
-                            className={`w-7 h-7 flex items-center justify-center rounded-md border font-semibold ${cls} ${
+                            className={`w-[30px] h-[30px] flex items-center justify-center rounded-md border font-semibold ${
                               textScale === val
                                 ? "border-transparent text-white"
                                 : "border-border text-muted-foreground hover:bg-muted-foreground/10"
                             }`}
-                            style={textScale === val ? { backgroundColor: primaryColor } : {}}
+                            style={textScale === val ? { backgroundColor: primaryColor, fontSize: px } : { fontSize: px }}
                           >
-                            {label}
+                            A
                           </button>
                         ))}
                       </div>
@@ -727,10 +756,10 @@ export function PlaygroundTab({
                         role="switch"
                         aria-checked={highContrast}
                         onClick={() => setHighContrast((v) => !v)}
-                        className={`relative w-9 h-5 rounded-full transition-colors ${highContrast ? "" : "bg-muted-foreground/30"}`}
+                        className={`relative w-[42px] h-6 rounded-full transition-colors ${highContrast ? "" : "bg-muted-foreground/30"}`}
                         style={highContrast ? { backgroundColor: primaryColor } : {}}
                       >
-                        <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${highContrast ? "translate-x-4" : ""}`} />
+                        <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${highContrast ? "translate-x-[18px]" : ""}`} />
                       </button>
                     </div>
                     {ttsSupported && (
