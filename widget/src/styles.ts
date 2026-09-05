@@ -1361,11 +1361,16 @@ export const STYLES = `
      para que gane en cualquier orden de cascada, sin importar la esquina. */
   .root[data-position] .panel {
     position: fixed;
-    inset: 0;
-    right: auto;
-    bottom: auto;
-    top: auto;
-    left: auto;
+    /* Los 4 offsets explícitos en 0, no el shorthand inset:0 combinado con
+       longhands en auto: esa combinación (probada en producción) resuelve
+       el inset entero como "auto" - el panel queda sin ancla al viewport y
+       cae en su posición estática dentro de .root (que en bottom-right/
+       bottom-left/top-right/top-left tiene su propio right/left/top/bottom
+       de 1rem), dejando una franja del ancho de ese margen sin cubrir. */
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
     width: 100vw;
     width: 100dvw;
     /* max-width (calc(100dvw - 3rem), fuera de este media query) no se
