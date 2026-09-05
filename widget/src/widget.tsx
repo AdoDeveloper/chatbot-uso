@@ -419,7 +419,7 @@ function MessageActions({ content, backendId, conversationId, apiUrl, apiKey, se
   if (!settings.enable_copy_action && !settings.enable_feedback_icons && !ttsSupported && !time) return null;
 
   return (
-    <div class="msg-actions">
+    <div class="msg-actions" onClick={(e) => e.stopPropagation()}>
       {ttsSupported && onSpeak && (
         <button class={`action-btn ${isSpeaking ? "action-active" : ""}`} onClick={onSpeak} title={isSpeaking ? "Detener lectura" : "Escuchar en voz alta"} aria-label={isSpeaking ? "Detener lectura" : "Escuchar en voz alta"}>
           {isSpeaking ? (
@@ -469,7 +469,7 @@ function UserMessageActions({ content, settings, ts }: {
   if (!settings.enable_copy_action && !time) return null;
 
   return (
-    <div class="msg-actions msg-actions-user">
+    <div class="msg-actions msg-actions-user" onClick={(e) => e.stopPropagation()}>
       {settings.enable_copy_action && (
         <button class={`action-btn ${copied ? "action-active" : ""}`} onClick={handleCopy} title="Copiar" aria-label="Copiar mensaje">
           {copied ? (
@@ -581,6 +581,9 @@ function ChatWidget({
   const [a11yOpen, setA11yOpen]             = useState(false);
   // TTS: id del mensaje que se está leyendo en voz alta (o null).
   const [speakingId, setSpeakingId]         = useState<string | null>(null);
+  // Mensaje cuyas acciones estan reveladas por click/tap (en tactil no hay
+  // hover); solo uno a la vez, para no llenar el hilo de iconos.
+  const [revealedId, setRevealedId]         = useState<string | null>(null);
 
   // Refs
   const contextRef = useRef<Record<string, unknown>>({});
@@ -1291,7 +1294,11 @@ function ChatWidget({
             {/* Mensajes */}
             <div class="messages" role="log" aria-live="polite">
               {messages.map((msg) => (
-                <div key={msg.id} class={`msg-row msg-row-${msg.role}`}>
+                <div
+                  key={msg.id}
+                  class={`msg-row msg-row-${msg.role}${revealedId === msg.id ? " msg-revealed" : ""}`}
+                  onClick={() => setRevealedId((id) => (id === msg.id ? null : msg.id))}
+                >
                   {msg.role === "assistant" && showBotIcon && (
                     <div class="msg-avatar" aria-hidden="true">
                       <BotIcon size={14} logoUrl={logoUrl} />

@@ -584,24 +584,27 @@ export const STYLES = `
 
 /* ── Botones de acción del mensaje ────────────────────────────────────────── */
 
+/* Ocultas por defecto; se revelan al pasar el puntero (donde lo hay) o al
+   tocar/hacer clic en el mensaje (.msg-revealed, que pone el propio
+   componente): en tactil no existe hover, y sin eso quedaban invisibles
+   salvo por el hover "pegado" tras tocar la burbuja - de ahi que se vieran
+   de forma intermitente en el telefono. */
 .msg-actions {
   display: flex;
   align-items: center;
   gap: 2px;
   margin-top: 6px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
 }
 
-/* Aparecer al pasar el puntero solo donde hay puntero: en tactil no existe
-   hover, y las acciones (y la hora) quedaban invisibles salvo por el hover
-   "pegado" tras tocar la burbuja - de ahi que se vieran de forma
-   intermitente en el telefono. */
+.msg-revealed .msg-actions,
+.msg-actions:focus-within {
+  opacity: 1;
+}
+
 @media (hover: hover) {
-  .msg-actions {
-    opacity: 0;
-    transition: opacity 0.15s ease;
-  }
   .msg-assistant:hover .msg-actions,
-  .msg-actions:focus-within,
   .msg-user-col:hover .msg-actions-user {
     opacity: 1;
   }
@@ -620,11 +623,16 @@ export const STYLES = `
   justify-content: flex-end;
 }
 
+/* Mismo color y peso optico que .action-btn (14px de icono sobre una caja
+   de 28px): 12px de texto con line-height 14px alinea la cifra con el
+   centro de los iconos en vez de flotar mas pequena y mas abajo. */
 .msg-time {
-  font-size: 10.5px;
+  font-size: 12px;
+  line-height: 14px;
   color: #9ca3af;
   white-space: nowrap;
   margin-left: 4px;
+  font-variant-numeric: tabular-nums;
 }
 
 .action-btn {

@@ -189,6 +189,9 @@ export function PlaygroundTab({
   const [textScale, setTextScale] = useState<"sm" | "md" | "lg">(() => loadA11yPrefs().textScale);
   const [highContrast, setHighContrast] = useState(() => loadA11yPrefs().highContrast);
   const [speakingId, setSpeakingId] = useState<string | null>(null);
+  // Indice del mensaje cuyas acciones estan reveladas por click/tap (en
+  // tactil no hay hover); solo uno a la vez.
+  const [revealedIdx, setRevealedIdx] = useState<number | null>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { saveA11yPrefs({ textScale, highContrast }); }, [textScale, highContrast]);
@@ -859,7 +862,8 @@ export function PlaygroundTab({
                   {messages.map((msg, i) => (
                     <div
                       key={i}
-                      className={`flex flex-col gap-1 ${msg.role === "user" ? "items-end" : "items-start"}`}
+                      onClick={() => setRevealedIdx((idx) => (idx === i ? null : i))}
+                      className={`group flex flex-col gap-1 ${msg.role === "user" ? "items-end" : "items-start"}`}
                     >
                       <div
                         className={`flex items-end gap-1.5 w-full ${msg.role === "user" ? "justify-end" : "justify-start"}`}
@@ -950,7 +954,8 @@ export function PlaygroundTab({
                         msg.content &&
                         (ttsSupported || enableCopyAction || enableFeedbackIcons || !!msg.ts) && (
                           <div
-                            className={`flex items-center gap-0.5 ${showBotIcon ? "pl-7" : "pl-1"}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className={`flex items-center gap-0.5 transition-opacity [@media(hover:hover)]:group-hover:opacity-100 ${revealedIdx === i ? "opacity-100" : "opacity-0"} ${showBotIcon ? "pl-7" : "pl-1"}`}
                           >
                             {ttsSupported && (
                               <button
@@ -1017,7 +1022,7 @@ export function PlaygroundTab({
                               </>
                             )}
                             {msg.ts && (
-                              <span className={`text-3xs whitespace-nowrap px-1 ${highContrast ? "text-white/70" : "text-muted-foreground/70"}`}>
+                              <span className={`text-2xs leading-[14px] tabular-nums whitespace-nowrap ml-1 ${highContrast ? "text-white/60" : "text-muted-foreground/60"}`}>
                                 {formatTime(msg.ts)}
                               </span>
                             )}
@@ -1026,7 +1031,7 @@ export function PlaygroundTab({
 
                       {/* Copiar + hora bajo el mensaje del usuario */}
                       {msg.role === "user" && msg.content && (enableCopyAction || !!msg.ts) && (
-                        <div className="flex items-center gap-0.5 justify-end pr-1">
+                        <div onClick={(e) => e.stopPropagation()} className={`flex items-center gap-0.5 justify-end pr-1 transition-opacity [@media(hover:hover)]:group-hover:opacity-100 ${revealedIdx === i ? "opacity-100" : "opacity-0"}`}>
                           {enableCopyAction && (
                             <button
                               type="button"
@@ -1043,7 +1048,7 @@ export function PlaygroundTab({
                             </button>
                           )}
                           {msg.ts && (
-                            <span className={`text-3xs whitespace-nowrap px-1 ${highContrast ? "text-white/70" : "text-muted-foreground/70"}`}>
+                            <span className={`text-2xs leading-[14px] tabular-nums whitespace-nowrap ml-1 ${highContrast ? "text-white/60" : "text-muted-foreground/60"}`}>
                               {formatTime(msg.ts)}
                             </span>
                           )}
