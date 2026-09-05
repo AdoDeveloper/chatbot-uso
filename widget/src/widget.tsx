@@ -221,8 +221,14 @@ function loadHistory(apiUrl: string, apiKey: string): {
       // guardados antes no lo traen y se quedaban sin hora al restaurarlos.
       // Se rellenan con updatedAt (lo mas cercano que se guardo de cuando
       // ocurrio la conversacion) en vez de dejarlos en blanco.
+      // Los ids se reasignan al restaurar: los guardados provienen del
+      // contador de otra sesion y podrian coincidir con los que uid() emita
+      // ahora, y quien colisiona termina recibiendo el streaming de otro
+      // mensaje. Reasignarlos aqui lo vuelve imposible, sin depender de que
+      // el prefijo aleatorio de uid() nunca se repita.
       messages: parsed.messages.map((m) => ({
         ...m,
+        id: uid(),
         streaming: false,
         error: false,
         ts: m.ts ?? parsed.updatedAt,
@@ -346,8 +352,18 @@ interface WidgetSettings {
   max_input_chars: number;
 }
 
+/* Un contador en memoria ("1", "2", ...) reiniciaba en cada carga mientras
+   el historial restaurado conservaba esos mismos ids: el primer mensaje
+   nuevo colisionaba con uno viejo y, como el streaming localiza su burbuja
+   por `m.id === assistantId`, la respuesta del bot se escribia dentro del
+   mensaje del usuario que compartia id (texto pegado y en markdown crudo).
+   El prefijo aleatorio hace que los ids no se repitan entre sesiones. */
 let _id = 0;
-const uid = () => String(++_id);
+const _idPrefix =
+  (typeof crypto !== "undefined" && crypto.randomUUID)
+    ? crypto.randomUUID().slice(0, 8)
+    : Math.random().toString(36).slice(2, 10);
+const uid = () => `${_idPrefix}-${++_id}`;
 
 function MarkdownContent({ content, streaming }: { content: string; streaming?: boolean }) {
   if (streaming && !content) {
