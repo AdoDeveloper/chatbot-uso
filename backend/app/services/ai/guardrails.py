@@ -179,7 +179,10 @@ def get_injection_pattern_defs() -> list[dict]:
 
 # Patrones de caracteres sospechosos (homoglifos, caracteres zero-width, override RTL).
 _SUSPICIOUS_CHARS = re.compile(
-    r"[\u200b-\u200f\u2028-\u202f\ufeff\u00ad"  # Zero-width, guion suave
+    # El rango llega hasta \u202e: \u202f (NARROW NO-BREAK SPACE) es un espacio
+    # tipogr\u00e1fico visible (categor\u00eda Zs) que los modelos usan en rangos como
+    # "9.0 \u2013 9.5", no un car\u00e1cter de formato invisible.
+    r"[\u200b-\u200f\u2028-\u202e\ufeff\u00ad"  # Zero-width, guion suave
     r"\u0410\u0412\u0415\u041a\u041c\u041d\u041e\u0420\u0421\u0422\u0423\u0425"  # Cir\u00edlico \u0410\u0412\u0415\u041a\u041c\u041d\u041e\u0420\u0421\u0422\u0423\u0425 (homoglifos may\u00fasculas)
     r"\u0430\u0435\u043e\u0440\u0441\u0445\u0443"  # Cir\u00edlico \u0430\u0432\u0435\u043e\u0440\u0441\u0445\u0443 (homoglifos min\u00fasculas)
     r"\u2060-\u206f"  # Formato invisible
