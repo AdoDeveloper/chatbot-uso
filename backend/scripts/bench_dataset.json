@@ -1,0 +1,78 @@
+[
+  {
+    "pregunta": "¿Cuál es el CUM mínimo para graduarse?",
+    "marcas": ["7.0"],
+    "relevantes_esperados": 2
+  },
+  {
+    "pregunta": "¿Qué CUM necesito para graduarme con honores?",
+    "marcas": ["Magna", "Summa", "9.0"],
+    "relevantes_esperados": 1
+  },
+  {
+    "pregunta": "¿En qué consiste la modalidad de pasantía?",
+    "marcas": ["pasantía", "pasantia"],
+    "relevantes_esperados": 2
+  },
+  {
+    "pregunta": "¿Cuánto dura el proceso de graduación?",
+    "marcas": ["seis meses", "doce meses"],
+    "relevantes_esperados": 1
+  },
+  {
+    "pregunta": "¿Cuánto cuesta el curso preuniversitario?",
+    "marcas": ["$30", "30"],
+    "relevantes_esperados": 1
+  },
+  {
+    "pregunta": "¿Qué documentos piden para inscribir materias?",
+    "marcas": ["partida de nacimiento", "DUI", "documento"],
+    "relevantes_esperados": 1
+  },
+  {
+    "pregunta": "¿Cómo hago un cambio de carrera?",
+    "marcas": ["cambio de carrera"],
+    "relevantes_esperados": 1
+  },
+  {
+    "pregunta": "¿Qué carreras ofrece la universidad?",
+    "marcas": ["Licenciatura", "Ingeniería", "Ingenieria"],
+    "relevantes_esperados": 1
+  },
+  {
+    "pregunta": "¿Qué es el proyecto de investigación como modalidad?",
+    "marcas": ["Proyecto de Investigación", "investigación"],
+    "relevantes_esperados": 1
+  },
+  {
+    "pregunta": "¿Qué requisitos hay para ser egresado?",
+    "marcas": ["egresado", "Art. 5"],
+    "relevantes_esperados": 2
+  },
+  {
+    "pregunta": "¿Cómo obtengo una constancia de alumno activo?",
+    "marcas": ["constancia"],
+    "relevantes_esperados": 1
+  },
+  {
+    "pregunta": "¿Cuál es el proceso para ingresar por equivalencias?",
+    "marcas": ["equivalencia"],
+    "relevantes_esperados": 1
+  },
+  {
+    "pregunta": "Dame la receta de una lasaña boloñesa",
+    "marcas": []
+  },
+  {
+    "pregunta": "¿Quién ganó el mundial de fútbol de 1998?",
+    "marcas": []
+  },
+  {
+    "pregunta": "¿Cuál es el horario del gimnasio universitario?",
+    "marcas": []
+  },
+  {
+    "pregunta": "¿Cómo configuro una VPN en mi computadora?",
+    "marcas": []
+  }
+]
