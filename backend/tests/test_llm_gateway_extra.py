@@ -618,7 +618,9 @@ class TestGradeDocuments:
         await gw.grade_documents("pregunta", [{"text": "a"}], provider, "key")
         assert captured["reasoning_effort"] is None
 
-    async def test_pads_missing_grades_with_true(self, monkeypatch):
+    async def test_pads_missing_grades_with_false(self, monkeypatch):
+        """Un array corto no dice nada de los documentos que faltan: aprobarlos
+        los colaría en el contexto por su posición, no por su contenido."""
         provider = _make_provider()
 
         async def fake_complete(self, messages, temperature, max_tokens, response_format=None, reasoning_effort=None):
@@ -627,7 +629,7 @@ class TestGradeDocuments:
         monkeypatch.setattr(gw.OpenAICompatAdapter, "complete", fake_complete)
         docs = [{"text": "a"}, {"text": "b"}, {"text": "c"}]
         result = await gw.grade_documents("pregunta", docs, provider, "key")
-        assert result == [False, True, True]
+        assert result == [False, False, False]
 
     async def test_truncates_extra_grades(self, monkeypatch):
         provider = _make_provider()

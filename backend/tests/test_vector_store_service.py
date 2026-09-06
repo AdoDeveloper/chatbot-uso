@@ -22,6 +22,14 @@ def _point(point_id, payload, score=None):
     return SimpleNamespace(id=point_id, payload=payload, score=score)
 
 
+# Los campos por los que filtra hybrid_search, más el índice de texto.
+_EXPECTED_INDEXES = {"text", "source_id", "is_discarded", "is_active"}
+
+
+def _indexed_fields(client) -> set[str]:
+    return {c.kwargs["field_name"] for c in client.create_payload_index.await_args_list}
+
+
 class FakeCollectionsResult:
     def __init__(self, names):
         self.collections = [SimpleNamespace(name=n) for n in names]
@@ -50,7 +58,7 @@ class TestEnsureCollection:
         patch_client.create_collection.assert_awaited_once()
         kwargs = patch_client.create_collection.call_args.kwargs
         assert kwargs["collection_name"] == vs.COLLECTION
-        patch_client.create_payload_index.assert_awaited_once()
+        assert _indexed_fields(patch_client) == _EXPECTED_INDEXES
 
     async def test_skips_creation_when_collection_exists(self, patch_client):
         patch_client.get_collections.return_value = FakeCollectionsResult([vs.COLLECTION])
@@ -58,8 +66,8 @@ class TestEnsureCollection:
         await vs.ensure_collection()
 
         patch_client.create_collection.assert_not_awaited()
-        # El índice de texto se intenta crear siempre, exista o no la colección.
-        patch_client.create_payload_index.assert_awaited_once()
+        # Los índices se intentan crear siempre, exista o no la colección.
+        assert _indexed_fields(patch_client) == _EXPECTED_INDEXES
 
     async def test_swallows_already_exists_race_on_create(self, patch_client):
         patch_client.get_collections.return_value = FakeCollectionsResult([])
@@ -67,7 +75,7 @@ class TestEnsureCollection:
 
         await vs.ensure_collection()  # no debe propagar
 
-        patch_client.create_payload_index.assert_awaited_once()
+        assert _indexed_fields(patch_client) == _EXPECTED_INDEXES
 
     async def test_reraises_unexpected_error_on_create(self, patch_client):
         patch_client.get_collections.return_value = FakeCollectionsResult([])

@@ -76,12 +76,39 @@ class TestGrade:
         assert result == {"relevant_docs": []}
 
     async def test_filters_by_grade(self):
-        state = _make_state(documents=[SAMPLE_DOC, {"id": "chunk-2"}, {"id": "chunk-3"}])
-        with patch("app.services.rag.corrective.grade_documents", AsyncMock(return_value=[True, False, True])):
+        docs = [SAMPLE_DOC, {"id": "chunk-2"}, {"id": "chunk-3"}, {"id": "chunk-4"}]
+        state = _make_state(documents=docs)
+        with patch(
+            "app.services.rag.corrective.grade_documents",
+            AsyncMock(return_value=[True, False, True, True]),
+        ):
             result = await _grade(state)
-        assert len(result["relevant_docs"]) == 2
+        assert [d["id"] for d in result["relevant_docs"]] == ["chunk-1", "chunk-3", "chunk-4"]
+
+    async def test_completes_context_when_grader_approves_too_few(self):
+        """Un solo fragmento deja al generador sin apoyo suficiente, así que se
+        completa con los mejores del recuperador hasta el mínimo."""
+        docs = [SAMPLE_DOC, {"id": "chunk-2"}, {"id": "chunk-3"}]
+        state = _make_state(documents=docs)
+        with patch(
+            "app.services.rag.corrective.grade_documents",
+            AsyncMock(return_value=[True, False, False]),
+        ):
+            result = await _grade(state)
+        assert len(result["relevant_docs"]) == 3
         assert result["relevant_docs"][0]["id"] == "chunk-1"
-        assert result["relevant_docs"][1]["id"] == "chunk-3"
+
+    async def test_keeps_context_empty_when_nothing_is_relevant(self):
+        """Sin ningún fragmento aprobado la pregunta queda fuera del corpus:
+        completar solo daría al generador material ajeno."""
+        docs = [SAMPLE_DOC, {"id": "chunk-2"}, {"id": "chunk-3"}]
+        state = _make_state(documents=docs)
+        with patch(
+            "app.services.rag.corrective.grade_documents",
+            AsyncMock(return_value=[False, False, False]),
+        ):
+            result = await _grade(state)
+        assert result["relevant_docs"] == []
 
 
 class TestDecideAfterGrade:
@@ -261,15 +288,34 @@ class TestRunSimpleRag:
         """provider pasado - el filtro de relevancia (mismo grade_documents que
         corrective RAG) descarta los chunks marcados como no relevantes, sin
         pasar por el ciclo expand/rewrite del grafo completo."""
-        docs = [{"id": "chunk-1"}, {"id": "chunk-2"}, {"id": "chunk-3"}]
+        docs = [{"id": "chunk-%d" % i} for i in range(1, 5)]
         with (
             patch("app.services.rag.corrective.embed_texts_async", AsyncMock(return_value=[SAMPLE_EMB])),
             patch("app.services.rag.corrective.vector_store.hybrid_search", AsyncMock(return_value=docs)),
-            patch("app.services.rag.corrective.grade_documents", AsyncMock(return_value=[True, False, True])),
+            patch(
+                "app.services.rag.corrective.grade_documents",
+                AsyncMock(return_value=[True, False, True, True]),
+            ),
         ):
             result, ratio = await run_simple_rag("¿Qué carrera ofrece?", provider=_PROVIDER_STUB, api_key="key")
-        assert result == [docs[0], docs[2]]
-        assert ratio == 2 / 3
+        assert result == [docs[0], docs[2], docs[3]]
+        assert ratio == 3 / 4
+
+    async def test_ratio_reflects_the_grader_not_the_completed_context(self):
+        """El ratio mide el juicio del filtro: si midiera lo enviado tras
+        completar, la métrica ocultaría que el evaluador aprobó poco."""
+        docs = [{"id": "chunk-%d" % i} for i in range(1, 5)]
+        with (
+            patch("app.services.rag.corrective.embed_texts_async", AsyncMock(return_value=[SAMPLE_EMB])),
+            patch("app.services.rag.corrective.vector_store.hybrid_search", AsyncMock(return_value=docs)),
+            patch(
+                "app.services.rag.corrective.grade_documents",
+                AsyncMock(return_value=[True, False, False, False]),
+            ),
+        ):
+            result, ratio = await run_simple_rag("¿Qué carrera ofrece?", provider=_PROVIDER_STUB, api_key="key")
+        assert len(result) == 3
+        assert ratio == 1 / 4
 
     async def test_no_docs_skips_grading_call(self):
         with (
