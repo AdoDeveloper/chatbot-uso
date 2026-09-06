@@ -12,6 +12,7 @@ from qdrant_client.models import (
     Filter,
     MatchAny,
     MatchValue,
+    PayloadSchemaType,
     PointStruct,
     Rrf,
     RrfQuery,
@@ -81,6 +82,24 @@ async def ensure_collection() -> None:
     except Exception as exc:
         # El índice puede ya existir, o la versión del servidor puede no soportar MULTILINGUAL
         log.debug("qdrant.text_index_skipped", reason=str(exc))
+
+    # Campos usados en filtros de búsqueda: sin índice, Qdrant los recorre punto
+    # por punto y el grafo HNSW no construye enlaces conscientes del filtro.
+    for field_name, field_schema in (
+        ("source_id", PayloadSchemaType.KEYWORD),
+        ("is_discarded", PayloadSchemaType.BOOL),
+        ("is_active", PayloadSchemaType.BOOL),
+    ):
+        try:
+            await client.create_payload_index(
+                collection_name=COLLECTION,
+                field_name=field_name,
+                field_schema=field_schema,
+            )
+            log.info("qdrant.payload_index_ensured", field=field_name)
+        except Exception as exc:
+            log.debug("qdrant.payload_index_skipped", field=field_name, reason=str(exc))
+
 
 async def upsert_chunks(
     chunks: list[dict],
