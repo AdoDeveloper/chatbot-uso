@@ -19,8 +19,10 @@ from app.schemas.chunk import (
     ChunkTestResult,
 )
 from app.services.ai.embedding import embed_texts_async
+from app.services.ai.llm_gateway import grade_documents
 from app.services.ingestion import vector_store
 from app.services.knowledge import chunk_editing
+from app.services.system import settings as settings_service
 
 router = APIRouter(prefix="/chunks", tags=["chunks"])
 
@@ -88,11 +90,20 @@ async def chunk_history(
     return await chunk_editing.chunk_history(db, point_id=point_id)
 
 
+_PREVIEW_CHARS = 500
+
+
 @router.post("/test-query", response_model=ChunkTestResponse)
 async def test_query(
     body: ChunkTestRequest,
+    db: AsyncSession = Depends(get_db),
     _=Depends(require_perm(P.KNOWLEDGE_READ)),
 ):
+    """Recupera los fragmentos de una consulta y los evalúa igual que el chat.
+
+    Sin la evaluación, la prueba mostraría fragmentos que el asistente
+    descarta antes de responder.
+    """
     start = time.monotonic()
 
     embeddings = await embed_texts_async([body.query], prefix="query: ")
@@ -108,17 +119,27 @@ async def test_query(
 
     results = results[: body.top_k]
 
+    grades: list[bool] = []
+    chain = await settings_service.get_active_chain(db)
+    if results and chain:
+        provider, api_key = chain[0]
+        grades = await grade_documents(body.query, results, provider, api_key)
+
     elapsed_ms = int((time.monotonic() - start) * 1000)
 
     chunks = [
         ChunkTestResult(
-            text=r.get("text", "")[:500],
+            text=(r.get("text") or "")[:_PREVIEW_CHARS],
             source_name=r.get("source_name", ""),
             score=round(r.get("score", 0), 4),
             chunk_index=r.get("chunk_index", 0),
             section=r.get("section"),
+            relevant=grades[i] if i < len(grades) else True,
+            truncated=len(r.get("text") or "") > _PREVIEW_CHARS,
         )
-        for r in results
+        for i, r in enumerate(results)
     ]
 
-    return ChunkTestResponse(chunks=chunks, latency_ms=elapsed_ms)
+    return ChunkTestResponse(
+        chunks=chunks, latency_ms=elapsed_ms, graded=bool(grades),
+    )

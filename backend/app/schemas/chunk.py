@@ -55,8 +55,14 @@ class ChunkTestResult(BaseModel):
     score: float
     chunk_index: int
     section: str | None = None
+    # El chat descarta los fragmentos que el evaluador no aprueba: sin esta
+    # marca, la prueba mostraría un contexto que el asistente nunca recibe.
+    relevant: bool = True
+    truncated: bool = False
 
 
 class ChunkTestResponse(BaseModel):
     chunks: list[ChunkTestResult]
     latency_ms: int
+    # False si no había proveedor disponible: entonces `relevant` no significa nada.
+    graded: bool = False

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Search, Zap, FileText, Loader2 } from "lucide-react";
+import { Search, Zap, FileText, Loader2, Check, X } from "lucide-react";
 import api from "@/lib/api";
 import type { Source } from "@/types";
 import { useApi, getErrorMessage } from "@/hooks/use-api";
@@ -15,7 +15,6 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Progress } from "@/components/ui/progress";
 import { PageHeader } from "@/components/ui/page-header";
 
 interface ChunkTestResult {
@@ -24,11 +23,14 @@ interface ChunkTestResult {
  score: number;
  chunk_index: number;
  section: string | null;
+ relevant: boolean;
+ truncated: boolean;
 }
 
 interface ChunkTestResponse {
  chunks: ChunkTestResult[];
  latency_ms: number;
+ graded: boolean;
 }
 
 export default function ChunkTestPage() {
@@ -68,14 +70,19 @@ export default function ChunkTestPage() {
   if (e.key === "Enter") handleTest();
  }
 
- const scoreColor = (s: number) => s >= 0.8 ? "bg-success" : s >= 0.5 ? "bg-warning" : "bg-destructive";
+ // El texto de cada fragmento empieza con "[Sección: ... | Parte x/y, Fragmento n/m]",
+ // un encabezado que se añade al indexar. Separarlo evita mostrarlo como contenido.
+ function splitPrefix(text: string): { prefix: string | null; body: string } {
+  const m = text.match(/^\[([^\]]+)\]\s*/);
+  return m ? { prefix: m[1], body: text.slice(m[0].length) } : { prefix: null, body: text };
+ }
 
  return (
   <div>
    <PageHeader
     icon={Search}
     title="Búsqueda"
-    tip="Pruebe qué fragmentos recupera el chatbot para una pregunta, sin generar una respuesta."
+    tip="Pruebe qué fragmentos recupera el chatbot para una pregunta y cuáles usaría para responder, sin generar la respuesta."
    />
 
    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -141,11 +148,15 @@ export default function ChunkTestPage() {
     {/* Panel de resultados */}
     <div className="lg:col-span-2 space-y-4">
      {results && (
-      <div className="flex items-center gap-3 text-sm text-muted-foreground">
-<Badge variant="secondary" className="gap-1 text-3xs">
-         <Zap className="h-3 w-3" /> {results.latency_ms}ms
-        </Badge>
-       <span>{results.chunks.length} chunks recuperados</span>
+      <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+       <Badge variant="secondary" className="gap-1 text-3xs">
+        <Zap className="h-3 w-3" /> {results.latency_ms}ms
+       </Badge>
+       <span>
+        {results.chunks.length} fragmentos recuperados
+        {results.graded &&
+         `, ${results.chunks.filter((c) => c.relevant).length} que el chatbot usaría`}
+       </span>
       </div>
      )}
 
@@ -166,38 +177,52 @@ export default function ChunkTestPage() {
      ) : results.chunks.length === 0 ? (
       <Card>
        <CardContent>
-        <EmptyState icon={FileText} title="Sin resultados" description="Ningún chunk supera el umbral de relevancia para esta consulta" />
+        <EmptyState icon={FileText} title="Sin resultados" description="No hay fragmentos indexados que coincidan con esta consulta" />
        </CardContent>
       </Card>
      ) : (
-      results.chunks.map((chunk, i) => (
-       <Card key={i}>
-        <CardContent className="p-4">
-         <div className="flex items-center gap-3 mb-3">
-<Badge variant="outline" className="font-mono text-3xs">
+      results.chunks.map((chunk, i) => {
+       const { prefix, body } = splitPrefix(chunk.text);
+       const descartado = results.graded && !chunk.relevant;
+       return (
+        <Card key={i} className={descartado ? "opacity-60" : undefined}>
+         <CardContent className="p-4">
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+           <Badge variant="outline" className="font-mono text-3xs">
             #{i + 1}
            </Badge>
-          <div className="flex-1 flex items-center gap-2">
-           <Progress
-            value={chunk.score * 100}
-            className="h-2 flex-1 max-w-32"
-            indicatorClassName={scoreColor(chunk.score)}
-           />
-           <span className="text-xs font-medium tabular-nums">{(chunk.score * 100).toFixed(1)}%</span>
-          </div>
-          <Badge variant="secondary" className="text-3xs">
-           <FileText className="h-3 w-3 mr-1" /> {chunk.source_name}
-          </Badge>
-          {chunk.section && (
-           <Badge variant="outline" className="text-3xs">
-            {chunk.section}
+           {results.graded && (
+            <Badge
+             variant={chunk.relevant ? "default" : "secondary"}
+             className="text-3xs gap-1"
+            >
+             {chunk.relevant ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
+             {chunk.relevant ? "El chatbot lo usa" : "Descartado"}
+            </Badge>
+           )}
+           <span className="flex-1" />
+           <Badge variant="secondary" className="text-3xs">
+            <FileText className="h-3 w-3 mr-1" /> {chunk.source_name}
            </Badge>
+           {chunk.section && (
+            <Badge variant="outline" className="text-3xs">
+             {chunk.section}
+            </Badge>
+           )}
+          </div>
+          {prefix && (
+           <p className="text-2xs text-muted-foreground font-mono mb-1.5">{prefix}</p>
           )}
-         </div>
-         <p className="text-13 leading-relaxed whitespace-pre-wrap">{chunk.text}</p>
-        </CardContent>
-       </Card>
-      ))
+          <p className="text-13 leading-relaxed whitespace-pre-wrap">{body}</p>
+          {chunk.truncated && (
+           <p className="text-2xs text-muted-foreground mt-2 italic">
+            Vista previa recortada; el fragmento completo es más largo.
+           </p>
+          )}
+         </CardContent>
+        </Card>
+       );
+      })
      )}
     </div>
    </div>
