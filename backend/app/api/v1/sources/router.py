@@ -18,6 +18,7 @@ from fastapi import (
     UploadFile,
     status,
 )
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -323,6 +324,34 @@ async def bulk_tag(
         source.meta = meta
     await db.commit()
     return OperationStatus()
+
+
+@router.get("/{source_id}/download")
+async def download_source(
+    source_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_perm(P.KNOWLEDGE_READ)),
+):
+    """Descarga el archivo original tal como se subió."""
+    source = await sources_svc.get_or_404(db, source_id)
+    if not source.file_path:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Esta fuente no tiene un archivo asociado.",
+        )
+
+    path = Path(source.file_path).resolve()
+    uploads = Path(get_settings().UPLOADS_DIR).resolve()
+    # El nombre guardado en BD no se usa como ruta, pero se comprueba igualmente
+    # que el archivo viva dentro del directorio de subidas.
+    if not path.is_relative_to(uploads) or not path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="El archivo ya no está disponible en disco.",
+        )
+
+    filename = source.name if source.name.endswith(path.suffix) else f"{source.name}{path.suffix}"
+    return FileResponse(path, filename=filename, media_type="application/octet-stream")
 
 
 @router.get("/{source_id}/preview", response_model=dict)

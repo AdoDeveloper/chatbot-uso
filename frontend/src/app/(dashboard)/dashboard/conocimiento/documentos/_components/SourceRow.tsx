@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   RefreshCw, Trash2, AlertCircle, Loader2, FileSearch,
   CheckCheck, Ban, Eye, Upload,
-  MoreHorizontal, Save, X,
+  MoreHorizontal, Save, X, Download,
 } from "lucide-react";
 import type { Source, SourcePreview, SourceQuality } from "@/types";
 import { Modal } from "@/components/composed/modal";
@@ -20,34 +20,51 @@ import { getErrorMessage } from "@/hooks/use-api";
 import {
   TYPE_LABEL, STATUS_BADGE, STATUS_LABEL, REVIEW_BADGE,
   TagInput, parseStage,
-  patchSourceTags,
+  patchSourceDetails,
 } from "./sources-helpers";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { usePermission } from "@/hooks/use-permission";
 import { PERM } from "@/lib/permissions";
 import { Loading } from "@/components/ui/loading";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 function InlineTagEditor({ source, onUpdated }: { source: Source; onUpdated: () => void }) {
   const { toast } = useToast();
   const [editing, setEditing] = useState(false);
   const [tags, setTags] = useState<string[]>(source.tags ?? []);
+  const [name, setName] = useState(source.name);
+  const [description, setDescription] = useState(source.description ?? "");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (editing) setTags(source.tags ?? []);
+    if (editing) {
+      setTags(source.tags ?? []);
+      setName(source.name);
+      setDescription(source.description ?? "");
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing]);
 
+  const trimmedName = name.trim();
+  const nameInvalid = trimmedName.length < 2 || trimmedName.length > 255;
+
   const save = async () => {
+    if (nameInvalid) return;
     setSaving(true);
     try {
-      await patchSourceTags(source.id, tags);
+      await patchSourceDetails(source.id, {
+        name: trimmedName,
+        description: description.trim(),
+        tags,
+      });
       onUpdated();
       setEditing(false);
-      toast({ type: "success", message: "Etiquetas actualizadas.", duration: 1500 });
+      toast({ type: "success", message: "Documento actualizado.", duration: 1500 });
     } catch (err) {
-      toast({ type: "error", message: getErrorMessage(err, "No se pudieron guardar las etiquetas.") });
+      toast({ type: "error", message: getErrorMessage(err, "No se pudieron guardar los cambios.") });
     } finally { setSaving(false); }
   };
 
@@ -63,28 +80,58 @@ function InlineTagEditor({ source, onUpdated }: { source: Source; onUpdated: () 
           onClick={() => setEditing(true)}
           className="px-2 py-0.5 text-2xs text-muted-foreground border border-dashed border-border rounded-full hover:border-muted-foreground hover:text-foreground transition"
         >
-          + Agregar
+          Editar
         </button>
       </div>
 
       <Modal
         open={editing}
         onClose={() => setEditing(false)}
-        title="Etiquetas"
+        title="Editar documento"
         size="md"
         footer={
           <>
             <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setEditing(false)}>
               <X className="w-3.5 h-3.5" /> Cancelar
             </Button>
-            <Button size="sm" className="gap-1.5" onClick={save} disabled={saving}>
+            <Button size="sm" className="gap-1.5" onClick={save} disabled={saving || nameInvalid}>
               {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
               {saving ? "Guardando..." : "Guardar"}
             </Button>
           </>
         }
       >
-        <TagInput value={tags} onChange={setTags} />
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor={`src-name-${source.id}`}>Nombre</Label>
+            <Input
+              id={`src-name-${source.id}`}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={255}
+            />
+            {nameInvalid && (
+              <p className="text-2xs text-destructive">El nombre debe tener entre 2 y 255 caracteres.</p>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor={`src-desc-${source.id}`}>Descripción</Label>
+            <Textarea
+              id={`src-desc-${source.id}`}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              maxLength={1000}
+              rows={3}
+              placeholder="Para qué sirve este documento y qué contiene."
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Etiquetas</Label>
+            <TagInput value={tags} onChange={setTags} />
+          </div>
+        </div>
       </Modal>
     </>
   );
@@ -117,6 +164,27 @@ export function SourceRow({
   const [preview, setPreview] = useState<SourcePreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [quality, setQuality] = useState<SourceQuality | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const { toast } = useToast();
+
+  async function handleDownload() {
+    setDownloading(true);
+    try {
+      const res = await api.get(`/sources/${source.id}/download`, { responseType: "blob" });
+      const url = URL.createObjectURL(res.data as Blob);
+      const a = document.createElement("a");
+      const cd = (res.headers["content-disposition"] as string | undefined) ?? "";
+      const match = cd.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/);
+      a.href = url;
+      a.download = match ? decodeURIComponent(match[1]) : source.name;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      toast({ type: "error", message: getErrorMessage(err, "No se pudo descargar el documento.") });
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   async function openPreview() {
     setPreviewOpen(true);
@@ -232,6 +300,12 @@ export function SourceRow({
          <DropdownMenuItem onClick={openPreview}>
           <Eye className="w-3.5 h-3.5 mr-2" />
           Vista previa
+         </DropdownMenuItem>
+         <DropdownMenuItem onClick={handleDownload} disabled={downloading}>
+          {downloading
+            ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
+            : <Download className="w-3.5 h-3.5 mr-2" />}
+          {downloading ? "Descargando..." : "Descargar original"}
          </DropdownMenuItem>
          {isReady && source.chunk_count > 0 && (
           <DropdownMenuItem onClick={() => router.push(`/dashboard/conocimiento/documentos/${source.id}/chunks`)}>

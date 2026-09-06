@@ -119,3 +119,11 @@ export async function patchSourceTags(sourceId: string, tags: string[]) {
   invalidateApiCache("/sources");
   await api.patch(`/sources/${sourceId}`, { tags });
 }
+
+export async function patchSourceDetails(
+  sourceId: string,
+  data: { name?: string; description?: string; tags?: string[] },
+) {
+  invalidateApiCache("/sources");
+  await api.patch(`/sources/${sourceId}`, data);
+}
