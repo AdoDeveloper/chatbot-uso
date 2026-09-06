@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.models.enums import SourceType
 from app.services.ingestion.parsing.docx import parse_docx
+from app.services.ingestion.parsing.normalize import normalizar_texto
 from app.services.ingestion.parsing.pdf import parse_pdf
 from app.services.ingestion.parsing.txt import parse_txt
 
@@ -13,10 +14,10 @@ _PARSERS = {
 
 
 async def parse_source(source_type: SourceType, file_path: str | None) -> str:
-    """Despacha al parser correcto según el tipo de fuente."""
+    """Despacha al parser correcto y normaliza el texto extraído."""
     parser = _PARSERS.get(source_type)
     if parser is None:
         raise ValueError(f"Tipo de fuente no soportado: {source_type}")
     if not file_path:
         raise ValueError(f"{source_type.value.upper()} requiere file_path")
-    return await parser(file_path)
+    return normalizar_texto(await parser(file_path))
