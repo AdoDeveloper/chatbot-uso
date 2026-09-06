@@ -317,6 +317,12 @@ async def _run_chat_inner(
         await llm_gen.aclose()
 
     final_text = "".join(full_content)
+    if not final_text.strip():
+        log.warning(
+            "chat.empty_response", session_id=request.session_id,
+            provider=provider_name, llm_ms=int((time.monotonic() - t_llm_start) * 1000),
+        )
+        final_text = cfg.no_providers_message
     if not timed_out and overrides["guardrails_enabled"]:
         final_text = pipeline.apply_output_guardrails(
             final_text, pii_entities=overrides["pii_entities"], context_chunks=llm_chunks,
