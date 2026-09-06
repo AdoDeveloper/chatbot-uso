@@ -58,6 +58,11 @@ _MIN_DOCS_TRAS_FILTRO = 3
 
 
 def _completar_con_mejores(docs: list[dict], relevantes: list[dict]) -> list[dict]:
+    # Sin ningún documento aprobado, la pregunta queda fuera del corpus: añadir
+    # los mejores del recuperador solo daría al generador material ajeno sobre
+    # el que apoyarse. El complemento es para un filtro corto, no vacío.
+    if not relevantes:
+        return []
     elegidos = list(relevantes)
     vistos = {id(d) for d in elegidos}
     for d in docs:

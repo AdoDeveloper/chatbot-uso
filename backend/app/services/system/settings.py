@@ -24,7 +24,16 @@ RUNTIME_DEFAULTS: dict = {
     "rate_limit_chat_per_hour": 100,
     "semantic_cache_enabled": True,
     "semantic_cache_ttl": 43200,
-    "semantic_cache_threshold": 0.90,
+    # Con e5 la similitud coseno entre preguntas distintas en español ya parte
+    # de valores altos, así que el margen util es estrecho: medido sobre este
+    # corpus, "CUM mínimo" y "CUM máximo" dan 0.9687 y "cuánto dura" contra
+    # "cuánto cuesta" la pasantía 0.9628, mientras que parafrasis reales bajan
+    # hasta 0.9555. Los rangos se solapan y ningún umbral acierta en todo; a
+    # 0.90 el caché respondía "$25 por cada cambio" a una pregunta sobre el
+    # curso preuniversitario. Se prefiere 0.97: no sirve respuestas ajenas, y
+    # una parafrasis que se pierda solo cuesta regenerar la respuesta. Ver la
+    # nota sobre anisotropía en services/rag/corrective.py.
+    "semantic_cache_threshold": 0.97,
     "guardrails_enabled": True,
     "max_input_chars": 4000,
     "max_output_tokens": 2048,

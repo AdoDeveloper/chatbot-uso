@@ -18,7 +18,7 @@ log = structlog.get_logger()
 
 CACHE_PREFIX = "semcache:v2:"
 DEFAULT_TTL = 43200  # 12 hours
-SIMILARITY_THRESHOLD = 0.93
+SIMILARITY_THRESHOLD = 0.97
 SCAN_BATCH_HARD_LIMIT = 2000
 _GENERATION_KEY = "semcache:generation"
 
