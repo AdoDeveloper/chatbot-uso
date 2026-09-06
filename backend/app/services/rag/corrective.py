@@ -48,6 +48,28 @@ def _sane_threshold(configured: float) -> float:
     return configured
 
 
+# El juez semántico es la única barrera de relevancia, y con preguntas cuya
+# respuesta se reparte entre varios artículos tiende a aprobar uno solo. Un
+# contexto tan escaso empuja al generador a rellenar los huecos: medido sobre
+# el tráfico real, la fidelidad de la respuesta sube de 0.51 con un chunk a
+# 0.84 con tres. Cuando el filtro deja menos de este mínimo, se completan con
+# los mejores del recuperador, que ya vienen ordenados por score.
+_MIN_DOCS_TRAS_FILTRO = 3
+
+
+def _completar_con_mejores(docs: list[dict], relevantes: list[dict]) -> list[dict]:
+    elegidos = list(relevantes)
+    vistos = {id(d) for d in elegidos}
+    for d in docs:
+        if len(elegidos) >= _MIN_DOCS_TRAS_FILTRO:
+            break
+        if id(d) not in vistos:
+            elegidos.append(d)
+            vistos.add(id(d))
+    log.info("rag.grade_completado", aprobados=len(relevantes), final=len(elegidos))
+    return elegidos
+
+
 class RagState(TypedDict):
     question: str
     original_question: str
@@ -115,6 +137,8 @@ async def _grade(state: RagState) -> dict:
     )
     relevant = [d for d, g in zip(docs, grades) if g]
     log.info("rag.grade", total=len(docs), relevant=len(relevant))
+    if docs and len(relevant) < _MIN_DOCS_TRAS_FILTRO:
+        relevant = _completar_con_mejores(docs, relevant)
     return {"relevant_docs": relevant}
 
 
@@ -353,10 +377,16 @@ async def run_simple_rag(
         docs = docs[:top_k]
 
     total_before_grade = len(docs)
+    aprobados = len(docs)
     if docs and provider is not None:
         grades = await grade_documents(question, docs, provider, api_key)
-        docs = [d for d, g in zip(docs, grades) if g]
-        log.info("rag.simple_grade", relevant=len(docs))
+        relevantes = [d for d, g in zip(docs, grades) if g]
+        aprobados = len(relevantes)
+        log.info("rag.simple_grade", relevant=aprobados)
+        if len(relevantes) < _MIN_DOCS_TRAS_FILTRO:
+            relevantes = _completar_con_mejores(docs, relevantes)
+        docs = relevantes
 
-    ratio = (len(docs) / total_before_grade) if total_before_grade else None
+    # El ratio mide el juicio del filtro, no lo que se envía tras completar.
+    ratio = (aprobados / total_before_grade) if total_before_grade else None
     return docs, ratio

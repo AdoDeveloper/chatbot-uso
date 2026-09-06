@@ -945,12 +945,13 @@ async def grade_documents(
 
     doc_list = "\n".join(f"[{i}] {d['text'][:1000]}" for i, d in enumerate(documents))
     prompt = (
-        "Eres un evaluador de relevancia estricto. Para cada documento numerado, indica true SOLO si "
-        "el documento contiene información que responde DIRECTAMENTE la pregunta. "
-        "Indica false si el documento es irrelevante o solo está relacionado temáticamente pero "
-        "no aporta la respuesta específica que se pide. "
-        "Ante la duda, marca false. "
-        'Responde SOLO con JSON: {"grades": [true, false, ...]}'
+        "Eres un evaluador de relevancia para un sistema de búsqueda sobre reglamentos "
+        "universitarios. Para cada documento numerado, indica true si el documento aporta "
+        "información útil para responder la pregunta, AUNQUE SEA PARCIAL: una respuesta "
+        "completa suele requerir combinar varios artículos del reglamento. "
+        "Indica false solo si el documento trata de un tema claramente distinto. "
+        "Ante la duda, marca true. "
+        'Responde SOLO con JSON, un valor por documento: {"grades": [true, false, ...]}'
     )
     messages = [
         {"role": "system", "content": prompt},
@@ -986,7 +987,7 @@ async def grade_documents(
                         degraded=True, docs=len(documents), received=len(grades),
                         provider=provider.name)
             while len(grades) < len(documents):
-                grades.append(True)
+                grades.append(False)
         return [bool(g) for g in grades[:len(documents)]]
     except Exception as exc:
         log.warning("llm.grade_failed_open", reason="exception",
