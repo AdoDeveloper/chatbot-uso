@@ -15,6 +15,7 @@ from app.core.deps import get_client_ip
 from app.core.versioning import _background_tasks
 from app.db import session as db_session
 from app.db.session import get_db
+from app.schemas.settings import NO_CONTEXT_MESSAGE
 from app.services.ai.llm_gateway import stream_chat
 from app.services.chat import pipeline
 
@@ -191,7 +192,7 @@ async def _run_chat_inner(
     if isinstance(effective_source_ids, list) and len(effective_source_ids) == 0:
         return ChatResponse(
             sources=[],
-            content="No tengo información disponible para responder esa pregunta en este momento.",
+            content=NO_CONTEXT_MESSAGE,
         )
 
     rag_question = pipeline.build_rag_question(request.question, history)
@@ -248,7 +249,7 @@ async def _run_chat_inner(
             client_ip=client_ip,
             origin_url=origin_url,
             is_playground=is_playground,
-            final_text="No tengo información disponible para responder esa pregunta en este momento.",
+            final_text=NO_CONTEXT_MESSAGE,
             sources=[],
             latency_ms=no_context_latency_ms,
             history=history,

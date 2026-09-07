@@ -39,6 +39,7 @@ from tenacity import (
 )
 
 from app.models.llm_provider import LLMProvider
+from app.schemas.settings import DEFAULT_SYSTEM_PROMPT
 
 log = structlog.get_logger()
 
@@ -187,6 +188,7 @@ class OpenAICompatAdapter(LLMAdapter):
                 "Configura la URL base en Configuración → Proveedores LLM."
             )
         super().__init__(model_name, api_key, base.rstrip("/"))
+        self.provider_type = provider_type
 
     def _headers(self) -> dict:
         h: dict[str, str] = {"Content-Type": "application/json"}
@@ -211,6 +213,11 @@ class OpenAICompatAdapter(LLMAdapter):
             "max_tokens": max_tokens,
             "stream": True,
         }
+        # Los modelos de razonamiento gastan el presupuesto de salida pensando
+        # antes de escribir: sin acotarlo, una respuesta breve termina en
+        # finish_reason "length" con el contenido vacío o cortado a media frase.
+        if self.provider_type == "groq":
+            payload["reasoning_effort"] = "low"
         async with client.stream(
             "POST", self._chat_url(), headers=self._headers(),
             json=payload, timeout=60.0,
@@ -721,34 +728,10 @@ def _get_adapter(
     return OpenAICompatAdapter(pt, model_name, api_key, api_base)
 
 
-_SYSTEM_TEMPLATE = (
-    "Eres el asistente virtual de la Universidad de Sonsonate. "
-    "Tu única fuente de información es el CONTEXTO que se te proporciona a continuación.\n\n"
-    "Reglas estrictas - sin excepciones:\n"
-    "- PROHIBIDO usar conocimiento propio o preentrenado. Si la respuesta no está "
-    "literalmente en el contexto, NO la des aunque la conozcas.\n"
-    "- Responde solo lo que el usuario preguntó. Ignora la información del contexto "
-    "que no sea relevante para la pregunta.\n"
-    "- Usa solo datos que aparezcan en el contexto: URLs, teléfonos, fechas, nombres, "
-    "pasos, requisitos. No los completes, estimes ni supongas.\n"
-    "- Si la información pedida no está en el contexto, responde: "
-    "'No tengo esa información en mis documentos.' y sugiere a quién contactar "
-    "(coordinador, secretaría, etc.) si aplica.\n"
-    "- Sé directo y conciso. No repitas la misma idea como título y como detalle.\n"
-    "- Para pasos o listas, usa viñetas simples sin encabezados redundantes.\n"
-    "- Responde en español y tutea al usuario.\n"
-    "- Nunca hagas referencia a secciones, tablas, anexos, páginas u otras partes del documento fuente. "
-    "Da la información directamente sin remitir al usuario a consultar el documento.\n"
-    "- Si el contexto contiene frases como \"ver tabla/lista/anexo al final del documento\", IGNÓRALAS "
-    "por completo: nunca las repitas. Usa en su lugar cualquier dato concreto (nombre, cargo, teléfono, "
-    "correo, oficina) que sí aparezca en el contexto. Si no hay ningún dato concreto disponible, di que "
-    "no tienes ese contacto específico y sugiere contactar a Secretaría o Coordinación Académica.\n"
-    "- Si el contexto incluye una URL que termina en .png, .jpg, .jpeg, .gif o .webp, "
-    "muéstrala como imagen usando sintaxis Markdown ![descripción](URL) en vez de solo pegar el enlace.\n"
-    "- Si el contexto incluye una URL que termina en .pdf, preséntala como enlace Markdown "
-    "[nombre descriptivo del documento](URL), por ejemplo [Ver tabla de aranceles (PDF)](URL).\n\n"
-    "CONTEXTO:\n{context}"
-)
+# El prompt efectivo viene de la configuración; este es el respaldo para
+# cuando la base de datos no trae ninguno. Comparte la definición con el valor
+# por defecto de ChatbotSettings para que ambos no vuelvan a divergir.
+_SYSTEM_TEMPLATE = DEFAULT_SYSTEM_PROMPT
 
 
 async def stream_chat(
