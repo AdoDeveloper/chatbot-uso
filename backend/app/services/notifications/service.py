@@ -148,6 +148,13 @@ _EVENT_META = {
         "intro": "El proveedor de inteligencia artificial no está respondiendo. El asistente podría no generar respuestas mientras persista la incidencia.",
         "action": "Le recomendamos revisar el estado del proveedor y la configuración de sus credenciales.",
     },
+    NotificationEvent.provider_degraded: {
+        "subject": "Un proveedor de inteligencia artificial dejó de responder",
+        "severity": "warning",
+        "eyebrow": "Estado del sistema",
+        "intro": "Un proveedor dejó de responder y quedó fuera de servicio temporalmente. El asistente sigue funcionando con los proveedores restantes.",
+        "action": "Le recomendamos revisar el estado de ese proveedor y sus credenciales antes de que fallen los demás.",
+    },
     NotificationEvent.unanswered_digest: {
         "subject": "Resumen diario de preguntas sin respuesta",
         "severity": "info",
@@ -251,7 +258,10 @@ def _html_body(event: NotificationEvent, payload: dict[str, Any]) -> str:
     if event is NotificationEvent.unanswered_digest and "total_open" in payload:
         return _daily_digest_body(m, payload)
 
-    if event is NotificationEvent.provider_down and "providers" in payload:
+    if event in (
+        NotificationEvent.provider_down,
+        NotificationEvent.provider_degraded,
+    ) and "providers" in payload:
         return _provider_down_body(m, payload)
 
     content = ""

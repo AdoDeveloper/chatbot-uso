@@ -55,6 +55,9 @@ class NotificationEvent(str, enum.Enum):
     doc_error = "doc_error"
     escalation = "escalation"
     provider_down = "provider_down"
+    # Un proveedor concreto queda fuera de la cadena; los demás siguen
+    # respondiendo, así que el asistente no se detiene.
+    provider_degraded = "provider_degraded"
     unanswered_digest = "unanswered_digest"
     rate_limit_threshold = "rate_limit_threshold"
     service_down = "service_down"

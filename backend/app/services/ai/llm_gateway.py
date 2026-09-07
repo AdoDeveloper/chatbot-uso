@@ -71,8 +71,14 @@ class CircuitBreaker:
             self._failures.pop(provider_id, None)
         return False
 
-    def record_failure(self, provider_id: str) -> None:
+    def record_failure(self, provider_id: str) -> bool:
+        """Registra el fallo y devuelve True si con este el circuito se abre.
+
+        El aviso se dispara desde el bucle de fallback: aquí no se conoce el
+        nombre del proveedor ni corresponde enviar notificaciones.
+        """
         now = time.monotonic()
+        ya_abierto = provider_id in self._open_until
         fails = self._failures.setdefault(provider_id, [])
         fails.append(now)
         cutoff = now - self._window
@@ -80,6 +86,8 @@ class CircuitBreaker:
         if len(self._failures[provider_id]) >= self._failure_threshold:
             self._open_until[provider_id] = now + self._cooldown
             log.warning("circuit_breaker.open", provider_id=provider_id)
+            return not ya_abierto
+        return False
 
     def record_success(self, provider_id: str) -> None:
         self._failures.pop(provider_id, None)
@@ -87,6 +95,21 @@ class CircuitBreaker:
 
 
 _breaker = CircuitBreaker()
+
+
+def _avisar_degradado(provider_name: str, error: str) -> None:
+    """Lanza el aviso en segundo plano: la respuesta al usuario no espera al
+    envío del correo, y un fallo notificando no puede tumbar el fallback."""
+    try:
+        import asyncio as _asyncio
+
+        from app.core.versioning import _background_tasks
+        from app.services.monitoring.alerts import notify_provider_degraded
+        task = _asyncio.create_task(notify_provider_degraded(provider_name, error))
+        _background_tasks.add(task)
+        task.add_done_callback(_background_tasks.discard)
+    except Exception as exc:
+        log.warning("llm.degraded_notify_failed", provider=provider_name, error=str(exc))
 
 
 def _is_retryable(exc: BaseException) -> bool:
@@ -784,10 +807,12 @@ async def stream_chat(
             _breaker.record_success(pid)
             return
         except Exception as exc:
-            _breaker.record_failure(pid)
+            se_abrio = _breaker.record_failure(pid)
             last_error = exc
             log.warning("llm.provider_failed", provider=provider_name, error=str(exc),
                         tokens_yielded=tokens_yielded)
+            if se_abrio:
+                _avisar_degradado(provider_name, str(exc))
             if tokens_yielded > 0:
                 raise RuntimeError(
                     "La respuesta del servicio de IA se interrumpió. Intenta de nuevo."

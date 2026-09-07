@@ -37,6 +37,7 @@ const EVENT_META: Record<string, { label: string; icon: typeof FileText; href?: 
   doc_error: { label: "Error procesando documento", icon: AlertCircle, href: "/dashboard/conocimiento/documentos" },
   escalation: { label: "Chat escalado a humano", icon: UserRound, href: "/dashboard/conversaciones?status=escalated" },
   provider_down: { label: "Proveedor IA caído", icon: Plug, href: "/dashboard/configuracion/proveedores" },
+  provider_degraded: { label: "Proveedor IA degradado", icon: Plug, href: "/dashboard/configuracion/proveedores" },
   service_down: { label: "Servicio degradado", icon: Plug, href: "/dashboard/configuracion/proveedores" },
   rate_limit_threshold: { label: "Cerca del límite de cuotas", icon: AlertCircle, href: "/dashboard/configuracion/cuotas" },
   unanswered_digest: { label: "Resumen diario", icon: Inbox, href: "/dashboard/conversaciones/pendientes" },

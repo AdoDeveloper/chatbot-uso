@@ -16,13 +16,14 @@ const EVENT_LABELS: Record<NotificationEvent, string> = {
   doc_error: "Error de procesamiento",
   escalation: "Escalamiento activado",
   provider_down: "Proveedor IA caído",
+  provider_degraded: "Proveedor IA degradado",
   unanswered_digest: "Preguntas sin respuesta (diario)",
   rate_limit_threshold: "Rate limit cerca del techo (≥80%)",
   service_down: "Servicio degradado (MySQL/Redis/Qdrant)",
 };
 
 const ALL_EVENTS: NotificationEvent[] = [
-  "doc_ready", "doc_error", "escalation", "provider_down", "unanswered_digest",
+  "doc_ready", "doc_error", "escalation", "provider_down", "provider_degraded", "unanswered_digest",
   "rate_limit_threshold", "service_down",
 ];
 const ALL_CHANNELS: NotificationChannel[] = ["email"];

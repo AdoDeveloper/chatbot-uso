@@ -30,7 +30,8 @@ _E = {
     "unansweredstatus":   ("open", "in_progress", "resolved"),
     "notificationevent":  (
         "doc_ready", "doc_error", "escalation", "provider_down",
-        "unanswered_digest", "rate_limit_threshold", "service_down",
+        "provider_degraded", "unanswered_digest", "rate_limit_threshold",
+        "service_down",
     ),
     "notificationchannel":   ("email", "in_app"),
     "escalationtrigger":     (

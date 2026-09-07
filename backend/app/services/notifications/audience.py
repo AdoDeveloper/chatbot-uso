@@ -11,6 +11,7 @@ EVENT_PERMISSION: dict[NotificationEvent, str] = {
     NotificationEvent.escalation: P.ESCALATION_READ,
     NotificationEvent.unanswered_digest: P.ANALYTICS_READ,
     NotificationEvent.provider_down: P.SYSTEM_READ,
+    NotificationEvent.provider_degraded: P.SYSTEM_READ,
     NotificationEvent.service_down: P.SYSTEM_READ,
     NotificationEvent.rate_limit_threshold: P.SYSTEM_READ,
 }

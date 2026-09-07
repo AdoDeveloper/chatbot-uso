@@ -22,6 +22,8 @@ COOLDOWN_SEC = {
     NotificationEvent.service_down: 600,
     NotificationEvent.rate_limit_threshold: 1800,
     NotificationEvent.provider_down: 600,
+    # Más espaciado que la caída total: es informativo y el servicio sigue en pie.
+    NotificationEvent.provider_degraded: 3600,
 }
 
 
@@ -124,6 +126,30 @@ async def notify_provider_down(error: str, providers: list[str] | None = None) -
             await send_notification(db, event=NotificationEvent.provider_down, payload=payload)
     except Exception as exc:
         log.warning("alerts.provider_down_notify_failed", error=str(exc))
+
+
+async def notify_provider_degraded(provider_name: str, error: str) -> None:
+    """Avisa que un proveedor quedó fuera de la cadena, con los demás activos.
+
+    El cooldown va por proveedor: uno que falle repetidamente no silencia el
+    aviso de otro. Se dispara cuando el interruptor lo aparta, no en cada
+    fallo suelto, porque un 429 puntual lo resuelve el siguiente de la cadena
+    sin que el usuario lo note.
+    """
+    if not await _can_fire(NotificationEvent.provider_degraded, provider_name):
+        return
+    try:
+        from app.db.session import AsyncSessionLocal
+        payload = {
+            "providers": provider_name,
+            "error": error[:300] if error else "(sin detalle)",
+        }
+        async with AsyncSessionLocal() as db:
+            await send_notification(
+                db, event=NotificationEvent.provider_degraded, payload=payload,
+            )
+    except Exception as exc:
+        log.warning("alerts.provider_degraded_notify_failed", error=str(exc))
 
 
 async def run_all_checks(db: AsyncSession) -> dict:

@@ -66,6 +66,7 @@ const EVENT_META: Record<string, { label: string; icon: typeof FileText }> = {
   doc_error: { label: "Error procesando documento", icon: AlertCircle },
   escalation: { label: "Chat escalado a humano", icon: UserRound },
   provider_down: { label: "Proveedor IA caído", icon: Plug },
+  provider_degraded: { label: "Proveedor IA degradado", icon: Plug },
   unanswered_digest: { label: "Resumen diario", icon: Inbox },
   rate_limit_threshold: { label: "Límite de solicitudes cerca del máximo", icon: AlertCircle },
   service_down: { label: "Servicio degradado", icon: AlertCircle },
