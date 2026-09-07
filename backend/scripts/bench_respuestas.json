@@ -1,0 +1,105 @@
+[
+  {
+    "pregunta": "¿Cuál es el CUM mínimo para graduarse?",
+    "debe_contener": ["7.0"],
+    "no_debe_contener": ["6.0", "8.0 mínimo", "2.0", "GPA"],
+    "nota": "Art. 5: CUM acumulado mínimo de 7.0"
+  },
+  {
+    "pregunta": "¿Con qué CUM quedo exento de la modalidad de graduación?",
+    "debe_contener": ["9.0"],
+    "no_debe_contener": ["8.0 o superior", "7.0 o superior"],
+    "nota": "CUM igual o superior a 9.0 exime de la modalidad"
+  },
+  {
+    "pregunta": "¿Qué rango de CUM corresponde a Magna Cum Laude?",
+    "debe_contener": ["9.0", "9.5"],
+    "no_debe_contener": ["8.5", "8.0 a 8.9"],
+    "nota": "9.0 a 9.5 Magna (mencionar tambien Summa no es un error)"
+  },
+  {
+    "pregunta": "¿Qué rango de CUM corresponde a Summa Cum Laude?",
+    "debe_contener": ["9.6"],
+    "no_debe_contener": ["8.5", "7.0"],
+    "nota": "9.6 a 10 Summa Cum Laude"
+  },
+  {
+    "pregunta": "¿Cuánto dura como mínimo la modalidad de graduación?",
+    "debe_contener": ["seis", "6"],
+    "no_debe_contener": ["tres meses", "un año", "dos años"],
+    "nota": "mínimo seis meses, máximo doce",
+    "cualquiera": true
+  },
+  {
+    "pregunta": "¿Cuánto dura como máximo la modalidad de graduación?",
+    "debe_contener": ["doce", "12"],
+    "no_debe_contener": ["seis meses como máximo", "24"],
+    "nota": "máximo doce meses",
+    "cualquiera": true
+  },
+  {
+    "pregunta": "¿Cuánto cuesta el curso preuniversitario?",
+    "debe_contener": ["30"],
+    "no_debe_contener": ["25", "50", "10", "1200"],
+    "nota": "$30, 3 semanas en modalidad virtual"
+  },
+  {
+    "pregunta": "¿Cuánto cuesta el cambio de carrera?",
+    "debe_contener": ["25"],
+    "no_debe_contener": ["30", "50", "10"],
+    "nota": "$25 costo del trámite"
+  },
+  {
+    "pregunta": "¿Cuánto cuesta el estudio de equivalencias?",
+    "debe_contener": ["50"],
+    "no_debe_contener": ["25", "30"],
+    "nota": "$50 por el estudio de equivalencia"
+  },
+  {
+    "pregunta": "¿Cuánto tardan en entregar una constancia?",
+    "debe_contener": ["3", "tres"],
+    "no_debe_contener": ["inmediato", "24 horas"],
+    "nota": "3 días hábiles",
+    "cualquiera": true
+  },
+  {
+    "pregunta": "¿Cuántas semanas dura el curso preuniversitario?",
+    "debe_contener": ["3", "tres"],
+    "no_debe_contener": ["10 semanas", "un mes"],
+    "nota": "3 semanas en modalidad virtual",
+    "cualquiera": true
+  },
+  {
+    "pregunta": "¿Cuánto duran las carreras técnicas?",
+    "debe_contener": ["2", "dos"],
+    "no_debe_contener": ["5 años", "cinco"],
+    "nota": "los técnicos duran 2 años",
+    "cualquiera": true
+  },
+  {
+    "pregunta": "¿Cuánto tiempo dura la calidad de egresado antes de caducar?",
+    "debe_contener": ["tres años", "3 años"],
+    "no_debe_contener": ["caducidad de cinco", "caducidad de un año"],
+    "nota": "caduca a los tres años de aprobar todas las asignaturas",
+    "cualquiera": true
+  },
+  {
+    "pregunta": "¿Cuánto cuesta reponer el carnet de estudiante?",
+    "debe_contener": [],
+    "espera_rechazo": true,
+    "no_debe_contener": ["$10", "$25", "$30", "$50"],
+    "nota": "el corpus no trae ese costo: debe reconocer que no lo tiene"
+  },
+  {
+    "pregunta": "Con CUM de 8.5, ¿qué modalidades de graduación puedo elegir?",
+    "debe_contener": ["pasant"],
+    "no_debe_contener": [],
+    "nota": "8.0 a 8.9 accede a las modalidades generales"
+  },
+  {
+    "pregunta": "Con CUM de 7.5, ¿qué modalidades puedo elegir?",
+    "debe_contener": ["proyecto"],
+    "no_debe_contener": [],
+    "nota": "7.0 a 7.9 solo proyecto de investigación o formulación"
+  }
+]
