@@ -270,6 +270,7 @@ export type NotificationEvent =
   | "escalation"
   | "provider_down"
   | "provider_degraded"
+  | "provider_misconfigured"
   | "unanswered_digest"
   | "rate_limit_threshold"
   | "service_down";

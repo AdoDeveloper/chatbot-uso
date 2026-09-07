@@ -24,6 +24,9 @@ COOLDOWN_SEC = {
     NotificationEvent.provider_down: 600,
     # Más espaciado que la caída total: es informativo y el servicio sigue en pie.
     NotificationEvent.provider_degraded: 3600,
+    # Un error permanente no se resuelve solo entre avisos: recordarlo cada
+    # hora sería ruido hasta que alguien corrija la configuración a mano.
+    NotificationEvent.provider_misconfigured: 21600,
 }
 
 
@@ -150,6 +153,27 @@ async def notify_provider_degraded(provider_name: str, error: str) -> None:
             )
     except Exception as exc:
         log.warning("alerts.provider_degraded_notify_failed", error=str(exc))
+
+
+async def notify_provider_misconfigured(provider_name: str, error: str) -> None:
+    """Avisa que un proveedor falla de forma permanente: modelo retirado,
+    credencial inválida o sin crédito. Reintentar no lo arregla, así que se
+    dispara en el primer error de este tipo, sin esperar al interruptor.
+    """
+    if not await _can_fire(NotificationEvent.provider_misconfigured, provider_name):
+        return
+    try:
+        from app.db.session import AsyncSessionLocal
+        payload = {
+            "providers": provider_name,
+            "error": error[:300] if error else "(sin detalle)",
+        }
+        async with AsyncSessionLocal() as db:
+            await send_notification(
+                db, event=NotificationEvent.provider_misconfigured, payload=payload,
+            )
+    except Exception as exc:
+        log.warning("alerts.provider_misconfigured_notify_failed", error=str(exc))
 
 
 async def run_all_checks(db: AsyncSession) -> dict:

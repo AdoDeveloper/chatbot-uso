@@ -58,6 +58,10 @@ class NotificationEvent(str, enum.Enum):
     # Un proveedor concreto queda fuera de la cadena; los demás siguen
     # respondiendo, así que el asistente no se detiene.
     provider_degraded = "provider_degraded"
+    # A diferencia de provider_degraded (falla temporal: 429/5xx, se
+    # recupera solo), esto es un error permanente -modelo inexistente,
+    # credencial inválida, sin crédito- que reintentar no arregla.
+    provider_misconfigured = "provider_misconfigured"
     unanswered_digest = "unanswered_digest"
     rate_limit_threshold = "rate_limit_threshold"
     service_down = "service_down"

@@ -93,6 +93,15 @@ class CircuitBreaker:
         self._failures.pop(provider_id, None)
         self._open_until.pop(provider_id, None)
 
+    def force_open(self, provider_id: str, cooldown: float | None = None) -> None:
+        """Abre el circuito de inmediato, sin esperar el umbral de fallos.
+
+        Para errores permanentes (modelo retirado, credencial inválida): el
+        cooldown por defecto es más largo que el de un fallo transitorio,
+        porque nada va a cambiar en los próximos 30 segundos.
+        """
+        self._open_until[provider_id] = time.monotonic() + (cooldown or self._cooldown * 20)
+
 
 _breaker = CircuitBreaker()
 
@@ -110,6 +119,35 @@ def _avisar_degradado(provider_name: str, error: str) -> None:
         task.add_done_callback(_background_tasks.discard)
     except Exception as exc:
         log.warning("llm.degraded_notify_failed", provider=provider_name, error=str(exc))
+
+
+def _avisar_mal_configurado(provider_name: str, error: str) -> None:
+    """Igual que _avisar_degradado, para el aviso de error permanente."""
+    try:
+        import asyncio as _asyncio
+
+        from app.core.versioning import _background_tasks
+        from app.services.monitoring.alerts import notify_provider_misconfigured
+        task = _asyncio.create_task(notify_provider_misconfigured(provider_name, error))
+        _background_tasks.add(task)
+        task.add_done_callback(_background_tasks.discard)
+    except Exception as exc:
+        log.warning("llm.misconfigured_notify_failed", provider=provider_name, error=str(exc))
+
+
+# Códigos que reintentar no arregla: el modelo no existe o fue retirado
+# (404), la credencial no es válida o no tiene acceso a ese modelo (401/403),
+# o el proveedor se quedó sin crédito / se agotó la cuota diaria del modelo
+# gratuito (402, propio de OpenRouter). Se distinguen de 429/5xx, que sí se
+# resuelven solos y ya cubre el circuit breaker.
+_PERMANENT_STATUS_CODES = (401, 402, 403, 404)
+
+
+def _is_permanent_failure(exc: BaseException) -> bool:
+    return (
+        isinstance(exc, httpx.HTTPStatusError)
+        and exc.response.status_code in _PERMANENT_STATUS_CODES
+    )
 
 
 def _is_retryable(exc: BaseException) -> bool:
@@ -807,12 +845,21 @@ async def stream_chat(
             _breaker.record_success(pid)
             return
         except Exception as exc:
-            se_abrio = _breaker.record_failure(pid)
             last_error = exc
-            log.warning("llm.provider_failed", provider=provider_name, error=str(exc),
-                        tokens_yielded=tokens_yielded)
-            if se_abrio:
-                _avisar_degradado(provider_name, str(exc))
+            if _is_permanent_failure(exc):
+                # No tiene sentido gastar el margen de 5 fallos del interruptor
+                # en algo que un reintento no va a arreglar: se abre de una vez
+                # y se avisa como error de configuración, no como caída temporal.
+                _breaker.force_open(pid)
+                log.warning("llm.provider_misconfigured", provider=provider_name, error=str(exc),
+                            status_code=exc.response.status_code, tokens_yielded=tokens_yielded)
+                _avisar_mal_configurado(provider_name, str(exc))
+            else:
+                se_abrio = _breaker.record_failure(pid)
+                log.warning("llm.provider_failed", provider=provider_name, error=str(exc),
+                            tokens_yielded=tokens_yielded)
+                if se_abrio:
+                    _avisar_degradado(provider_name, str(exc))
             if tokens_yielded > 0:
                 raise RuntimeError(
                     "La respuesta del servicio de IA se interrumpió. Intenta de nuevo."

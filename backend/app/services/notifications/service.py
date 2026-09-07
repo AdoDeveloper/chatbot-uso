@@ -155,6 +155,13 @@ _EVENT_META = {
         "intro": "Un proveedor dejó de responder y quedó fuera de servicio temporalmente. El asistente sigue funcionando con los proveedores restantes.",
         "action": "Le recomendamos revisar el estado de ese proveedor y sus credenciales antes de que fallen los demás.",
     },
+    NotificationEvent.provider_misconfigured: {
+        "subject": "Un proveedor de inteligencia artificial tiene un error de configuración",
+        "severity": "danger",
+        "eyebrow": "Estado del sistema",
+        "intro": "Un proveedor falló con un error permanente (modelo inexistente, credencial inválida o sin crédito). No se resolverá solo: el asistente seguirá usando los demás proveedores mientras no se corrija.",
+        "action": "Revise el modelo configurado, la vigencia de la credencial y el crédito disponible de ese proveedor.",
+    },
     NotificationEvent.unanswered_digest: {
         "subject": "Resumen diario de preguntas sin respuesta",
         "severity": "info",
@@ -261,6 +268,7 @@ def _html_body(event: NotificationEvent, payload: dict[str, Any]) -> str:
     if event in (
         NotificationEvent.provider_down,
         NotificationEvent.provider_degraded,
+        NotificationEvent.provider_misconfigured,
     ) and "providers" in payload:
         return _provider_down_body(m, payload)
 
