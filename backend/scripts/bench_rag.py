@@ -34,8 +34,11 @@ from app.services.ingestion import vector_store  # noqa: E402
 
 DATASET = Path(__file__).parent / "bench_dataset.json"
 
-# Pausa entre llamadas al evaluador: el proveedor gratuito limita por minuto.
-PAUSA_LLM = 20.0
+# Pausa entre llamadas al evaluador. El proveedor limita por tokens en una
+# ventana de un minuto (8000 en el plan gratuito) y cada evaluación de k=12
+# fragmentos gasta unos 1700, así que se espacian para no agotarla: de otro
+# modo el filtro abre en true y el informe mide la degradación, no el juicio.
+PAUSA_LLM = 30.0
 
 
 def _es_relevante(texto: str, marcas: list[str]) -> bool:
@@ -111,8 +114,14 @@ async def main() -> int:
         # juicio: contarla como resultado falsearía el informe.
         aprobados = degradado = None
         if provider is not None and docs:
-            grades = await grade_documents(caso["pregunta"], docs, provider, api_key)
-            degradado = len(docs) > 1 and all(grades)
+            for intento in range(3):
+                grades = await grade_documents(caso["pregunta"], docs, provider, api_key)
+                degradado = len(docs) > 1 and all(grades)
+                if not degradado:
+                    break
+                # Reintenta tras la ventana del límite antes de darlo por perdido.
+                if intento < 2:
+                    await asyncio.sleep(PAUSA_LLM * 2)
             aprobados = None if degradado else [d for d, g in zip(docs, grades) if g]
             await asyncio.sleep(PAUSA_LLM)
 
