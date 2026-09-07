@@ -52,13 +52,14 @@ class ChunkTestRequest(BaseModel):
 class ChunkTestResult(BaseModel):
     text: str
     source_name: str
+    # Permite abrir el documento del que sale el fragmento desde el resultado.
+    source_id: str | None = None
     score: float
     chunk_index: int
     section: str | None = None
     # El chat descarta los fragmentos que el evaluador no aprueba: sin esta
     # marca, la prueba mostraría un contexto que el asistente nunca recibe.
     relevant: bool = True
-    truncated: bool = False
 
 
 class ChunkTestResponse(BaseModel):

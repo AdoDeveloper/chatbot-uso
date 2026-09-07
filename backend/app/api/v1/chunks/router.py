@@ -90,9 +90,6 @@ async def chunk_history(
     return await chunk_editing.chunk_history(db, point_id=point_id)
 
 
-_PREVIEW_CHARS = 500
-
-
 @router.post("/test-query", response_model=ChunkTestResponse)
 async def test_query(
     body: ChunkTestRequest,
@@ -129,13 +126,16 @@ async def test_query(
 
     chunks = [
         ChunkTestResult(
-            text=(r.get("text") or "")[:_PREVIEW_CHARS],
+            # Texto completo: la pantalla sirve para revisar qué recibe el
+            # asistente, y un fragmento cortado no permite juzgar si el
+            # troceado dejó la información utilizable.
+            text=r.get("text") or "",
             source_name=r.get("source_name", ""),
+            source_id=r.get("source_id"),
             score=round(r.get("score", 0), 4),
             chunk_index=r.get("chunk_index", 0),
             section=r.get("section"),
             relevant=grades[i] if i < len(grades) else True,
-            truncated=len(r.get("text") or "") > _PREVIEW_CHARS,
         )
         for i, r in enumerate(results)
     ]

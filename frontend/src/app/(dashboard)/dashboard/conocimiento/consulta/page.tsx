@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Link from "next/link";
 import { Search, Zap, FileText, Loader2, Check, X } from "lucide-react";
 import api from "@/lib/api";
 import type { Source } from "@/types";
@@ -20,11 +21,11 @@ import { PageHeader } from "@/components/ui/page-header";
 interface ChunkTestResult {
  text: string;
  source_name: string;
+ source_id: string | null;
  score: number;
  chunk_index: number;
  section: string | null;
  relevant: boolean;
- truncated: boolean;
 }
 
 interface ChunkTestResponse {
@@ -41,6 +42,9 @@ export default function ChunkTestPage() {
  const { data: sourcesData } = useApi<Source[]>("/sources");
  const sources = (sourcesData ?? []).filter((s) => s.status === "ready");
  const [results, setResults] = useState<ChunkTestResponse | null>(null);
+ // La consulta que produjo los resultados en pantalla: resaltar con lo que el
+ // usuario está escribiendo movería las marcas antes de volver a buscar.
+ const [lastQuery, setLastQuery] = useState("");
  const [loading, setLoading] = useState(false);
  // Token de la request más reciente: evita que una respuesta vieja sobrescriba una más nueva.
  const latestRequestRef = useRef(0);
@@ -57,6 +61,7 @@ export default function ChunkTestPage() {
    });
    if (requestId !== latestRequestRef.current) return; // superada por una consulta más nueva
    setResults(data);
+   setLastQuery(query.trim());
   } catch (err) {
    if (requestId !== latestRequestRef.current) return;
    setResults(null);
@@ -75,6 +80,57 @@ export default function ChunkTestPage() {
  function splitPrefix(text: string): { prefix: string | null; body: string } {
   const m = text.match(/^\[([^\]]+)\]\s*/);
   return m ? { prefix: m[1], body: text.slice(m[0].length) } : { prefix: null, body: text };
+ }
+
+ // La búsqueda es semántica: un fragmento puede ser pertinente sin repetir las
+ // palabras de la pregunta. Resaltarlas ayuda a ubicar el pasaje dentro de un
+ // texto largo, no a juzgar la relevancia.
+ const STOPWORDS = new Set([
+  "cual", "cuál", "como", "cómo", "para", "que", "qué", "los", "las", "del",
+  "una", "uno", "por", "con", "sin", "sobre", "este", "esta", "hay", "son",
+  "the", "and", "quien", "quién", "donde", "dónde", "cuando", "cuándo",
+ ]);
+
+ function normalize(s: string) {
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+ }
+
+ function highlight(body: string, consulta: string) {
+  const terminos = Array.from(
+   new Set(
+    normalize(consulta)
+     .split(/[^\p{L}\p{N}.]+/u)
+     .filter((w) => w.length > 3 && !STOPWORDS.has(w)),
+   ),
+  );
+  if (terminos.length === 0) return body;
+  const plano = normalize(body);
+  const marcas: Array<[number, number]> = [];
+  for (const t of terminos) {
+   let desde = 0;
+   for (;;) {
+    const i = plano.indexOf(t, desde);
+    if (i === -1) break;
+    marcas.push([i, i + t.length]);
+    desde = i + t.length;
+   }
+  }
+  if (marcas.length === 0) return body;
+  marcas.sort((a, b) => a[0] - b[0]);
+  const piezas: React.ReactNode[] = [];
+  let cursor = 0;
+  marcas.forEach(([ini, fin], i) => {
+   if (ini < cursor) return;
+   if (ini > cursor) piezas.push(body.slice(cursor, ini));
+   piezas.push(
+    <mark key={i} className="bg-warning/30 text-foreground rounded-sm px-0.5">
+     {body.slice(ini, fin)}
+    </mark>,
+   );
+   cursor = fin;
+  });
+  if (cursor < body.length) piezas.push(body.slice(cursor));
+  return piezas;
  }
 
  return (
@@ -201,9 +257,20 @@ export default function ChunkTestPage() {
             </Badge>
            )}
            <span className="flex-1" />
-           <Badge variant="secondary" className="text-3xs">
-            <FileText className="h-3 w-3 mr-1" /> {chunk.source_name}
-           </Badge>
+           {chunk.source_id ? (
+            <Link
+             href={`/dashboard/conocimiento/documentos/${chunk.source_id}/chunks`}
+             className="inline-flex items-center gap-1 text-3xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+             title={`Abrir ${chunk.source_name}`}
+            >
+             <FileText className="h-3 w-3" aria-hidden="true" />
+             {chunk.source_name}
+            </Link>
+           ) : (
+            <Badge variant="secondary" className="text-3xs">
+             <FileText className="h-3 w-3 mr-1" /> {chunk.source_name}
+            </Badge>
+           )}
            {chunk.section && (
             <Badge variant="outline" className="text-3xs">
              {chunk.section}
@@ -213,12 +280,12 @@ export default function ChunkTestPage() {
           {prefix && (
            <p className="text-2xs text-muted-foreground font-mono mb-1.5">{prefix}</p>
           )}
-          <p className="text-13 leading-relaxed whitespace-pre-wrap">{body}</p>
-          {chunk.truncated && (
-           <p className="text-2xs text-muted-foreground mt-2 italic">
-            Vista previa recortada; el fragmento completo es más largo.
-           </p>
-          )}
+          <p className="text-13 leading-relaxed whitespace-pre-wrap break-words">
+           {highlight(body, lastQuery)}
+          </p>
+          <p className="text-2xs text-muted-foreground mt-2 tabular-nums">
+           Fragmento {chunk.chunk_index} · {body.length} caracteres
+          </p>
          </CardContent>
         </Card>
        );
