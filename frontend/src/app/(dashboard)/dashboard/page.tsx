@@ -485,13 +485,13 @@ function WorkflowCycle({
   }`}>
    <div className="flex items-center justify-between mb-3">
     <div>
-      <p className="text-15 font-semibold">Ciclo de publicación</p>
+      <p className="text-15 font-semibold">Estado del asistente</p>
      <p className="text-2xs text-muted-foreground mt-0.5">
       {loading
        ? "Verificando estado..."
        : allOk
-        ? "Todo publicado y al día"
-        : "Hay pasos pendientes antes de publicar"}
+        ? "Todo al día"
+        : "Hay pasos pendientes"}
      </p>
     </div>
     {allOk && !loading && (
@@ -501,7 +501,7 @@ function WorkflowCycle({
     )}
    </div>
 
-   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
     {phases.map((phase, i) => {
      const state = loading ? "unavailable" : phaseState[phase.key];
      const isOk      = state === "ok";

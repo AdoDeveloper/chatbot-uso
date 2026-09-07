@@ -220,7 +220,7 @@ export default function PublicacionesPage() {
 
   const loadError = sourcesError || versionsError;
   useEffect(() => {
-    if (loadError) toast({ type: "error", message: "No se pudo cargar el estado de publicaciones." });
+    if (loadError) toast({ type: "error", message: "No se pudo cargar el historial de cambios." });
   }, [loadError, toast]);
 
   async function load() {
@@ -311,7 +311,7 @@ export default function PublicacionesPage() {
 
   const hasPendingSources = pendingSources.length > 0;
 
-  const latestDeployId = versions.find((v) => v.is_active)?.id;
+  const activeVersionId = versions.find((v) => v.is_active)?.id;
   const displayed = showAllSnapshots ? versions : versions.slice(0, 10);
   const activeSections = diff ? Object.entries(diff.sections).filter(([, changes]) => changes.length > 0) : [];
 
@@ -406,14 +406,14 @@ export default function PublicacionesPage() {
             className="shrink-0"
           >
             {showAllSnapshots ? <EyeOff /> : <Eye />}
-            {showAllSnapshots ? "Solo publicaciones" : "Ver todos los snapshots"}
+            {showAllSnapshots ? "Ver solo los recientes" : "Ver todo el historial"}
           </Button>
         </div>
 
         {showAllSnapshots && (
           <div className="mb-3 flex items-center gap-2 rounded-lg border border-muted bg-muted/30 px-4 py-2.5 text-2xs text-muted-foreground">
             <Eye className="w-3.5 h-3.5 shrink-0" />
-            Mostrando todos los snapshots: publicaciones, manuales y rollbacks.
+            Mostrando el historial completo: cambios de configuración, puntos de restauración guardados a mano y restauraciones.
           </div>
         )}
 
@@ -423,9 +423,9 @@ export default function PublicacionesPage() {
           <Card>
             <CardContent>
               <EmptyState
-                icon={Rocket}
-                title="Sin publicaciones"
-                description="Cuando publiques la configuración por primera vez, aparecerá aquí."
+                icon={History}
+                title="Sin cambios registrados"
+                description="Cada cambio en la configuración del asistente queda aquí, con quién lo hizo y cuándo."
               />
             </CardContent>
           </Card>
@@ -434,8 +434,7 @@ export default function PublicacionesPage() {
             {displayed.map((v) => {
               const TriggerIcon = TRIGGER_ICONS[v.trigger_source || "manual"] || Settings;
               const isExpanded = expandedId === v.id;
-              const isInProduction = v.id === latestDeployId;
-              const isDeploy = v.trigger_source === "deploy";
+              const isInProduction = v.id === activeVersionId;
               const isRollback = v.trigger_source === "rollback";
               const isManual = v.trigger_source === "manual";
 
@@ -444,7 +443,6 @@ export default function PublicacionesPage() {
                   <button onClick={() => handleExpand(v)} className="w-full text-left px-5 py-3 flex items-center gap-3 hover:bg-muted/30 transition-colors">
                     <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
                       isInProduction ? "bg-primary text-primary-foreground" :
-                      isDeploy ? "bg-primary/10 text-primary" :
                       isRollback ? "bg-warning/10 text-warning" :
                       "bg-muted/50 text-muted-foreground"
                     }`}>
@@ -453,9 +451,9 @@ export default function PublicacionesPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-13">v{v.version_number}</span>
-                        {isInProduction && <Badge className="text-3xs">En producción</Badge>}
+                        {isInProduction && <Badge className="text-3xs">Configuración actual</Badge>}
                         {v.trigger_source && (
-                          <Badge variant={isDeploy ? "outline" : "secondary"} className="text-3xs">
+                          <Badge variant="secondary" className="text-3xs">
                             {TRIGGER_LABELS[v.trigger_source] || v.trigger_source}
                           </Badge>
                         )}
@@ -467,7 +465,7 @@ export default function PublicacionesPage() {
                       </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      {isDeploy && !isInProduction && (
+                      {!isInProduction && (
                         <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setRollbackTarget(v); }} className="gap-1 text-2xs h-7">
                           <RotateCcw className="h-3 w-3" /> Restaurar
                         </Button>
