@@ -1009,8 +1009,11 @@ async def classify_topic(
     adapter = _get_adapter(provider.name, provider.provider_type, provider.model_name, provider.api_base, api_key)
     reasoning_effort = "low" if provider.provider_type == "groq" else None
     try:
+        # El JSON del tema ocupa poco, pero un modelo de razonamiento gasta
+        # parte del presupuesto antes de escribirlo: con 32 tokens la respuesta
+        # llegaba vacía y ninguna pregunta se clasificaba.
         text = await adapter.complete(
-            messages, temperature=0.0, max_tokens=32, reasoning_effort=reasoning_effort,
+            messages, temperature=0.0, max_tokens=128, reasoning_effort=reasoning_effort,
         )
         if not text or not text.strip():
             return None

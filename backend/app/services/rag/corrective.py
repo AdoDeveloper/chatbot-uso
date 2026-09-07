@@ -75,6 +75,16 @@ def _completar_con_mejores(docs: list[dict], relevantes: list[dict]) -> list[dic
     return elegidos
 
 
+def _sin_respuesta(docs: list[dict], ratio: float | None) -> bool:
+    """Una pregunta queda sin responder cuando el evaluador no aprueba nada.
+
+    No basta con mirar si la lista está vacía: el complemento de contexto
+    devuelve fragmentos aunque el juicio haya sido negativo, y sin esta
+    comprobación esas preguntas dejarían de registrarse.
+    """
+    return not docs or ratio == 0
+
+
 class RagState(TypedDict):
     question: str
     original_question: str
@@ -83,6 +93,8 @@ class RagState(TypedDict):
     score_threshold: float
     documents: list[dict]
     relevant_docs: list[dict]
+    # Cuántos aprobó el evaluador antes de completar el contexto.
+    approved_count: int
     rewrite_count: int
     provider: LLMProvider
     api_key: str | None
@@ -141,10 +153,11 @@ async def _grade(state: RagState) -> dict:
         api_key=state["api_key"],
     )
     relevant = [d for d, g in zip(docs, grades) if g]
-    log.info("rag.grade", total=len(docs), relevant=len(relevant))
-    if docs and len(relevant) < _MIN_DOCS_TRAS_FILTRO:
+    aprobados = len(relevant)
+    log.info("rag.grade", total=len(docs), relevant=aprobados)
+    if docs and aprobados < _MIN_DOCS_TRAS_FILTRO:
         relevant = _completar_con_mejores(docs, relevant)
-    return {"relevant_docs": relevant}
+    return {"relevant_docs": relevant, "approved_count": aprobados}
 
 
 async def _rewrite(state: RagState) -> dict:
@@ -266,6 +279,7 @@ async def run_adaptive_rag(
     use_corrective_rag: bool = True,
     conversation_id: str | None = None,
     greeting_response: str | None = None,
+    original_question: str | None = None,
 ) -> tuple[list[dict], float | None] | str:
     """
     Adaptive RAG entry point. Returns either:
@@ -275,7 +289,12 @@ async def run_adaptive_rag(
 
     `greeting_response` lets the caller pass the admin-customized greeting from
     ChatbotSettings; falls back to the hardcoded default when not provided.
+
+    `question` puede venir expandida con el turno anterior para que la búsqueda
+    entienda una pregunta corta; `original_question` es lo que el usuario
+    escribió, y es lo que se registra como pregunta sin respuesta.
     """
+    a_registrar = original_question or question
     route = classify_query(question)
     log.info("rag.route", question=question[:80], route=route)
 
@@ -292,8 +311,8 @@ async def run_adaptive_rag(
             provider=provider if use_corrective_rag else None,
             api_key=api_key if use_corrective_rag else None,
         )
-        if not docs:
-            await _maybe_flag_unanswered(question, conversation_id, provider=provider, api_key=api_key)
+        if _sin_respuesta(docs, ratio):
+            await _maybe_flag_unanswered(a_registrar, conversation_id, provider=provider, api_key=api_key)
         return docs, ratio
 
     docs, ratio = await run_corrective_rag(
@@ -304,8 +323,8 @@ async def run_adaptive_rag(
         top_k=top_k,
         score_threshold=score_threshold,
     )
-    if not docs:
-        await _maybe_flag_unanswered(question, conversation_id, provider=provider, api_key=api_key)
+    if _sin_respuesta(docs, ratio):
+        await _maybe_flag_unanswered(a_registrar, conversation_id, provider=provider, api_key=api_key)
     return docs, ratio
 
 
@@ -332,7 +351,11 @@ async def run_corrective_rag(
     final_state = await _graph.ainvoke(initial)
     context = final_state["relevant_docs"]
     total_docs = final_state["documents"]
-    ratio = (len(context) / len(total_docs)) if total_docs else None
+    # Sobre lo aprobado por el evaluador, no sobre el contexto ya completado:
+    # de otro modo el ratio nunca sería cero y una pregunta sin respuesta
+    # pasaría por respondida.
+    aprobados = final_state.get("approved_count", len(context))
+    ratio = (aprobados / len(total_docs)) if total_docs else None
 
     log.info("rag.done", question=question[:80], context_chunks=len(context))
     return context, ratio

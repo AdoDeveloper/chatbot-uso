@@ -201,7 +201,8 @@ async def _run_chat_inner(
     try:
         rag_result = await asyncio.wait_for(
             pipeline.retrieve_context(
-                rag_question, primary_provider, primary_key, effective_source_ids, cfg
+                rag_question, primary_provider, primary_key, effective_source_ids, cfg,
+                original_question=request.question,
             ),
             timeout=35.0,
         )

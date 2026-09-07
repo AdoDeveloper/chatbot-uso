@@ -272,9 +272,19 @@ def build_rag_question(question: str, history: list[dict]) -> str:
 
 
 async def retrieve_context(
-    question: str, provider, api_key: str, source_ids: list[str] | None, cfg
+    question: str,
+    provider,
+    api_key: str,
+    source_ids: list[str] | None,
+    cfg,
+    original_question: str | None = None,
 ) -> str | tuple[list[dict], float | None]:
-    """Ejecuta Adaptive RAG: devuelve un saludo (str) o (chunks, context_relevance_ratio)."""
+    """Ejecuta Adaptive RAG: devuelve un saludo (str) o (chunks, context_relevance_ratio).
+
+    `question` puede llegar expandida con el turno anterior para que la
+    búsqueda entienda una pregunta corta; `original_question` es lo que el
+    usuario escribió y es lo que se registra si queda sin respuesta.
+    """
     return await run_adaptive_rag(
         question=question,
         provider=provider,
@@ -284,6 +294,7 @@ async def retrieve_context(
         score_threshold=cfg.score_threshold,
         use_corrective_rag=cfg.use_corrective_rag,
         greeting_response=cfg.greeting_response,
+        original_question=original_question,
     )
 
 
