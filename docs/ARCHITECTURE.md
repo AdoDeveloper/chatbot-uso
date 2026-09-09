@@ -277,6 +277,12 @@ erDiagram
 
 ```
 
+> `LLM_PROVIDERS` (cadena de proveedores configurados por el admin, con
+> prioridad y fallback) y `PROVIDER_TYPE_CATALOG` (catálogo editable de URL
+> base y headers por defecto por tipo de proveedor - reemplaza cualquier
+> lista de proveedores hardcodeada en el código) se omiten del diagrama por
+> brevedad; ver `docs/API.md` para sus endpoints.
+
 ---
 
 ## 6. Adaptive RAG - máquina de estados

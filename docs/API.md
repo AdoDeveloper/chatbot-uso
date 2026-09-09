@@ -259,6 +259,21 @@ común: cada grupo vive en su propia carpeta bajo `backend/app/api/v1/`.
 | POST | `/providers/models` | Consultar modelos por configuración |
 | POST | `/providers/reorder` | Reordenar la cadena de proveedores |
 
+### Tipos de proveedor (`provider-types/`)
+
+Catálogo editable de URL base y headers HTTP por defecto para cada tipo de
+proveedor (`groq`, `openrouter`, `together`, etc.). Un proveedor sin URL base
+propia resuelve contra este catálogo en tiempo de petición - editarlo aquí
+afecta de inmediato a todos los proveedores que no tengan su propia URL base
+configurada, sin necesidad de desplegar código.
+
+| Método | Ruta | Descripción |
+| --- | --- | --- |
+| GET | `/provider-types` | Listar tipos de proveedor conocidos |
+| POST | `/provider-types` | Agregar un tipo de proveedor |
+| PATCH | `/provider-types/{id}` | Editar un tipo de proveedor |
+| DELETE | `/provider-types/{id}` | Eliminar un tipo de proveedor |
+
 ### Configuración del asistente (`settings/`)
 
 | Método | Ruta | Descripción |

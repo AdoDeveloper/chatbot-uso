@@ -112,6 +112,12 @@ proveedor:
 - Se ordena la **cadena de proveedores** arrastrando: si el primero falla, el
   sistema intenta con el siguiente.
 
+Debajo de la lista de proveedores, la tabla **Tipos de proveedor** muestra los
+proveedores conocidos con su dirección por defecto. Sirve para agregar un tipo
+nuevo (cuando aparece un proveedor no listado) o corregir la dirección de uno
+existente si el proveedor cambia su servicio - el cambio se aplica de
+inmediato a todos los proveedores conectados de ese tipo.
+
 ### 4.2 Asistente
 
 Define el comportamiento del chatbot: nombre, mensaje de bienvenida,
