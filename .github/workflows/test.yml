@@ -165,18 +165,14 @@ jobs:
         working-directory: frontend
         run: npx playwright install --with-deps chromium
 
-      # docker compose --wait solo confirma el healthcheck INTERNO del
-      # contenedor (wget a 127.0.0.1 dentro del propio contenedor) - no
-      # garantiza que el puerto publicado sea alcanzable desde el proceso
-      # host (Playwright) en ese instante. Sin este polling, el primer test
-      # puede toparse con una ventana breve donde el puerto aun no acepta
-      # conexiones externas y falla con ERR_CONNECTION_REFUSED.
+      # Confirma que los puertos publicados son alcanzables desde el host
+      # (curl con -4 fuerza IPv4, igual que la URL real que usa Playwright).
       - name: Wait for frontend and backend to accept connections from the host
         run: |
-          for url in http://localhost:8000/api/v1/health/live http://localhost:3000/login; do
+          for url in http://127.0.0.1:8000/api/v1/health/live http://127.0.0.1:3000/login; do
             echo "Esperando $url..."
             for i in $(seq 1 30); do
-              if curl -sf -o /dev/null "$url"; then
+              if curl -4 -sf -o /dev/null "$url"; then
                 echo "  $url respondió (intento $i)."
                 break
               fi
@@ -192,7 +188,12 @@ jobs:
         working-directory: frontend
         run: npx playwright test
         env:
-          PLAYWRIGHT_BASE_URL: http://localhost:3000
+          # 127.0.0.1 explícito, no "localhost": el runner de GitHub Actions
+          # resuelve "localhost" a IPv6 (::1) antes que a IPv4 y Chromium (a
+          # diferencia de curl, que tiene fallback) falla en seco con
+          # ERR_CONNECTION_REFUSED si nada escucha en esa interfaz - Docker
+          # solo publica el puerto en IPv4 salvo configuración explícita.
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
 
       - name: Upload Playwright report on failure
         if: failure()
