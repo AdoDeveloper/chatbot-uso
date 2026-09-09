@@ -1,0 +1,15 @@
+# Override solo para CI: reemplaza el volumen nombrado model_cache por un
+# bind mount a una carpeta del runner, para poder cachearla entre runs con
+# actions/cache. Sin esto, cada ejecucion del workflow descarga desde cero
+# los modelos ONNX (intfloat/multilingual-e5-large + Qdrant/bm25) en el
+# entrypoint del backend, lo que puede agotar el timeout del job frontend-e2e.
+# Uso: docker compose -f docker-compose.yml -f docker-compose.ci.yml up ...
+services:
+  backend:
+    # docker compose no mezcla listas de volumes entre archivos: hay que
+    # repetir los mounts del compose base, sólo cambiando model_cache por
+    # el bind mount cacheable.
+    volumes:
+      - ./backend:/app
+      - uploads_data:/app/uploads
+      - ./.cache/fastembed:/home/appuser/.cache/fastembed

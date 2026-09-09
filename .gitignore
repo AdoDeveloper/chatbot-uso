@@ -13,6 +13,9 @@ build/
 .env.*
 !.env.example
 
+# Cache de modelos de embeddings para CI (docker-compose.ci.yml)
+/.cache/
+
 # IDE
 .vscode/
 .idea/

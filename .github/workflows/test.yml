@@ -102,7 +102,10 @@ jobs:
   frontend-e2e:
     name: Frontend E2E (Playwright)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 20 min no alcanzaba: dos builds de Docker desde cero más, en el primer
+    # run sin cache, la descarga de los modelos de embeddings en el arranque
+    # del backend agotaban el tiempo antes de que el healthcheck pasara.
+    timeout-minutes: 30
     needs: [backend, frontend-unit]
 
     steps:
@@ -121,16 +124,32 @@ jobs:
             echo "WIDGET_BASE_URL=http://localhost:8000"
           } > backend/.env
 
+      # El entrypoint del backend descarga los modelos ONNX (embeddings) en el
+      # primer arranque si el cache está vacío - sin cachear entre runs, esa
+      # descarga puede agotar el tiempo disponible antes de que el healthcheck
+      # pase, dejando al frontend (que depende de backend healthy) sin arrancar.
+      - name: Cache embedding models
+        uses: actions/cache@v4
+        with:
+          path: .cache/fastembed
+          key: fastembed-models-${{ hashFiles('backend/requirements.txt') }}
+
+      - name: Prepare cache dir permissions
+        # El contenedor corre como appuser (UID no root, no determinista de
+        # antemano); con 777 evita un Permission denied al escribir el bind
+        # mount desde el host, sin necesidad de conocer el UID exacto.
+        run: mkdir -p .cache/fastembed && chmod -R 777 .cache
+
       - name: Bring up the stack
-        run: docker compose up -d --wait mysql redis qdrant backend frontend
+        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --wait mysql redis qdrant backend frontend
 
       - name: Show backend logs
         if: always()
         run: |
           echo "=== docker compose ps ==="
-          docker compose ps
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml ps
           echo "=== backend logs ==="
-          docker compose logs backend --no-color
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml logs backend --no-color
 
       - uses: actions/setup-node@v4
         with:
@@ -162,4 +181,4 @@ jobs:
 
       - name: Tear down
         if: always()
-        run: docker compose down -v
+        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml down -v
