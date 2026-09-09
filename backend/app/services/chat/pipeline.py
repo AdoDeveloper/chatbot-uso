@@ -53,7 +53,7 @@ def exact_cache_key(question: str, source_ids: list[str] | None, use_draft: bool
     return f"chat:v1:{h}"
 
 
-async def load_chat_config(db: AsyncSession, use_draft: bool):  # noqa: ARG001
+async def load_chat_config(db: AsyncSession, use_draft: bool):
     """Carga la configuración del chatbot desde la BD.
 
     `use_draft` se conserva por compatibilidad con las llamadas existentes: la
@@ -62,7 +62,7 @@ async def load_chat_config(db: AsyncSession, use_draft: bool):  # noqa: ARG001
     return await settings_service.get_settings(db)
 
 
-async def load_provider_chain(db: AsyncSession, use_draft: bool):  # noqa: ARG001
+async def load_provider_chain(db: AsyncSession, use_draft: bool):
     """Carga la cadena de proveedores LLM activa."""
     return await settings_service.get_active_chain(db)
 

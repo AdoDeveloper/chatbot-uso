@@ -3,7 +3,16 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, String, Text, Uuid, UniqueConstraint, func
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    String,
+    Text,
+    UniqueConstraint,
+    Uuid,
+    func,
+)
 from sqlalchemy.dialects import mysql
 from sqlalchemy.orm import Mapped, mapped_column
 

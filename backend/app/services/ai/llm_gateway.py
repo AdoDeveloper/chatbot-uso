@@ -28,6 +28,7 @@ import re
 import time
 from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator
+from typing import TYPE_CHECKING
 
 import httpx
 import structlog
@@ -40,6 +41,9 @@ from tenacity import (
 
 from app.models.llm_provider import LLMProvider
 from app.schemas.settings import DEFAULT_SYSTEM_PROMPT
+
+if TYPE_CHECKING:
+    from app.models.provider_type_catalog import ProviderTypeCatalog
 
 log = structlog.get_logger()
 
@@ -178,11 +182,11 @@ def _local_base_fallback(type_key: str) -> str | None:
 # Caché de filas del catálogo por type_key: evita una consulta a BD en cada
 # petición de chat. TTL corto para que una edición desde el panel se refleje
 # sin necesidad de reiniciar el backend.
-_CATALOG_CACHE: dict[str, tuple[float, "ProviderTypeCatalog | None"]] = {}
+_CATALOG_CACHE: dict[str, tuple[float, ProviderTypeCatalog | None]] = {}
 _CATALOG_CACHE_TTL = 300.0
 
 
-async def _resolve_catalog_entry(type_key: str) -> "ProviderTypeCatalog | None":
+async def _resolve_catalog_entry(type_key: str) -> ProviderTypeCatalog | None:
     now = time.monotonic()
     cached = _CATALOG_CACHE.get(type_key)
     if cached and now - cached[0] < _CATALOG_CACHE_TTL:
