@@ -78,6 +78,19 @@ export interface LLMProvider {
   last_test_error: string | null;
 }
 
+export interface ProviderTypeCatalogItem {
+  id: string;
+  type_key: string;
+  display_name: string;
+  default_api_base: string | null;
+  default_headers: Record<string, string>;
+  models_endpoint_path: string;
+  is_builtin: boolean;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ChatbotSettings {
   system_prompt: string;
   top_k: number;

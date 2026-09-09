@@ -156,37 +156,149 @@ def _is_retryable(exc: BaseException) -> bool:
     return isinstance(exc, (httpx.ConnectError, httpx.ReadTimeout))
 
 
-# El admin SIEMPRE puede sobrescribirlas vía api_base en el panel.
-# Son solo valores por defecto de conveniencia para que baste con una API key.
+# El admin SIEMPRE puede sobrescribirlas vía api_base en el panel del
+# proveedor. Cuando no lo hace, se resuelve contra provider_type_catalog
+# (tabla editable desde Configuración → Tipos de proveedor) - no hay lista
+# de proveedores hardcodeada en el código; el catálogo es la fuente de
+# verdad y puede corregirse sin desplegar nada.
 
-def _openai_compat_bases() -> dict[str, str]:
+def _local_base_fallback(type_key: str) -> str | None:
+    """Únicos valores que siguen resueltos desde settings, no desde el
+    catálogo: son locales al servidor (Ollama/LMStudio/vLLM en la misma red
+    del backend), no URLs públicas de un proveedor externo."""
     from app.core.config import get_settings
     s = get_settings()
     return {
-        "openai": "https://api.openai.com/v1",
-        "groq": "https://api.groq.com/openai/v1",
-        "openrouter": "https://openrouter.ai/api/v1",
-        "deepseek": "https://api.deepseek.com/v1",
-        "together": "https://api.together.xyz/v1",
-        "xai": "https://api.x.ai/v1",
-        "mistral": "https://api.mistral.ai/v1",
-        "fireworks": "https://api.fireworks.ai/inference/v1",
-        "perplexity": "https://api.perplexity.ai",
         "ollama": s.LLM_OLLAMA_BASE,
         "lmstudio": s.LLM_LMSTUDIO_BASE,
         "vllm": s.LLM_VLLM_BASE,
-        "cerebras": "https://api.cerebras.ai/v1",
-        "sambanova": "https://api.sambanova.ai/v1",
-        "lepton": "https://api.lepton.ai/v1",
-        "anyscale": "https://api.endpoints.anyscale.com/v1",
-        "ovhcloud": "https://llama-3-1-70b-instruct.endpoints.kepler.ai.cloud.ovh.net/api/openai_compat/v1",
-        "nvidia": "https://integrate.api.nvidia.com/v1",
-        "cloudflare": "https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/v1",
-        "hyperbolic": "https://api.hyperbolic.xyz/v1",
-        "nebius": "https://api.studio.nebius.ai/v1",
-        "infomaniak": "https://api.ai.infomaniak.com/v1",
-        "scaleway": "https://api.scaleway.ai/v1",
-    }
+    }.get(type_key)
+
+
+# Caché de filas del catálogo por type_key: evita una consulta a BD en cada
+# petición de chat. TTL corto para que una edición desde el panel se refleje
+# sin necesidad de reiniciar el backend.
+_CATALOG_CACHE: dict[str, tuple[float, "ProviderTypeCatalog | None"]] = {}
+_CATALOG_CACHE_TTL = 300.0
+
+
+async def _resolve_catalog_entry(type_key: str) -> "ProviderTypeCatalog | None":
+    now = time.monotonic()
+    cached = _CATALOG_CACHE.get(type_key)
+    if cached and now - cached[0] < _CATALOG_CACHE_TTL:
+        return cached[1]
+
+    from app.db.session import AsyncSessionLocal
+    from app.services.system.provider_catalog import get_type_by_key
+
+    entry = None
+    try:
+        async with AsyncSessionLocal() as db:
+            entry = await get_type_by_key(db, type_key)
+    except Exception as exc:
+        log.warning("llm.catalog_lookup_failed", type_key=type_key, error=str(exc))
+
+    _CATALOG_CACHE[type_key] = (now, entry)
+    return entry
+
+
+async def _resolve_base_and_headers(
+    provider_type: str, api_base: str | None, fallback_base: str | None = None,
+) -> tuple[str | None, dict[str, str]]:
+    """api_base explícito > catálogo editable > fallback local (Ollama/etc.)
+    > constante fija del adaptador (si el llamador la pasa como fallback_base)."""
+    if api_base:
+        return api_base, {}
+    entry = await _resolve_catalog_entry(provider_type)
+    if entry and entry.default_api_base:
+        return entry.default_api_base, (entry.default_headers or {})
+    local = _local_base_fallback(provider_type)
+    if local:
+        return local, (entry.default_headers if entry else {})
+    return fallback_base, (entry.default_headers if entry else {})
+
+# Caché de metadata de /models por (base, modelo): evita una consulta extra
+# en cada llamada. TTL corto porque el catálogo de un proveedor casi nunca
+# cambia en producción, pero no queremos quedar pegados a un dato viejo
+# para siempre si el admin cambia de modelo.
+_REASONING_META_CACHE: dict[tuple[str, str, str], tuple[float, dict | None]] = {}
+_REASONING_META_TTL = 600.0
+
+
+async def _fetch_model_entry(
+    base: str, model_name: str, api_key: str | None,
+    extra_headers: dict[str, str] | None = None, models_path: str = "/models",
+) -> dict | None:
+    """Busca en el endpoint de listado de modelos la entrada de ESTE modelo,
+    sin asumir el proveedor. `models_path` viene del catálogo editable -
+    la mayoría sigue "/models" (spec OpenAI), algunos difieren (ej. Together
+    AI: "/serverless-models").
+
+    Devuelve None si el proveedor no expone ese endpoint, no responde, o el
+    modelo no aparece en el catálogo - en cualquiera de esos casos no hay
+    evidencia positiva de nada, así que el llamador debe tratarlo como
+    "sin metadata" y no enviar ningún campo de razonamiento.
+    """
+    cache_key = (base, model_name, models_path)
+    now = time.monotonic()
+    cached = _REASONING_META_CACHE.get(cache_key)
+    if cached and now - cached[0] < _REASONING_META_TTL:
+        return cached[1]
+
+    entry: dict | None = None
+    try:
+        client = _get_http_client()
+        headers = {"Content-Type": "application/json", **(extra_headers or {})}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+        path = models_path if models_path.startswith("/") else f"/{models_path}"
+        r = await client.get(f"{base}{path}", headers=headers, timeout=10.0)
+        r.raise_for_status()
+        for m in r.json().get("data", []):
+            if m.get("id") == model_name:
+                entry = m
+                break
+    except Exception:
+        entry = None
+
+    _REASONING_META_CACHE[cache_key] = (now, entry)
+    return entry
+
+
+# Niveles de esfuerzo ordenados de menor a mayor: cuando un proveedor declara
+# varios, preferimos el más bajo disponible para no gastar de más en un juez
+# o clasificador que solo necesita una respuesta corta y determinista.
+_EFFORT_ORDER = {"minimal": 0, "low": 1, "medium": 2, "high": 3, "xhigh": 4, "max": 5}
+
+
+def _reasoning_kwargs_from_metadata(entry: dict | None) -> dict:
+    """Traduce la metadata de /models a un payload real, por FORMATO de wire
+    (no por nombre de proveedor). Solo actúa ante evidencia POSITIVA de que
+    el modelo razona - nunca por ausencia de metadata, porque varios
+    proveedores (vLLM, algunos self-hosted) responden 400 ante un campo
+    desconocido en vez de ignorarlo en silencio.
+    """
+    if not entry:
+        return {}
+
+    # Formato OpenRouter: objeto "reasoning" anidado con niveles soportados.
+    reasoning_meta = entry.get("reasoning")
+    if isinstance(reasoning_meta, dict):
+        efforts = reasoning_meta.get("supported_efforts") or []
+        if not efforts and not reasoning_meta.get("default_enabled"):
+            return {}
+        payload: dict = {"reasoning": {"exclude": True}}
+        if efforts:
+            payload["reasoning"]["effort"] = min(efforts, key=lambda e: _EFFORT_ORDER.get(e, 9))
+        return payload
+
+    # Formato Groq: capacidad booleana en supported_features, sin niveles.
+    features = entry.get("supported_features") or []
+    if "reasoning" in features:
+        return {"reasoning_effort": "low"}
+
+    return {}
+
 
 _ANTHROPIC_BASE = "https://api.anthropic.com"
 _GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta"
@@ -241,18 +353,21 @@ class OpenAICompatAdapter(LLMAdapter):
     POST /chat/completions with the OpenAI request/response schema.
     """
 
-    def __init__(self, provider_type: str, model_name: str, api_key: str | None, api_base: str | None):
-        base = api_base or _openai_compat_bases().get(provider_type)
-        if not base:
+    def __init__(
+        self, provider_type: str, model_name: str, api_key: str | None, api_base: str | None,
+        extra_headers: dict[str, str] | None = None,
+    ):
+        if not api_base:
             raise ValueError(
                 f"URL base desconocida para el proveedor '{provider_type}'. "
-                "Configura la URL base en Configuración → Proveedores LLM."
+                "Configúrala en el proveedor o en Configuración → Tipos de proveedor."
             )
-        super().__init__(model_name, api_key, base.rstrip("/"))
+        super().__init__(model_name, api_key, api_base.rstrip("/"))
         self.provider_type = provider_type
+        self.extra_headers = extra_headers or {}
 
     def _headers(self) -> dict:
-        h: dict[str, str] = {"Content-Type": "application/json"}
+        h: dict[str, str] = {"Content-Type": "application/json", **self.extra_headers}
         if self.api_key:
             h["Authorization"] = f"Bearer {self.api_key}"
         return h
@@ -262,6 +377,20 @@ class OpenAICompatAdapter(LLMAdapter):
         if base.endswith("/chat/completions"):
             return base
         return f"{base}/chat/completions"
+
+    async def _auto_reasoning_kwargs(self) -> dict:
+        """Detecta si ESTE modelo razona consultando el endpoint de listado
+        de modelos del proveedor (sin mirar provider_type) y traduce al
+        formato de wire que declare. Nunca envía nada sin evidencia
+        positiva: ver _reasoning_kwargs_from_metadata.
+        """
+        catalog_entry = await _resolve_catalog_entry(self.provider_type)
+        models_path = catalog_entry.models_endpoint_path if catalog_entry else "/models"
+        entry = await _fetch_model_entry(
+            self.api_base, self.model_name, self.api_key,
+            extra_headers=self.extra_headers, models_path=models_path,
+        )
+        return _reasoning_kwargs_from_metadata(entry)
 
     async def stream_chat(
         self, messages: list[dict], temperature: float = 0.3, max_tokens: int = 1024
@@ -277,8 +406,7 @@ class OpenAICompatAdapter(LLMAdapter):
         # Los modelos de razonamiento gastan el presupuesto de salida pensando
         # antes de escribir: sin acotarlo, una respuesta breve termina en
         # finish_reason "length" con el contenido vacío o cortado a media frase.
-        if self.provider_type == "groq":
-            payload["reasoning_effort"] = "low"
+        payload.update(await self._auto_reasoning_kwargs())
         async with client.stream(
             "POST", self._chat_url(), headers=self._headers(),
             json=payload, timeout=60.0,
@@ -321,6 +449,8 @@ class OpenAICompatAdapter(LLMAdapter):
             payload["response_format"] = response_format
         if reasoning_effort:
             payload["reasoning_effort"] = reasoning_effort
+        else:
+            payload.update(await self._auto_reasoning_kwargs())
         resp = await client.post(
             self._chat_url(), headers=self._headers(),
             json=payload, timeout=30.0,
@@ -766,7 +896,7 @@ _ADAPTER_MAP: dict[str, type] = {
 }
 
 
-def _get_adapter(
+async def _get_adapter(
     provider_name: str,
     provider_type: str,
     model_name: str,
@@ -783,10 +913,14 @@ def _get_adapter(
                 f"El proveedor '{provider_name}' ({pt}) requiere una API key configurada."
             )
         log.debug("llm.adapter_selected", provider_type=pt, adapter=adapter_cls.__name__)
-        return adapter_cls(model_name, api_key, api_base)
+        # Cada adaptador ya conserva su propia constante fija (_ANTHROPIC_BASE
+        # etc.) como último fallback si ni api_base ni el catálogo traen nada.
+        resolved_base, _headers = await _resolve_base_and_headers(pt, api_base)
+        return adapter_cls(model_name, api_key, resolved_base)
 
     log.debug("llm.adapter_selected", provider_type=pt, adapter="OpenAICompatAdapter")
-    return OpenAICompatAdapter(pt, model_name, api_key, api_base)
+    resolved_base, extra_headers = await _resolve_base_and_headers(pt, api_base)
+    return OpenAICompatAdapter(pt, model_name, api_key, resolved_base, extra_headers)
 
 
 # El prompt efectivo viene de la configuración; este es el respaldo para
@@ -836,7 +970,7 @@ async def stream_chat(
         try:
             # _get_adapter() dentro del try: un proveedor mal configurado no debe
             # tumbar el bucle de fallback sin probar el resto de la cadena.
-            adapter = _get_adapter(provider_name, provider_type, model_name, api_base, api_key)
+            adapter = await _get_adapter(provider_name, provider_type, model_name, api_base, api_key)
             log.info("llm.request", provider=provider_name, model=model_name,
                      adapter=type(adapter).__name__)
             async for token in adapter.stream_chat(messages, temperature, max_tokens):
@@ -893,11 +1027,13 @@ async def fetch_models(
     """
     client = _get_http_client()
     headers: dict[str, str] = {}
+    resolved_base, extra_headers = await _resolve_base_and_headers(provider_type, api_base)
 
     try:
         if provider_type == "anthropic":
-            base = (api_base or _ANTHROPIC_BASE).rstrip("/")
+            base = (resolved_base or _ANTHROPIC_BASE).rstrip("/")
             url = f"{base}/v1/models"
+            headers.update(extra_headers)
             if api_key:
                 headers["x-api-key"] = api_key
             headers["anthropic-version"] = "2023-06-01"
@@ -907,12 +1043,12 @@ async def fetch_models(
             models = [{"id": m["id"], "name": m.get("display_name", m["id"])} for m in items]
 
         elif provider_type == "gemini":
-            base = (api_base or _GEMINI_BASE).rstrip("/")
+            base = (resolved_base or _GEMINI_BASE).rstrip("/")
             url = f"{base}/models"
             params: dict = {}
             if api_key:
                 params["key"] = api_key
-            r = await client.get(url, params=params, timeout=15)
+            r = await client.get(url, params=params, headers=extra_headers, timeout=15)
             r.raise_for_status()
             items = r.json().get("models", [])
             models = []
@@ -923,8 +1059,9 @@ async def fetch_models(
                 models.append({"id": mid, "name": m.get("displayName", mid)})
 
         elif provider_type == "cohere":
-            base = (api_base or _COHERE_MODELS_BASE).rstrip("/")
+            base = (resolved_base or _COHERE_MODELS_BASE).rstrip("/")
             url = f"{base}/models"
+            headers.update(extra_headers)
             if api_key:
                 headers["Authorization"] = f"Bearer {api_key}"
             r = await client.get(url, headers=headers, timeout=15)
@@ -934,13 +1071,17 @@ async def fetch_models(
 
         else:
             # OpenAI-compat: openai, groq, openrouter, deepseek, mistral, together, ollama…
-            base = api_base or _openai_compat_bases().get(provider_type)
+            base = resolved_base
             if not base:
                 raise ValueError(
                     f"URL base desconocida para '{provider_type}'. "
-                    "Configura 'URL base' en el proveedor."
+                    "Configúrala en el proveedor o en Configuración → Tipos de proveedor."
                 )
-            url = f"{base.rstrip('/')}/models"
+            catalog_entry = await _resolve_catalog_entry(provider_type)
+            models_path = catalog_entry.models_endpoint_path if catalog_entry else "/models"
+            models_path = models_path if models_path.startswith("/") else f"/{models_path}"
+            url = f"{base.rstrip('/')}{models_path}"
+            headers.update(extra_headers)
             if api_key:
                 headers["Authorization"] = f"Bearer {api_key}"
             r = await client.get(url, headers=headers, timeout=15)
@@ -979,7 +1120,7 @@ async def test_connection(
     api_base: str | None = None,
 ) -> dict:
     try:
-        adapter = _get_adapter("test", provider_type, model_name, api_base, api_key)
+        adapter = await _get_adapter("test", provider_type, model_name, api_base, api_key)
     except Exception as exc:
         log.info("llm.test", provider_type=provider_type, model=model_name, success=False)
         return {"success": False, "latency_ms": None, "error": str(exc)}
@@ -1012,38 +1153,52 @@ async def grade_documents(
         {"role": "system", "content": prompt},
         {"role": "user", "content": f"Pregunta: {question}\n\nDocumentos:\n{doc_list}"},
     ]
-    adapter = _get_adapter(provider.name, provider.provider_type, provider.model_name, provider.api_base, api_key)
-    reasoning_effort = "low" if provider.provider_type == "groq" else None
-    try:
-        text = await adapter.complete(
-            messages, temperature=0.0, max_tokens=512, reasoning_effort=reasoning_effort,
-        )
+    adapter = await _get_adapter(provider.name, provider.provider_type, provider.model_name, provider.api_base, api_key)
+
+    def _parse(text: str) -> list[bool] | None:
+        """Intenta extraer los juicios del texto. None si el formato no sirve."""
         if not text or not text.strip():
-            log.warning("llm.grade_failed_open", reason="empty_response",
-                        degraded=True, docs=len(documents), provider=provider.name)
-            return [True] * len(documents)
+            return None
         cleaned = text.strip()
         cleaned = cleaned.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
         try:
             data = json.loads(cleaned)
+            grades = data.get("grades", [])
         except json.JSONDecodeError:
             match = re.search(r'\[(true|false)(?:\s*,\s*(true|false))*\]', cleaned, re.IGNORECASE)
-            if match:
-                raw = re.findall(r'(true|false)', match.group(), re.IGNORECASE)
-                data = {"grades": [v.lower() == "true" for v in raw]}
-            else:
-                log.warning("llm.grade_failed_open", reason="parse_failed",
-                            degraded=True, docs=len(documents),
-                            provider=provider.name, text=cleaned[:200])
-                return [True] * len(documents)
-        grades = data.get("grades", [])
+            if not match:
+                return None
+            raw = re.findall(r'(true|false)', match.group(), re.IGNORECASE)
+            grades = [v.lower() == "true" for v in raw]
         if len(grades) < len(documents):
-            log.warning("llm.grade_failed_open", reason="short_grades_array",
-                        degraded=True, docs=len(documents), received=len(grades),
-                        provider=provider.name)
-            while len(grades) < len(documents):
-                grades.append(False)
+            return None
         return [bool(g) for g in grades[:len(documents)]]
+
+    try:
+        for intento in range(2):
+            # 2000, no 512: un modelo con razonamiento oculto (exclude=true)
+            # gasta parte de ESTE mismo presupuesto pensando antes de escribir
+            # el JSON visible - con 512 el corte llega a mitad de la respuesta
+            # antes de emitir los 12 juicios completos (confirmado con Nemotron
+            # Ultra: finish_reason="length" con el array a medio terminar).
+            text = await adapter.complete(
+                messages, temperature=0.0, max_tokens=2000,
+            )
+            grades = _parse(text)
+            if grades is not None:
+                return grades
+            # Un array corto no dice nada sobre los documentos que faltan: no
+            # hay forma de saber si eran relevantes o no, así que se reintenta
+            # una vez antes de degradar - más barato que rechazar contexto
+            # bueno por un problema de formato en la respuesta del juez.
+            log.warning("llm.grade_retry", reason="short_or_unparsable",
+                        docs=len(documents), provider=provider.name, intento=intento)
+
+        # Tras el reintento, el mismo criterio que el resto de la función:
+        # fail-open. Rellenar con False penalizaría documentos nunca evaluados.
+        log.warning("llm.grade_failed_open", reason="short_grades_array",
+                    degraded=True, docs=len(documents), provider=provider.name)
+        return [True] * len(documents)
     except Exception as exc:
         log.warning("llm.grade_failed_open", reason="exception",
                     degraded=True, docs=len(documents),
@@ -1078,14 +1233,13 @@ async def classify_topic(
         {"role": "system", "content": prompt},
         {"role": "user", "content": f"Pregunta: {question}"},
     ]
-    adapter = _get_adapter(provider.name, provider.provider_type, provider.model_name, provider.api_base, api_key)
-    reasoning_effort = "low" if provider.provider_type == "groq" else None
+    adapter = await _get_adapter(provider.name, provider.provider_type, provider.model_name, provider.api_base, api_key)
     try:
         # El JSON del tema ocupa poco, pero un modelo de razonamiento gasta
         # parte del presupuesto antes de escribirlo: con 32 tokens la respuesta
         # llegaba vacía y ninguna pregunta se clasificaba.
         text = await adapter.complete(
-            messages, temperature=0.0, max_tokens=128, reasoning_effort=reasoning_effort,
+            messages, temperature=0.0, max_tokens=128,
         )
         if not text or not text.strip():
             return None
@@ -1118,9 +1272,11 @@ async def _extract_statements(
         {"role": "system", "content": prompt},
         {"role": "user", "content": f"Respuesta: {answer[:2000]}"},
     ]
-    adapter = _get_adapter(provider.name, provider.provider_type, provider.model_name, provider.api_base, api_key)
-    reasoning_effort = "low" if provider.provider_type == "groq" else None
-    text = await adapter.complete(messages, temperature=0.0, max_tokens=512, reasoning_effort=reasoning_effort)
+    adapter = await _get_adapter(provider.name, provider.provider_type, provider.model_name, provider.api_base, api_key)
+    # 2000, no 512: mismo motivo que grade_documents - un modelo con
+    # razonamiento oculto puede agotar un presupuesto chico antes de escribir
+    # el JSON visible.
+    text = await adapter.complete(messages, temperature=0.0, max_tokens=2000)
     if not text or not text.strip():
         return None
     cleaned = text.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
@@ -1164,9 +1320,8 @@ async def grade_faithfulness(
             {"role": "system", "content": prompt},
             {"role": "user", "content": f"Contexto:\n{context_text}\n\nStatements:\n{stmt_list}"},
         ]
-        adapter = _get_adapter(provider.name, provider.provider_type, provider.model_name, provider.api_base, api_key)
-        reasoning_effort = "low" if provider.provider_type == "groq" else None
-        text = await adapter.complete(messages, temperature=0.0, max_tokens=512, reasoning_effort=reasoning_effort)
+        adapter = await _get_adapter(provider.name, provider.provider_type, provider.model_name, provider.api_base, api_key)
+        text = await adapter.complete(messages, temperature=0.0, max_tokens=2000)
         if not text or not text.strip():
             return None
         cleaned = text.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
@@ -1219,7 +1374,7 @@ async def rewrite_query(
         {"role": "system", "content": system},
         {"role": "user", "content": question},
     ]
-    adapter = _get_adapter(provider.name, provider.provider_type, provider.model_name, provider.api_base, api_key)
+    adapter = await _get_adapter(provider.name, provider.provider_type, provider.model_name, provider.api_base, api_key)
     try:
         # Con `avoid` se sube la temperatura para variar la reformulación.
         temperature = 0.4 if avoid else 0.0

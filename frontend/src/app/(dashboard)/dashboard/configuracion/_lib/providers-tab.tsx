@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useApi, getErrorMessage, invalidateApiCache } from "@/hooks/use-api";
 import { useToast } from "@/components/ui/toast";
-import type { LLMProvider } from "@/types";
+import type { LLMProvider, ProviderTypeCatalogItem } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Modal } from "@/components/composed/modal";
@@ -23,33 +23,13 @@ import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ProviderTypesPanel } from "./provider-types-panel";
 
-const SUGGESTED_PROVIDERS = [
- { value: "openai", label: "OpenAI" }, { value: "anthropic", label: "Anthropic" },
- { value: "openrouter", label: "OpenRouter" }, { value: "groq", label: "Groq" },
- { value: "gemini", label: "Google Gemini" }, { value: "deepseek", label: "DeepSeek" },
- { value: "azure", label: "Azure OpenAI" }, { value: "bedrock", label: "AWS Bedrock" },
- { value: "cohere", label: "Cohere" }, { value: "mistral", label: "Mistral AI" },
- { value: "together", label: "Together AI" },
- { value: "ollama", label: "Ollama (local)" },
- { value: "lmstudio", label: "LM Studio (local)" },
- { value: "custom", label: "Otro / Custom" },
-];
-
-const MODEL_HINTS: Record<string, string> = {
- openai: "gpt-4o", anthropic: "claude-sonnet-4-6",
- openrouter: "meta-llama/llama-3.1-8b-instruct:free", groq: "llama-3.1-8b-instant",
- gemini: "gemini-2.0-flash", deepseek: "deepseek-chat",
- azure: "nombre-del-deployment",
- ollama: "llama3.2 / gpt-oss:20b-cloud / …", lmstudio: "nombre-del-modelo-cargado",
-};
-
-const PROVIDER_BASE_URLS: Record<string, string> = {
- ollama: "",
- lmstudio: "",
-};
-
+// Sin URL base propia: son locales al servidor del backend (Ollama/LM
+// Studio), cada instancia apunta a su propio host, no a un valor del catálogo.
 const LOCAL_PROVIDERS = new Set(["ollama", "lmstudio"]);
+
+const CUSTOM_TYPE_VALUE = "__custom__";
 
 interface ProviderForm {
  name: string; provider_type: string; custom_type: string;
@@ -67,8 +47,9 @@ interface ProviderPanelHandle {
 }
 
 const ProviderPanel = forwardRef<ProviderPanelHandle, {
- editing: LLMProvider | null; onClose: () => void; onSaved: () => void; onSavingChange: (saving: boolean) => void;
-}>(function ProviderPanel({ editing, onClose, onSaved, onSavingChange }, ref) {
+ editing: LLMProvider | null; catalogTypes: ProviderTypeCatalogItem[];
+ onClose: () => void; onSaved: () => void; onSavingChange: (saving: boolean) => void;
+}>(function ProviderPanel({ editing, catalogTypes, onClose, onSaved, onSavingChange }, ref) {
  const { toast } = useToast();
  const [form, setForm] = useState<ProviderForm>(emptyForm);
  const [showKey, setShowKey] = useState(false);
@@ -81,8 +62,8 @@ const ProviderPanel = forwardRef<ProviderPanelHandle, {
 
  useEffect(() => {
   if (editing) {
-   const isKnown = SUGGESTED_PROVIDERS.some((p) => p.value === editing.provider_type && p.value !== "custom");
-   setForm({ name: editing.name, provider_type: isKnown ? editing.provider_type : "custom",
+   const isKnown = catalogTypes.some((t) => t.type_key === editing.provider_type);
+   setForm({ name: editing.name, provider_type: isKnown ? editing.provider_type : CUSTOM_TYPE_VALUE,
     custom_type: isKnown ? "" : editing.provider_type, model_name: editing.model_name,
     api_key: "", api_base: editing.api_base ?? "", dashboard_url: editing.dashboard_url ?? "",
     is_active: editing.is_active,
@@ -90,24 +71,23 @@ const ProviderPanel = forwardRef<ProviderPanelHandle, {
   } else { setForm(emptyForm()); }
   setTestState("idle"); setTestMsg("");
   setFetchedModels(null); setFetchModelsError(null);
- }, [editing]);
+ }, [editing, catalogTypes]);
 
  const set = (k: keyof ProviderForm, v: unknown) => { setForm((f) => ({ ...f, [k]: v })); setTestState("idle"); };
 
  function handleProviderTypeChange(newType: string) {
-  setForm((f) => ({
-   ...f,
-   provider_type: newType,
-   api_base: PROVIDER_BASE_URLS[newType] ?? (["azure", "custom"].includes(newType) ? f.api_base : ""),
-  }));
+  setForm((f) => ({ ...f, provider_type: newType, api_base: LOCAL_PROVIDERS.has(newType) ? f.api_base : "" }));
   setTestState("idle");
   setFetchedModels(null);
   setFetchModelsError(null);
  }
 
- const resolvedType = form.provider_type === "custom" ? form.custom_type : form.provider_type;
+ const resolvedType = form.provider_type === CUSTOM_TYPE_VALUE ? form.custom_type : form.provider_type;
  const isLocal = LOCAL_PROVIDERS.has(form.provider_type);
- const showBaseUrl = ["azure", "custom"].includes(form.provider_type) || isLocal;
+ const selectedCatalogEntry = catalogTypes.find((t) => t.type_key === form.provider_type) ?? null;
+ // Cualquier tipo permite sobrescribir la URL - el catálogo solo aporta un
+ // valor por defecto; custom/local siempre la necesitan explícita.
+ const showBaseUrl = true;
 
  async function handleFetchModels() {
   if (!resolvedType) return;
@@ -186,12 +166,19 @@ const ProviderPanel = forwardRef<ProviderPanelHandle, {
    <div>
     <label className="block text-xs font-medium text-muted-foreground mb-1">Proveedor</label>
     <Select value={form.provider_type} onChange={(e) => handleProviderTypeChange(e.target.value)}>
-     {SUGGESTED_PROVIDERS.map((p) => <SelectOption key={p.value} value={p.value}>{p.label}</SelectOption>)}
+     {catalogTypes.map((t) => <SelectOption key={t.type_key} value={t.type_key}>{t.display_name}</SelectOption>)}
+     <SelectOption value={CUSTOM_TYPE_VALUE}>Otro / Custom</SelectOption>
     </Select>
-    {form.provider_type === "custom" && (
+    {form.provider_type === CUSTOM_TYPE_VALUE && (
      <Input value={form.custom_type} onChange={(e) => set("custom_type", e.target.value)}
       placeholder="ej: together_ai, replicate..."
       className="mt-2" />
+    )}
+    {selectedCatalogEntry?.notes && (
+     <p className="mt-1.5 flex items-start gap-1 text-2xs text-warning">
+      <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+      <span>{selectedCatalogEntry.notes}</span>
+     </p>
     )}
    </div>
    <div>
@@ -231,13 +218,13 @@ const ProviderPanel = forwardRef<ProviderPanelHandle, {
       </Select>
       {!fetchedModels.some((m) => m.id === form.model_name) && (
        <Input value={form.model_name} onChange={(e) => set("model_name", e.target.value)}
-        placeholder={MODEL_HINTS[resolvedType] ?? "nombre-del-modelo"} className="mt-2" autoComplete="off" />
+        placeholder="nombre-del-modelo" className="mt-2" autoComplete="off" />
       )}
       <p className="text-3xs text-muted-foreground mt-1">{fetchedModels.length} modelos obtenidos del proveedor</p>
      </>
     ) : (
      <Input value={form.model_name} onChange={(e) => set("model_name", e.target.value)}
-      placeholder={MODEL_HINTS[resolvedType] ?? MODEL_HINTS[form.provider_type] ?? "nombre-del-modelo"} autoComplete="off" />
+      placeholder="nombre-del-modelo" autoComplete="off" />
     )}
    </div>
    {!isLocal && (
@@ -259,7 +246,7 @@ const ProviderPanel = forwardRef<ProviderPanelHandle, {
    {showBaseUrl && (
     <div>
      <label className="block text-xs font-medium text-muted-foreground mb-1">
-      URL base
+      URL base {!isLocal && <span className="text-muted-foreground">(opcional - vacío usa el valor del catálogo)</span>}
       {form.provider_type === "azure" && <span className="text-muted-foreground ml-1">(endpoint de Azure OpenAI)</span>}
       {isLocal && <span className="text-muted-foreground ml-1">(endpoint local)</span>}
      </label>
@@ -268,7 +255,7 @@ const ProviderPanel = forwardRef<ProviderPanelHandle, {
        form.provider_type === "azure" ? "https://mi-recurso.openai.azure.com"
        : form.provider_type === "ollama" ? "http://<host>:11434/v1"
        : form.provider_type === "lmstudio" ? "http://<host>:1234/v1"
-       : "https://..."
+       : selectedCatalogEntry?.default_api_base ?? "https://..."
       } />
      {isLocal && (
       <p className="mt-1 text-2xs text-muted-foreground">
@@ -319,6 +306,8 @@ export function ProvidersTab() {
  const { data: providersData, loading, refetch: fetchProviders, setData: setProviders } =
   useApi<LLMProvider[]>("/providers");
  const providers = providersData ?? [];
+ const { data: catalogData, refetch: refetchCatalog } = useApi<ProviderTypeCatalogItem[]>("/provider-types");
+ const catalogTypes = catalogData ?? [];
  const [panelOpen, setPanelOpen] = useState(false);
  const [editing, setEditing] = useState<LLMProvider | null>(null);
  const [testingId, setTestingId] = useState<string | null>(null);
@@ -515,8 +504,12 @@ export function ProvidersTab() {
      </>
     }
    >
-    <ProviderPanel ref={panelRef} editing={editing} onClose={() => setPanelOpen(false)} onSaved={fetchProviders} onSavingChange={setPanelSaving} />
+    <ProviderPanel ref={panelRef} editing={editing} catalogTypes={catalogTypes}
+     onClose={() => setPanelOpen(false)} onSaved={fetchProviders} onSavingChange={setPanelSaving} />
    </Modal>
+   <div className="mt-6">
+    <ProviderTypesPanel catalogTypes={catalogTypes} onChanged={refetchCatalog} />
+   </div>
   </div>
  );
 }

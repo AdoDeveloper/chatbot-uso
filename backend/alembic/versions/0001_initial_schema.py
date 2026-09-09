@@ -220,6 +220,24 @@ def upgrade() -> None:
         sa.Column("last_test_error",       sa.Text,        nullable=True),
     )
 
+    # provider_type_catalog - no FK dependencies. Catálogo editable de tipos
+    # de proveedor conocidos (URL base + headers por defecto), reemplaza el
+    # dict hardcodeado que antes vivía en llm_gateway.py.
+    _ct(
+        "provider_type_catalog",
+        sa.Column("id",                    sa.Uuid(native_uuid=False), primary_key=True),
+        sa.Column("type_key",              sa.String(50),  nullable=False),
+        sa.Column("display_name",          sa.String(120), nullable=False),
+        sa.Column("default_api_base",      sa.String(512), nullable=True),
+        sa.Column("default_headers",       sa.JSON,        nullable=False, server_default=sa.text("('{}')")),
+        sa.Column("models_endpoint_path",  sa.String(120), nullable=False, server_default=sa.text("('/models')")),
+        sa.Column("is_builtin",            sa.Boolean,     nullable=False, server_default=sa.false()),
+        sa.Column("notes",                 sa.Text,        nullable=True),
+        sa.Column("created_at",            mysql.DATETIME(fsp=6), server_default=sa.text("CURRENT_TIMESTAMP(6)"), nullable=False),
+        sa.Column("updated_at",            mysql.DATETIME(fsp=6), server_default=sa.text("CURRENT_TIMESTAMP(6)"), nullable=False),
+        sa.UniqueConstraint("type_key", name="uq_provider_type_catalog_type_key"),
+    )
+
     # sources - depends on users
     _ct(
         "sources",
@@ -498,6 +516,7 @@ def downgrade() -> None:
     op.drop_table("chunk_edits")
     op.drop_table("faq_entries")
     op.drop_table("sources")
+    op.drop_table("provider_type_catalog")
     op.drop_table("llm_providers")
     op.drop_table("widget_config")
     op.drop_table("global_settings")

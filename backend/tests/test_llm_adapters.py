@@ -386,14 +386,14 @@ class TestBedrockAdapter:
 
 
 class TestAdapterFactory:
-    def test_unknown_provider_type_uses_openai_compat(self):
-        adapter = gw._get_adapter("mi-servidor-custom", "mi-servidor-custom", "model", "https://x.example.com", "key")
+    async def test_unknown_provider_type_uses_openai_compat(self):
+        adapter = await gw._get_adapter("mi-servidor-custom", "mi-servidor-custom", "model", "https://x.example.com", "key")
         assert isinstance(adapter, gw.OpenAICompatAdapter)
 
-    def test_known_cloud_provider_without_key_raises(self):
+    async def test_known_cloud_provider_without_key_raises(self):
         with pytest.raises(RuntimeError, match="requiere una API key"):
-            gw._get_adapter("Anthropic", "anthropic", "claude-3", None, None)
+            await gw._get_adapter("Anthropic", "anthropic", "claude-3", None, None)
 
-    def test_ollama_style_local_provider_without_key_is_allowed(self):
-        adapter = gw._get_adapter("ollama", "ollama", "llama3", "http://localhost:11434/v1", None)
+    async def test_ollama_style_local_provider_without_key_is_allowed(self):
+        adapter = await gw._get_adapter("ollama", "ollama", "llama3", "http://localhost:11434/v1", None)
         assert isinstance(adapter, gw.OpenAICompatAdapter)

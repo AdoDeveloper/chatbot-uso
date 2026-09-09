@@ -26,6 +26,7 @@ from app.models.invitation import Invitation
 from app.models.llm_provider import LLMProvider
 from app.models.notification_log import NotificationLog
 from app.models.notification_rule import NotificationRule
+from app.models.provider_type_catalog import ProviderTypeCatalog
 from app.models.rate_limit_event import RateLimitEvent
 from app.models.rbac import Module, Permission, Role, RolePermission
 from app.models.source import Source
@@ -58,6 +59,7 @@ __all__ = [
     "NotificationRule",
     "Permission",
     "PermissionAction",
+    "ProviderTypeCatalog",
     "RateLimitEvent",
     "Role",
     "RolePermission",

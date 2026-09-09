@@ -14,6 +14,7 @@ from app.api.v1.health.router import router as health_router
 from app.api.v1.integrations.router import router as integrations_router
 from app.api.v1.invitations.router import router as invitations_router
 from app.api.v1.notifications.router import router as notifications_router
+from app.api.v1.provider_types.router import router as provider_types_router
 from app.api.v1.providers.router import router as providers_router
 from app.api.v1.settings.router import router as settings_router
 from app.api.v1.sources.router import router as sources_router
@@ -29,6 +30,7 @@ router.include_router(invitations_router)
 router.include_router(access_router)
 router.include_router(system_router)
 router.include_router(providers_router)
+router.include_router(provider_types_router)
 router.include_router(settings_router)
 router.include_router(integrations_router)
 router.include_router(versions_router)

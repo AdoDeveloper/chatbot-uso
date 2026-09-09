@@ -141,16 +141,16 @@ class TestCircuitBreaker:
 
 
 class TestGetAdapterAzure:
-    def test_azure_requires_api_key(self):
+    async def test_azure_requires_api_key(self):
         with pytest.raises(RuntimeError, match="requiere una API key"):
-            gw._get_adapter("Azure Prov", "azure", "gpt-4", "https://x.openai.azure.com", None)
+            await gw._get_adapter("Azure Prov", "azure", "gpt-4", "https://x.openai.azure.com", None)
 
-    def test_azure_with_key_returns_azure_adapter(self):
-        adapter = gw._get_adapter("Azure Prov", "azure_openai", "gpt-4", "https://x.openai.azure.com", "key")
+    async def test_azure_with_key_returns_azure_adapter(self):
+        adapter = await gw._get_adapter("Azure Prov", "azure_openai", "gpt-4", "https://x.openai.azure.com", "key")
         assert isinstance(adapter, gw.AzureOpenAIAdapter)
 
-    def test_provider_type_is_case_and_whitespace_insensitive(self):
-        adapter = gw._get_adapter("Anthropic Prov", "  ANTHROPIC  ", "claude-3", None, "key")
+    async def test_provider_type_is_case_and_whitespace_insensitive(self):
+        adapter = await gw._get_adapter("Anthropic Prov", "  ANTHROPIC  ", "claude-3", None, "key")
         assert isinstance(adapter, gw.AnthropicAdapter)
 
 
@@ -504,7 +504,7 @@ class TestFetchModels:
             ]})
 
         _patch_client(monkeypatch, handler)
-        models = await gw.fetch_models("openai", api_key="key")
+        models = await gw.fetch_models("openai", api_key="key", api_base="https://api.openai.com/v1")
         ids = [m["id"] for m in models]
         assert ids == sorted(["gpt-4o", "o1-preview"])
 
@@ -513,8 +513,33 @@ class TestFetchModels:
             return httpx.Response(200, json={"data": [{"id": "llama3"}, {"id": "mixtral"}]})
 
         _patch_client(monkeypatch, handler)
-        models = await gw.fetch_models("groq", api_key="key")
+        models = await gw.fetch_models("groq", api_key="key", api_base="https://api.groq.com/openai/v1")
         assert models == [{"id": "llama3", "name": "llama3"}, {"id": "mixtral", "name": "mixtral"}]
+
+    async def test_resolves_base_from_catalog_when_no_explicit_api_base(self, monkeypatch):
+        """Sin api_base explícito, fetch_models() debe resolver contra el
+        catálogo editable (provider_type_catalog), no contra un dict
+        hardcodeado - este es el mecanismo que reemplazó _openai_compat_bases()."""
+        gw._CATALOG_CACHE.clear()
+        fake_entry = SimpleNamespace(
+            default_api_base="https://api.together.xyz/v1",
+            default_headers={},
+            models_endpoint_path="/serverless-models",
+        )
+
+        async def fake_resolve(type_key):
+            assert type_key == "together"
+            return fake_entry
+
+        monkeypatch.setattr(gw, "_resolve_catalog_entry", fake_resolve)
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            assert request.url.path.endswith("/serverless-models")
+            return httpx.Response(200, json={"data": [{"id": "meta-llama/Llama-3-70b"}]})
+
+        _patch_client(monkeypatch, handler)
+        models = await gw.fetch_models("together", api_key="key")
+        assert models == [{"id": "meta-llama/Llama-3-70b", "name": "meta-llama/Llama-3-70b"}]
 
     async def test_unknown_provider_without_api_base_raises_value_error(self):
         with pytest.raises(ValueError, match="URL base desconocida"):
@@ -573,6 +598,149 @@ class TestTestConnection:
         assert "API key" in result["error"]
 
 
+class TestAutoReasoningDetection:
+    """_reasoning_kwargs_from_metadata decide por FORMATO de wire declarado
+    en /models, nunca por provider_type - y solo ante evidencia positiva,
+    porque proveedores como vLLM responden 400 ante un campo desconocido
+    en vez de ignorarlo (a diferencia de OpenAI/OpenRouter/Azure)."""
+
+    def test_no_metadata_returns_empty(self):
+        assert gw._reasoning_kwargs_from_metadata(None) == {}
+
+    def test_groq_style_feature_flag_returns_flat_field(self):
+        entry = {"id": "openai/gpt-oss-120b", "supported_features": ["reasoning", "tools"]}
+        assert gw._reasoning_kwargs_from_metadata(entry) == {"reasoning_effort": "low"}
+
+    def test_groq_style_without_reasoning_feature_returns_empty(self):
+        entry = {"id": "llama-3.1-8b-instant", "supported_features": ["tools"]}
+        assert gw._reasoning_kwargs_from_metadata(entry) == {}
+
+    def test_openrouter_style_nested_object_picks_lowest_effort(self):
+        entry = {
+            "id": "nvidia/nemotron-3-ultra-550b-a55b:free",
+            "reasoning": {"supported_efforts": ["medium", "high", "low"], "default_enabled": True},
+        }
+        assert gw._reasoning_kwargs_from_metadata(entry) == {
+            "reasoning": {"exclude": True, "effort": "low"}
+        }
+
+    def test_openrouter_style_no_efforts_but_default_enabled_still_excludes(self):
+        entry = {"id": "some/model", "reasoning": {"supported_efforts": [], "default_enabled": True}}
+        assert gw._reasoning_kwargs_from_metadata(entry) == {"reasoning": {"exclude": True}}
+
+    def test_openrouter_style_reasoning_not_supported_returns_empty(self):
+        entry = {"id": "some/plain-model", "reasoning": {"supported_efforts": [], "default_enabled": False}}
+        assert gw._reasoning_kwargs_from_metadata(entry) == {}
+
+    def test_unknown_shape_returns_empty_never_guesses(self):
+        entry = {"id": "some/model", "some_other_field": True}
+        assert gw._reasoning_kwargs_from_metadata(entry) == {}
+
+
+class TestAutoReasoningFetchIntegration:
+    """Cubre _fetch_model_entry end-to-end: consulta /models, cachea por
+    (base, modelo), y nunca revienta si el proveedor no expone el endpoint."""
+
+    async def test_finds_matching_model_in_catalog(self, monkeypatch):
+        gw._REASONING_META_CACHE.clear()
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            assert request.url.path.endswith("/models")
+            return httpx.Response(200, json={"data": [
+                {"id": "openai/gpt-oss-120b", "supported_features": ["reasoning"]},
+                {"id": "other-model"},
+            ]})
+
+        _patch_client(monkeypatch, handler)
+        entry = await gw._fetch_model_entry("https://api.groq.com/openai/v1", "openai/gpt-oss-120b", "key")
+        assert entry == {"id": "openai/gpt-oss-120b", "supported_features": ["reasoning"]}
+
+    async def test_model_not_in_catalog_returns_none(self, monkeypatch):
+        gw._REASONING_META_CACHE.clear()
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json={"data": [{"id": "other-model"}]})
+
+        _patch_client(monkeypatch, handler)
+        entry = await gw._fetch_model_entry("https://api.groq.com/openai/v1", "missing-model", "key")
+        assert entry is None
+
+    async def test_provider_without_models_endpoint_fails_open_to_none(self, monkeypatch):
+        gw._REASONING_META_CACHE.clear()
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(404)
+
+        _patch_client(monkeypatch, handler)
+        entry = await gw._fetch_model_entry("https://integrate.api.nvidia.com/v1", "nvidia/nemotron", "key")
+        assert entry is None
+
+    async def test_caches_result_across_calls(self, monkeypatch):
+        gw._REASONING_META_CACHE.clear()
+        calls = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls.append(1)
+            return httpx.Response(200, json={"data": [{"id": "m", "supported_features": ["reasoning"]}]})
+
+        _patch_client(monkeypatch, handler)
+        await gw._fetch_model_entry("https://api.groq.com/openai/v1", "m", "key")
+        await gw._fetch_model_entry("https://api.groq.com/openai/v1", "m", "key")
+        assert len(calls) == 1
+
+    async def test_openai_compat_adapter_sends_detected_kwargs_in_complete(self, monkeypatch):
+        gw._REASONING_META_CACHE.clear()
+        captured_payloads = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.url.path.endswith("/models"):
+                return httpx.Response(200, json={"data": [
+                    {"id": "openai/gpt-oss-120b", "supported_features": ["reasoning"]},
+                ]})
+            import json as _json
+            captured_payloads.append(_json.loads(request.content))
+            return httpx.Response(200, json={"choices": [{"message": {"content": "ok"}}]})
+
+        _patch_client(monkeypatch, handler)
+        adapter = gw.OpenAICompatAdapter("groq", "openai/gpt-oss-120b", "key", "https://api.groq.com/openai/v1")
+        await adapter.complete([{"role": "user", "content": "hola"}], temperature=0.0, max_tokens=10)
+        assert captured_payloads[0]["reasoning_effort"] == "low"
+
+    async def test_openai_compat_adapter_sends_nothing_without_metadata(self, monkeypatch):
+        gw._REASONING_META_CACHE.clear()
+        captured_payloads = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.url.path.endswith("/models"):
+                return httpx.Response(200, json={"data": []})
+            import json as _json
+            captured_payloads.append(_json.loads(request.content))
+            return httpx.Response(200, json={"choices": [{"message": {"content": "ok"}}]})
+
+        _patch_client(monkeypatch, handler)
+        adapter = gw.OpenAICompatAdapter("vllm", "self-hosted-model", "key", "https://vllm.internal/v1")
+        await adapter.complete([{"role": "user", "content": "hola"}], temperature=0.0, max_tokens=10)
+        assert "reasoning_effort" not in captured_payloads[0]
+        assert "reasoning" not in captured_payloads[0]
+
+    async def test_explicit_reasoning_effort_overrides_auto_detection(self, monkeypatch):
+        gw._REASONING_META_CACHE.clear()
+        captured_payloads = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            assert not request.url.path.endswith("/models"), "no debe consultar /models si ya se pasó reasoning_effort"
+            import json as _json
+            captured_payloads.append(_json.loads(request.content))
+            return httpx.Response(200, json={"choices": [{"message": {"content": "ok"}}]})
+
+        _patch_client(monkeypatch, handler)
+        adapter = gw.OpenAICompatAdapter("groq", "openai/gpt-oss-120b", "key", "https://api.groq.com/openai/v1")
+        await adapter.complete(
+            [{"role": "user", "content": "hola"}], temperature=0.0, max_tokens=10, reasoning_effort="high",
+        )
+        assert captured_payloads[0]["reasoning_effort"] == "high"
+
+
 class TestGradeDocuments:
     async def test_empty_documents_returns_empty_list(self):
         provider = _make_provider()
@@ -590,46 +758,58 @@ class TestGradeDocuments:
         result = await gw.grade_documents("pregunta", docs, provider, "key")
         assert result == [True, False, True]
 
-    async def test_passes_low_reasoning_effort_for_groq(self, monkeypatch):
-        """gpt-oss vía Groq gasta tiempo en razonamiento interno antes de
-        emitir el JSON de grades - reasoning_effort='low' baja esa latencia
-        ~45% (medido empíricamente) sin cambiar el resultado. Solo se pasa
-        para provider_type='groq', otros backends podrían no soportarlo."""
-        provider = _make_provider(provider_type="groq")
-        captured = {}
+    async def test_never_forces_reasoning_effort_explicitly(self, monkeypatch):
+        """grade_documents ya no decide reasoning_effort por provider_type:
+        deja el parámetro en None y es OpenAICompatAdapter.complete() quien
+        detecta dinámicamente (vía metadata de /models) si corresponde
+        enviar algo. Válido para cualquier provider_type, no solo groq."""
+        for provider_type in ("groq", "openai", "openrouter"):
+            provider = _make_provider(provider_type=provider_type)
+            captured = {}
 
-        async def fake_complete(self, messages, temperature, max_tokens, response_format=None, reasoning_effort=None):
-            captured["reasoning_effort"] = reasoning_effort
-            return '{"grades": [true]}'
+            async def fake_complete(self, messages, temperature, max_tokens, response_format=None, reasoning_effort=None):
+                captured["reasoning_effort"] = reasoning_effort
+                return '{"grades": [true]}'
 
-        monkeypatch.setattr(gw.OpenAICompatAdapter, "complete", fake_complete)
-        await gw.grade_documents("pregunta", [{"text": "a"}], provider, "key")
-        assert captured["reasoning_effort"] == "low"
+            monkeypatch.setattr(gw.OpenAICompatAdapter, "complete", fake_complete)
+            await gw.grade_documents("pregunta", [{"text": "a"}], provider, "key")
+            assert captured["reasoning_effort"] is None
 
-    async def test_does_not_pass_reasoning_effort_for_other_providers(self, monkeypatch):
-        provider = _make_provider(provider_type="openai")
-        captured = {}
-
-        async def fake_complete(self, messages, temperature, max_tokens, response_format=None, reasoning_effort=None):
-            captured["reasoning_effort"] = reasoning_effort
-            return '{"grades": [true]}'
-
-        monkeypatch.setattr(gw.OpenAICompatAdapter, "complete", fake_complete)
-        await gw.grade_documents("pregunta", [{"text": "a"}], provider, "key")
-        assert captured["reasoning_effort"] is None
-
-    async def test_pads_missing_grades_with_false(self, monkeypatch):
-        """Un array corto no dice nada de los documentos que faltan: aprobarlos
-        los colaría en el contexto por su posición, no por su contenido."""
+    async def test_retries_once_then_fails_open_on_persistent_short_array(self, monkeypatch):
+        """Un array corto no dice nada de los documentos que faltan, así que
+        no se puede rellenar con False sin penalizar documentos nunca
+        evaluados. Se reintenta una vez; si sigue corto, se abre igual que
+        el resto de fallos de la función (all-True), no se cierra."""
         provider = _make_provider()
+        llamadas = []
 
         async def fake_complete(self, messages, temperature, max_tokens, response_format=None, reasoning_effort=None):
+            llamadas.append(1)
             return '{"grades": [false]}'
 
         monkeypatch.setattr(gw.OpenAICompatAdapter, "complete", fake_complete)
         docs = [{"text": "a"}, {"text": "b"}, {"text": "c"}]
         result = await gw.grade_documents("pregunta", docs, provider, "key")
-        assert result == [False, False, False]
+        assert result == [True, True, True]
+        assert len(llamadas) == 2
+
+    async def test_short_array_recovers_on_retry(self, monkeypatch):
+        """Si el reintento sí trae el array completo, se usa ese juicio real
+        en vez de degradar - el primer intento corto no debe desperdiciarse
+        forzando un fail-open innecesario."""
+        provider = _make_provider()
+        respuestas = iter([
+            '{"grades": [false]}',
+            '{"grades": [true, false, true]}',
+        ])
+
+        async def fake_complete(self, messages, temperature, max_tokens, response_format=None, reasoning_effort=None):
+            return next(respuestas)
+
+        monkeypatch.setattr(gw.OpenAICompatAdapter, "complete", fake_complete)
+        docs = [{"text": "a"}, {"text": "b"}, {"text": "c"}]
+        result = await gw.grade_documents("pregunta", docs, provider, "key")
+        assert result == [True, False, True]
 
     async def test_truncates_extra_grades(self, monkeypatch):
         provider = _make_provider()
@@ -695,7 +875,7 @@ class TestOpenAICompatAdapterCompleteReasoningEffort:
             return httpx.Response(200, json={"choices": [{"message": {"content": "ok"}}]})
 
         _patch_client(monkeypatch, handler)
-        adapter = gw.OpenAICompatAdapter("groq", "openai/gpt-oss-120b", "key", None)
+        adapter = gw.OpenAICompatAdapter("groq", "openai/gpt-oss-120b", "key", "https://api.groq.com/openai/v1")
         await adapter.complete([{"role": "user", "content": "hi"}], reasoning_effort="low")
         assert captured["body"]["reasoning_effort"] == "low"
 
@@ -708,7 +888,7 @@ class TestOpenAICompatAdapterCompleteReasoningEffort:
             return httpx.Response(200, json={"choices": [{"message": {"content": "ok"}}]})
 
         _patch_client(monkeypatch, handler)
-        adapter = gw.OpenAICompatAdapter("openai", "gpt-4o", "key", None)
+        adapter = gw.OpenAICompatAdapter("openai", "gpt-4o", "key", "https://api.openai.com/v1")
         await adapter.complete([{"role": "user", "content": "hi"}])
         assert "reasoning_effort" not in captured["body"]
 
