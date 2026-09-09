@@ -16,6 +16,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.schemas.settings import NO_CONTEXT_MESSAGE
 from app.services.chat import pipeline
 from app.api.v1.chat import router as chat_router
 
@@ -129,7 +130,7 @@ async def test_empty_context_after_grading_skips_the_llm(client, admin_user, aut
     )
     assert stream_chat_called is False
     assert body["sources"] == []
-    assert "no tengo información" in body["content"].lower()
+    assert body["content"] == NO_CONTEXT_MESSAGE
     assert body["message_id"] is not None
     assert body["conversation_id"] is not None
 

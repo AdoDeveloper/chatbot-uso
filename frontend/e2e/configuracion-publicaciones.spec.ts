@@ -35,7 +35,7 @@ test.describe("Configuracion > Publicaciones", () => {
     }
 
     await page.goto("/dashboard/configuracion/publicaciones");
-    await expect(page.getByText(/publicar versión/i)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("heading", { name: "Publicaciones" })).toBeVisible({ timeout: 10_000 });
 
     let saved = false;
     for (let attempt = 0; attempt < 4 && !saved; attempt++) {
@@ -114,7 +114,7 @@ test.describe("Configuracion > Publicaciones", () => {
     fs.unlinkSync(filePath);
 
     await page.goto("/dashboard/configuracion/publicaciones");
-    await expect(page.getByText(/publicar versión/i)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("heading", { name: "Publicaciones" })).toBeVisible({ timeout: 10_000 });
 
     const pendingRow = page.locator("div.bg-muted\\/30.border-border\\/50", { hasText: sourceName });
     await expect(pendingRow).toBeVisible({ timeout: 15_000 });
@@ -196,7 +196,7 @@ test.describe("Configuracion > Publicaciones", () => {
   test("modal de snapshot: cerrar por Escape y por Cancelar sin dejar excepciones ni el dialogo abierto", async ({ page }) => {
     // El texto del borrador NO se limpia en Escape/Cancel (solo al guardar con éxito) - quirk conocido y no destructivo; este test valida solo apertura/cierre limpios.
     await page.goto("/dashboard/configuracion/publicaciones");
-    await expect(page.getByText(/publicar versión/i)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("heading", { name: "Publicaciones" })).toBeVisible({ timeout: 10_000 });
 
     await page.getByRole("button", { name: /guardar punto de restauración/i }).click();
     const dialog = page.getByRole("dialog");

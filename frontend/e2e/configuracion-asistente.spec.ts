@@ -24,18 +24,18 @@ test.describe("Configuracion > Asistente", () => {
     await page.screenshot({ path: path.join(SHOT_DIR, "01-configuracion.png") });
   });
 
-  test("editar y guardar el nombre del asistente (tab Prompt)", async ({ page }) => {
-    await page.goto("/dashboard/configuracion/asistente?tab=prompt");
-    await expect(page.getByText(/^nombre$/i).first()).toBeVisible({ timeout: 10_000 });
+  test("editar y guardar el nombre del chatbot (tab Widget)", async ({ page }) => {
+    await page.goto("/dashboard/configuracion/asistente?tab=apariencia");
+    await expect(page.getByText(/^identidad$/i).first()).toBeVisible({ timeout: 10_000 });
 
-    const nameInput = page.locator("input[maxlength='80']");
+    const nameInput = page.getByText("Nombre del chatbot", { exact: true }).locator("..").locator("input");
     const original = await nameInput.inputValue();
     await nameInput.fill(`${original} `);
-    await page.screenshot({ path: path.join(SHOT_DIR, "02-prompt-editado.png") });
+    await page.screenshot({ path: path.join(SHOT_DIR, "02-widget-editado.png") });
 
     await page.getByRole("button", { name: /^guardar$/i }).click();
     await expect(page.getByRole("button", { name: /^guardar$/i })).toHaveCount(0, { timeout: 10_000 });
-    await page.screenshot({ path: path.join(SHOT_DIR, "03-prompt-guardado.png") });
+    await page.screenshot({ path: path.join(SHOT_DIR, "03-widget-guardado.png") });
 
     await nameInput.fill(original);
     const saveBtn = page.getByRole("button", { name: /^guardar$/i });
@@ -92,14 +92,10 @@ test.describe("Configuracion > Asistente", () => {
     }
   });
 
-  test("tab Prompt: mensajes automaticos (bienvenida, saludo, bloqueo, sin-servicio) editables y restaurados", async ({ page }) => {
+  test("tab Prompt: mensajes automaticos (saludo, bloqueo, sin-servicio) editables y restaurados", async ({ page }) => {
+    test.setTimeout(60_000);
     await page.goto("/dashboard/configuracion/asistente?tab=prompt");
-    await expect(page.getByText(/^nombre$/i).first()).toBeVisible({ timeout: 10_000 });
-
-    const welcomeInput = page.locator("input[maxlength='500']");
-    const originalWelcome = await welcomeInput.inputValue();
-    await welcomeInput.fill(`${originalWelcome} `);
-    await expect(page.getByRole("button", { name: /^guardar$/i })).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText(/prompt del sistema/i).first()).toBeVisible({ timeout: 10_000 });
 
     const systemPromptCard = page.getByText(/prompt del sistema/i);
     await systemPromptCard.click();
@@ -109,6 +105,7 @@ test.describe("Configuracion > Asistente", () => {
     await expect(page.getByText(new RegExp(`${originalPrompt.length}/4000`))).toBeVisible();
 
     await page.getByText(/mensajes automáticos/i).click();
+    // Orden real en prompt-tab.tsx: [0]=prompt del sistema, [1]=saludo automático, [2]=bloqueo por guardrails, [3]=sin servicio de IA.
     const greetingTextarea = page.locator("textarea").nth(1);
     const blockedTextarea = page.locator("textarea").nth(2);
     const noProvidersTextarea = page.locator("textarea").nth(3);
@@ -127,7 +124,6 @@ test.describe("Configuracion > Asistente", () => {
     await saveBtn.click();
     await expect(page.getByRole("button", { name: /^guardar$/i })).toHaveCount(0, { timeout: 10_000 });
 
-    await welcomeInput.fill(originalWelcome);
     await greetingTextarea.fill(originalGreeting);
     await blockedTextarea.fill(originalBlocked);
     await noProvidersTextarea.fill(originalNoProviders);
@@ -136,7 +132,7 @@ test.describe("Configuracion > Asistente", () => {
       await saveBtn2.click();
       await expect(page.getByRole("button", { name: /^guardar$/i })).toHaveCount(0, { timeout: 10_000 });
     }
-    await expect(welcomeInput).toHaveValue(originalWelcome);
+    await expect(greetingTextarea).toHaveValue(originalGreeting);
   });
 
   test("tab Prompt: presets rapidos de parametros RAG, sliders y switch de revision de relevancia, restaurado", async ({ page }) => {

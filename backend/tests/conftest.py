@@ -10,9 +10,12 @@ import pytest_asyncio
 os.environ["SECRET_KEY"] = "test-secret-key-for-unit-tests-only-please"
 os.environ.setdefault(
     "DATABASE_URL",
-    "mysql+aiomysql://chatbot:Admin1234@localhost:3306/chatbot_test_ci",
+    "mysql+aiomysql://chatbot:6fb436cdc176118ba413d92d5dec5c74@localhost:3306/chatbot_test_ci",
 )
-os.environ["REDIS_URL"] = "redis://localhost:6379/15"
+os.environ.setdefault(
+    "REDIS_URL",
+    "redis://:f29448388acf7558824a685c3981b940@localhost:6379/15",
+)
 os.environ["UPLOADS_DIR"] = "/tmp/test-uploads"
 os.environ["ALLOWED_ORIGINS"] = '["http://testserver"]'
 os.environ["WIDGET_BASE_URL"] = "http://testserver"

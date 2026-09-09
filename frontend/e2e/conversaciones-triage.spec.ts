@@ -61,7 +61,9 @@ test.describe("Conversaciones > Escalamientos", () => {
     const disposableTag = `e2e-bulk-${Date.now()}`;
     await tagInput.fill(disposableTag);
     await page.getByRole("button", { name: /\+tag/i }).click();
-    await expect(page.getByText(new RegExp(`#${disposableTag}`))).toBeVisible({ timeout: 10_000 });
+    // El tag puede quedar visible en más de un lugar a la vez (fila + chip
+    // de filtro): basta con que al menos uno esté visible.
+    await expect(page.getByText(new RegExp(`#${disposableTag}`)).first()).toBeVisible({ timeout: 10_000 });
 
     // Re-selecciona: un bulk action exitoso limpia la selección.
     await firstCheckbox.check();

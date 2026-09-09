@@ -52,10 +52,10 @@ async def make_conversation(db_session):
 def stub_dispatch_escalation(monkeypatch):
     calls = []
 
-    async def _fake_dispatch(db, *, conversation_id, question, reason, trigger_type=None, extra=None):
+    async def _fake_dispatch(db, *, conversation_id, question, reason, trigger_type=None, extra=None, is_test=False):
         calls.append({
             "conversation_id": conversation_id, "question": question,
-            "reason": reason, "trigger_type": trigger_type, "extra": extra,
+            "reason": reason, "trigger_type": trigger_type, "extra": extra, "is_test": is_test,
         })
 
     import app.api.v1.widget.router as widget_router
