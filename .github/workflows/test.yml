@@ -165,6 +165,29 @@ jobs:
         working-directory: frontend
         run: npx playwright install --with-deps chromium
 
+      # docker compose --wait solo confirma el healthcheck INTERNO del
+      # contenedor (wget a 127.0.0.1 dentro del propio contenedor) - no
+      # garantiza que el puerto publicado sea alcanzable desde el proceso
+      # host (Playwright) en ese instante. Sin este polling, el primer test
+      # puede toparse con una ventana breve donde el puerto aun no acepta
+      # conexiones externas y falla con ERR_CONNECTION_REFUSED.
+      - name: Wait for frontend and backend to accept connections from the host
+        run: |
+          for url in http://localhost:8000/api/v1/health/live http://localhost:3000/login; do
+            echo "Esperando $url..."
+            for i in $(seq 1 30); do
+              if curl -sf -o /dev/null "$url"; then
+                echo "  $url respondió (intento $i)."
+                break
+              fi
+              if [ "$i" -eq 30 ]; then
+                echo "  ERROR: $url no respondió tras 30 intentos."
+                exit 1
+              fi
+              sleep 2
+            done
+          done
+
       - name: Run Playwright tests
         working-directory: frontend
         run: npx playwright test
