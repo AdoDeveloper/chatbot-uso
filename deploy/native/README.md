@@ -30,8 +30,8 @@ NodeSource propio) se descarga el binario oficial de nodejs.org directo.
 `setup-services.sh`, sin pasos manuales intermedios:
 
 ```bash
-# Como root, en el servidor:
-curl -fsSL https://raw.githubusercontent.com/AdoDeveloper/chatbot-uso/master/deploy/native/bootstrap.sh | bash -s -- tu-dominio.cloud
+# Como root, en el servidor (sustituir <usuario>/<repo> por el repositorio real):
+curl -fsSL https://raw.githubusercontent.com/<usuario>/<repo>/master/deploy/native/bootstrap.sh | bash -s -- tu-dominio.cloud
 ```
 
 ### Opción B: paso a paso

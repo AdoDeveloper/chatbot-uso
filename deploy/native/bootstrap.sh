@@ -4,10 +4,10 @@
 # un solo comando. Pensado para un VPS recién provisionado (Ubuntu 24.04).
 #
 # Uso (como root, en el VPS):
-#   curl -fsSL https://raw.githubusercontent.com/AdoDeveloper/chatbot-uso/master/deploy/native/bootstrap.sh | bash -s -- tu-dominio.cloud
+#   curl -fsSL https://raw.githubusercontent.com/<usuario>/<repo>/master/deploy/native/bootstrap.sh | bash -s -- tu-dominio.cloud
 #
 # O manualmente:
-#   git clone https://github.com/AdoDeveloper/chatbot-uso.git /root/chatbot-uso
+#   git clone https://github.com/<usuario>/<repo>.git /root/chatbot-uso
 #   bash /root/chatbot-uso/deploy/native/bootstrap.sh tu-dominio.cloud
 # ══════════════════════════════════════════════════════════════════════════════
 set -euo pipefail
@@ -18,7 +18,7 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 DOMAIN="${1:?Uso: bootstrap.sh tu-dominio.cloud}"
-REPO_URL="https://github.com/AdoDeveloper/chatbot-uso.git"
+REPO_URL="${REPO_URL:-https://github.com/<usuario>/<repo>.git}"
 CLONE_DIR="/root/chatbot-uso"
 APP_DIR="/opt/chatbot"
 
