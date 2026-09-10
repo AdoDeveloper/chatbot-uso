@@ -122,7 +122,7 @@ chatbot-uso/
 ├── backend/                FastAPI + SQLAlchemy + Alembic
 │   ├── app/                Código de la API
 │   ├── alembic/            Migraciones de BD
-│   ├── scripts/            Utilidades manuales y bancos de pruebas
+│   ├── scripts/            Utilidades de instalación (esquema y datos semilla)
 │   ├── tests/              pytest
 │   ├── requirements.txt
 │   ├── Dockerfile
@@ -181,13 +181,11 @@ chatbot-uso/
 
 ## Scripts administrativos
 
-Utilidades manuales en `backend/scripts/`. Ninguna forma parte del arranque
-automático: se ejecutan a mano cuando hacen falta.
+Utilidades de instalación en `backend/scripts/`, para poblar una instancia
+nueva. Ninguna forma parte del arranque automático: se ejecutan a mano cuando
+hacen falta y es seguro repetirlas.
 
 | Script | Uso |
 | --- | --- |
 | `init_db.py` | Crear el esquema y sembrar los datos iniciales |
 | `seed_provider_catalog.py` | Poblar el catálogo de tipos de proveedor LLM (URL base y headers por defecto) |
-| `bench_rag.py` | Medir el recuperador y el filtro de relevancia (Hit@k, MRR, precisión, recall) |
-| `bench_guardrails.py` | Medir los patrones de inyección contra preguntas legítimas y ataques reales |
-| `bench_respuestas.py` | Clasificar las respuestas del chat contra datos verificables del corpus |
