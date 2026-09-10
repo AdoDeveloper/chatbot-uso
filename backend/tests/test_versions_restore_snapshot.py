@@ -138,6 +138,12 @@ class TestPruneAutoSnapshots:
 
         assert removed > 0, "la poda debe borrar aunque las versiones formen una cadena"
 
+        # El ON DELETE SET NULL lo aplica MySQL, no la sesión: con
+        # expire_on_commit=False los objetos del identity map conservan el
+        # parent_version_id viejo y el SELECT los devuelve cacheados. Hay que
+        # expirar para leer el estado real de la base.
+        db_session.expire_all()
+
         # Las mas antiguas se fueron; ninguna quedó apuntando a una borrada.
         supervivientes = await _fetch_all(db_session, ids)
         vivos = {v.id for v in supervivientes}
