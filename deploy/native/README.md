@@ -80,11 +80,8 @@ sudo bash setup-services.sh tu-dominio.cloud
 | Reproducibilidad vs CI | Alta (mismo compose en test.yml y prod) | Media (el CI usa contenedores de servicio) |
 | Portabilidad de distro | N/A (mismas imágenes en cualquier host con Docker) | Depende de `PKG_FAMILY` - ver tabla de arriba |
 
-## Node.js: 24 LTS, no el 20 que fija `package.json`
+## Node.js
 
-Los scripts instalan **Node 24** (Active LTS, soporte hasta abril 2028), no el
-20.x que declara `package.json`/CI del repo. Next.js 15.5.25 solo exige
-`>=18.18`, así que no hay incompatibilidad real; Node 20 ya no recibe parches
-de seguridad. `package.json` y `test.yml`/`frontend/Dockerfile` del repo
-también fueron actualizados a Node 24 para no divergir entre este flujo
-nativo, Docker y CI.
+Los scripts instalan **Node 24** (Active LTS, soporte hasta abril 2028),
+la misma versión que usan `test.yml` y `frontend/Dockerfile` - sin
+divergencia entre este flujo nativo, Docker y CI.
