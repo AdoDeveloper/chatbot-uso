@@ -143,13 +143,15 @@ jobs:
       - name: Bring up the stack
         run: docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --wait mysql redis qdrant backend frontend
 
-      - name: Show backend logs
+      - name: Show stack logs after startup
         if: always()
         run: |
           echo "=== docker compose ps ==="
           docker compose -f docker-compose.yml -f docker-compose.ci.yml ps
           echo "=== backend logs ==="
           docker compose -f docker-compose.yml -f docker-compose.ci.yml logs backend --no-color
+          echo "=== frontend logs ==="
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml logs frontend --no-color
 
       - uses: actions/setup-node@v4
         with:
@@ -167,20 +169,31 @@ jobs:
 
       # Confirma que los puertos publicados son alcanzables desde el host
       # (curl con -4 fuerza IPv4, igual que la URL real que usa Playwright).
+      # Exige 3 respuestas consecutivas, no solo una: un único curl exitoso
+      # no descarta que el contenedor siga terminando de inicializar (visto
+      # en CI: el healthcheck de Docker y un curl aislado pasaban, y aun así
+      # el primer request real de Chromium fallaba con chrome-error).
       - name: Wait for frontend and backend to accept connections from the host
         run: |
           for url in http://127.0.0.1:8000/api/v1/health/live http://127.0.0.1:3000/login; do
             echo "Esperando $url..."
-            for i in $(seq 1 30); do
+            consecutive=0
+            for i in $(seq 1 40); do
               if curl -4 -sf -o /dev/null "$url"; then
-                echo "  $url respondió (intento $i)."
-                break
+                consecutive=$((consecutive + 1))
+                echo "  $url respondió (intento $i, ${consecutive}/3 consecutivas)."
+                if [ "$consecutive" -ge 3 ]; then
+                  break
+                fi
+              else
+                consecutive=0
               fi
-              if [ "$i" -eq 30 ]; then
-                echo "  ERROR: $url no respondió tras 30 intentos."
+              if [ "$i" -eq 40 ]; then
+                echo "  ERROR: $url no respondió de forma estable tras 40 intentos."
+                docker compose -f docker-compose.yml -f docker-compose.ci.yml ps
                 exit 1
               fi
-              sleep 2
+              sleep 1
             done
           done
 
@@ -194,6 +207,16 @@ jobs:
           # ERR_CONNECTION_REFUSED si nada escucha en esa interfaz - Docker
           # solo publica el puerto en IPv4 salvo configuración explícita.
           PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
+
+      - name: Show stack logs after Playwright
+        if: failure()
+        run: |
+          echo "=== docker compose ps ==="
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml ps
+          echo "=== backend logs ==="
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml logs backend --no-color
+          echo "=== frontend logs ==="
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml logs frontend --no-color
 
       - name: Upload Playwright report on failure
         if: failure()
