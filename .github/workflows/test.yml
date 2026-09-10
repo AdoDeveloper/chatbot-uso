@@ -141,7 +141,20 @@ jobs:
         run: mkdir -p .cache/fastembed && chmod -R 777 .cache
 
       - name: Bring up the stack
-        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --wait mysql redis qdrant backend frontend
+        # FRONTEND_API_URL/APP_URL: sin esto, docker-compose.yml usa su
+        # default "http://localhost" (puerto 80) como NEXT_PUBLIC_APP_URL,
+        # horneado en el build de Next.js. El middleware de auth
+        # (middleware.ts) construye sus redirects absolutos a partir de esa
+        # URL - así, cualquier navegación no autenticada a "/" (que
+        # redirige primero a /dashboard y de ahí el middleware rebota a
+        # /login) terminaba apuntando a http://localhost/login, un puerto
+        # donde nada escucha en el runner, y Chromium fallaba en seco con
+        # chrome-error://chromewebdata/. curl a las rutas exactas nunca lo
+        # detectó porque no sigue ese redirect construido por el servidor.
+        run: |
+          FRONTEND_API_URL=http://127.0.0.1:8000 \
+          FRONTEND_APP_URL=http://127.0.0.1:3000 \
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --build --wait mysql redis qdrant backend frontend
 
       - name: Show stack logs after startup
         if: always()
