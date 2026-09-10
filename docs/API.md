@@ -67,6 +67,7 @@ completa de la API. Solo están disponibles en un entorno con
 | POST | `/sources/{id}/approve` | Aprobar una fuente para uso |
 | POST | `/sources/{id}/reject` | Rechazar una fuente |
 | GET | `/sources/{id}/preview` | Vista previa del texto extraído |
+| GET | `/sources/{id}/download` | Descargar el archivo original |
 | GET | `/sources/{id}/quality` | Métricas de calidad/uso de la fuente |
 | POST | `/sources/bulk/delete` | Eliminar varias fuentes |
 | POST | `/sources/bulk/reingest` | Reprocesar varias fuentes |
@@ -143,7 +144,6 @@ completa de la API. Solo están disponibles en un entorno con
 | GET | `/analytics/timeline` | Línea de tiempo de actividad |
 | GET | `/analytics/latency/timeseries` | Serie temporal de latencia |
 | GET | `/analytics/channels` | Distribución por canal |
-| GET | `/analytics/devices` | Distribución por dispositivo |
 | GET | `/analytics/pages` | Páginas de origen |
 | GET | `/analytics/topics` | Temas más consultados |
 | GET | `/analytics/heatmap` | Mapa de calor de horarios |
@@ -283,7 +283,7 @@ configurada, sin necesidad de desplegar código.
 | GET | `/settings/export` | Exportar configuración |
 | POST | `/settings/import` | Importar configuración |
 
-### Versiones y publicación (`versions/`)
+### Versiones e historial de cambios (`versions/`)
 
 | Método | Ruta | Descripción |
 | --- | --- | --- |
@@ -292,9 +292,9 @@ configurada, sin necesidad de desplegar código.
 | GET | `/versions/{id}` | Detalle de una versión |
 | GET | `/versions/{id}/diff` | Diferencias con la versión activa |
 | POST | `/versions/{id}/rollback` | Restaurar una versión |
-| POST | `/versions/deploy` | Publicar a producción |
-| GET | `/versions/deploy/config` | Configuración de despliegue activa |
-| GET | `/versions/deploy/status` | Estado del despliegue |
+
+> No hay endpoints de publicación: la configuración se aplica en vivo. Cada
+> cambio queda registrado como una versión que puede restaurarse.
 
 ### Integraciones y autenticación (`integrations/`)
 

@@ -8,10 +8,12 @@ Chatbot institucional con pipeline RAG (Retrieval-Augmented Generation) y panel 
 
 ## Índice
 
+- [Requisitos generales](#requisitos-generales)
 - [Quick start con Docker](#quick-start-con-docker)
 - [Documentación](#documentación)
 - [Estructura del repositorio](#estructura-del-repositorio)
 - [Variables de entorno críticas](#variables-de-entorno-críticas)
+- [Scripts administrativos](#scripts-administrativos)
 
 ---
 
@@ -105,6 +107,8 @@ evite correr `npm install` desde Windows dentro del mismo checkout.
 | Documento | Contenido |
 | --- | --- |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Diagramas de despliegue, flujo del chat, ingestión, modelo de datos y Adaptive RAG |
+| [docs/API.md](docs/API.md) | Referencia de los endpoints REST del backend |
+| [docs/MANUAL-USUARIO.md](docs/MANUAL-USUARIO.md) | Guía del panel de administración para el usuario final |
 | [docs/INSTALLATION.md](docs/INSTALLATION.md) | Entorno de desarrollo local con Docker Compose o WSL2 manual |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Despliegue en producción en Ubuntu Server sin Docker (systemd, nginx, HTTPS, backups) |
 | [deploy/native/README.md](deploy/native/README.md) | Scripts de despliegue nativo automatizados, multi-distro (apt/dnf/zypper) |
@@ -118,6 +122,7 @@ chatbot-uso/
 ├── backend/                FastAPI + SQLAlchemy + Alembic
 │   ├── app/                Código de la API
 │   ├── alembic/            Migraciones de BD
+│   ├── scripts/            Utilidades manuales y bancos de pruebas
 │   ├── tests/              pytest
 │   ├── requirements.txt
 │   ├── Dockerfile
@@ -125,12 +130,17 @@ chatbot-uso/
 │   └── .env.example
 ├── frontend/               Next.js 15 + Tailwind v4 + shadcn/ui
 │   ├── src/                Código del panel de administración
+│   ├── e2e/                Pruebas end-to-end (Playwright)
 │   ├── package.json
 │   ├── Dockerfile
 │   └── .env.example
 ├── widget/                 SDK Preact embebible (Shadow DOM)
+├── deploy/native/          Scripts de despliegue nativo (sin Docker)
+├── nginx/                  Configuración del proxy inverso
 ├── docs/                   Documentación técnica
 ├── docker-compose.yml      Stack completo para desarrollo
+├── docker-compose.prod.yml Ajustes de producción (límites de memoria, réplicas)
+├── docker-compose.ci.yml   Override del E2E en CI (caché de modelos)
 ├── Makefile                Atajos
 └── README.md               Este archivo
 ```
@@ -167,7 +177,17 @@ chatbot-uso/
 | `NEXT_PUBLIC_API_URL` | URL pública del backend (sin `/api/v1`) |
 | `NEXT_PUBLIC_APP_URL` | Origen público del panel para callbacks OAuth |
 
-### Scripts administrativos
+---
 
-`backend/scripts/update_system_prompt.py` es una utilidad manual para actualizar
-el prompt del sistema desde CLI. No forma parte del arranque automático.
+## Scripts administrativos
+
+Utilidades manuales en `backend/scripts/`. Ninguna forma parte del arranque
+automático: se ejecutan a mano cuando hacen falta.
+
+| Script | Uso |
+| --- | --- |
+| `init_db.py` | Crear el esquema y sembrar los datos iniciales |
+| `seed_provider_catalog.py` | Poblar el catálogo de tipos de proveedor LLM (URL base y headers por defecto) |
+| `bench_rag.py` | Medir el recuperador y el filtro de relevancia (Hit@k, MRR, precisión, recall) |
+| `bench_guardrails.py` | Medir los patrones de inyección contra preguntas legítimas y ataques reales |
+| `bench_respuestas.py` | Clasificar las respuestas del chat contra datos verificables del corpus |

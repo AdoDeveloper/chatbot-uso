@@ -24,6 +24,21 @@ NodeSource propio) se descarga el binario oficial de nodejs.org directo.
 
 ## Uso
 
+### Opción A: un solo comando (VPS recién provisionado)
+
+`bootstrap.sh` clona el repositorio y encadena `setup-base.sh` +
+`setup-services.sh`, sin pasos manuales intermedios:
+
+```bash
+# Como root, en el servidor:
+curl -fsSL https://raw.githubusercontent.com/AdoDeveloper/chatbot-uso/master/deploy/native/bootstrap.sh | bash -s -- tu-dominio.cloud
+```
+
+### Opción B: paso a paso
+
+Útil cuando el código no viene de GitHub (por ejemplo, para desplegar cambios
+locales sin publicarlos primero).
+
 ```bash
 # 1. En el servidor, como root:
 sudo bash setup-base.sh

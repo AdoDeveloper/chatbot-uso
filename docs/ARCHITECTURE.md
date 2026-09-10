@@ -23,7 +23,7 @@ flowchart TB
     subgraph data["Servicios de datos"]
         mysql[("MySQL 8<br/>:3306")]
         redis[("Redis 7<br/>:6379")]
-        qdrant[("Qdrant 1.12+<br/>:6333<br/>vectores")]
+        qdrant[("Qdrant 1.17.1<br/>:6333<br/>vectores")]
     end
 
     subgraph llm["Proveedores LLM externos"]
@@ -63,7 +63,7 @@ flowchart LR
     end
 
     subgraph be["Backend"]
-        fa["FastAPI 0.115<br/>+ Uvicorn"]
+        fa["FastAPI 0.119+<br/>+ Uvicorn"]
         sa["SQLAlchemy 2<br/>(async)"]
         al["Alembic<br/>(migraciones)"]
         lg["LangGraph<br/>(Adaptive RAG)"]
@@ -87,8 +87,8 @@ flowchart LR
 
 | Capa | Tecnología | Versión |
 | --- | --- | --- |
-| Backend | Python + FastAPI (Uvicorn) | 3.12 / 0.118 |
-| ORM | SQLAlchemy async + Alembic | 2.0 |
+| Backend | Python + FastAPI (Uvicorn) | 3.12 / 0.119+ |
+| ORM | SQLAlchemy async + Alembic | 2.0.36 / 1.14 |
 | Base de datos | MySQL | 8.0 |
 | Caché / rate-limit | Redis | 7 |
 | Vector DB (cliente) | Qdrant | qdrant-client 1.17.1 |
@@ -339,12 +339,20 @@ chatbot-uso/
 │   │   ├── models/         SQLAlchemy ORM
 │   │   ├── schemas/        Pydantic
 │   │   └── services/       Lógica de negocio
-│   │       ├── chat/       pipeline.py (fases del turno de chat + cache + scope)
-│   │       ├── rag/        Adaptive RAG (corrective.py + router.py)
-│   │       ├── ingestion/  chunking, embedding, vector_store
-│   │       ├── knowledge/  faq.py
-│   │       └── ai/         guardrails.py, semantic_cache.py, embedding.py
+│   │       ├── chat/           pipeline.py (fases del turno de chat + cache + scope)
+│   │       ├── rag/            Adaptive RAG (corrective.py + router.py)
+│   │       ├── ingestion/      chunking, embedding, vector_store
+│   │       ├── knowledge/      faq.py
+│   │       ├── ai/             llm_gateway.py, guardrails.py, semantic_cache.py, embedding.py
+│   │       ├── sources/        Ciclo de vida de los documentos
+│   │       ├── escalation/     Derivación a una persona
+│   │       ├── notifications/  Correo y bandeja in-app
+│   │       ├── monitoring/     Versionado, analítica, alertas y salud
+│   │       ├── auth/, users/   Sesiones, RBAC e invitaciones
+│   │       ├── system/         Configuración, proveedores y auditoría
+│   │       └── widget/         Endpoints públicos del chat embebido
 │   ├── alembic/versions/   Migraciones
+│   ├── scripts/            Utilidades manuales y bancos de pruebas
 │   └── tests/              pytest
 │
 ├── frontend/               Next.js 15 + Tailwind v4
@@ -422,18 +430,26 @@ Cada ajuste tiene exactamente una fuente:
 
 ## 12. Versionado de configuración
 
-El sistema mantiene un historial de versiones de toda la configuración
-(proveedores, asistente, widget, escalamiento, notificaciones, fuentes, FAQ)
-como snapshots JSON en la tabla `config_versions`.
+El sistema mantiene un historial de versiones de la configuración del
+asistente (proveedores, ajustes del asistente, widget, guardrails) como
+snapshots JSON en la tabla `config_versions`. No hay flujo de publicación: los
+cambios se aplican en vivo y el historial sirve para auditoría y rollback.
 
 Las versiones se generan de tres formas:
 
 - **Automática**: un middleware ASGI captura un snapshot tras cada mutación
   exitosa de configuración (sin añadir latencia a la respuesta - es
   *fire-and-forget*). Solo crea una versión nueva si hubo cambios reales
-  respecto a la anterior.
-- **Manual**: el administrador crea un punto de restauración explícito.
-- **En despliegue**: al publicar a producción.
+  respecto a la anterior. El `trigger_source` indica el área tocada:
+  `settings`, `providers`, `widget` o `guardrails`.
+- **Manual**: el administrador crea un punto de restauración explícito
+  (`trigger_source="manual"`).
+- **Rollback**: al restaurar una versión anterior se registra el nuevo estado
+  (`trigger_source="rollback"`).
+
+Quedan fuera del versionado, a propósito, la gestión de contenido (documentos
+y FAQ, que el rollback nunca revierte) y los ajustes operativos del sistema
+(caché, cuotas, notificaciones, integraciones).
 
 Los secretos (contraseñas SMTP, credenciales OAuth) se enmascaran en los
 snapshots. Cualquier versión puede restaurarse (rollback).

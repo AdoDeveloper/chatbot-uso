@@ -159,12 +159,12 @@ como un botón para abrirlo).
 ### 4.7 Playground y Publicaciones
 
 - **Playground**: prueba el chatbot tal como lo vería un visitante, con la
-  configuración en borrador.
-- **Publicaciones**: gestiona el ciclo de publicación. Los cambios se preparan
-  en borrador y se **publican** a producción cuando están listos. El sistema
-  guarda una versión **automáticamente** cada vez que se modifica la
-  configuración (proveedores, asistente, widget, escalamiento, etc.), además de
-  los puntos de restauración que se crean manualmente. En cualquier momento se
+  configuración vigente.
+- **Publicaciones**: historial de cambios de la configuración. Cada cambio se
+  aplica **de inmediato** al widget (no hay un paso de publicación aparte), y
+  el sistema guarda una versión **automáticamente** cada vez que se modifica
+  algo (proveedores, asistente, widget, escalamiento, etc.), además de los
+  puntos de restauración que se crean manualmente. En cualquier momento se
   puede volver a una versión anterior.
 
 ---
@@ -276,8 +276,9 @@ Tras subirlo debe **aprobarlo** en Conocimiento → Documentos. Solo el contenid
 aprobado es visible al chatbot.
 
 **Cambié la configuración del asistente pero el widget no cambia.**
-Los cambios se preparan en borrador. Debe **publicarlos** desde Publicaciones
-para que lleguen al widget en producción.
+Los cambios se aplican de inmediato, sin paso de publicación. Si el widget
+sigue igual, recargue la página del sitio donde está incrustado: el navegador
+puede tener la versión anterior en caché.
 
 **Un usuario no recibió el correo de invitación.**
 Revise la carpeta de spam del destinatario. El correo se envía desde la cuenta
