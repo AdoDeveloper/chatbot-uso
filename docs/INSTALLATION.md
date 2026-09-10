@@ -11,8 +11,8 @@ La forma más rápida. Requiere Docker Desktop 24+ con Docker Compose v2.
 ### Requisitos
 
 - Docker Desktop 24+ (Windows 11 con WSL2 backend, macOS, o Linux)
-- 8 GB RAM mínimo (los modelos de IA ocupan ~1.7 GB)
-- 15 GB de disco libre (imágenes + modelos)
+- 8 GB RAM mínimo (los modelos de IA cargados en memoria ocupan ~1.4 GB)
+- 15 GB de disco libre (imágenes + ~2 GB de modelos descargados)
 
 > **En Windows**: clonar el repo dentro del filesystem de WSL2 (`~/chatbot-uso`), **no** en `/mnt/c/`. El I/O cruzado NTFS↔WSL2 es 5-10× más lento y corrompe permisos de volúmenes Docker.
 
@@ -67,7 +67,7 @@ Para desarrollo local en Windows con WSL2 Ubuntu 24.04 sin usar Docker.
 | Recurso | Mínimo |
 | --- | --- |
 | RAM | 8 GB |
-| Disco | 20 GB libres |
+| Disco | 20 GB libres (más que la Opción A: aquí MySQL, Redis y Qdrant se instalan nativos, sin compartir capas de imagen) |
 | OS WSL2 | Ubuntu 24.04 LTS |
 | Python | 3.12 |
 | Node.js | 24 LTS |

@@ -66,14 +66,20 @@ curl http://localhost:8000/api/v1/health/live
 ### Comandos útiles (Makefile)
 
 ```bash
-make up              # Levantar todo
-make down            # Detener todo
-make logs            # Ver logs
-make restart         # Reiniciar servicios
-make migrate         # Correr migraciones manualmente
-make infra           # Solo MySQL + Redis + Qdrant
-make dev-backend     # Backend con hot-reload (requiere make infra)
-make dev-frontend    # Frontend con hot-reload
+make setup             # Prepara el .env (solo la primera vez)
+make up                # Levantar todo
+make prod SERVER=<ip>  # Desplegar en un servidor
+make down              # Detener todo
+make build              # Reconstruir las imágenes
+make logs               # Ver logs
+make restart            # Reiniciar servicios
+make ps                 # Estado de los contenedores
+make migrate            # Correr migraciones manualmente
+make infra              # Solo MySQL + Redis + Qdrant
+make dev-backend        # Backend con hot-reload (requiere make infra)
+make dev-frontend       # Frontend con hot-reload
+make shell-backend      # Shell dentro del contenedor backend
+make shell-db           # mysql CLI dentro del contenedor mysql
 ```
 
 ### Limpieza de dependencias Node en WSL/Windows
