@@ -17,13 +17,24 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 2 : 2,
+  // 1 worker en CI: el runner de GitHub Actions tiene solo 2 vCPU y ya corre
+  // el stack de 5 contenedores Docker. Con 2 workers, dos Chromium arrancan
+  // a la vez justo cuando el stack recién terminó de levantar, y el primer
+  // test puede toparse con contención de CPU que Chromium reporta como
+  // chrome-error://chromewebdata/ en vez de un timeout normal - el healthcheck
+  // y un curl aislado pasan bien porque no compiten por el mismo CPU.
+  workers: process.env.CI ? 1 : 2,
   reporter: [["list"], ["html", { open: "never" }]],
   globalSetup: "./e2e/global-setup.ts",
   use: {
     baseURL,
     trace: "on-first-retry",
     screenshot: "only-on-failure",
+    // Margen extra sobre el default (30s) para la navegación y las acciones
+    // en CI, por la misma razón: el primer request real puede coincidir con
+    // el pico de CPU de Docker + Chromium arrancando.
+    navigationTimeout: process.env.CI ? 45_000 : undefined,
+    actionTimeout: process.env.CI ? 15_000 : undefined,
   },
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
