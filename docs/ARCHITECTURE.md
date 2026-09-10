@@ -17,7 +17,7 @@ flowchart TB
 
     subgraph app["Aplicación"]
         front["Frontend Next.js<br/>:3000"]
-        back["Backend FastAPI<br/>:8000<br/>(1-2 workers)"]
+        back["Backend FastAPI<br/>:8000<br/>(proceso único Uvicorn)"]
     end
 
     subgraph data["Servicios de datos"]
@@ -131,7 +131,7 @@ sequenceDiagram
     end
 
     API->>SC: ¿hit cache semántico?
-    alt Hit (similarity ≥ 0.93)
+    alt Hit (similarity ≥ 0.97, configurable desde el panel)
         SC-->>API: respuesta cacheada
         API-->>W: JSON: sources + content
     else Miss
@@ -181,7 +181,7 @@ flowchart TB
     detect{"Tipo?"}
 
     upload --> detect
-    detect -->|PDF| ext_pdf["pypdf"]
+    detect -->|PDF| ext_pdf["pymupdf4llm<br/>(+ OCR de respaldo)"]
     detect -->|DOCX| ext_docx["python-docx"]
     detect -->|TXT| ext_txt["texto plano"]
     detect -->|FAQ| faq["Texto directo<br/>(sin archivo)"]

@@ -233,10 +233,11 @@ TextEmbedding('intfloat/multilingual-e5-large')
 SparseTextEmbedding('Qdrant/bm25')
 print('Embeddings descargados.')
 "
-
-# spaCy para detección de PII (opcional pero recomendado)
-python3 -m spacy download es_core_news_sm
 ```
+
+> La detección de PII (DUI, NIT, teléfono, correo, tarjeta) usa Presidio en
+> modo solo-patrones (expresiones regulares), sin modelo de lenguaje: no
+> requiere descargar ningún modelo de spaCy.
 
 #### Migraciones y arranque
 

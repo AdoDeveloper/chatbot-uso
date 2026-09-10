@@ -290,12 +290,15 @@ TextEmbedding('intfloat/multilingual-e5-large')
 SparseTextEmbedding('Qdrant/bm25')
 print('Embeddings descargados.')
 "
-
-# spaCy para detección de PII (recomendado)
-python3 -m spacy download es_core_news_sm
 ```
 
-> Una vez descargados, el servicio systemd incluye `HF_HUB_OFFLINE=1` para que use el caché local y no revalide contra HuggingFace en cada arranque.
+> La detección de PII (DUI, NIT, teléfono, correo, tarjeta) usa Presidio en
+> modo solo-patrones (expresiones regulares), sin modelo de lenguaje: no
+> requiere descargar ningún modelo de spaCy.
+>
+> Una vez descargados los embeddings, el servicio systemd incluye
+> `HF_HUB_OFFLINE=1` para que use el caché local y no revalide contra
+> HuggingFace en cada arranque.
 
 ### 6.5 Servicio systemd
 
@@ -646,7 +649,6 @@ Pruebas funcionales:
 - [ ] Contraseña del primer admin cambiada tras el primer login.
 - [ ] `ALLOWED_ORIGINS` con solo el dominio real del panel.
 - [ ] SMTP probado (invitaciones y notificaciones).
-- [ ] Modelo spaCy instalado (`es_core_news_sm`) para detección de PII completa.
 - [ ] Prueba de carga básica con usuarios concurrentes esperados.
 
 ### Verificación funcional (humo)

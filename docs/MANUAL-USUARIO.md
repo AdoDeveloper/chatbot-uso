@@ -37,7 +37,9 @@ base son:
 | Editor | Gestión de contenido y base de conocimiento |
 | Lector | Solo lectura: estadísticas e historial |
 
-Un administrador puede crear roles personalizados y ajustar sus permisos.
+Estos tres roles son fijos, con sus permisos ya definidos por el sistema: no
+se pueden crear roles adicionales ni cambiar qué puede hacer cada uno (ver
+7.1).
 
 ---
 
@@ -214,9 +216,10 @@ se muestran según los permisos de cada usuario.
 ### 7.1 Acceso (usuarios, roles, permisos, SSO)
 
 - **Usuarios**: alta, edición y desactivación de cuentas.
-- **Roles**: creación y edición de roles personalizados (los del sistema son
-  fijos).
-- **Permisos**: matriz que define qué puede hacer cada rol por módulo.
+- **Roles**: los tres roles del sistema (Administrador, Editor, Lector) son
+  fijos; no se pueden crear roles adicionales.
+- **Permisos**: matriz de consulta que muestra qué puede hacer cada rol por
+  módulo.
 - **Inicio de sesión**: acceso con cuentas corporativas de Microsoft 365 (si
   está configurado).
 
