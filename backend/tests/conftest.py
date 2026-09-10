@@ -8,13 +8,16 @@ import pytest
 import pytest_asyncio
 
 os.environ["SECRET_KEY"] = "test-secret-key-for-unit-tests-only-please"
+# DATABASE_URL/REDIS_URL reales los inyecta el entorno (CI vía env: en
+# test.yml, o exportados a mano en local) - estos son solo el fallback para
+# una BD de test local sin contraseña, ver docs/INSTALLATION.md.
 os.environ.setdefault(
     "DATABASE_URL",
-    "mysql+aiomysql://chatbot:6fb436cdc176118ba413d92d5dec5c74@localhost:3306/chatbot_test_ci",
+    "mysql+aiomysql://chatbot:chatbot@localhost:3306/chatbot_test_ci",
 )
 os.environ.setdefault(
     "REDIS_URL",
-    "redis://:f29448388acf7558824a685c3981b940@localhost:6379/15",
+    "redis://localhost:6379/15",
 )
 os.environ["UPLOADS_DIR"] = "/tmp/test-uploads"
 os.environ["ALLOWED_ORIGINS"] = '["http://testserver"]'
