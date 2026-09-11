@@ -1,10 +1,10 @@
 import { test, expect } from "@playwright/test";
 
 /**
- * Coverage for the main /dashboard landing page's interactive elements -
- * closes a real gap found while mapping every button/modal/action across all
- * views: this page had zero interaction testing (smoke-all-pages.spec.ts
- * only checks that it loads without errors).
+ * Coverage for the main /dashboard landing page's interactive elements
+ * (KPI cards, workflow links, quick actions) - complements
+ * smoke-all-pages.spec.ts, which only checks that the page loads without
+ * errors.
  */
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;

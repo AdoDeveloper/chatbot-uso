@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 
-// /dashboard/configuracion is a section landing - always send the user to the
-// canonical first sub-route so reload, history, and bookmarks stay clean.
+// /dashboard/configuracion es una sección landing - siempre envía al usuario
+// a la primera subruta canónica para que recargar, el historial y los
+// marcadores se mantengan consistentes.
 export default function ConfiguracionRoot() {
- redirect("/dashboard/configuracion/asistente");
+  redirect("/dashboard/configuracion/asistente");
 }

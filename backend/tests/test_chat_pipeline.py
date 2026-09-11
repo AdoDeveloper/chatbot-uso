@@ -9,9 +9,9 @@ class TestTruncateAtWordBoundary:
         assert _truncate_at_word_boundary("corto", 300) == "corto"
 
     def test_cuts_at_last_space_before_limit(self):
-        text = "Teléfono: 7851-7588 y 7841-4724 disponible en horario de oficina"
+        text = "Teléfono: 2222-2222 y 3333-3333 disponible en horario de oficina"
         result = _truncate_at_word_boundary(text, 25)
-        assert result == "Teléfono: 7851-7588 y…"
+        assert result == "Teléfono: 2222-2222 y…"
 
     def test_never_splits_a_long_word_mid_way(self):
         """Con max_len=15, el corte literal caería a mitad de

@@ -1,10 +1,10 @@
 import { test, expect } from "@playwright/test";
 
 /**
- * Covers the pending-invitation delete action added this session: a
- * physical-delete button appears next to non-active invitations (revoked or
- * expired), and does not appear next to active ones (those only get
- * "Revocar" - deleting an active invite is blocked server-side).
+ * Coverage for the pending-invitation delete action: a physical-delete
+ * button appears next to non-active invitations (revoked or expired), and
+ * does not appear next to active ones (those only get "Revocar" - deleting
+ * an active invite is blocked server-side).
  *
  * Doesn't create/revoke/delete a real invitation in every run (that would
  * mutate shared test data on each execution); it asserts the row-level

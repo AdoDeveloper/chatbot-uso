@@ -126,14 +126,14 @@ class TestOAuth:
     async def test_update_persists_domains(self, client, admin_user, auth_headers):
         r = await client.put(
             "/api/v1/integrations/oauth",
-            json={"allowed_domains": ["udesonsonate.edu.sv"], "is_active": True},
+            json={"allowed_domains": ["ejemplo.edu.sv"], "is_active": True},
             headers=auth_headers(admin_user),
         )
         assert r.status_code == 200
-        assert r.json()["allowed_domains"] == ["udesonsonate.edu.sv"]
+        assert r.json()["allowed_domains"] == ["ejemplo.edu.sv"]
 
         again = await client.get("/api/v1/integrations/oauth", headers=auth_headers(admin_user))
-        assert again.json()["allowed_domains"] == ["udesonsonate.edu.sv"]
+        assert again.json()["allowed_domains"] == ["ejemplo.edu.sv"]
         assert again.json()["is_active"] is True
 
 

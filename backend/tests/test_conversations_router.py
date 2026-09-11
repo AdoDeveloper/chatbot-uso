@@ -1,9 +1,9 @@
 """Tests para app/api/v1/conversations/router.py.
 
-Cubre lo que no tenía ningún test: get_conversation, update status, CSAT,
-feedback de mensajes, tags, y bulk_action (optimizado hoy de N
-SELECTs a un solo IN() - este archivo fija el contrato para que una futura
-regresión de performance o de lógica no pase desapercibida).
+Cubre get_conversation, update status, CSAT, feedback de mensajes, tags, y
+bulk_action (que resuelve con un solo SELECT ... IN() en vez de N
+SELECTs) - este archivo fija el contrato para que una futura regresión de
+performance o de lógica no pase desapercibida.
 """
 from __future__ import annotations
 

@@ -126,18 +126,18 @@ class TestApplyOutputGuardrailsContextAllowList:
     def test_email_present_in_context_is_not_redacted(self):
         from app.services.chat.pipeline import apply_output_guardrails
 
-        context = [{"text": "Correo electrónico: internacionalizacionyrrpp@usonsonate.edu.sv"}]
-        text = "Puede escribir a internacionalizacionyrrpp@usonsonate.edu.sv"
+        context = [{"text": "Correo electrónico: contacto@ejemplo.edu.sv"}]
+        text = "Puede escribir a contacto@ejemplo.edu.sv"
         result = apply_output_guardrails(text, context_chunks=context)
-        assert "internacionalizacionyrrpp@usonsonate.edu.sv" in result
+        assert "contacto@ejemplo.edu.sv" in result
 
     def test_phone_present_in_context_is_not_redacted(self):
         from app.services.chat.pipeline import apply_output_guardrails
 
-        context = [{"text": "Teléfono: 7851-7588"}]
-        text = "El teléfono de contacto es 7851-7588."
+        context = [{"text": "Teléfono: 2222-2222"}]
+        text = "El teléfono de contacto es 2222-2222."
         result = apply_output_guardrails(text, context_chunks=context)
-        assert "7851-7588" in result
+        assert "2222-2222" in result
 
     def test_email_not_in_any_context_chunk_is_still_redacted(self):
         from app.services.chat.pipeline import apply_output_guardrails
@@ -160,9 +160,9 @@ class TestApplyOutputGuardrailsContextAllowList:
     def test_no_context_chunks_behaves_like_before(self):
         from app.services.chat.pipeline import apply_output_guardrails
 
-        text = "Contacto: internacionalizacionyrrpp@usonsonate.edu.sv"
+        text = "Contacto: contacto@ejemplo.edu.sv"
         result = apply_output_guardrails(text)
-        assert "internacionalizacionyrrpp@usonsonate.edu.sv" not in result
+        assert "contacto@ejemplo.edu.sv" not in result
 
 
 class TestRedactPiiConfigurableEntities:

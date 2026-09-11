@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-// Covers two fixed bugs on /dashboard/conversaciones: assistant replies render as markdown (not raw "**bold**"/"# heading" text), and delete-conversation is a labeled, always-visible button rather than a hover-only icon.
+// Coverage for /dashboard/conversaciones: assistant replies render as sanitized markdown, and the delete-conversation action is a labeled, always-visible button.
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;
 

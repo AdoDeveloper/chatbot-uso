@@ -27,7 +27,7 @@ def _provider(*, model_name: str = "", provider_type: str = "", context_limit=No
 
 class TestGetContextWindow:
     def test_explicit_context_limit_wins_over_everything(self):
-        # context_limit no existe hoy como campo real en LLMProvider, pero get_context_window ya lo respeta si algún caller lo pasa - contrato forward-compatible.
+        # context_limit no es un campo real de LLMProvider, pero get_context_window ya lo respeta si algún caller lo pasa - contrato forward-compatible.
         p = _provider(model_name="gpt-4o", provider_type="openai", context_limit=999_999)
         assert get_context_window(p) == 999_999
 

@@ -328,7 +328,7 @@ export function AuditoriaTab() {
 
             {detail.meta_json && Object.keys(detail.meta_json).length > 0 && (
               <div>
-                <p className="text-2xs text-muted-foreground mb-1.5">meta_json</p>
+                <p className="text-2xs text-muted-foreground mb-1.5">Datos adicionales</p>
                 <pre className="text-3xs text-foreground bg-muted/40 border border-border rounded-lg p-3 overflow-auto max-h-72">
 {JSON.stringify(detail.meta_json, null, 2)}
                 </pre>
