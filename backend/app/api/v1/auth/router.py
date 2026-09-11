@@ -294,7 +294,7 @@ async def me(current_user=Depends(get_current_user)):
     return UserResponse.model_validate(current_user)
 
 
-@router.post("/change-password", response_model=UserResponse)
+@router.post("/change-password", response_model=TokenResponse)
 async def change_password(
     body: ChangePasswordRequest,
     request: Request,
@@ -318,7 +318,15 @@ async def change_password(
         ip=get_client_ip(request),
     )
     await db.commit()
-    return UserResponse.model_validate(current_user)
+
+    # tokens_valid_after invalida cualquier token emitido antes de este
+    # commit, incluido el access token con el que se acaba de autenticar
+    # esta misma petición - sin reemitir, la siguiente llamada del cliente
+    # (GET /auth/me) recibe 401 y la sesión se cierra sola justo después de
+    # cambiar la contraseña.
+    return _token_response(
+        current_user, *await rbac_service.issue_user_tokens(db, current_user)
+    )
 
 
 

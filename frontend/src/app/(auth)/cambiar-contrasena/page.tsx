@@ -10,8 +10,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import api from "@/lib/api";
+import api, { tokenStore } from "@/lib/api";
 import { getErrorMessage } from "@/hooks/use-api";
+import type { TokenResponse } from "@/types";
 
 const schema = z
   .object({
@@ -31,7 +32,7 @@ const schema = z
 type FormData = z.infer<typeof schema>;
 
 export default function CambiarContrasenaPage() {
-  const { user, refreshUser } = useAuth();
+  const { user } = useAuth();
   // Distingue redirect forzado (contraseña temporal) de acceso voluntario.
   const isForced = user?.must_change_password ?? false;
   const [showCurrent, setShowCurrent] = useState(false);
@@ -47,11 +48,19 @@ export default function CambiarContrasenaPage() {
   const onSubmit = async (data: FormData) => {
     setServerError("");
     try {
-      await api.post("/auth/change-password", {
+      // change-password rota tokens_valid_after, lo que invalida de inmediato
+      // el access token con el que se autenticó esta misma petición - por eso
+      // el endpoint responde con un par de tokens nuevo (igual que login),
+      // que hay que guardar antes de seguir usando la sesión.
+      const { data: tokens } = await api.post<TokenResponse>("/auth/change-password", {
         current_password: data.current_password,
         new_password: data.new_password,
       });
-      await refreshUser();
+      tokenStore.set(tokens.access_token, tokens.refresh_token);
+      // Navegación completa, no refreshUser()+router.push: mismo motivo que
+      // login() - una soft-navigation puede no ver a tiempo la cookie/token
+      // recién rotados.
+      window.location.href = "/dashboard";
     } catch (err: unknown) {
       setServerError(getErrorMessage(err, "No se pudo cambiar la contraseña. Intente de nuevo."));
     }

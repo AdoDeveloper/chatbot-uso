@@ -33,7 +33,14 @@ export default async function globalSetup(config: FullConfig) {
     await page.locator("#current_password").fill(E2E_PASS);
     await page.locator("#new_password").fill(rotatedPassword);
     await page.locator("#confirm_password").fill(rotatedPassword);
-    await page.locator('button[type="submit"]').click();
+    const [response] = await Promise.all([
+      page.waitForResponse((r) => r.url().includes("/auth/change-password")),
+      page.locator('button[type="submit"]').click(),
+    ]);
+    if (!response.ok()) {
+      const body = await response.text().catch(() => "<no body>");
+      throw new Error(`change-password devolvió ${response.status()}: ${body}`);
+    }
     await page.waitForURL(/\/dashboard/, { timeout: 10_000 });
   }
 
