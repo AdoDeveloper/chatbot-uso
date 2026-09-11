@@ -15,10 +15,12 @@
 /e2e/.auth
 /test-results
 /playwright-report
-/e2e/tablas-acciones.spec.ts-snapshots
-/e2e/smoke-all-pages.spec.ts-snapshots
 /e2e/.report-screenshots
 /scripts
+
+# Baselines de regresión visual (toHaveScreenshot): SÍ se versionan. Sin
+# commitear el -linux.png que CI genera en su primer run, cada corrida en
+# CI vuelve a fallar con "snapshot doesn't exist" para siempre.
 
 # next.js
 /.next/

@@ -13,16 +13,18 @@ const SHOT_DIR = path.join("e2e", ".report-screenshots", "configuracion-asistent
 fs.mkdirSync(SHOT_DIR, { recursive: true });
 
 test.describe("Configuracion > Asistente > Previsualizar", () => {
-  test("abrir/cerrar el launcher, cambiar entorno Pruebas/Produccion, enviar un mensaje real", async ({ page }) => {
+  test("abrir/cerrar el launcher, cambiar alcance Todos/Aprobados, enviar un mensaje real", async ({ page }) => {
     const consoleErrors: string[] = [];
     await page.goto("/dashboard/configuracion/asistente?tab=previsualizar");
     page.on("pageerror", (e) => consoleErrors.push(String(e)));
     await expect(page.getByText(/vista previa/i).first()).toBeVisible({ timeout: 10_000 });
 
-    await page.getByRole("button", { name: /producción/i }).click();
-    await expect(page.getByText(/entorno de producción/i)).toBeVisible({ timeout: 5_000 });
-    await page.getByRole("button", { name: /pruebas/i }).click();
-    await expect(page.getByText(/entorno de pruebas/i)).toBeVisible({ timeout: 5_000 });
+    // SegmentedControl "Documentos a consultar": Todos (incluye borradores)
+    // vs. Aprobados (solo fuentes publicadas), no un entorno Pruebas/Producción.
+    await page.getByRole("button", { name: /^aprobados$/i }).click();
+    await expect(page.getByText(/solo aprobados/i)).toBeVisible({ timeout: 5_000 });
+    await page.getByRole("button", { name: /^todos$/i }).click();
+    await expect(page.getByText(/incluye borradores/i)).toBeVisible({ timeout: 5_000 });
 
     await expect(page.getByPlaceholder(/escribe un mensaje/i)).toBeVisible({ timeout: 10_000 });
     const minimizeBtn = page.getByRole("button", { name: /minimizar chat/i });
@@ -106,7 +108,7 @@ test.describe("Configuracion > Asistente > Previsualizar", () => {
     if (await a11yItem.isVisible().catch(() => false)) {
       await a11yItem.click();
 
-      const radioGroup = page.getByRole("radiogroup", { name: /tamaño de texto/i });
+      const radioGroup = page.getByRole("radiogroup", { name: /tamaño del texto/i });
       await expect(radioGroup).toBeVisible({ timeout: 5_000 });
       const radios = radioGroup.getByRole("radio");
       const count = await radios.count();

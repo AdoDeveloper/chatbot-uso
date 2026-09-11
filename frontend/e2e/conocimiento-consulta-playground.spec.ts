@@ -21,7 +21,7 @@ test.describe("Conocimiento > Consulta", () => {
     await page.locator("#main-content").getByRole("button", { name: /buscar/i }).click();
 
     // Wait for actual result content, not a generic spinner check - a page-wide spinner sweep is prone to false negatives from unrelated transient UI state under concurrent E2E load.
-    await expect(page.getByText(/chunks recuperados/i)).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(/fragmentos recuperados/i)).toBeVisible({ timeout: 30_000 });
     await page.screenshot({ path: path.join(SHOT_DIR, "01-consulta-resultado.png") });
   });
 });

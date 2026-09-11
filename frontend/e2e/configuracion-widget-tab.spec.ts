@@ -118,7 +118,10 @@ test.describe("Configuracion > Asistente > Apariencia", () => {
     await editInput.blur();
     await expect(page.getByText(editedLabel)).toBeVisible({ timeout: 10_000 });
 
-    const reasonSwitch = page.locator("div", { hasText: editedLabel }).locator('[role="switch"]').last();
+    // Locator acotado a la fila real (div.rounded-lg con label+switch como
+    // hijos directos) - "div" a secas matchea cualquier ancestro con ese
+    // texto y .last() termina agarrando el switch de otro motivo.
+    const reasonSwitch = page.locator("div.rounded-lg", { hasText: editedLabel }).locator('[role="switch"]');
     await expect(reasonSwitch).toHaveAttribute("aria-checked", "true", { timeout: 5_000 });
     await reasonSwitch.click();
     await expect(reasonSwitch).toHaveAttribute("aria-checked", "false", { timeout: 5_000 });

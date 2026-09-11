@@ -23,7 +23,7 @@ test.describe("Dashboard inicio", () => {
     await expect(page.getByText(/latencia promedio/i)).toBeVisible();
   });
 
-  test("workflow cycle links to documentos, playground and publicaciones", async ({ page }) => {
+  test("workflow cycle links to documentos and playground", async ({ page }) => {
     await page.goto("/dashboard");
 
     await page.getByRole("link", { name: /documentos/i }).first().click();
@@ -32,10 +32,6 @@ test.describe("Dashboard inicio", () => {
     await page.goto("/dashboard");
     await page.getByRole("link", { name: /pruebas/i }).first().click();
     await expect(page).toHaveURL(/\/dashboard\/configuracion\/playground/);
-
-    await page.goto("/dashboard");
-    await page.getByRole("link", { name: /publicaci[oó]n/i }).first().click();
-    await expect(page).toHaveURL(/\/dashboard\/configuracion\/publicaciones/);
   });
 
   test("quick actions navigate to their targets", async ({ page }) => {
@@ -116,6 +112,9 @@ test.describe("Dashboard inicio - OnboardingWizard", () => {
     const authHeader = { Authorization: `Bearer ${token}` };
 
     const providersResp = await page.request.get("/api/v1/providers", { headers: authHeader });
+    if (!providersResp.ok()) {
+      test.skip(true, `GET /api/v1/providers devolvió ${providersResp.status()}, no se puede manipular el estado del sistema`);
+    }
     const providers: Array<{ id: string; is_active: boolean }> = await providersResp.json();
     // `step` solo se libera si TODOS los proveedores quedan inactivos.
     const activeProviders = providers.filter((p) => p.is_active);

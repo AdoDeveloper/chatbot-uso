@@ -12,7 +12,10 @@ const E2E_PASS = process.env.E2E_PASS;
 test.use({ storageState: "e2e/.auth/admin.json" });
 test.skip(!E2E_USER || !E2E_PASS, "E2E_USER / E2E_PASS not set - skipping");
 
-const BACKEND_URL = "http://localhost:8000";
+// 127.0.0.1, no "localhost": en el runner de CI "localhost" resuelve a
+// IPv6 (::1) antes que a IPv4, donde nada escucha - el <script src> del
+// widget fallaba en silencio y el botón "Abrir chat" nunca se renderizaba.
+const BACKEND_URL = "http://127.0.0.1:8000";
 
 async function getWidgetKey(request: import("@playwright/test").APIRequestContext, authHeader: string): Promise<string> {
   const cfgRes = await request.get(`${BACKEND_URL}/api/v1/widget/config`, { headers: { Authorization: authHeader } });

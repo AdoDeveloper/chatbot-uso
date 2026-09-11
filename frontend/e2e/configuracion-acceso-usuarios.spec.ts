@@ -136,7 +136,7 @@ test.describe("Configuracion > Acceso > Usuarios", () => {
     await expect(dialog).not.toBeVisible({ timeout: 5_000 });
   });
 
-  test("ciclo completo de un usuario de prueba: invitar, aceptar, editar rol/estado, resetear contrasena, eliminar", async ({ page, request }) => {
+  test("ciclo completo de un usuario de prueba: invitar, aceptar, editar rol/estado, resetear contrasena, eliminar", async ({ page, request, baseURL }) => {
     const email = `e2e-lifecycle-${Date.now()}@invalid.example`;
     const tempPass = "TempPass!2026x";
     await page.context().grantPermissions(["clipboard-write", "clipboard-read"]);
@@ -156,7 +156,6 @@ test.describe("Configuracion > Acceso > Usuarios", () => {
     const row = page.locator("tr", { hasText: email });
     await expect(row).toBeVisible({ timeout: 10_000 });
 
-    const baseURL = "http://localhost:3000";
     const authHeader = `Bearer ${(await page.context().cookies()).find((c) => c.name === "chatbot_access")?.value}`;
     const invitesResp = await request.get(`${baseURL}/api/v1/users/invitations?page=1&page_size=50`, {
       headers: { Authorization: authHeader },

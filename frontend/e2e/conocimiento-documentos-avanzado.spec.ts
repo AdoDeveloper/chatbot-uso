@@ -75,21 +75,26 @@ test.describe("Conocimiento > Documentos > controles avanzados de fila", () => {
     const name = `E2E Tags Source ${Date.now()}`;
     const row = await uploadDisposableSource(page, name, "Contenido de prueba E2E para el editor de etiquetas inline.");
 
-    await row.getByRole("button", { name: /agregar/i }).click();
+    // Las etiquetas se editan dentro del modal general "Editar documento"
+    // (botón "Editar" en la fila), no en un dialogo dedicado - el input de
+    // etiqueta tiene su propio botón "+ Agregar" para añadirla a la lista
+    // local, que solo se persiste al pulsar "Guardar" del modal.
+    await row.getByRole("button", { name: /^editar$/i }).click();
     const dialog = page.getByRole("dialog");
-    await expect(dialog.getByRole("heading", { name: /etiquetas/i })).toBeVisible({ timeout: 5_000 });
+    await expect(dialog.getByRole("heading", { name: /editar documento/i })).toBeVisible({ timeout: 5_000 });
 
-    const tagInput = dialog.locator("input").first();
+    const tagInput = dialog.getByPlaceholder(/admisiones, 2026/i);
     await tagInput.fill("e2e-tag-cancelada");
-    await tagInput.press("Enter");
+    await dialog.getByRole("button", { name: /\+ agregar/i }).click();
+    await expect(dialog.getByText("e2e-tag-cancelada")).toBeVisible();
     // Este tag NO debe persistir.
     await dialog.getByRole("button", { name: /cancelar/i }).click();
     await expect(dialog).not.toBeVisible({ timeout: 5_000 });
     await expect(row.getByText("e2e-tag-cancelada")).toHaveCount(0);
 
-    await row.getByRole("button", { name: /agregar/i }).click();
+    await row.getByRole("button", { name: /^editar$/i }).click();
     const dialog2 = page.getByRole("dialog");
-    const tagInput2 = dialog2.locator("input").first();
+    const tagInput2 = dialog2.getByPlaceholder(/admisiones, 2026/i);
     await tagInput2.fill("e2e-tag-guardada");
     await tagInput2.press("Enter");
     await dialog2.getByRole("button", { name: /^guardar$/i }).click();

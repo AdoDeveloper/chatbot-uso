@@ -56,11 +56,14 @@ test.describe("Conocimiento > Documentos > Fuentes", () => {
     await page.waitForTimeout(8_000);
     await page.screenshot({ path: path.join(SHOT_DIR, "02-fuente-procesada.png") });
 
-    await row.getByRole("button", { name: /agregar/i }).click();
+    // Las etiquetas se editan dentro del modal general "Editar documento"
+    // (botón "Editar" en la fila) - no hay un dialogo dedicado a "Etiquetas".
+    await row.getByRole("button", { name: /^editar$/i }).click();
     const tagDialog = page.getByRole("dialog");
-    await expect(tagDialog.getByRole("heading", { name: /etiquetas/i })).toBeVisible();
-    await tagDialog.locator("input").first().fill("e2e-test");
-    await tagDialog.locator("input").first().press("Enter");
+    await expect(tagDialog.getByRole("heading", { name: /editar documento/i })).toBeVisible();
+    const tagInput = tagDialog.getByPlaceholder(/admisiones, 2026/i);
+    await tagInput.fill("e2e-test");
+    await tagInput.press("Enter");
     await tagDialog.getByRole("button", { name: /^guardar$/i }).click();
     await expect(tagDialog).not.toBeVisible({ timeout: 10_000 });
     await expect(row.getByText("e2e-test")).toBeVisible({ timeout: 10_000 });

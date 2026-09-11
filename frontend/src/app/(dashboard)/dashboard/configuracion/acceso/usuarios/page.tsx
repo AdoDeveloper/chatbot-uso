@@ -376,8 +376,11 @@ function UsuariosTab() {
 
   const { data: usersData, loading, error: usersError, refetch: loadUsers } =
     useApi<{ items: User[]; total: number }>(`/users?page=${usersPage}&page_size=${usersPageSize}`);
+  // Sin active_only=true: la tabla necesita ver invitaciones revocadas y
+  // expiradas para poder mostrarles su badge de estado (INVITE_STATUS_META);
+  // filtrarlas en la query las haría desaparecer en vez de marcarlas.
   const { data: invitationsData, refetch: loadInvitations } =
-    useApi<{ items: Invitation[]; total: number }>(`/users/invitations?active_only=true&page=${invitesPage}&page_size=${invitesPageSize}`);
+    useApi<{ items: Invitation[]; total: number }>(`/users/invitations?page=${invitesPage}&page_size=${invitesPageSize}`);
   const { data: summaryData } = useApi<{ total_members: number; active: number; no_access_yet: number; admins: number }>("/users/summary");
   const { data: rolesData } = useApi<Role[]>("/rbac/roles");
   const users = usersData?.items ?? [];

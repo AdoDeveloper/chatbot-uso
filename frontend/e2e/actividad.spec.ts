@@ -253,7 +253,10 @@ test.describe("Actividad > Seguridad", () => {
     const consoleErrors: string[] = [];
     await page.goto("/dashboard/actividad?tab=seguridad");
     page.on("pageerror", (e) => consoleErrors.push(String(e)));
-    await expect(page.getByText(/intentos fallidos/i)).toBeVisible({ timeout: 10_000 });
+    // .first(): "Intentos fallidos" (título de la StatCard) y "Sin intentos
+    // fallidos" (empty-state cuando no hay registros) matchean ambos este
+    // regex - cualquiera de los dos confirma que la sección cargó.
+    await expect(page.getByText(/intentos fallidos/i).first()).toBeVisible({ timeout: 10_000 });
 
     const dateInputs = page.locator('input[type="date"]');
     if (await dateInputs.count() >= 2) {

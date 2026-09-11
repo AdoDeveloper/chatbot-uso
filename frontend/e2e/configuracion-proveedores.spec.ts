@@ -32,7 +32,7 @@ test.describe("Configuracion > Proveedores", () => {
     await expect(createDialog.getByRole("heading", { name: /agregar proveedor/i })).toBeVisible();
 
     await createDialog.locator("input").first().fill(name);
-    await createDialog.locator("select").first().selectOption("custom");
+    await createDialog.locator("select").first().selectOption("__custom__");
     await createDialog.getByPlaceholder(/together_ai/i).fill("e2e_custom");
     await createDialog.getByPlaceholder(/nombre-del-modelo/i).fill("e2e-fake-model");
     await createDialog.getByPlaceholder(/sk-\.\.\./i).fill("sk-e2e-fake-key");
@@ -119,7 +119,7 @@ test.describe("Configuracion > Proveedores", () => {
     await expect(keyInput).toHaveAttribute("type", "password");
 
     // Endpoint custom falso: nunca contacta a un proveedor real, resuelve a un estado de fallo manejado.
-    await dialog.locator("select").first().selectOption("custom");
+    await dialog.locator("select").first().selectOption("__custom__");
     await dialog.getByPlaceholder(/together_ai/i).fill("e2e_probar_test");
     await dialog.getByPlaceholder(/nombre-del-modelo/i).fill("e2e-fake-model");
     await dialog.getByPlaceholder("https://...").fill("https://example.invalid/v1");
@@ -141,7 +141,7 @@ test.describe("Configuracion > Proveedores", () => {
     await page.getByRole("button", { name: /^agregar$/i }).click();
     const createDialog = page.getByRole("dialog");
     await createDialog.locator("input").first().fill(name);
-    await createDialog.locator("select").first().selectOption("custom");
+    await createDialog.locator("select").first().selectOption("__custom__");
     await createDialog.getByPlaceholder(/together_ai/i).fill("e2e_chain_order");
     await createDialog.getByPlaceholder(/nombre-del-modelo/i).fill("e2e-fake-model");
     await createDialog.getByPlaceholder(/sk-\.\.\./i).fill("sk-e2e-fake-key");

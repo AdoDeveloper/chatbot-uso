@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { readFileSync } from "node:fs";
 
 /**
  * Smoke E2E for the login flow.
@@ -15,7 +16,18 @@ import { test, expect } from "@playwright/test";
  *   E2E_USER=admin@example.com E2E_PASS='secret' npm run test:e2e
  */
 const E2E_USER = process.env.E2E_USER;
-const E2E_PASS = process.env.E2E_PASS;
+
+// Si global-setup.ts tuvo que rotar la contraseña (admin recién sembrado con
+// must_change_password=true), E2E_PASS ya quedó obsoleta - usar la vigente.
+function currentE2EPassword(): string | undefined {
+  try {
+    const { password } = JSON.parse(readFileSync("e2e/.auth/admin-password.json", "utf-8"));
+    return password;
+  } catch {
+    return process.env.E2E_PASS;
+  }
+}
+const E2E_PASS = currentE2EPassword();
 
 test.describe("Login smoke", () => {
   test("root redirects to login", async ({ page }) => {
