@@ -26,16 +26,17 @@ test.describe("Configuracion > Publicaciones", () => {
     test.setTimeout(90_000);
 
     async function touchConfig() {
-      // page.request (no el fixture request suelto): comparte el mismo
-      // stack de red que el navegador, que sí resuelve el proxy de forma
-      // confiable bajo la carga concurrente de la corrida completa.
+      // DIAGNOSTICO: pegarle directo al backend (sin pasar por el rewrite de
+      // Next) para aislar si el 500 sostenido viene de Next.js o del backend.
+      const authHeader = `Bearer ${(await page.context().cookies()).find((c) => c.name === "chatbot_access")?.value}`;
       await expect(async () => {
-        const res = await page.request.put("/api/v1/widget/config", {
+        const res = await page.request.put("http://127.0.0.1:8000/api/v1/widget/config", {
+          headers: { Authorization: authHeader },
           data: { welcome_message: `E2E snapshot toggle ${Date.now()}` },
         }).catch(() => null);
         if (res && !res.ok()) {
           const body = await res.text().catch(() => "<no body>");
-          console.log("[diag] PUT /widget/config", res.status(), JSON.stringify(res.headers()), body.slice(0, 1000));
+          console.log("[diag] PUT /widget/config (directo)", res.status(), JSON.stringify(res.headers()), body.slice(0, 1000));
         }
         expect(res?.ok(), `failed to force a real config change: ${res?.status()}`).toBeTruthy();
       }).toPass({ timeout: 30_000 });

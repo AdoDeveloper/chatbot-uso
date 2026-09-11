@@ -157,15 +157,17 @@ test.describe("Configuracion > Acceso > Usuarios", () => {
     const row = page.locator("tr", { hasText: email });
     await expect(row).toBeVisible({ timeout: 10_000 });
 
-    // page.request (no el fixture request suelto): comparte el mismo stack
-    // de red que el navegador, que sí resuelve el proxy de forma confiable
-    // bajo la carga concurrente de la corrida completa.
+    // DIAGNOSTICO: pegarle directo al backend (sin pasar por el rewrite de
+    // Next) para aislar si el 500 sostenido viene de Next.js o del backend.
+    const authHeader = `Bearer ${(await page.context().cookies()).find((c) => c.name === "chatbot_access")?.value}`;
     let invite: { email: string; token: string; id: string } | undefined;
     await expect(async () => {
-      const invitesResp = await page.request.get("/api/v1/users/invitations?page=1&page_size=50");
+      const invitesResp = await page.request.get("http://127.0.0.1:8000/api/v1/users/invitations?page=1&page_size=50", {
+        headers: { Authorization: authHeader },
+      });
       if (!invitesResp.ok()) {
         const body = await invitesResp.text().catch(() => "<no body>");
-        console.log("[diag] GET /users/invitations", invitesResp.status(), JSON.stringify(invitesResp.headers()), body.slice(0, 1000));
+        console.log("[diag] GET /users/invitations (directo)", invitesResp.status(), JSON.stringify(invitesResp.headers()), body.slice(0, 1000));
       }
       expect(invitesResp.ok(), `GET /users/invitations devolvió ${invitesResp.status()}`).toBeTruthy();
       const invitesJson = await invitesResp.json();
@@ -173,7 +175,7 @@ test.describe("Configuracion > Acceso > Usuarios", () => {
       expect(invite, "invitation for the disposable user must exist via API").toBeTruthy();
     }).toPass({ timeout: 30_000 });
 
-    const acceptResp = await page.request.post(`/api/v1/auth/invite/${invite!.token}/accept`, {
+    const acceptResp = await page.request.post(`http://127.0.0.1:8000/api/v1/auth/invite/${invite!.token}/accept`, {
       data: { password: tempPass, full_name: "E2E Lifecycle User" },
     });
     expect(acceptResp.ok(), `accept invitation failed: ${acceptResp.status()} ${await acceptResp.text()}`).toBeTruthy();
