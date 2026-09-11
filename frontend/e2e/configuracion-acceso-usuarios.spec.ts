@@ -157,12 +157,16 @@ test.describe("Configuracion > Acceso > Usuarios", () => {
     await expect(row).toBeVisible({ timeout: 10_000 });
 
     const authHeader = `Bearer ${(await page.context().cookies()).find((c) => c.name === "chatbot_access")?.value}`;
-    const invitesResp = await request.get(`${baseURL}/api/v1/users/invitations?page=1&page_size=50`, {
-      headers: { Authorization: authHeader },
-    });
-    const invitesJson = await invitesResp.json();
-    const invite = (invitesJson.items as Array<{ email: string; token: string; id: string }>).find((i) => i.email === email);
-    expect(invite, "invitation for the disposable user must exist via API").toBeTruthy();
+    let invite: { email: string; token: string; id: string } | undefined;
+    await expect(async () => {
+      const invitesResp = await request.get(`${baseURL}/api/v1/users/invitations?page=1&page_size=50`, {
+        headers: { Authorization: authHeader },
+      });
+      expect(invitesResp.ok(), `GET /users/invitations devolvió ${invitesResp.status()}`).toBeTruthy();
+      const invitesJson = await invitesResp.json();
+      invite = (invitesJson.items as Array<{ email: string; token: string; id: string }>).find((i) => i.email === email);
+      expect(invite, "invitation for the disposable user must exist via API").toBeTruthy();
+    }).toPass({ timeout: 15_000 });
 
     const acceptResp = await request.post(`${baseURL}/api/v1/auth/invite/${invite!.token}/accept`, {
       headers: { "Content-Type": "application/json" },

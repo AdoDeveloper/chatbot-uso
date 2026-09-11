@@ -27,11 +27,16 @@ test.describe("Configuracion > Publicaciones", () => {
 
     const authHeader = `Bearer ${(await page.context().cookies()).find((c) => c.name === "chatbot_access")?.value}`;
     async function touchConfig() {
-      const res = await request.put(`${baseURL}/api/v1/widget/config`, {
-        headers: { Authorization: authHeader, "Content-Type": "application/json" },
-        data: { welcome_message: `E2E snapshot toggle ${Date.now()}` },
-      }).catch(() => null);
-      expect(res?.ok(), `failed to force a real config change: ${res?.status()}`).toBeTruthy();
+      // Reintenta: la primera llamada API de la corrida puede pegarle al
+      // backend/proxy todavía calentando (500 transitorio), sin relación
+      // con el código bajo prueba.
+      await expect(async () => {
+        const res = await request.put(`${baseURL}/api/v1/widget/config`, {
+          headers: { Authorization: authHeader, "Content-Type": "application/json" },
+          data: { welcome_message: `E2E snapshot toggle ${Date.now()}` },
+        }).catch(() => null);
+        expect(res?.ok(), `failed to force a real config change: ${res?.status()}`).toBeTruthy();
+      }).toPass({ timeout: 15_000 });
     }
 
     await page.goto("/dashboard/configuracion/publicaciones");
@@ -68,8 +73,8 @@ test.describe("Configuracion > Publicaciones", () => {
     // Serializa toda la config del sistema; bajo contención real de E2E (workers:2, otros specs escribiendo las mismas tablas) puede superar 20s vs. 5.8s en solitario.
     await expect(page.getByRole("dialog")).not.toBeVisible({ timeout: 60_000 });
 
-    // Los snapshots manuales quedan ocultos por defecto (solo "Ver todos") y el historial muestra un change_summary calculado, no la descripción libre enviada.
-    await page.getByRole("button", { name: /ver todos los snapshots/i }).click();
+    // Los snapshots manuales quedan ocultos por defecto (solo "Ver todo el historial") y el historial muestra un change_summary calculado, no la descripción libre enviada.
+    await page.getByRole("button", { name: /ver todo el historial/i }).click();
     await expect(page.getByText(/snapshot manual/i).first()).toBeVisible({ timeout: 10_000 });
     await page.screenshot({ path: path.join(SHOT_DIR, "02-snapshot-en-historial.png") });
   });
@@ -80,7 +85,7 @@ test.describe("Configuracion > Publicaciones", () => {
     // sección ("Historial") matchean ambos este regex.
     await expect(page.getByRole("heading", { name: /historial/i }).first()).toBeVisible({ timeout: 10_000 });
 
-    const toggleBtn = page.getByRole("button", { name: /ver todos los snapshots/i });
+    const toggleBtn = page.getByRole("button", { name: /ver todo el historial/i });
     await toggleBtn.click();
     const firstVersion = page.locator("button", { hasText: /^v\d/ }).first();
     await expect(firstVersion).toBeVisible({ timeout: 10_000 });
@@ -89,11 +94,11 @@ test.describe("Configuracion > Publicaciones", () => {
     await page.screenshot({ path: path.join(SHOT_DIR, "03-diff-expandido.png") });
 
     await firstVersion.click();
-    await expect(page.getByText(/mostrando todos los snapshots/i)).toBeVisible();
+    await expect(page.getByText(/mostrando el historial completo/i)).toBeVisible();
 
-    await page.getByRole("button", { name: /solo publicaciones/i }).click();
-    await expect(page.getByText(/mostrando todos los snapshots/i)).toHaveCount(0);
-    await expect(page.getByRole("button", { name: /ver todos los snapshots/i })).toBeVisible();
+    await page.getByRole("button", { name: /ver solo los recientes/i }).click();
+    await expect(page.getByText(/mostrando el historial completo/i)).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /ver todo el historial/i })).toBeVisible();
   });
 
   test("rechazar una fuente pendiente: modal, validacion, cierre por Escape y rechazo real", async ({ page }) => {

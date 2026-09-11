@@ -130,6 +130,24 @@ jobs:
             echo "WIDGET_BASE_URL=http://localhost:8000"
           } > backend/.env
 
+      # El Dockerfile del backend asume static/widget/widget.js ya compilado
+      # (gitignored, se genera aparte con este build). Sin este paso, /widget/
+      # nunca se monta en el backend y todo lo que dependa del widget.js real
+      # (no el playground simulado) falla con 404 al cargar el script.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: widget/package-lock.json
+
+      - name: Build widget bundle
+        working-directory: widget
+        run: |
+          npm ci
+          npm run build
+          mkdir -p ../backend/static/widget
+          cp dist/widget.js ../backend/static/widget/widget.js
+
       # El entrypoint del backend descarga los modelos ONNX (embeddings) en el
       # primer arranque si el cache está vacío - sin cachear entre runs, esa
       # descarga puede agotar el tiempo disponible antes de que el healthcheck

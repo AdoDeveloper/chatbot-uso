@@ -97,7 +97,8 @@ test.describe("Login happy path", () => {
 
     // "Chatbot USO" brand text in the sidebar confirms we're inside the
     // authenticated shell, not just parked on a redirect destination.
-    await expect(page.getByText("Chatbot USO")).toBeVisible();
+    // .first(): el saludo del dashboard también contiene ese texto.
+    await expect(page.getByText("Chatbot USO").first()).toBeVisible();
   });
 
   test("logged-in user can reach a deep route (admin tabs)", async ({ browser }) => {

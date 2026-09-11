@@ -399,15 +399,24 @@ export default function PublicacionesPage() {
             <History className="w-4 h-4 text-muted-foreground" />
             Historial
           </h2>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowAllSnapshots((v) => !v)}
-            className="shrink-0"
-          >
-            {showAllSnapshots ? <EyeOff /> : <Eye />}
-            {showAllSnapshots ? "Ver solo los recientes" : "Ver todo el historial"}
-          </Button>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSnapshotOpen(true)}
+              className="gap-1.5"
+            >
+              <Save className="h-3.5 w-3.5" /> Guardar punto de restauración
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAllSnapshots((v) => !v)}
+            >
+              {showAllSnapshots ? <EyeOff /> : <Eye />}
+              {showAllSnapshots ? "Ver solo los recientes" : "Ver todo el historial"}
+            </Button>
+          </div>
         </div>
 
         {showAllSnapshots && (
