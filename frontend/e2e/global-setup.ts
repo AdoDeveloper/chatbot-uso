@@ -30,12 +30,32 @@ export default async function globalSetup(config: FullConfig) {
   // más abajo, no vuelve a loguearse con E2E_PASS.
   if (page.url().includes("/cambiar-contrasena")) {
     const rotatedPassword = `${E2E_PASS}Aa1`;
+
+    // Diagnóstico: si algo falla más abajo, estos logs quedan en la salida
+    // de "Run Playwright tests" en CI en vez de un timeout ciego.
+    page.on("console", (msg) => console.log(`[browser:${msg.type()}]`, msg.text()));
+    page.on("pageerror", (err) => console.log("[browser:pageerror]", err.message));
+    page.on("requestfailed", (req) =>
+      console.log("[browser:requestfailed]", req.url(), req.failure()?.errorText)
+    );
+    page.on("response", (r) => {
+      if (r.url().includes("/auth/")) {
+        console.log("[browser:response]", r.status(), r.url());
+      }
+    });
+
     await page.locator("#current_password").fill(E2E_PASS);
     await page.locator("#new_password").fill(rotatedPassword);
     await page.locator("#confirm_password").fill(rotatedPassword);
+
+    const submitBtn = page.locator('button[type="submit"]');
+    await submitBtn.waitFor({ state: "visible", timeout: 5_000 });
+    const isDisabled = await submitBtn.isDisabled();
+    console.log("[global-setup] submit button disabled?", isDisabled);
+
     const [response] = await Promise.all([
-      page.waitForResponse((r) => r.url().includes("/auth/change-password")),
-      page.locator('button[type="submit"]').click(),
+      page.waitForResponse((r) => r.url().includes("/auth/change-password"), { timeout: 15_000 }),
+      submitBtn.click(),
     ]);
     if (!response.ok()) {
       const body = await response.text().catch(() => "<no body>");
