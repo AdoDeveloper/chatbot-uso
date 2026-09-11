@@ -107,7 +107,12 @@ fi
 # --workers: el circuit breaker del LLM gateway y el semáforo de concurrencia
 # de chat viven en memoria del proceso, así que varios workers en un mismo
 # contenedor fragmentan esa protección sin necesidad real para este volumen.
+# --timeout-keep-alive por encima del default (5s): Next.js reutiliza
+# conexiones pooled en su proxy de rewrites, y una conexión cerrada por
+# el backend justo antes de reusarse producía un 500 genérico sin
+# traza en los logs (el request nunca llegaba a FastAPI).
 exec uvicorn app.main:app \
     --host 0.0.0.0 \
     --port 8000 \
-    --timeout-graceful-shutdown 30
+    --timeout-graceful-shutdown 30 \
+    --timeout-keep-alive 75
