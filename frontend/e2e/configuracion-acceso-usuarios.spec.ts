@@ -163,6 +163,10 @@ test.describe("Configuracion > Acceso > Usuarios", () => {
     let invite: { email: string; token: string; id: string } | undefined;
     await expect(async () => {
       const invitesResp = await page.request.get("/api/v1/users/invitations?page=1&page_size=50");
+      if (!invitesResp.ok()) {
+        const body = await invitesResp.text().catch(() => "<no body>");
+        console.log("[diag] GET /users/invitations", invitesResp.status(), JSON.stringify(invitesResp.headers()), body.slice(0, 1000));
+      }
       expect(invitesResp.ok(), `GET /users/invitations devolvió ${invitesResp.status()}`).toBeTruthy();
       const invitesJson = await invitesResp.json();
       invite = (invitesJson.items as Array<{ email: string; token: string; id: string }>).find((i) => i.email === email);

@@ -33,6 +33,10 @@ test.describe("Configuracion > Publicaciones", () => {
         const res = await page.request.put("/api/v1/widget/config", {
           data: { welcome_message: `E2E snapshot toggle ${Date.now()}` },
         }).catch(() => null);
+        if (res && !res.ok()) {
+          const body = await res.text().catch(() => "<no body>");
+          console.log("[diag] PUT /widget/config", res.status(), JSON.stringify(res.headers()), body.slice(0, 1000));
+        }
         expect(res?.ok(), `failed to force a real config change: ${res?.status()}`).toBeTruthy();
       }).toPass({ timeout: 30_000 });
     }
