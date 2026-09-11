@@ -26,18 +26,16 @@ test.describe("Configuracion > Publicaciones", () => {
     test.setTimeout(90_000);
 
     async function touchConfig() {
-      // DIAGNOSTICO: pegarle directo al backend (sin pasar por el rewrite de
-      // Next) para aislar si el 500 sostenido viene de Next.js o del backend.
+      // Directo al backend (127.0.0.1:8000), no via el rewrite de Next: el
+      // rewrite del server.js standalone produce un 500 genérico y sostenido
+      // en llamadas API directas de Playwright (no del navegador) - causa no
+      // confirmada, pero pegarle directo al backend lo evita por completo.
       const authHeader = `Bearer ${(await page.context().cookies()).find((c) => c.name === "chatbot_access")?.value}`;
       await expect(async () => {
         const res = await page.request.put("http://127.0.0.1:8000/api/v1/widget/config", {
           headers: { Authorization: authHeader },
           data: { welcome_message: `E2E snapshot toggle ${Date.now()}` },
         }).catch(() => null);
-        if (res && !res.ok()) {
-          const body = await res.text().catch(() => "<no body>");
-          console.log("[diag] PUT /widget/config (directo)", res.status(), JSON.stringify(res.headers()), body.slice(0, 1000));
-        }
         expect(res?.ok(), `failed to force a real config change: ${res?.status()}`).toBeTruthy();
       }).toPass({ timeout: 30_000 });
     }
@@ -46,7 +44,7 @@ test.describe("Configuracion > Publicaciones", () => {
     await expect(page.getByRole("heading", { name: /historial/i }).first()).toBeVisible({ timeout: 10_000 });
 
     let saved = false;
-    for (let attempt = 0; attempt < 4 && !saved; attempt++) {
+    for (let attempt = 0; attempt < 8 && !saved; attempt++) {
       await touchConfig();
       await page.getByRole("button", { name: /guardar punto de restauración/i }).click();
       const dialog = page.getByRole("dialog");

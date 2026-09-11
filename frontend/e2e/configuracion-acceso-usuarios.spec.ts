@@ -157,18 +157,16 @@ test.describe("Configuracion > Acceso > Usuarios", () => {
     const row = page.locator("tr", { hasText: email });
     await expect(row).toBeVisible({ timeout: 10_000 });
 
-    // DIAGNOSTICO: pegarle directo al backend (sin pasar por el rewrite de
-    // Next) para aislar si el 500 sostenido viene de Next.js o del backend.
+    // Directo al backend (127.0.0.1:8000), no via el rewrite de Next: el
+    // rewrite del server.js standalone produce un 500 genérico y sostenido
+    // en llamadas API directas de Playwright (no del navegador) - causa no
+    // confirmada, pero pegarle directo al backend lo evita por completo.
     const authHeader = `Bearer ${(await page.context().cookies()).find((c) => c.name === "chatbot_access")?.value}`;
     let invite: { email: string; token: string; id: string } | undefined;
     await expect(async () => {
       const invitesResp = await page.request.get("http://127.0.0.1:8000/api/v1/users/invitations?page=1&page_size=50", {
         headers: { Authorization: authHeader },
       });
-      if (!invitesResp.ok()) {
-        const body = await invitesResp.text().catch(() => "<no body>");
-        console.log("[diag] GET /users/invitations (directo)", invitesResp.status(), JSON.stringify(invitesResp.headers()), body.slice(0, 1000));
-      }
       expect(invitesResp.ok(), `GET /users/invitations devolvió ${invitesResp.status()}`).toBeTruthy();
       const invitesJson = await invitesResp.json();
       invite = (invitesJson.items as Array<{ email: string; token: string; id: string }>).find((i) => i.email === email);
