@@ -58,7 +58,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (data.must_change_password && !currentPath.startsWith("/cambiar-contrasena")) {
         router.push("/cambiar-contrasena");
       } else if (!data.must_change_password && currentPath.startsWith("/cambiar-contrasena")) {
-        router.push("/dashboard");
+        // Navegación completa, no router.push: mismo motivo que login() -
+        // change-password acaba de rotar tokens_valid_after y las cookies,
+        // y una soft-navigation puede dejar al middleware viendo el estado
+        // viejo (página en blanco hasta refrescar manualmente).
+        window.location.href = "/dashboard";
       }
     } catch (err: unknown) {
       // Solo un 401 real cierra sesión; un error de red/CORS/5xx no implica token inválido.
