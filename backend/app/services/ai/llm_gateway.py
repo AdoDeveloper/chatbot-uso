@@ -327,12 +327,6 @@ class LLMAdapter(ABC):
         response_format: dict | None = None, reasoning_effort: str | None = None,
     ) -> str: ...
 
-# Este es el adapter DEFAULT. Cualquier proveedor que la factory no haga
-# match explícito cae aquí. Funciona con ~90% de las APIs de LLM del mercado.
-
-# Este es el adapter DEFAULT. Cualquier proveedor que la factory no haga
-# match explícito cae aquí. Funciona con ~90% de las APIs de LLM del mercado.
-
     async def test_connection(self) -> dict:
         t0 = time.monotonic()
         try:
@@ -347,6 +341,8 @@ class LLMAdapter(ABC):
             return {"success": False, "latency_ms": None, "error": str(exc)}
 
 
+# Este es el adapter DEFAULT. Cualquier proveedor que la factory no haga
+# match explícito cae aquí. Funciona con ~90% de las APIs de LLM del mercado.
 class OpenAICompatAdapter(LLMAdapter):
     """Universal OpenAI-compatible adapter.
 
