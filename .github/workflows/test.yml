@@ -120,7 +120,13 @@ jobs:
             echo "DEBUG=false"
             echo "FIRST_ADMIN_EMAIL=admin@example.com"
             echo "FIRST_ADMIN_PASSWORD=ci-admin-pass-1234"
-            echo 'ALLOWED_ORIGINS=["http://localhost", "http://localhost:3000"]'
+            # 127.0.0.1:3000, no solo localhost:3000: Playwright navega con
+            # PLAYWRIGHT_BASE_URL=http://127.0.0.1:3000 (ver "Run Playwright
+            # tests" más abajo), así que el Origin real de sus requests es
+            # 127.0.0.1 - sin esta entrada, el preflight OPTIONS a rutas
+            # autenticadas (ej. change-password) recibe 403 y el navegador
+            # nunca llega a disparar la petición real.
+            echo 'ALLOWED_ORIGINS=["http://localhost", "http://localhost:3000", "http://127.0.0.1:3000"]'
             echo "WIDGET_BASE_URL=http://localhost:8000"
           } > backend/.env
 
