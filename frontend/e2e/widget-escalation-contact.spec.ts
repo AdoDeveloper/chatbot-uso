@@ -34,7 +34,7 @@ async function loadWidgetPage(page: import("@playwright/test").Page, widgetKey: 
   await expect(openBtn).toBeVisible({ timeout: 15_000 });
   await openBtn.click();
 
-  const messageInput = page.locator('textarea[placeholder*="pregunta" i]').first();
+  const messageInput = page.locator('textarea[placeholder*="mensaje" i]').first();
   await expect(messageInput).toBeVisible({ timeout: 5_000 });
   return messageInput;
 }

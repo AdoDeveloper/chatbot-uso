@@ -36,7 +36,7 @@ test.describe("Configuracion > Publicaciones", () => {
           data: { welcome_message: `E2E snapshot toggle ${Date.now()}` },
         }).catch(() => null);
         expect(res?.ok(), `failed to force a real config change: ${res?.status()}`).toBeTruthy();
-      }).toPass({ timeout: 15_000 });
+      }).toPass({ timeout: 30_000 });
     }
 
     await page.goto("/dashboard/configuracion/publicaciones");

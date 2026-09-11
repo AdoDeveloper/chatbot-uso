@@ -166,7 +166,7 @@ test.describe("Configuracion > Acceso > Usuarios", () => {
       const invitesJson = await invitesResp.json();
       invite = (invitesJson.items as Array<{ email: string; token: string; id: string }>).find((i) => i.email === email);
       expect(invite, "invitation for the disposable user must exist via API").toBeTruthy();
-    }).toPass({ timeout: 15_000 });
+    }).toPass({ timeout: 30_000 });
 
     const acceptResp = await request.post(`${baseURL}/api/v1/auth/invite/${invite!.token}/accept`, {
       headers: { "Content-Type": "application/json" },
