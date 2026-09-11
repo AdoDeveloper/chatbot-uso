@@ -220,6 +220,12 @@ jobs:
           # ERR_CONNECTION_REFUSED si nada escucha en esa interfaz - Docker
           # solo publica el puerto en IPv4 salvo configuración explícita.
           PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
+          # Mismo admin que "Create backend .env for CI" siembra en el primer
+          # arranque del backend - sin esto, los specs gated con
+          # test.skip(!E2E_USER || !E2E_PASS) nunca corren en CI (la mayoría
+          # de la suite: todo lo que requiere una sesión autenticada).
+          E2E_USER: admin@example.com
+          E2E_PASS: ci-admin-pass-1234
 
       - name: Show stack logs after Playwright
         if: failure()
