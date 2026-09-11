@@ -9,7 +9,7 @@ Diagramas y explicación del flujo interno del sistema.
 ```mermaid
 flowchart TB
     subgraph internet["Internet"]
-        users["Usuarios finales<br/>(widget en sitio USO)"]
+        users["Usuarios finales<br/>(widget en el sitio institucional)"]
         admin["Personal admin<br/>(panel)"]
     end
 

@@ -2,7 +2,7 @@
 
 Guía para desplegar el chatbot en un servidor Ubuntu 24.04 LTS sin Docker, accesible por dominio público con HTTPS.
 
-> **Destinatario:** equipo de TI de la Universidad de Sonsonate.
+> **Destinatario:** equipo de TI de la institución que despliega el sistema.
 
 ---
 
@@ -242,20 +242,20 @@ QDRANT_URL=http://localhost:6333
 QDRANT_API_KEY=API_KEY_QDRANT
 
 # Dominio público del panel (sustituir por el real)
-ALLOWED_ORIGINS=["https://chatbot.usonsonate.edu.sv"]
-WIDGET_BASE_URL=https://chatbot.usonsonate.edu.sv
-FRONTEND_URL=https://chatbot.usonsonate.edu.sv
+ALLOWED_ORIGINS=["https://chatbot.tudominio.com"]
+WIDGET_BASE_URL=https://chatbot.tudominio.com
+FRONTEND_URL=https://chatbot.tudominio.com
 
 # Primer administrador (se crea solo en el primer arranque)
-FIRST_ADMIN_EMAIL=admin@usonsonate.edu.sv
+FIRST_ADMIN_EMAIL=admin@tudominio.com
 FIRST_ADMIN_PASSWORD=CONTRASEÑA_FUERTE_INICIAL
 
 # SMTP (opcional - para invitaciones)
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
-SMTP_USER=correo@usonsonate.edu.sv
+SMTP_USER=correo@tudominio.com
 SMTP_PASSWORD=APP_PASSWORD
-SMTP_FROM=noreply@usonsonate.edu.sv
+SMTP_FROM=noreply@tudominio.com
 SMTP_TLS=true
 ```
 
@@ -345,11 +345,11 @@ sudo systemctl enable --now chatbot-backend
 
 ```bash
 cd /opt/chatbot/frontend
-NEXT_PUBLIC_API_URL=https://chatbot.usonsonate.edu.sv \
-NEXT_PUBLIC_APP_URL=https://chatbot.usonsonate.edu.sv \
+NEXT_PUBLIC_API_URL=https://chatbot.tudominio.com \
+NEXT_PUBLIC_APP_URL=https://chatbot.tudominio.com \
 npm install
-NEXT_PUBLIC_API_URL=https://chatbot.usonsonate.edu.sv \
-NEXT_PUBLIC_APP_URL=https://chatbot.usonsonate.edu.sv \
+NEXT_PUBLIC_API_URL=https://chatbot.tudominio.com \
+NEXT_PUBLIC_APP_URL=https://chatbot.tudominio.com \
 npm run build
 ```
 
@@ -417,7 +417,7 @@ upstream chatbot_frontend { server 127.0.0.1:3000; keepalive 16; }
 
 server {
     listen 80;
-    server_name chatbot.usonsonate.edu.sv;
+    server_name chatbot.tudominio.com;
 
     client_max_body_size 55m;
 
@@ -489,7 +489,7 @@ sudo systemctl reload nginx
 > El dominio debe apuntar (registro DNS A) a la IP pública del servidor **antes** de ejecutar certbot.
 
 ```bash
-sudo certbot --nginx -d chatbot.usonsonate.edu.sv
+sudo certbot --nginx -d chatbot.tudominio.com
 ```
 
 Certbot configura HTTPS automáticamente y gestiona la renovación.
@@ -583,7 +583,7 @@ rsync -a /opt/chatbot/backend/uploads/ /var/backups/chatbot/uploads/
 | MySQL | `sudo tail -f /var/log/mysql/error.log` |
 | Nginx | `sudo tail -f /var/log/nginx/error.log` |
 
-**Healthcheck externo:** configurar UptimeRobot u otra herramienta para monitorear `https://chatbot.usonsonate.edu.sv/api/v1/health/live` → debe responder `{"status":"ok"}`.
+**Healthcheck externo:** configurar UptimeRobot u otra herramienta para monitorear `https://chatbot.tudominio.com/api/v1/health/live` → debe responder `{"status":"ok"}`.
 
 ---
 
@@ -603,8 +603,8 @@ sudo systemctl restart chatbot-backend
 # Frontend
 cd ../frontend
 npm install
-NEXT_PUBLIC_API_URL=https://chatbot.usonsonate.edu.sv \
-NEXT_PUBLIC_APP_URL=https://chatbot.usonsonate.edu.sv \
+NEXT_PUBLIC_API_URL=https://chatbot.tudominio.com \
+NEXT_PUBLIC_APP_URL=https://chatbot.tudominio.com \
 npm run build
 sudo systemctl restart chatbot-frontend
 ```
@@ -623,9 +623,9 @@ sudo journalctl -u chatbot-backend -f
 
 Pruebas funcionales:
 
-1. `https://chatbot.usonsonate.edu.sv` → carga el login del panel.
+1. `https://chatbot.tudominio.com` → carga el login del panel.
 2. Entrar con `FIRST_ADMIN_EMAIL` → fuerza cambio de contraseña.
-3. `https://chatbot.usonsonate.edu.sv/api/v1/health/ready` → `{"status":"ok", "checks": {...}}`.
+3. `https://chatbot.tudominio.com/api/v1/health/ready` → `{"status":"ok", "checks": {...}}`.
 
 > Nota: con `ENVIRONMENT=production` la documentación interactiva (`/api/docs`,
 > `/api/redoc`) queda **deshabilitada** a propósito; no usarla como verificación.

@@ -1,6 +1,6 @@
-# Chatbot RAG - Universidad de Sonsonate
+# Chatbot RAG institucional
 
-Chatbot institucional con pipeline RAG (Retrieval-Augmented Generation) y panel de administración para la Universidad de Sonsonate (USO).
+Chatbot con pipeline RAG (Retrieval-Augmented Generation) y panel de administración, pensado para instituciones educativas.
 
 **Stack**: FastAPI · Next.js 15 · MySQL 8 · Qdrant · Redis · multilingual-e5-large · Adaptive RAG (LangGraph)
 
@@ -164,7 +164,7 @@ chatbot-uso/
 | `REDIS_URL` | Redis: `redis://:password@host:6379/0` |
 | `QDRANT_URL` | URL del servicio Qdrant |
 | `QDRANT_API_KEY` | API key de Qdrant |
-| `ALLOWED_ORIGINS` | Dominios CORS: `["https://admin.usonsonate.edu.sv"]` |
+| `ALLOWED_ORIGINS` | Dominios CORS: `["https://admin.tudominio.com"]` |
 | `FIRST_ADMIN_EMAIL` | Email del primer admin (seed) |
 | `FIRST_ADMIN_PASSWORD` | Contraseña inicial del admin |
 

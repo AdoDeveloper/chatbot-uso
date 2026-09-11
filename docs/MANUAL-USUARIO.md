@@ -1,6 +1,6 @@
 # Manual de usuario
 
-Guía de uso del panel administrativo del chatbot de la Universidad de Sonsonate.
+Guía de uso del panel administrativo del chatbot institucional.
 
 > Este manual está dirigido al personal que administra el chatbot: carga de
 > contenido, configuración del asistente y seguimiento de su uso. No requiere
