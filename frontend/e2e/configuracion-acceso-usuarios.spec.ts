@@ -136,7 +136,8 @@ test.describe("Configuracion > Acceso > Usuarios", () => {
     await expect(dialog).not.toBeVisible({ timeout: 5_000 });
   });
 
-  test("ciclo completo de un usuario de prueba: invitar, aceptar, editar rol/estado, resetear contrasena, eliminar", async ({ page, request, baseURL }) => {
+  test("ciclo completo de un usuario de prueba: invitar, aceptar, editar rol/estado, resetear contrasena, eliminar", async ({ page }) => {
+    test.setTimeout(90_000);
     const email = `e2e-lifecycle-${Date.now()}@invalid.example`;
     const tempPass = "TempPass!2026x";
     await page.context().grantPermissions(["clipboard-write", "clipboard-read"]);
@@ -156,20 +157,19 @@ test.describe("Configuracion > Acceso > Usuarios", () => {
     const row = page.locator("tr", { hasText: email });
     await expect(row).toBeVisible({ timeout: 10_000 });
 
-    const authHeader = `Bearer ${(await page.context().cookies()).find((c) => c.name === "chatbot_access")?.value}`;
+    // page.request (no el fixture request suelto): comparte el mismo stack
+    // de red que el navegador, que sí resuelve el proxy de forma confiable
+    // bajo la carga concurrente de la corrida completa.
     let invite: { email: string; token: string; id: string } | undefined;
     await expect(async () => {
-      const invitesResp = await request.get(`${baseURL}/api/v1/users/invitations?page=1&page_size=50`, {
-        headers: { Authorization: authHeader },
-      });
+      const invitesResp = await page.request.get("/api/v1/users/invitations?page=1&page_size=50");
       expect(invitesResp.ok(), `GET /users/invitations devolvió ${invitesResp.status()}`).toBeTruthy();
       const invitesJson = await invitesResp.json();
       invite = (invitesJson.items as Array<{ email: string; token: string; id: string }>).find((i) => i.email === email);
       expect(invite, "invitation for the disposable user must exist via API").toBeTruthy();
     }).toPass({ timeout: 30_000 });
 
-    const acceptResp = await request.post(`${baseURL}/api/v1/auth/invite/${invite!.token}/accept`, {
-      headers: { "Content-Type": "application/json" },
+    const acceptResp = await page.request.post(`/api/v1/auth/invite/${invite!.token}/accept`, {
       data: { password: tempPass, full_name: "E2E Lifecycle User" },
     });
     expect(acceptResp.ok(), `accept invitation failed: ${acceptResp.status()} ${await acceptResp.text()}`).toBeTruthy();

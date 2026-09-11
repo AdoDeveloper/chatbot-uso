@@ -22,17 +22,15 @@ const SHOT_DIR = path.join("e2e", ".report-screenshots", "configuracion-publicac
 fs.mkdirSync(SHOT_DIR, { recursive: true });
 
 test.describe("Configuracion > Publicaciones", () => {
-  test("guardar punto de restauracion manual", async ({ page, request, baseURL }) => {
+  test("guardar punto de restauracion manual", async ({ page }) => {
     test.setTimeout(90_000);
 
-    const authHeader = `Bearer ${(await page.context().cookies()).find((c) => c.name === "chatbot_access")?.value}`;
     async function touchConfig() {
-      // Reintenta: la primera llamada API de la corrida puede pegarle al
-      // backend/proxy todavía calentando (500 transitorio), sin relación
-      // con el código bajo prueba.
+      // page.request (no el fixture request suelto): comparte el mismo
+      // stack de red que el navegador, que sí resuelve el proxy de forma
+      // confiable bajo la carga concurrente de la corrida completa.
       await expect(async () => {
-        const res = await request.put(`${baseURL}/api/v1/widget/config`, {
-          headers: { Authorization: authHeader, "Content-Type": "application/json" },
+        const res = await page.request.put("/api/v1/widget/config", {
           data: { welcome_message: `E2E snapshot toggle ${Date.now()}` },
         }).catch(() => null);
         expect(res?.ok(), `failed to force a real config change: ${res?.status()}`).toBeTruthy();

@@ -46,9 +46,12 @@ async function sendMessageAndWaitReply(messageInput: import("@playwright/test").
 }
 
 async function fillAndSubmitContact(page: import("@playwright/test").Page, type: "email" | "whatsapp", value: string) {
-  const footerBtn = page.getByRole("button", { name: /necesitas hablar con alguien/i });
-  await expect(footerBtn).toBeVisible({ timeout: 10_000 });
-  await footerBtn.click();
+  // La tarjeta de escalamiento aparece como burbuja del bot en el flujo
+  // (disparada por escalationPrompt en la respuesta), no detrás de un botón
+  // de pie de página siempre visible.
+  const promptYesBtn = page.getByRole("button", { name: /^sí$/i });
+  await expect(promptYesBtn).toBeVisible({ timeout: 10_000 });
+  await promptYesBtn.click();
 
   if (type === "whatsapp") {
     await page.getByRole("radio", { name: /whatsapp/i }).check();
