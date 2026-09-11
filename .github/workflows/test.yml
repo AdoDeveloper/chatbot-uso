@@ -147,16 +147,9 @@ jobs:
         run: mkdir -p .cache/fastembed && chmod -R 777 .cache
 
       - name: Bring up the stack
-        # FRONTEND_API_URL/APP_URL: sin esto, docker-compose.yml usa su
-        # default "http://localhost" (puerto 80) como NEXT_PUBLIC_APP_URL,
-        # horneado en el build de Next.js. El middleware de auth
-        # (middleware.ts) construye sus redirects absolutos a partir de esa
-        # URL - así, cualquier navegación no autenticada a "/" (que
-        # redirige primero a /dashboard y de ahí el middleware rebota a
-        # /login) terminaba apuntando a http://localhost/login, un puerto
-        # donde nada escucha en el runner, y Chromium fallaba en seco con
-        # chrome-error://chromewebdata/. curl a las rutas exactas nunca lo
-        # detectó porque no sigue ese redirect construido por el servidor.
+        # Sin estas vars, NEXT_PUBLIC_APP_URL queda en su default
+        # "http://localhost" y los redirects del middleware de auth apuntan
+        # a un puerto sin nada escuchando en el runner (chrome-error).
         run: |
           FRONTEND_API_URL=http://127.0.0.1:8000 \
           FRONTEND_APP_URL=http://127.0.0.1:3000 \
