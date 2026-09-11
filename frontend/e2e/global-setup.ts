@@ -1,5 +1,5 @@
 import { chromium, type FullConfig } from "@playwright/test";
-import { writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 
 /**
  * Logs in once via the real UI form and persists the resulting cookies to
@@ -52,6 +52,7 @@ export default async function globalSetup(config: FullConfig) {
     // login.spec.ts hace un login real por UI con E2E_PASS (no reutiliza
     // admin.json como el resto de specs) - sin esto, su contraseña queda
     // obsoleta en cuanto este bloque la rota y ese spec falla siempre.
+    mkdirSync("e2e/.auth", { recursive: true });
     writeFileSync("e2e/.auth/admin-password.json", JSON.stringify({ password: rotatedPassword }));
   }
 
