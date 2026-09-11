@@ -205,7 +205,7 @@ jobs:
       # el primer request real de Chromium fallaba con chrome-error).
       - name: Wait for frontend and backend to accept connections from the host
         run: |
-          for url in http://127.0.0.1:8000/api/v1/health/live http://127.0.0.1:3000/login; do
+          for url in http://127.0.0.1:8000/api/v1/health/ready http://127.0.0.1:3000/login; do
             echo "Esperando $url..."
             consecutive=0
             for i in $(seq 1 40); do

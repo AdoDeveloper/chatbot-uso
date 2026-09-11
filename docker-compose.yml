@@ -94,7 +94,11 @@ services:
       - uploads_data:/app/uploads
       - model_cache:/home/appuser/.cache/fastembed
     healthcheck:
-      test: ["CMD-SHELL", "python -c 'import urllib.request,sys; sys.exit(0 if urllib.request.urlopen(\"http://127.0.0.1:8000/api/v1/health/live\", timeout=5).status==200 else 1)'"]
+      # /health/ready (no /live): live solo confirma que el proceso arrancó,
+      # sin tocar BD/Redis/Qdrant - un request real podía 500 mientras el
+      # pool de conexiones aún se inicializaba después de que Docker ya
+      # reportaba el contenedor healthy.
+      test: ["CMD-SHELL", "python -c 'import urllib.request,sys; sys.exit(0 if urllib.request.urlopen(\"http://127.0.0.1:8000/api/v1/health/ready\", timeout=5).status==200 else 1)'"]
       interval: 30s
       timeout: 10s
       retries: 20
