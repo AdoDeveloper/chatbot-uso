@@ -33,11 +33,20 @@ async function loadWidgetPage(page: import("@playwright/test").Page, widgetKey: 
     if (msg.type() === "error") console.log("[diag:console.error]", msg.text());
   });
 
-  await page.setContent(`<!DOCTYPE html>
-<html><head><meta charset="utf-8"></head><body>
-<chatbot-widget api-url="${BACKEND_URL}" api-key="${widgetKey}"></chatbot-widget>
-<script src="${BACKEND_URL}/widget/widget.js"></script>
-</body></html>`, { waitUntil: "domcontentloaded" });
+  // page.goto a una página real (no page.setContent): setContent sirve el
+  // documento sobre un origen opaco donde localStorage lanza SecurityError -
+  // el historial persistido del widget (incluida la tarjeta de escalamiento)
+  // depende de poder leer/escribir localStorage con un origen real, como en
+  // producción. /api/docs (Swagger, solo fuera de production) es una página
+  // HTML real servida en el mismo origen que necesita el widget.
+  await page.goto(`${BACKEND_URL}/api/docs`, { waitUntil: "domcontentloaded" });
+  await page.evaluate(({ apiUrl, apiKey }) => {
+    document.body.innerHTML = `<chatbot-widget api-url="${apiUrl}" api-key="${apiKey}"></chatbot-widget>`;
+    const script = document.createElement("script");
+    script.src = `${apiUrl}/widget/widget.js`;
+    document.body.appendChild(script);
+  }, { apiUrl: BACKEND_URL, apiKey: widgetKey });
+  await page.waitForFunction(() => document.querySelector("chatbot-widget")?.shadowRoot != null, { timeout: 15_000 });
 
   const openBtn = page.getByRole("button", { name: /abrir chat/i });
   await expect(openBtn).toBeVisible({ timeout: 15_000 });
