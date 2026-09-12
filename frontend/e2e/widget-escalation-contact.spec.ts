@@ -24,6 +24,13 @@ async function getWidgetKey(request: import("@playwright/test").APIRequestContex
 }
 
 async function loadWidgetPage(page: import("@playwright/test").Page, widgetKey: string) {
+  // DIAGNOSTICO: escalation_prompt confirmado true en la respuesta, pero la
+  // tarjeta de escalamiento no aparece - capturar excepciones silenciosas.
+  page.on("pageerror", (err) => console.log("[diag:pageerror]", err.message));
+  page.on("console", (msg) => {
+    if (msg.type() === "error") console.log("[diag:console.error]", msg.text());
+  });
+
   await page.setContent(`<!DOCTYPE html>
 <html><head><meta charset="utf-8"></head><body>
 <chatbot-widget api-url="${BACKEND_URL}" api-key="${widgetKey}"></chatbot-widget>
