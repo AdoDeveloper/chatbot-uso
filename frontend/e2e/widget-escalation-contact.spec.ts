@@ -30,9 +30,7 @@ async function loadWidgetPage(page: import("@playwright/test").Page, widgetKey: 
   // tarjeta de escalamiento no aparece - capturar excepciones silenciosas.
   page.on("pageerror", (err) => console.log("[diag:pageerror]", err.message));
   page.on("console", (msg) => {
-    if (msg.type() === "error" || msg.text().includes("[widget-diag]")) {
-      console.log("[diag:console]", msg.text());
-    }
+    console.log("[diag:console:all]", msg.type(), msg.text());
   });
 
   // page.route + page.goto a una página real (no page.setContent ni
