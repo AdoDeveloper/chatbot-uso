@@ -203,45 +203,39 @@ test.describe("Actividad > Seguridad", () => {
       }).catch(() => null);
       const widgetKey = cfgRes && cfgRes.ok() ? (await cfgRes.json()).api_key : null;
 
-      const loginAttempts = Array.from({ length: 6 }, () =>
-        request.post(`${baseURL}/api/v1/auth/login`, {
-          data: { email: "nobody-e2e-liberar-test@invalid.example", password: "wrong-password-e2e" },
-        }).catch(() => {}));
-      const chatAttempts = widgetKey
-        ? Array.from({ length: 12 }, (_, i) =>
-            request.post(`${baseURL}/api/v1/widget/public/chat`, {
-              headers: { "X-Widget-Key": widgetKey },
-              data: { question: `Rate limit test ${i}`, session_id: sessionId },
-            }).catch(() => {}))
-        : [];
-      await Promise.all([...loginAttempts, ...chatAttempts]);
-
-      await page.goto("/dashboard/actividad?tab=seguridad", { timeout: 30_000 });
-      await expect(page.getByText(/logins fallidos por ip/i)).toBeVisible({ timeout: 20_000 });
-      await page.screenshot({ path: path.join(SHOT_DIR, "07-logins-fallidos.png") });
+      async function fireThrottleBurst(sid: string) {
+        const loginAttempts = Array.from({ length: 6 }, () =>
+          request.post(`${baseURL}/api/v1/auth/login`, {
+            data: { email: "nobody-e2e-liberar-test@invalid.example", password: "wrong-password-e2e" },
+          }).catch(() => {}));
+        const chatAttempts = widgetKey
+          ? Array.from({ length: 12 }, (_, i) =>
+              request.post(`${baseURL}/api/v1/widget/public/chat`, {
+                headers: { "X-Widget-Key": widgetKey },
+                data: { question: `Rate limit test ${i}`, session_id: sid },
+              }).catch(() => {}))
+          : [];
+        await Promise.all([...loginAttempts, ...chatAttempts]);
+      }
 
       const liberarButton = page.getByRole("button", { name: /^liberar$/i }).first();
       let found = false;
-      for (let attempt = 1; attempt <= 3 && !found; attempt++) {
-        if (attempt > 1) {
-          const retrySessionId = `${sessionId}-retry${attempt}`;
-          const retryLogins = Array.from({ length: 6 }, () =>
-            request.post(`${baseURL}/api/v1/auth/login`, {
-              data: { email: "nobody-e2e-liberar-test@invalid.example", password: "wrong-password-e2e" },
-            }).catch(() => {}));
-          const retryChats = widgetKey
-            ? Array.from({ length: 12 }, (_, i) =>
-                request.post(`${baseURL}/api/v1/widget/public/chat`, {
-                  headers: { "X-Widget-Key": widgetKey },
-                  data: { question: `Rate limit test retry ${i}`, session_id: retrySessionId },
-                }).catch(() => {}))
-            : [];
-          await Promise.all([...retryLogins, ...retryChats]);
+      for (let attempt = 1; attempt <= 4 && !found; attempt++) {
+        // Ráfaga justo antes de leer la página en vez de esperar+navegar en
+        // serie: la ventana de 60s de Redis empieza a contar recién con la
+        // primera petición, así que minimizar el tiempo entre la ráfaga y la
+        // lectura es lo que más ayuda bajo contención real de CI.
+        await fireThrottleBurst(attempt === 1 ? sessionId : `${sessionId}-retry${attempt}`);
+        if (attempt === 1) {
+          await page.goto("/dashboard/actividad?tab=seguridad", { timeout: 30_000 });
+          await expect(page.getByText(/logins fallidos por ip/i)).toBeVisible({ timeout: 20_000 });
+          await page.screenshot({ path: path.join(SHOT_DIR, "07-logins-fallidos.png") });
+        } else {
           await page.reload();
         }
         found = await liberarButton.waitFor({ state: "visible", timeout: 15_000 }).then(() => true).catch(() => false);
       }
-      expect(found, "el rate-limit de prueba (60s) expiró en los 3 intentos - revisar contención real del backend compartido, no un dato faltante").toBe(true);
+      expect(found, "el rate-limit de prueba (60s) expiró en los 4 intentos - revisar contención real del backend compartido, no un dato faltante").toBe(true);
       await liberarButton.click();
       await page.screenshot({ path: path.join(SHOT_DIR, "05-ip-liberada.png") });
     } finally {
