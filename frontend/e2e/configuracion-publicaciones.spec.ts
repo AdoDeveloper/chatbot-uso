@@ -25,12 +25,12 @@ test.describe("Configuracion > Publicaciones", () => {
   test("guardar punto de restauracion manual", async ({ page }) => {
     test.setTimeout(90_000);
 
+    // Directo al backend (127.0.0.1:8000), no via el rewrite de Next: el
+    // rewrite del server.js standalone produce un 500 genérico y sostenido
+    // en llamadas API directas de Playwright (no del navegador) - causa no
+    // confirmada, pero pegarle directo al backend lo evita por completo.
+    const authHeader = `Bearer ${(await page.context().cookies()).find((c) => c.name === "chatbot_access")?.value}`;
     async function touchConfig() {
-      // Directo al backend (127.0.0.1:8000), no via el rewrite de Next: el
-      // rewrite del server.js standalone produce un 500 genérico y sostenido
-      // en llamadas API directas de Playwright (no del navegador) - causa no
-      // confirmada, pero pegarle directo al backend lo evita por completo.
-      const authHeader = `Bearer ${(await page.context().cookies()).find((c) => c.name === "chatbot_access")?.value}`;
       await expect(async () => {
         const res = await page.request.put("http://127.0.0.1:8000/api/v1/widget/config", {
           headers: { Authorization: authHeader },
@@ -43,33 +43,49 @@ test.describe("Configuracion > Publicaciones", () => {
     await page.goto("/dashboard/configuracion/publicaciones");
     await expect(page.getByRole("heading", { name: /historial/i }).first()).toBeVisible({ timeout: 10_000 });
 
+    // PUT /widget/config dispara un snapshot automático fire-and-forget
+    // (VersioningMiddleware) - se deja que ese primer cambio lo capture ÉL,
+    // esperando a que termine, para que el cambio real de cada intento del
+    // loop (uno nuevo, aún no snapshoteado) sea el que compite limpiamente
+    // contra ese mismo middleware en vez de perder siempre contra su propio
+    // eco.
+    await touchConfig();
+    await page.waitForTimeout(1_000);
+
+    // El dialogo se abre UNA vez fuera del loop: abrirlo de nuevo en cada
+    // intento deja tiempo de sobra para que el snapshot automático del
+    // middleware (fire-and-forget, pero rápido) capture el cambio antes de
+    // que el clic en "Guardar" llegue al backend, perdiendo la carrera
+    // siempre. Reabrir el formulario no es necesario para ganarla - solo
+    // repetir el cambio de config justo antes del envío.
+    await page.getByRole("button", { name: /guardar punto de restauración/i }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByRole("heading", { name: /guardar punto de restauración/i })).toBeVisible();
+    const desc = `E2E restore point ${Date.now()}`;
+    await dialog.getByPlaceholder(/antes de cambiar el prompt/i).fill(desc);
+    await page.screenshot({ path: path.join(SHOT_DIR, "01-snapshot-formulario.png") });
+
     let saved = false;
     for (let attempt = 0; attempt < 8 && !saved; attempt++) {
-      await touchConfig();
-      await page.getByRole("button", { name: /guardar punto de restauración/i }).click();
-      const dialog = page.getByRole("dialog");
-      await expect(dialog.getByRole("heading", { name: /guardar punto de restauración/i })).toBeVisible();
-
-      const desc = `E2E restore point ${Date.now()}`;
-      await dialog.getByPlaceholder(/antes de cambiar el prompt/i).fill(desc);
-      if (attempt === 0) await page.screenshot({ path: path.join(SHOT_DIR, "01-snapshot-formulario.png") });
-
       const versionsResp = await Promise.all([
         page.waitForResponse((r) => r.url().includes("/api/v1/versions") && r.request().method() === "POST"),
-        dialog.getByRole("button", { name: /^guardar$/i }).click(),
+        (async () => {
+          await touchConfig();
+          await dialog.getByRole("button", { name: /^guardar$/i }).click();
+        })(),
       ]).then(([r]) => r);
 
       if (versionsResp.status() === 201) {
         saved = true;
       } else if (versionsResp.status() === 409) {
-        // Perdió la carrera contra el auto-snapshot del middleware; reintenta con un nuevo touch de config.
-        await page.keyboard.press("Escape");
-        await expect(dialog).not.toBeVisible({ timeout: 5_000 });
+        // Perdió la carrera contra el snapshot automático del middleware; el
+        // dialogo sigue abierto (el 409 solo muestra un toast) - el próximo
+        // intento repite touchConfig()+Guardar sin reabrir el formulario.
       } else {
         expect(versionsResp.status(), `unexpected /versions status: ${versionsResp.status()}`).toBe(201);
       }
     }
-    expect(saved, "could not save a manual snapshot after 4 attempts (kept losing the race to the auto-snapshot middleware)").toBe(true);
+    expect(saved, "could not save a manual snapshot after 8 attempts (kept losing the race to the auto-snapshot middleware)").toBe(true);
 
     // Serializa toda la config del sistema; bajo contención real de E2E (workers:2, otros specs escribiendo las mismas tablas) puede superar 20s vs. 5.8s en solitario.
     await expect(page.getByRole("dialog")).not.toBeVisible({ timeout: 60_000 });
