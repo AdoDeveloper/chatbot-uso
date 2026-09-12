@@ -83,21 +83,27 @@ async function sendMessageAndWaitReply(messageInput: import("@playwright/test").
   console.log("[diag] .escal-card outerHTML:", escalCardHtml.slice(0, 500));
   const msgCount = await page.locator(".msg-row").count();
   console.log("[diag] .msg-row count:", msgCount);
-  const bodyHtml = await page.evaluate(() => {
+  const rows = await page.evaluate(() => {
     const widget = document.querySelector("chatbot-widget");
     const root = widget?.shadowRoot ?? document;
-    const msgs = root.querySelector(".messages, [class*='messages']");
-    return msgs ? msgs.outerHTML.slice(0, 1500) : "NO_MESSAGES_CONTAINER";
-  }).catch((e) => `EVAL_ERROR: ${e}`);
-  console.log("[diag] messages container html:", bodyHtml);
+    return Array.from(root.querySelectorAll(".msg-row")).map((el) => ({
+      role: el.className.includes("msg-row-user") ? "user" : "assistant",
+      text: (el.querySelector(".msg")?.textContent ?? "").slice(0, 200),
+      streaming: el.querySelector('[aria-label="Escribiendo"]') != null,
+    }));
+  }).catch((e) => [{ role: "EVAL_ERROR", text: String(e), streaming: false }]);
+  console.log("[diag] rows:", JSON.stringify(rows));
   // DIAGNOSTICO: leer el estado persistido directamente (saveHistory corre
   // en cada cambio de escalState/messages) - confirma si React realmente
-  // actualizo el estado, sin depender del DOM renderizado.
+  // actualizo el estado, sin depender del DOM renderizado. El sufijo ":sid"
+  // tambien empieza con "usobot:history:" y podia matchear primero.
   const persisted = await page.evaluate(() => {
-    const key = Object.keys(localStorage).find((k) => k.startsWith("usobot:history:"));
+    const key = Object.keys(localStorage).find(
+      (k) => k.startsWith("usobot:history:") && !k.endsWith(":sid"),
+    );
     return key ? localStorage.getItem(key) : "NO_KEY_FOUND";
   }).catch((e) => `EVAL_ERROR: ${e}`);
-  console.log("[diag] localStorage history:", (persisted ?? "").slice(0, 500));
+  console.log("[diag] localStorage history:", (persisted ?? "").slice(0, 800));
 }
 
 async function fillAndSubmitContact(page: import("@playwright/test").Page, type: "email" | "whatsapp", value: string) {
