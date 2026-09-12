@@ -207,15 +207,17 @@ test.describe("Actividad > Seguridad", () => {
         const loginAttempts = Array.from({ length: 6 }, () =>
           request.post(`${baseURL}/api/v1/auth/login`, {
             data: { email: "nobody-e2e-liberar-test@invalid.example", password: "wrong-password-e2e" },
-          }).catch(() => {}));
+          }).catch((e) => e));
         const chatAttempts = widgetKey
           ? Array.from({ length: 12 }, (_, i) =>
               request.post(`${baseURL}/api/v1/widget/public/chat`, {
                 headers: { "X-Widget-Key": widgetKey },
                 data: { question: `Rate limit test ${i}`, session_id: sid },
-              }).catch(() => {}))
+              }).catch((e) => e))
           : [];
-        await Promise.all([...loginAttempts, ...chatAttempts]);
+        const results = await Promise.all([...loginAttempts, ...chatAttempts]);
+        const statuses = results.map((r) => (r && typeof r.status === "function" ? r.status() : `ERR:${r}`));
+        console.log(`[diag] burst statuses (${sid}):`, JSON.stringify(statuses));
       }
 
       const liberarButton = page.getByRole("button", { name: /^liberar$/i }).first();
