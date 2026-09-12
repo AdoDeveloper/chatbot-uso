@@ -72,7 +72,7 @@ async function sendMessageAndWaitReply(messageInput: import("@playwright/test").
   page.off("response", onResp);
   for (const [i, r] of responses.entries()) {
     const body = await r.json().catch(() => null);
-    console.log(`[diag] /widget/public/chat #${i} status=${r.status()} escalation_prompt=${body?.escalation_prompt} content=${(body?.content ?? "").slice(0, 150)}`);
+    console.log(`[diag] /widget/public/chat #${i} status=${r.status()} conversation_id=${body?.conversation_id} escalation_prompt=${body?.escalation_prompt} content=${(body?.content ?? "").slice(0, 150)}`);
   }
   await page.waitForTimeout(500);
   const escalCardHtml = await page.locator(".escal-card").first().evaluate((el) => el.outerHTML).catch((e) => `NOT_FOUND: ${e}`);
