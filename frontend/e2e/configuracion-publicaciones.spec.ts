@@ -40,6 +40,16 @@ test.describe("Configuracion > Publicaciones", () => {
       }).toPass({ timeout: 30_000 });
     }
 
+    // welcome_message queda pisado por touchConfig() al terminar - otros
+    // specs (widget-escalation-contact) leen la config real del widget vía
+    // GET /widget/config, así que un texto de prueba filtrado ahí los
+    // contamina hasta que algo más lo vuelva a cambiar.
+    const originalCfg = await page.request
+      .get("http://127.0.0.1:8000/api/v1/widget/config", { headers: { Authorization: authHeader } })
+      .then((r) => r.json())
+      .catch(() => null);
+    const originalWelcome: string | undefined = originalCfg?.welcome_message;
+
     await page.goto("/dashboard/configuracion/publicaciones");
     await expect(page.getByRole("heading", { name: /historial/i }).first()).toBeVisible({ timeout: 10_000 });
 
@@ -103,6 +113,13 @@ test.describe("Configuracion > Publicaciones", () => {
     await page.getByRole("button", { name: /ver todo el historial/i }).click();
     await expect(page.getByText(/snapshot manual/i).first()).toBeVisible({ timeout: 10_000 });
     await page.screenshot({ path: path.join(SHOT_DIR, "02-snapshot-en-historial.png") });
+
+    if (originalWelcome !== undefined) {
+      await page.request.put("http://127.0.0.1:8000/api/v1/widget/config", {
+        headers: { Authorization: authHeader },
+        data: { welcome_message: originalWelcome },
+      }).catch(() => {});
+    }
   });
 
   test("ver historial y expandir el diff de una version", async ({ page }) => {
