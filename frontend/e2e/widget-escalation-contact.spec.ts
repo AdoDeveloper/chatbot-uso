@@ -61,6 +61,15 @@ async function sendMessageAndWaitReply(messageInput: import("@playwright/test").
   await page.waitForTimeout(500);
   const escalCardHtml = await page.locator(".escal-card").first().evaluate((el) => el.outerHTML).catch((e) => `NOT_FOUND: ${e}`);
   console.log("[diag] .escal-card outerHTML:", escalCardHtml.slice(0, 500));
+  const msgCount = await page.locator(".msg-row").count();
+  console.log("[diag] .msg-row count:", msgCount);
+  const bodyHtml = await page.evaluate(() => {
+    const widget = document.querySelector("chatbot-widget");
+    const root = widget?.shadowRoot ?? document;
+    const msgs = root.querySelector(".messages, [class*='messages']");
+    return msgs ? msgs.outerHTML.slice(0, 1500) : "NO_MESSAGES_CONTAINER";
+  }).catch((e) => `EVAL_ERROR: ${e}`);
+  console.log("[diag] messages container html:", bodyHtml);
 }
 
 async function fillAndSubmitContact(page: import("@playwright/test").Page, type: "email" | "whatsapp", value: string) {
