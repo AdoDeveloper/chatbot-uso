@@ -166,9 +166,11 @@ export async function streamChat(
       return;
     }
 
+    try { console.log("[widget-diag] chat.ts about to call onDone", { message_id: data.message_id, conversation_id: data.conversation_id, escalation_prompt: data.escalation_prompt }); } catch { /* noop */ }
     callbacks.onSources(data.sources ?? []);
     callbacks.onToken(data.content ?? "");
     callbacks.onDone(data.message_id, data.conversation_id, data.escalation_prompt);
+    try { console.log("[widget-diag] chat.ts called onDone successfully"); } catch { /* noop */ }
     return;
   }
 
