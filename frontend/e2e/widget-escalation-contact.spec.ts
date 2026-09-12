@@ -70,7 +70,11 @@ test.describe("Widget real - escalamiento con contacto", () => {
     const widgetKey = await getWidgetKey(request, authHeader);
 
     const messageInput = await loadWidgetPage(page, widgetKey);
-    const uniqueQuestion = `E2E widget escalation email ${Date.now()}`;
+    // "agente" dispara la regla sembrada por defecto "Usuario solicita
+    // agente" (user_request) en un solo turno - las demás reglas por
+    // defecto (no_answer, confidence_below) exigen 2+ turnos consecutivos
+    // o un umbral de latencia de 120s, poco fiables para un E2E rápido.
+    const uniqueQuestion = `Quiero hablar con un agente E2E ${Date.now()}`;
     await sendMessageAndWaitReply(messageInput, page, uniqueQuestion);
 
     const emailValue = `e2e+${Date.now()}@example.com`;
@@ -91,7 +95,7 @@ test.describe("Widget real - escalamiento con contacto", () => {
     const widgetKey = await getWidgetKey(request, authHeader);
 
     const messageInput = await loadWidgetPage(page, widgetKey);
-    const uniqueQuestion = `E2E widget escalation whatsapp ${Date.now()}`;
+    const uniqueQuestion = `Quiero hablar con un agente E2E ${Date.now()}`;
     await sendMessageAndWaitReply(messageInput, page, uniqueQuestion);
 
     const whatsappValue = "+503 7777 7777";

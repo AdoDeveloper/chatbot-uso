@@ -25,7 +25,9 @@ async function uploadDisposableSource(page: import("@playwright/test").Page, nam
   fs.writeFileSync(filePath, content);
   await page.goto("/dashboard/conocimiento/documentos");
   await expect(page.getByRole("tab", { name: /fuentes/i })).toBeVisible({ timeout: 10_000 });
-  await page.getByRole("button", { name: /^agregar$/i }).click();
+  // .first(): si la tabla está vacía, el EmptyState agrega su propio botón
+  // "Agregar" además del de la cabecera.
+  await page.getByRole("button", { name: /^agregar$/i }).first().click();
   const uploadDialog = page.getByRole("dialog");
   await uploadDialog.locator('input[type="file"]').setInputFiles(filePath);
   await uploadDialog.getByPlaceholder(/instructivo para alumnos/i).fill(name);

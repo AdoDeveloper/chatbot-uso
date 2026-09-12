@@ -127,7 +127,9 @@ test.describe("Configuracion > Publicaciones", () => {
 
     await page.goto("/dashboard/conocimiento/documentos");
     await expect(page.getByRole("tab", { name: /fuentes/i })).toBeVisible({ timeout: 10_000 });
-    await page.getByRole("button", { name: /^agregar$/i }).click();
+    // .first(): si la tabla está vacía, el EmptyState agrega su propio botón
+    // "Agregar" además del de la cabecera.
+    await page.getByRole("button", { name: /^agregar$/i }).first().click();
     const uploadDialog = page.getByRole("dialog");
     await uploadDialog.locator('input[type="file"]').setInputFiles(filePath);
     await uploadDialog.getByPlaceholder(/instructivo para alumnos/i).fill(sourceName);
@@ -191,7 +193,9 @@ test.describe("Configuracion > Publicaciones", () => {
     fs.writeFileSync(filePath, `Documento de prueba E2E ${uniqueId} para probar el flujo de aprobacion de publicaciones.`);
 
     await page.goto("/dashboard/conocimiento/documentos");
-    await page.getByRole("button", { name: /^agregar$/i }).click();
+    // .first(): si la tabla está vacía, el EmptyState agrega su propio botón
+    // "Agregar" además del de la cabecera.
+    await page.getByRole("button", { name: /^agregar$/i }).first().click();
     const uploadDialog = page.getByRole("dialog");
     await uploadDialog.locator('input[type="file"]').setInputFiles(filePath);
     await uploadDialog.getByPlaceholder(/instructivo para alumnos/i).fill(sourceName);

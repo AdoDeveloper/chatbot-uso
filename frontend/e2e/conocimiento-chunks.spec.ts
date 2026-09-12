@@ -31,7 +31,9 @@ test("descartar/restaurar y editar el contenido de un chunk", async ({ page }) =
   );
 
   await page.goto("/dashboard/conocimiento/documentos");
-  await page.getByRole("button", { name: /^agregar$/i }).click();
+  // .first(): si la tabla está vacía, el EmptyState agrega su propio botón
+  // "Agregar" además del de la cabecera.
+  await page.getByRole("button", { name: /^agregar$/i }).first().click();
   const uploadDialog = page.getByRole("dialog");
   await uploadDialog.locator('input[type="file"]').setInputFiles(filePath);
   await uploadDialog.getByPlaceholder(/instructivo para alumnos/i).fill(sourceName);
@@ -138,7 +140,9 @@ test("filtro de warnings por tipo (chunk corto)", async ({ page }) => {
   );
 
   await page.goto("/dashboard/conocimiento/documentos");
-  await page.getByRole("button", { name: /^agregar$/i }).click();
+  // .first(): si la tabla está vacía, el EmptyState agrega su propio botón
+  // "Agregar" además del de la cabecera.
+  await page.getByRole("button", { name: /^agregar$/i }).first().click();
   const uploadDialog = page.getByRole("dialog");
   await uploadDialog.locator('input[type="file"]').setInputFiles(filePath);
   await uploadDialog.getByPlaceholder(/instructivo para alumnos/i).fill(sourceName);

@@ -33,7 +33,9 @@ test("seleccionar y eliminar varias fuentes en lote", async ({ page }) => {
   await expect(page.getByRole("tab", { name: /fuentes/i })).toBeVisible({ timeout: 10_000 });
 
   for (let i = 0; i < names.length; i++) {
-    await page.getByRole("button", { name: /^agregar$/i }).click();
+    // .first(): si la tabla está vacía, el EmptyState agrega su propio
+    // botón "Agregar" además del de la cabecera.
+    await page.getByRole("button", { name: /^agregar$/i }).first().click();
     const uploadDialog = page.getByRole("dialog");
     await uploadDialog.locator('input[type="file"]').setInputFiles(filePaths[i]);
     await uploadDialog.getByPlaceholder(/instructivo para alumnos/i).fill(names[i]);

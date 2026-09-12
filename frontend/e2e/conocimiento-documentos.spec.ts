@@ -36,7 +36,9 @@ test.describe("Conocimiento > Documentos > Fuentes", () => {
     await page.goto("/dashboard/conocimiento/documentos");
     await expect(page.getByRole("tab", { name: /fuentes/i })).toBeVisible({ timeout: 10_000 });
 
-    await page.getByRole("button", { name: /^agregar$/i }).click();
+    // .first(): si la tabla está vacía en este punto de la corrida, el
+    // EmptyState agrega su propio botón "Agregar" además del de la cabecera.
+    await page.getByRole("button", { name: /^agregar$/i }).first().click();
     const uploadDialog = page.getByRole("dialog");
     await expect(uploadDialog.getByRole("heading", { name: /nueva fuente de datos/i })).toBeVisible();
 
