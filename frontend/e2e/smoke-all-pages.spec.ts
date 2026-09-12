@@ -19,14 +19,18 @@ const E2E_PASS = process.env.E2E_PASS;
 test.use({ storageState: "e2e/.auth/admin.json" });
 test.skip(!E2E_USER || !E2E_PASS, "E2E_USER / E2E_PASS not set - skipping");
 
-// Estas 3 rutas listan datos que otros specs crean/borran a lo largo de la
-// corrida (invitaciones, usuarios, notificaciones) - su alto de página varía
-// según cuántas filas queden en ese momento, así que una comparación de
-// píxeles de página completa nunca converge en un baseline estable.
+// Estas rutas listan/grafican datos que otros specs crean/borran a lo largo
+// de la corrida (invitaciones, usuarios, notificaciones, conversaciones de
+// prueba de rate-limit) - su alto de página varía según cuánto quede
+// acumulado en ese momento (confirmado en CI: 4045px, 3660px y 4190px en
+// intentos consecutivos de la misma corrida para estadisticas), así que una
+// comparación de píxeles de página completa nunca converge en un baseline
+// estable.
 const DYNAMIC_HEIGHT_ROUTES = new Set([
   "/dashboard/configuracion/notificaciones",
   "/dashboard/configuracion/acceso",
   "/dashboard/configuracion/acceso/usuarios",
+  "/dashboard/estadisticas",
 ]);
 
 const ROUTES = [

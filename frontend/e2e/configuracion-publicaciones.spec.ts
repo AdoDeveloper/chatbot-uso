@@ -61,16 +61,25 @@ test.describe("Configuracion > Publicaciones", () => {
     await page.screenshot({ path: path.join(SHOT_DIR, "01-snapshot-formulario.png") });
 
     let saved = false;
-    for (let attempt = 0; attempt < 8 && !saved; attempt++) {
+    for (let attempt = 0; attempt < 20 && !saved; attempt++) {
+      // No esperar la respuesta del PUT antes de hacer clic: eso le daría al
+      // middleware todo el round-trip completo (mas el tiempo hasta este
+      // punto) para correr su tarea en background antes de que el guardado
+      // manual siquiera empiece. Se dispara el PUT sin await y el clic
+      // inmediatamente después, dejando que ambos corran en paralelo - el
+      // clic (via React: evento -> handler -> fetch) siempre tarda mas en
+      // salir del navegador que el propio round-trip del PUT ya en vuelo,
+      // pero no tanto como para perder frente al capture_snapshot en
+      // background si se dispara sin demora artificial.
+      const versionsRespPromise = page.waitForResponse(
+        (r) => r.url().includes("/api/v1/versions") && r.request().method() === "POST",
+      );
       const putPromise = page.request.put("http://127.0.0.1:8000/api/v1/widget/config", {
         headers: { Authorization: authHeader },
         data: { welcome_message: `E2E snapshot toggle ${Date.now()}-${attempt}` },
       });
-      const [versionsResp] = await Promise.all([
-        page.waitForResponse((r) => r.url().includes("/api/v1/versions") && r.request().method() === "POST"),
-        dialog.getByRole("button", { name: /^guardar$/i }).click(),
-        putPromise,
-      ]);
+      await dialog.getByRole("button", { name: /^guardar$/i }).click();
+      const [versionsResp] = await Promise.all([versionsRespPromise, putPromise]);
 
       if (versionsResp.status() === 201) {
         saved = true;
@@ -78,7 +87,7 @@ test.describe("Configuracion > Publicaciones", () => {
       // 409: perdió la carrera contra el auto-snapshot de este mismo cambio -
       // el diálogo sigue abierto (el 409 solo muestra un toast), reintenta.
     }
-    expect(saved, "could not save a manual snapshot after 8 attempts (kept losing the race to the auto-snapshot middleware)").toBe(true);
+    expect(saved, "could not save a manual snapshot after 20 attempts (kept losing the race to the auto-snapshot middleware)").toBe(true);
 
     // Serializa toda la config del sistema; bajo contención real de E2E (workers:2, otros specs escribiendo las mismas tablas) puede superar 20s vs. 5.8s en solitario.
     await expect(page.getByRole("dialog")).not.toBeVisible({ timeout: 60_000 });
