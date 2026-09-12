@@ -58,6 +58,9 @@ async function sendMessageAndWaitReply(messageInput: import("@playwright/test").
   const body = await chatResp.json().catch(() => null);
   console.log("[diag] /widget/public/chat escalation_prompt:", body?.escalation_prompt, "content:", (body?.content ?? "").slice(0, 200));
   await expect(page.locator('[aria-label="Escribiendo"]')).toHaveCount(0, { timeout: 30_000 });
+  await page.waitForTimeout(500);
+  const escalCardHtml = await page.locator(".escal-card").first().evaluate((el) => el.outerHTML).catch((e) => `NOT_FOUND: ${e}`);
+  console.log("[diag] .escal-card outerHTML:", escalCardHtml.slice(0, 500));
 }
 
 async function fillAndSubmitContact(page: import("@playwright/test").Page, type: "email" | "whatsapp", value: string) {
