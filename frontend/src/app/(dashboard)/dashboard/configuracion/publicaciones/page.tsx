@@ -268,7 +268,7 @@ export default function PublicacionesPage() {
   async function handleSaveSnapshot() {
     setSaving(true);
     try {
-      await api.post("/versions", { description: snapshotDesc || "Punto de restauración manual" });
+      await api.post("/versions", { description: snapshotDesc || "Punto de restauración manual", force: true });
       toast({ type: "success", message: "Punto de restauración guardado." });
       setSnapshotOpen(false);
       setSnapshotDesc("");

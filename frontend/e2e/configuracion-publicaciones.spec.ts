@@ -23,36 +23,16 @@ fs.mkdirSync(SHOT_DIR, { recursive: true });
 
 test.describe("Configuracion > Publicaciones", () => {
   test("guardar punto de restauracion manual", async ({ page }) => {
-    test.setTimeout(90_000);
-
-    // Directo al backend (127.0.0.1:8000), no via el rewrite de Next: el
-    // rewrite del server.js standalone produce un 500 genérico y sostenido
-    // en llamadas API directas de Playwright (no del navegador) - causa no
-    // confirmada, pero pegarle directo al backend lo evita por completo.
-    const authHeader = `Bearer ${(await page.context().cookies()).find((c) => c.name === "chatbot_access")?.value}`;
-
-    // welcome_message queda pisado por el loop de abajo al terminar - otros
-    // specs (widget-escalation-contact) leen la config real del widget vía
-    // GET /widget/config, así que un texto de prueba filtrado ahí los
-    // contamina hasta que algo más lo vuelva a cambiar.
-    const originalCfg = await page.request
-      .get("http://127.0.0.1:8000/api/v1/widget/config", { headers: { Authorization: authHeader } })
-      .then((r) => r.json())
-      .catch(() => null);
-    const originalWelcome: string | undefined = originalCfg?.welcome_message;
-
     await page.goto("/dashboard/configuracion/publicaciones");
     await expect(page.getByRole("heading", { name: /historial/i }).first()).toBeVisible({ timeout: 10_000 });
 
-    // capture_snapshot() hace diff contra la version activa: en cuanto CUALQUIER
-    // captura (automática o manual) se confirma, esa se vuelve la nueva base y
-    // la otra ve "sin cambios" -> 409. No hay forma de esperar a que el
-    // auto-snapshot "termine" y luego ganar: para cuando termina, ya no queda
-    // diff que capturar. La única ventana real es API-a-API antes de que el
-    // navegador renderice nada: se dispara la PUT que cambia la config y, en
-    // el mismo tick (antes de esperar su respuesta), el POST manual - ambos
-    // le llegan al backend prácticamente juntos, y el que gane el lock de
-    // capture_snapshot ve el diff todavía sin capturar.
+    // El guardado manual envía force=true (POST /versions): captura_snapshot
+    // siempre crea la version aunque el diff ya haya sido capturado por el
+    // auto-snapshot del middleware segundos antes. Sin esto, el guardado
+    // manual perdía sistematicamente esa carrera (el middleware corre en
+    // background sin round-trip HTTP, siempre le ganaba) - no tenía sentido
+    // de producto de todos modos: el usuario pidió explícitamente un punto
+    // de restauración, debe crearse aunque no haya "nada nuevo" que capturar.
     await page.getByRole("button", { name: /guardar punto de restauración/i }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByRole("heading", { name: /guardar punto de restauración/i })).toBeVisible();
@@ -60,34 +40,11 @@ test.describe("Configuracion > Publicaciones", () => {
     await dialog.getByPlaceholder(/antes de cambiar el prompt/i).fill(desc);
     await page.screenshot({ path: path.join(SHOT_DIR, "01-snapshot-formulario.png") });
 
-    let saved = false;
-    for (let attempt = 0; attempt < 20 && !saved; attempt++) {
-      // No esperar la respuesta del PUT antes de hacer clic: eso le daría al
-      // middleware todo el round-trip completo (mas el tiempo hasta este
-      // punto) para correr su tarea en background antes de que el guardado
-      // manual siquiera empiece. Se dispara el PUT sin await y el clic
-      // inmediatamente después, dejando que ambos corran en paralelo - el
-      // clic (via React: evento -> handler -> fetch) siempre tarda mas en
-      // salir del navegador que el propio round-trip del PUT ya en vuelo,
-      // pero no tanto como para perder frente al capture_snapshot en
-      // background si se dispara sin demora artificial.
-      const versionsRespPromise = page.waitForResponse(
-        (r) => r.url().includes("/api/v1/versions") && r.request().method() === "POST",
-      );
-      const putPromise = page.request.put("http://127.0.0.1:8000/api/v1/widget/config", {
-        headers: { Authorization: authHeader },
-        data: { welcome_message: `E2E snapshot toggle ${Date.now()}-${attempt}` },
-      });
-      await dialog.getByRole("button", { name: /^guardar$/i }).click();
-      const [versionsResp] = await Promise.all([versionsRespPromise, putPromise]);
-
-      if (versionsResp.status() === 201) {
-        saved = true;
-      }
-      // 409: perdió la carrera contra el auto-snapshot de este mismo cambio -
-      // el diálogo sigue abierto (el 409 solo muestra un toast), reintenta.
-    }
-    expect(saved, "could not save a manual snapshot after 20 attempts (kept losing the race to the auto-snapshot middleware)").toBe(true);
+    const [versionsResp] = await Promise.all([
+      page.waitForResponse((r) => r.url().includes("/api/v1/versions") && r.request().method() === "POST"),
+      dialog.getByRole("button", { name: /^guardar$/i }).click(),
+    ]);
+    expect(versionsResp.status(), `unexpected /versions status: ${versionsResp.status()}`).toBe(201);
 
     // Serializa toda la config del sistema; bajo contención real de E2E (workers:2, otros specs escribiendo las mismas tablas) puede superar 20s vs. 5.8s en solitario.
     await expect(page.getByRole("dialog")).not.toBeVisible({ timeout: 60_000 });
@@ -96,13 +53,6 @@ test.describe("Configuracion > Publicaciones", () => {
     await page.getByRole("button", { name: /ver todo el historial/i }).click();
     await expect(page.getByText(/snapshot manual/i).first()).toBeVisible({ timeout: 10_000 });
     await page.screenshot({ path: path.join(SHOT_DIR, "02-snapshot-en-historial.png") });
-
-    if (originalWelcome !== undefined) {
-      await page.request.put("http://127.0.0.1:8000/api/v1/widget/config", {
-        headers: { Authorization: authHeader },
-        data: { welcome_message: originalWelcome },
-      }).catch(() => {});
-    }
   });
 
   test("ver historial y expandir el diff de una version", async ({ page }) => {

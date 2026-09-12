@@ -42,6 +42,11 @@ class VersionDetailOut(VersionOut):
 
 class VersionCreate(BaseModel):
     description: str = ""
+    # Guardado manual explícito: el usuario pidió un punto de restauración a
+    # propósito, tiene sentido crearlo aunque no haya diff nuevo desde la
+    # última versión (ej. el auto-snapshot del middleware ya capturó el
+    # mismo cambio segundos antes).
+    force: bool = False
 
 
 class VersionListOut(BaseModel):
@@ -132,6 +137,7 @@ async def create_version(
         user_id=user.id,
         description=body.description or "Snapshot manual",
         trigger_source="manual",
+        force=body.force,
     )
     if not version:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Sin cambios desde la última versión")
