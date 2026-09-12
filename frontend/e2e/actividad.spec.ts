@@ -20,6 +20,14 @@ test.skip(!E2E_USER || !E2E_PASS, "E2E_USER / E2E_PASS not set - skipping");
 const SHOT_DIR = path.join("e2e", ".report-screenshots", "actividad");
 fs.mkdirSync(SHOT_DIR, { recursive: true });
 
+// Directo al backend (127.0.0.1:8000), no via el rewrite de Next: el
+// rewrite del server.js standalone devuelve 500 sostenido para
+// /api/v1/auth/login y /api/v1/widget/* en llamadas API directas de
+// Playwright (no del navegador) - confirmado con logs de diagnostico,
+// causa no confirmada del lado del rewrite. Pegarle directo al backend
+// lo evita por completo.
+const BACKEND_URL = "http://127.0.0.1:8000";
+
 async function cleanupRateLimitConversations(
   request: import("@playwright/test").APIRequestContext,
   baseURL: string | undefined,
@@ -157,7 +165,7 @@ test.describe("Actividad > Seguridad", () => {
 
   test("desbloquear un usuario con limite activo (rate-limit de chat)", async ({ page, request, baseURL }) => {
     const authHeader = `Bearer ${(await page.context().cookies()).find(c => c.name === "chatbot_access")?.value}`;
-    const cfgRes = await request.get(`${baseURL}/api/v1/widget/config`, {
+    const cfgRes = await request.get(`${BACKEND_URL}/api/v1/widget/config`, {
       headers: { Authorization: authHeader },
     }).catch(() => null);
     const widgetKey = cfgRes && cfgRes.ok() ? (await cfgRes.json()).api_key : null;
@@ -167,7 +175,7 @@ test.describe("Actividad > Seguridad", () => {
     const sessionId = `e2e-ratelimit-${Date.now()}`;
     try {
       for (let i = 0; i < 12; i++) {
-        await request.post(`${baseURL}/api/v1/widget/public/chat`, {
+        await request.post(`${BACKEND_URL}/api/v1/widget/public/chat`, {
           headers: { "X-Widget-Key": widgetKey! },
           data: { question: `Rate limit test ${i}`, session_id: sessionId },
         }).catch(() => {});
@@ -198,26 +206,24 @@ test.describe("Actividad > Seguridad", () => {
     const authHeader = `Bearer ${(await page.context().cookies()).find(c => c.name === "chatbot_access")?.value}`;
     const sessionId = `e2e-ratelimit-liberar-${Date.now()}`;
     try {
-      const cfgRes = await request.get(`${baseURL}/api/v1/widget/config`, {
+      const cfgRes = await request.get(`${BACKEND_URL}/api/v1/widget/config`, {
         headers: { Authorization: authHeader },
       }).catch(() => null);
       const widgetKey = cfgRes && cfgRes.ok() ? (await cfgRes.json()).api_key : null;
 
       async function fireThrottleBurst(sid: string) {
         const loginAttempts = Array.from({ length: 6 }, () =>
-          request.post(`${baseURL}/api/v1/auth/login`, {
+          request.post(`${BACKEND_URL}/api/v1/auth/login`, {
             data: { email: "nobody-e2e-liberar-test@invalid.example", password: "wrong-password-e2e" },
           }).catch((e) => e));
         const chatAttempts = widgetKey
           ? Array.from({ length: 12 }, (_, i) =>
-              request.post(`${baseURL}/api/v1/widget/public/chat`, {
+              request.post(`${BACKEND_URL}/api/v1/widget/public/chat`, {
                 headers: { "X-Widget-Key": widgetKey },
                 data: { question: `Rate limit test ${i}`, session_id: sid },
               }).catch((e) => e))
           : [];
-        const results = await Promise.all([...loginAttempts, ...chatAttempts]);
-        const statuses = results.map((r) => (r && typeof r.status === "function" ? r.status() : `ERR:${r}`));
-        console.log(`[diag] burst statuses (${sid}):`, JSON.stringify(statuses));
+        await Promise.all([...loginAttempts, ...chatAttempts]);
       }
 
       const liberarButton = page.getByRole("button", { name: /^liberar$/i }).first();
