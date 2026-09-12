@@ -40,8 +40,16 @@ async function loadWidgetPage(page: import("@playwright/test").Page, widgetKey: 
 }
 
 async function sendMessageAndWaitReply(messageInput: import("@playwright/test").Locator, page: import("@playwright/test").Page, question: string) {
-  await messageInput.fill(question);
-  await messageInput.press("Enter");
+  const [chatResp] = await Promise.all([
+    page.waitForResponse((r) => r.url().includes("/widget/public/chat")),
+    (async () => {
+      await messageInput.fill(question);
+      await messageInput.press("Enter");
+    })(),
+  ]);
+  // DIAGNOSTICO: confirmar si el backend realmente marca escalation_prompt.
+  const body = await chatResp.json().catch(() => null);
+  console.log("[diag] /widget/public/chat escalation_prompt:", body?.escalation_prompt, "content:", (body?.content ?? "").slice(0, 200));
   await expect(page.locator('[aria-label="Escribiendo"]')).toHaveCount(0, { timeout: 30_000 });
 }
 

@@ -65,15 +65,24 @@ test.describe("Configuracion > Publicaciones", () => {
     await dialog.getByPlaceholder(/antes de cambiar el prompt/i).fill(desc);
     await page.screenshot({ path: path.join(SHOT_DIR, "01-snapshot-formulario.png") });
 
+    // El PUT de touchConfig() dispara la tarea en background del middleware
+    // desde el mismo tick en que el servidor responde; el clic manual pasa
+    // por React antes de que su POST salga del navegador, así que llega
+    // después casi siempre y pierde la carrera. Se dispara primero el clic
+    // (para que su POST ya esté en camino) y, tras un margen breve para que
+    // alcance a salir del navegador, recién entonces el PUT - de modo que
+    // ambos requests lleguen al servidor en un orden que sí le da una
+    // oportunidad real al guardado manual.
     let saved = false;
     for (let attempt = 0; attempt < 8 && !saved; attempt++) {
-      const versionsResp = await Promise.all([
+      const [versionsResp] = await Promise.all([
         page.waitForResponse((r) => r.url().includes("/api/v1/versions") && r.request().method() === "POST"),
+        dialog.getByRole("button", { name: /^guardar$/i }).click(),
         (async () => {
+          await page.waitForTimeout(50);
           await touchConfig();
-          await dialog.getByRole("button", { name: /^guardar$/i }).click();
         })(),
-      ]).then(([r]) => r);
+      ]);
 
       if (versionsResp.status() === 201) {
         saved = true;
