@@ -916,7 +916,6 @@ function ChatWidget({
           );
         },
         onDone(messageId, convId, escalationPrompt) {
-          try { console.log("[widget-diag] onDone called", { messageId, convId, escalationPrompt, isCurrent: isCurrent() }); } catch { /* noop */ }
           if (!isCurrent()) return;
           let finalText = "";
           setMessages((prev) => {
