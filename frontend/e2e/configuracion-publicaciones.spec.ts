@@ -53,21 +53,27 @@ test.describe("Configuracion > Publicaciones", () => {
     await page.goto("/dashboard/configuracion/publicaciones");
     await expect(page.getByRole("heading", { name: /historial/i }).first()).toBeVisible({ timeout: 10_000 });
 
-    // PUT /widget/config dispara un snapshot automático fire-and-forget
-    // (VersioningMiddleware) - se deja que ese primer cambio lo capture ÉL,
-    // esperando a que termine, para que el cambio real de cada intento del
-    // loop (uno nuevo, aún no snapshoteado) sea el que compite limpiamente
-    // contra ese mismo middleware en vez de perder siempre contra su propio
-    // eco.
-    await touchConfig();
-    await page.waitForTimeout(1_000);
+    async function latestVersionCount(): Promise<number> {
+      const res = await page.request.get("http://127.0.0.1:8000/api/v1/versions?page=1&page_size=1", {
+        headers: { Authorization: authHeader },
+      });
+      return (await res.json()).total as number;
+    }
 
-    // El dialogo se abre UNA vez fuera del loop: abrirlo de nuevo en cada
-    // intento deja tiempo de sobra para que el snapshot automático del
-    // middleware (fire-and-forget, pero rápido) capture el cambio antes de
-    // que el clic en "Guardar" llegue al backend, perdiendo la carrera
-    // siempre. Reabrir el formulario no es necesario para ganarla - solo
-    // repetir el cambio de config justo antes del envío.
+    // capture_snapshot() hace diff contra la version activa: si el manual
+    // "Guardar" compite contra el auto-snapshot del middleware por el MISMO
+    // cambio de touchConfig(), ambos ven el mismo diff y uno de los dos saca
+    // 409 ("sin cambios"). En vez de competir, se espera a que el
+    // auto-snapshot de este touchConfig() quede confirmado (el total de
+    // versiones sube) y RECIÉN DESPUÉS se hace un cambio nuevo, distinto,
+    // que el middleware todavía no vio - así el manual save tiene su propio
+    // diff exclusivo y no hay carrera que perder.
+    const countBefore = await latestVersionCount();
+    await touchConfig();
+    await expect(async () => {
+      expect(await latestVersionCount()).toBeGreaterThan(countBefore);
+    }).toPass({ timeout: 15_000 });
+
     await page.getByRole("button", { name: /guardar punto de restauración/i }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByRole("heading", { name: /guardar punto de restauración/i })).toBeVisible();
@@ -75,36 +81,32 @@ test.describe("Configuracion > Publicaciones", () => {
     await dialog.getByPlaceholder(/antes de cambiar el prompt/i).fill(desc);
     await page.screenshot({ path: path.join(SHOT_DIR, "01-snapshot-formulario.png") });
 
-    // El PUT de touchConfig() dispara la tarea en background del middleware
-    // desde el mismo tick en que el servidor responde; el clic manual pasa
-    // por React antes de que su POST salga del navegador, así que llega
-    // después casi siempre y pierde la carrera. Se dispara primero el clic
-    // (para que su POST ya esté en camino) y, tras un margen breve para que
-    // alcance a salir del navegador, recién entonces el PUT - de modo que
-    // ambos requests lleguen al servidor en un orden que sí le da una
-    // oportunidad real al guardado manual.
+    const countBeforeSave = await latestVersionCount();
+    await touchConfig();
+    await expect(async () => {
+      expect(await latestVersionCount()).toBeGreaterThan(countBeforeSave);
+    }).toPass({ timeout: 15_000 });
+
+    // Este cambio (post-dialogo) todavía no tiene snapshot propio: es el
+    // diff exclusivo del guardado manual.
     let saved = false;
-    for (let attempt = 0; attempt < 8 && !saved; attempt++) {
+    for (let attempt = 0; attempt < 3 && !saved; attempt++) {
       const [versionsResp] = await Promise.all([
         page.waitForResponse((r) => r.url().includes("/api/v1/versions") && r.request().method() === "POST"),
         dialog.getByRole("button", { name: /^guardar$/i }).click(),
-        (async () => {
-          await page.waitForTimeout(50);
-          await touchConfig();
-        })(),
       ]);
 
       if (versionsResp.status() === 201) {
         saved = true;
       } else if (versionsResp.status() === 409) {
-        // Perdió la carrera contra el snapshot automático del middleware; el
-        // dialogo sigue abierto (el 409 solo muestra un toast) - el próximo
-        // intento repite touchConfig()+Guardar sin reabrir el formulario.
+        // Diff ya capturado por alguna otra causa (otro spec corriendo en
+        // paralelo) - fuerza un cambio nuevo y reintenta.
+        await touchConfig();
       } else {
         expect(versionsResp.status(), `unexpected /versions status: ${versionsResp.status()}`).toBe(201);
       }
     }
-    expect(saved, "could not save a manual snapshot after 8 attempts (kept losing the race to the auto-snapshot middleware)").toBe(true);
+    expect(saved, "could not save a manual snapshot after 3 attempts").toBe(true);
 
     // Serializa toda la config del sistema; bajo contención real de E2E (workers:2, otros specs escribiendo las mismas tablas) puede superar 20s vs. 5.8s en solitario.
     await expect(page.getByRole("dialog")).not.toBeVisible({ timeout: 60_000 });
