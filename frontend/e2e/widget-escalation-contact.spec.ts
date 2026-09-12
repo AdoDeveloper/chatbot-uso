@@ -20,7 +20,9 @@ const BACKEND_URL = "http://127.0.0.1:8000";
 async function getWidgetKey(request: import("@playwright/test").APIRequestContext, authHeader: string): Promise<string> {
   const cfgRes = await request.get(`${BACKEND_URL}/api/v1/widget/config`, { headers: { Authorization: authHeader } });
   expect(cfgRes.ok(), `widget config request failed: ${cfgRes.status()}`).toBeTruthy();
-  return (await cfgRes.json()).api_key as string;
+  const cfg = await cfgRes.json();
+  console.log("[diag] widget config enable_escalation:", cfg.enable_escalation);
+  return cfg.api_key as string;
 }
 
 async function loadWidgetPage(page: import("@playwright/test").Page, widgetKey: string) {
@@ -75,6 +77,14 @@ async function sendMessageAndWaitReply(messageInput: import("@playwright/test").
     return msgs ? msgs.outerHTML.slice(0, 1500) : "NO_MESSAGES_CONTAINER";
   }).catch((e) => `EVAL_ERROR: ${e}`);
   console.log("[diag] messages container html:", bodyHtml);
+  // DIAGNOSTICO: leer el estado persistido directamente (saveHistory corre
+  // en cada cambio de escalState/messages) - confirma si React realmente
+  // actualizo el estado, sin depender del DOM renderizado.
+  const persisted = await page.evaluate(() => {
+    const key = Object.keys(localStorage).find((k) => k.startsWith("usobot:history:"));
+    return key ? localStorage.getItem(key) : "NO_KEY_FOUND";
+  }).catch((e) => `EVAL_ERROR: ${e}`);
+  console.log("[diag] localStorage history:", (persisted ?? "").slice(0, 500));
 }
 
 async function fillAndSubmitContact(page: import("@playwright/test").Page, type: "email" | "whatsapp", value: string) {
