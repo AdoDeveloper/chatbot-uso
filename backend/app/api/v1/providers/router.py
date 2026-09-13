@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_client_ip, require_perm
@@ -12,16 +12,13 @@ from app.db.session import get_db
 from app.models.user import User
 from app.schemas.provider import (
     ProviderCreate,
-    ProviderModelItem,
-    ProviderModelsRequest,
-    ProviderModelsResult,
     ProviderOut,
     ProviderReorderRequest,
     ProviderTestRequest,
     ProviderTestResult,
     ProviderUpdate,
 )
-from app.services.ai.llm_gateway import fetch_models, test_connection
+from app.services.ai.llm_gateway import test_connection
 from app.services.system import settings as settings_service
 from app.services.system.audit import log_action
 
@@ -97,47 +94,6 @@ async def delete_provider(
         ip=get_client_ip(request),
     )
     await db.commit()
-
-
-@router.post("/models", response_model=ProviderModelsResult)
-async def list_provider_models(
-    data: ProviderModelsRequest,
-    _: User = Depends(_admin),
-):
-    """Consulta la API del proveedor y devuelve sus modelos disponibles."""
-    try:
-        items = await fetch_models(
-            provider_type=data.provider_type,
-            api_key=data.api_key,
-            api_base=data.api_base,
-            instance_headers=data.extra_headers,
-        )
-        return ProviderModelsResult(models=[ProviderModelItem(**m) for m in items])
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
-
-
-@router.get("/{provider_id}/models", response_model=ProviderModelsResult)
-async def list_saved_provider_models(
-    provider_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(_admin),
-):
-    """Consulta modelos usando la API key almacenada del proveedor guardado."""
-    row = await settings_service.get_provider_with_key(db, provider_id)
-    if not row:
-        raise NotFoundError("Proveedor no encontrado")
-    provider, api_key = row
-    try:
-        items = await fetch_models(
-            provider_type=provider.provider_type,
-            api_key=api_key,
-            api_base=provider.api_base,
-            instance_headers=provider.extra_headers,
-        )
-        return ProviderModelsResult(models=[ProviderModelItem(**m) for m in items])
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
 
 
 @router.post("/test", response_model=ProviderTestResult)

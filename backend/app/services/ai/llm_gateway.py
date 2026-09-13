@@ -206,93 +206,9 @@ async def _resolve_base_and_headers(
         return entry.default_api_base, (entry.default_headers or {})
     return fallback_base, (entry.default_headers if entry else {})
 
-# Caché de metadata de /models por (base, modelo): evita una consulta extra
-# en cada llamada. TTL corto porque el catálogo de un proveedor casi nunca
-# cambia en producción, pero no queremos quedar pegados a un dato viejo
-# para siempre si el admin cambia de modelo.
-_REASONING_META_CACHE: dict[tuple[str, str, str], tuple[float, dict | None]] = {}
-_REASONING_META_TTL = 600.0
-
-
-async def _fetch_model_entry(
-    base: str, model_name: str, api_key: str | None,
-    extra_headers: dict[str, str] | None = None, models_path: str = "/models",
-) -> dict | None:
-    """Busca en el endpoint de listado de modelos la entrada de ESTE modelo,
-    sin asumir el proveedor. `models_path` viene del catálogo editable -
-    la mayoría sigue "/models" (spec OpenAI), algunos difieren (ej. Together
-    AI: "/serverless-models").
-
-    Devuelve None si el proveedor no expone ese endpoint, no responde, o el
-    modelo no aparece en el catálogo - en cualquiera de esos casos no hay
-    evidencia positiva de nada, así que el llamador debe tratarlo como
-    "sin metadata" y no enviar ningún campo de razonamiento.
-    """
-    cache_key = (base, model_name, models_path)
-    now = time.monotonic()
-    cached = _REASONING_META_CACHE.get(cache_key)
-    if cached and now - cached[0] < _REASONING_META_TTL:
-        return cached[1]
-
-    entry: dict | None = None
-    try:
-        client = _get_http_client()
-        headers = {"Content-Type": "application/json", **(extra_headers or {})}
-        if api_key:
-            headers["Authorization"] = f"Bearer {api_key}"
-        path = models_path if models_path.startswith("/") else f"/{models_path}"
-        r = await client.get(f"{base}{path}", headers=headers, timeout=10.0)
-        r.raise_for_status()
-        for m in r.json().get("data", []):
-            if m.get("id") == model_name:
-                entry = m
-                break
-    except Exception:
-        entry = None
-
-    _REASONING_META_CACHE[cache_key] = (now, entry)
-    return entry
-
-
-# Niveles de esfuerzo ordenados de menor a mayor: cuando un proveedor declara
-# varios, preferimos el más bajo disponible para no gastar de más en un juez
-# o clasificador que solo necesita una respuesta corta y determinista.
-_EFFORT_ORDER = {"minimal": 0, "low": 1, "medium": 2, "high": 3, "xhigh": 4, "max": 5}
-
-
-def _reasoning_kwargs_from_metadata(entry: dict | None) -> dict:
-    """Traduce la metadata de /models a un payload real, por FORMATO de wire
-    (no por nombre de proveedor). Solo actúa ante evidencia POSITIVA de que
-    el modelo razona - nunca por ausencia de metadata, porque varios
-    proveedores (vLLM, algunos self-hosted) responden 400 ante un campo
-    desconocido en vez de ignorarlo en silencio.
-    """
-    if not entry:
-        return {}
-
-    # Formato OpenRouter: objeto "reasoning" anidado con niveles soportados.
-    reasoning_meta = entry.get("reasoning")
-    if isinstance(reasoning_meta, dict):
-        efforts = reasoning_meta.get("supported_efforts") or []
-        if not efforts and not reasoning_meta.get("default_enabled"):
-            return {}
-        payload: dict = {"reasoning": {"exclude": True}}
-        if efforts:
-            payload["reasoning"]["effort"] = min(efforts, key=lambda e: _EFFORT_ORDER.get(e, 9))
-        return payload
-
-    # Formato Groq: capacidad booleana en supported_features, sin niveles.
-    features = entry.get("supported_features") or []
-    if "reasoning" in features:
-        return {"reasoning_effort": "low"}
-
-    return {}
-
-
 _ANTHROPIC_BASE = "https://api.anthropic.com"
 _GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta"
 _COHERE_BASE = "https://api.cohere.com/v2"          # endpoint de chat
-_COHERE_MODELS_BASE = "https://api.cohere.com/v1"   # endpoint de listado de modelos (solo v1)
 # Fecha fija que Anthropic exige en cada request (no es un "año de release" -
 # es su esquema real de versionado; sigue vigente y estable a la fecha).
 _ANTHROPIC_API_VERSION = "2023-06-01"
@@ -374,20 +290,6 @@ class OpenAICompatAdapter(LLMAdapter):
             return base
         return f"{base}/chat/completions"
 
-    async def _auto_reasoning_kwargs(self) -> dict:
-        """Detecta si ESTE modelo razona consultando el endpoint de listado
-        de modelos del proveedor (sin mirar provider_type) y traduce al
-        formato de wire que declare. Nunca envía nada sin evidencia
-        positiva: ver _reasoning_kwargs_from_metadata.
-        """
-        catalog_entry = await _resolve_catalog_entry(self.provider_type)
-        models_path = catalog_entry.models_endpoint_path if catalog_entry else "/models"
-        entry = await _fetch_model_entry(
-            self.api_base, self.model_name, self.api_key,
-            extra_headers=self.extra_headers, models_path=models_path,
-        )
-        return _reasoning_kwargs_from_metadata(entry)
-
     async def stream_chat(
         self, messages: list[dict], temperature: float = 0.3, max_tokens: int = 1024
     ) -> AsyncGenerator[str, None]:
@@ -399,10 +301,6 @@ class OpenAICompatAdapter(LLMAdapter):
             "max_tokens": max_tokens,
             "stream": True,
         }
-        # Los modelos de razonamiento gastan el presupuesto de salida pensando
-        # antes de escribir: sin acotarlo, una respuesta breve termina en
-        # finish_reason "length" con el contenido vacío o cortado a media frase.
-        payload.update(await self._auto_reasoning_kwargs())
         async with client.stream(
             "POST", self._chat_url(), headers=self._headers(),
             json=payload, timeout=60.0,
@@ -445,8 +343,6 @@ class OpenAICompatAdapter(LLMAdapter):
             payload["response_format"] = response_format
         if reasoning_effort:
             payload["reasoning_effort"] = reasoning_effort
-        else:
-            payload.update(await self._auto_reasoning_kwargs())
         resp = await client.post(
             self._chat_url(), headers=self._headers(),
             json=payload, timeout=30.0,
@@ -1031,166 +927,6 @@ async def stream_chat(
     except Exception as _log_exc:
         log.warning("llm.provider_failure_audit_failed", error=str(_log_exc))
     raise RuntimeError("El servicio de IA no está disponible en este momento. Intenta de nuevo en unos minutos.")
-
-
-async def fetch_models(
-    provider_type: str,
-    api_key: str | None = None,
-    api_base: str | None = None,
-    instance_headers: dict[str, str] | None = None,
-) -> list[dict]:
-    """Devuelve los modelos disponibles del proveedor consultando su API.
-
-    Retorna lista de {"id": str, "name": str} ordenada por id.
-    Lanza ValueError con mensaje legible si el proveedor no responde.
-    """
-    client = _get_http_client()
-    headers: dict[str, str] = {}
-    resolved_base, catalog_headers = await _resolve_base_and_headers(provider_type, api_base)
-    extra_headers = {**catalog_headers, **(instance_headers or {})}
-    catalog_entry = await _resolve_catalog_entry(provider_type)
-
-    def _models_path() -> str:
-        """models_endpoint_path del catálogo (Configuración → Tipos de
-        proveedor). Sin valor adivinado en código: cada proveedor documenta
-        su propia ruta de listado y puede cambiarla sin aviso (ya pasó con
-        Together AI y Azure) - forzar un default aquí solo reintroduce el
-        mismo riesgo de quedar desactualizado. Es un dato opcional: no todo
-        proveedor expone un endpoint de listado (o el catálogo simplemente
-        no lo tiene configurado todavía), y eso no debe impedir usar el
-        proveedor - "Cargar modelos" es solo un atajo; el nombre del modelo
-        siempre se puede escribir a mano."""
-        path = catalog_entry.models_endpoint_path if catalog_entry else None
-        if not path:
-            raise ValueError(
-                f"'{provider_type}' no tiene configurada una ruta de listado de modelos, "
-                "así que no se puede autocompletar. Si el proveedor ofrece un endpoint para "
-                "esto, búscalo en su documentación y configúralo en Configuración → Tipos de "
-                "proveedor; si no, escribe el nombre del modelo directamente."
-            )
-        return path if path.startswith("/") else f"/{path}"
-
-    try:
-        if provider_type == "anthropic":
-            base = (resolved_base or _ANTHROPIC_BASE).rstrip("/")
-            url = f"{base}{_models_path()}"
-            headers.update(extra_headers)
-            if api_key:
-                headers["x-api-key"] = api_key
-            headers["anthropic-version"] = _ANTHROPIC_API_VERSION
-            r = await client.get(url, headers=headers, timeout=15)
-            r.raise_for_status()
-            items = r.json().get("data", [])
-            models = [{"id": m["id"], "name": m.get("display_name", m["id"])} for m in items]
-
-        elif provider_type == "gemini":
-            base = (resolved_base or _GEMINI_BASE).rstrip("/")
-            url = f"{base}{_models_path()}"
-            params: dict = {}
-            if api_key:
-                params["key"] = api_key
-            r = await client.get(url, params=params, headers=extra_headers, timeout=15)
-            r.raise_for_status()
-            items = r.json().get("models", [])
-            models = []
-            for m in items:
-                if "generateContent" not in m.get("supportedGenerationMethods", []):
-                    continue
-                mid = m["name"].removeprefix("models/")
-                models.append({"id": mid, "name": m.get("displayName", mid)})
-
-        elif provider_type == "cohere":
-            base = (resolved_base or _COHERE_MODELS_BASE).rstrip("/")
-            url = f"{base}{_models_path()}"
-            headers.update(extra_headers)
-            if api_key:
-                headers["Authorization"] = f"Bearer {api_key}"
-            r = await client.get(url, headers=headers, timeout=15)
-            r.raise_for_status()
-            items = r.json().get("models", [])
-            models = [{"id": m.get("name", ""), "name": m.get("name", "")} for m in items if m.get("name")]
-
-        elif provider_type in ("azure", "azure_openai"):
-            # Azure NO habla el formato OpenAI-compat de /models: usa su
-            # propio endpoint versionado y devuelve deployments, no modelos
-            # base. Requiere la URL del recurso (sin /openai/deployments/...).
-            if not resolved_base:
-                raise ValueError(
-                    "URL base desconocida para Azure OpenAI. Configúrala en el proveedor "
-                    "(ej. https://mi-recurso.openai.azure.com)."
-                )
-            base = resolved_base.split("/openai/deployments/")[0].rstrip("/")
-            url = f"{base}{_models_path()}?api-version={_AZURE_API_VERSION}"
-            headers.update(extra_headers)
-            if api_key:
-                headers["api-key"] = api_key
-            r = await client.get(url, headers=headers, timeout=15)
-            r.raise_for_status()
-            items = r.json().get("data", [])
-            models = [{"id": m["id"], "name": m.get("id", m["id"])} for m in items if m.get("id")]
-
-        elif provider_type in ("bedrock", "aws_bedrock"):
-            # No es HTTP: usa el cliente "bedrock" (listado), distinto del
-            # cliente "bedrock-runtime" (inferencia) que usa BedrockAdapter.
-            import asyncio
-            try:
-                import boto3
-            except ImportError as exc:
-                raise ValueError(
-                    "Soporte para AWS Bedrock no instalado en el servidor (falta boto3)."
-                ) from exc
-
-            def _list():
-                region = resolved_base or "us-east-1"
-                client_bedrock = boto3.client("bedrock", region_name=region)
-                resp = client_bedrock.list_foundation_models()
-                return resp.get("modelSummaries", [])
-
-            summaries = await asyncio.get_running_loop().run_in_executor(None, _list)
-            models = [
-                {"id": m["modelId"], "name": m.get("modelName", m["modelId"])}
-                for m in summaries if m.get("modelId")
-            ]
-
-        else:
-            # OpenAI-compat: openai, groq, openrouter, deepseek, mistral, together, ollama…
-            base = resolved_base
-            if not base:
-                raise ValueError(
-                    f"URL base desconocida para '{provider_type}'. "
-                    "Configúrala en el proveedor o en Configuración → Tipos de proveedor."
-                )
-            url = f"{base.rstrip('/')}{_models_path()}"
-            headers.update(extra_headers)
-            if api_key:
-                headers["Authorization"] = f"Bearer {api_key}"
-            r = await client.get(url, headers=headers, timeout=15)
-            r.raise_for_status()
-            raw = r.json().get("data", [])
-
-            # Para OpenAI filtramos solo modelos de chat/razonamiento
-            if provider_type == "openai":
-                _CHAT_PREFIXES = ("gpt-", "o1", "o3", "o4", "chatgpt")
-                _EXCLUDE = ("audio", "realtime", "embedding", "whisper", "dall", "tts", "moderation")
-                raw = [
-                    m for m in raw
-                    if any(m.get("id", "").startswith(p) for p in _CHAT_PREFIXES)
-                    and not any(x in m.get("id", "") for x in _EXCLUDE)
-                ]
-
-            models = [{"id": m.get("id", ""), "name": m.get("id", "")} for m in raw if m.get("id")]
-
-    except ValueError:
-        raise
-    except httpx.HTTPStatusError as exc:
-        raise ValueError(
-            f"El proveedor respondió con error {exc.response.status_code}. "
-            "Verifica que la API key sea válida."
-        ) from exc
-    except Exception as exc:
-        raise ValueError(f"No se pudo conectar al proveedor: {exc}") from exc
-
-    return sorted(models, key=lambda m: m["id"])
 
 
 async def test_connection(

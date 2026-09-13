@@ -78,19 +78,3 @@ class ProviderReorderItem(BaseModel):
 
 class ProviderReorderRequest(BaseModel):
     items: list[ProviderReorderItem]
-
-
-class ProviderModelsRequest(BaseModel):
-    provider_type: str = Field(..., min_length=1, max_length=50)
-    api_key: str | None = None
-    api_base: str | None = None
-    extra_headers: dict[str, str] = Field(default_factory=dict)
-
-
-class ProviderModelItem(BaseModel):
-    id: str
-    name: str
-
-
-class ProviderModelsResult(BaseModel):
-    models: list[ProviderModelItem]

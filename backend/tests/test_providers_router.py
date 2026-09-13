@@ -1,9 +1,9 @@
 """Tests para app/api/v1/providers/router.py - no tenía ningún test.
 
-Los endpoints /test, /models y /{id}/test llaman a proveedores LLM externos
-reales (llm_gateway.test_connection / fetch_models) - se mockean con
-monkeypatch para no hacer llamadas HTTP de verdad ni depender de que un
-proveedor externo esté disponible.
+Los endpoints /test y /{id}/test llaman a proveedores LLM externos
+reales (llm_gateway.test_connection) - se mockean con monkeypatch para no
+hacer llamadas HTTP de verdad ni depender de que un proveedor externo esté
+disponible.
 """
 from __future__ import annotations
 
@@ -175,38 +175,3 @@ class TestTestConnection:
         assert r.status_code == 404
 
 
-class TestListModels:
-    async def test_ad_hoc_models(self, client, admin_user, auth_headers, monkeypatch):
-        async def _fake_fetch_models(**kwargs):
-            return [{"id": "llama-3.1-70b", "name": "Llama 3.1 70B"}]
-
-        from app.api.v1.providers import router as providers_router
-        monkeypatch.setattr(providers_router, "fetch_models", _fake_fetch_models)
-
-        r = await client.post(
-            "/api/v1/providers/models",
-            json={"provider_type": "groq", "api_key": "sk-x"},
-            headers=auth_headers(admin_user),
-        )
-        assert r.status_code == 200
-        assert r.json()["models"] == [{"id": "llama-3.1-70b", "name": "Llama 3.1 70B"}]
-
-    async def test_ad_hoc_models_invalid_provider_returns_422(self, client, admin_user, auth_headers, monkeypatch):
-        async def _fake_fetch_models(**kwargs):
-            raise ValueError("URL base desconocida")
-
-        from app.api.v1.providers import router as providers_router
-        monkeypatch.setattr(providers_router, "fetch_models", _fake_fetch_models)
-
-        r = await client.post(
-            "/api/v1/providers/models",
-            json={"provider_type": "inventado"},
-            headers=auth_headers(admin_user),
-        )
-        assert r.status_code == 422
-
-    async def test_saved_provider_models_not_found(self, client, admin_user, auth_headers):
-        r = await client.get(
-            f"/api/v1/providers/{uuid.uuid4()}/models", headers=auth_headers(admin_user),
-        )
-        assert r.status_code == 404

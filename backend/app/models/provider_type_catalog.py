@@ -37,13 +37,6 @@ class ProviderTypeCatalog(Base):
     default_api_base: Mapped[str | None] = mapped_column(String(512), nullable=True)
     default_headers: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
 
-    # Ruta del endpoint de listado de modelos, relativa a default_api_base o
-    # al api_base del proveedor instanciado. La mayoría sigue "/models"
-    # (spec OpenAI), pero algunos difieren (ej. Together AI: /serverless-models).
-    models_endpoint_path: Mapped[str] = mapped_column(
-        String(120), nullable=False, default="/models"
-    )
-
     # Sembrado vs. creado por el admin - solo cosmético, no bloquea edición/borrado.
     is_builtin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="0")
 

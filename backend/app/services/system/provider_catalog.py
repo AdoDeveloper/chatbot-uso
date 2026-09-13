@@ -25,12 +25,7 @@ _BUILTIN_CATALOG: list[dict] = [
     {"type_key": "groq", "display_name": "Groq", "default_api_base": "https://api.groq.com/openai/v1"},
     {"type_key": "openrouter", "display_name": "OpenRouter", "default_api_base": "https://openrouter.ai/api/v1"},
     {"type_key": "deepseek", "display_name": "DeepSeek", "default_api_base": "https://api.deepseek.com/v1"},
-    {
-        "type_key": "together", "display_name": "Together AI",
-        "default_api_base": "https://api.together.xyz/v1",
-        "models_endpoint_path": "/serverless-models",
-        "notes": "El endpoint de listado de modelos es /serverless-models, no /models.",
-    },
+    {"type_key": "together", "display_name": "Together AI", "default_api_base": "https://api.together.xyz/v1"},
     {"type_key": "xai", "display_name": "xAI (Grok)", "default_api_base": "https://api.x.ai/v1"},
     {"type_key": "mistral", "display_name": "Mistral AI", "default_api_base": "https://api.mistral.ai/v1"},
     {"type_key": "fireworks", "display_name": "Fireworks AI", "default_api_base": "https://api.fireworks.ai/inference/v1"},
@@ -72,26 +67,12 @@ _BUILTIN_CATALOG: list[dict] = [
         "notes": "La API real de Infomaniak parece requerir un product_id en el path (/1/ai/{product_id}/...). Verificar y ajustar la URL por despliegue antes de usar.",
     },
     {"type_key": "scaleway", "display_name": "Scaleway Generative APIs", "default_api_base": "https://api.scaleway.ai/v1"},
-    {
-        "type_key": "anthropic", "display_name": "Anthropic",
-        "default_api_base": "https://api.anthropic.com",
-        "models_endpoint_path": "/v1/models",
-    },
-    {
-        "type_key": "gemini", "display_name": "Google Gemini",
-        "default_api_base": "https://generativelanguage.googleapis.com/v1beta",
-        "models_endpoint_path": "/models",
-    },
-    {
-        "type_key": "cohere", "display_name": "Cohere",
-        "default_api_base": "https://api.cohere.com/v2",
-        "models_endpoint_path": "/models",
-        "notes": "El listado de modelos usa v1 (api.cohere.com/v1), distinto del endpoint de chat (v2). La URL base de arriba es solo para chat.",
-    },
+    {"type_key": "anthropic", "display_name": "Anthropic", "default_api_base": "https://api.anthropic.com"},
+    {"type_key": "gemini", "display_name": "Google Gemini", "default_api_base": "https://generativelanguage.googleapis.com/v1beta"},
+    {"type_key": "cohere", "display_name": "Cohere", "default_api_base": "https://api.cohere.com/v2"},
     {
         "type_key": "azure", "display_name": "Azure OpenAI",
         "default_api_base": None,
-        "models_endpoint_path": "/openai/models",
         "notes": "URL del recurso (ej. https://mi-recurso.openai.azure.com), sin /openai/deployments/... - se arma automáticamente por deployment. Requiere fijar la URL por instancia, no hay valor compartido entre recursos de Azure distintos.",
     },
 ]
@@ -115,7 +96,6 @@ async def seed_provider_catalog(db: AsyncSession) -> None:
                 display_name=item["display_name"],
                 default_api_base=item.get("default_api_base"),
                 default_headers=item.get("default_headers", {}),
-                models_endpoint_path=item.get("models_endpoint_path", "/models"),
                 is_builtin=True,
                 is_local=item.get("is_local", False),
                 notes=item.get("notes"),
@@ -124,7 +104,6 @@ async def seed_provider_catalog(db: AsyncSession) -> None:
             row.display_name = item["display_name"]
             row.default_api_base = item.get("default_api_base")
             row.default_headers = item.get("default_headers", {})
-            row.models_endpoint_path = item.get("models_endpoint_path", "/models")
             row.is_local = item.get("is_local", False)
             row.notes = item.get("notes")
 
@@ -155,7 +134,6 @@ async def create_type(db: AsyncSession, data: ProviderTypeCatalogCreate) -> Prov
         display_name=data.display_name,
         default_api_base=data.default_api_base,
         default_headers=data.default_headers,
-        models_endpoint_path=data.models_endpoint_path,
         is_local=data.is_local,
         notes=data.notes,
     )
@@ -185,8 +163,6 @@ async def update_type(
         row.default_api_base = data.default_api_base or None
     if data.default_headers is not None:
         row.default_headers = data.default_headers
-    if data.models_endpoint_path is not None:
-        row.models_endpoint_path = data.models_endpoint_path
     if data.is_local is not None:
         row.is_local = data.is_local
     if "notes" in data.model_fields_set:

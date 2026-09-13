@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback, forwardRef, useImperativeHandle } from "react";
 import {
  Loader2, Save, Plus, Pencil, Trash2, Eye, EyeOff,
- Minus, Zap, AlertCircle, CheckCircle2, X, ExternalLink, RefreshCw,
+ Minus, Zap, AlertCircle, CheckCircle2, X, ExternalLink,
  ArrowUp, ArrowDown, MoreHorizontal,
 } from "lucide-react";
 import api from "@/lib/api";
@@ -56,9 +56,6 @@ const ProviderPanel = forwardRef<ProviderPanelHandle, {
  const [testState, setTestState] = useState<TestState>("idle");
  const [testMsg, setTestMsg] = useState("");
  const [testMs, setTestMs] = useState<number | null>(null);
- const [fetchedModels, setFetchedModels] = useState<{ id: string; name: string }[] | null>(null);
- const [fetchingModels, setFetchingModels] = useState(false);
- const [fetchModelsError, setFetchModelsError] = useState<string | null>(null);
 
  useEffect(() => {
   if (editing) {
@@ -72,7 +69,6 @@ const ProviderPanel = forwardRef<ProviderPanelHandle, {
     priority: editing.priority !== null ? String(editing.priority) : "" });
   } else { setForm(emptyForm()); }
   setTestState("idle"); setTestMsg("");
-  setFetchedModels(null); setFetchModelsError(null);
  }, [editing, catalogTypes]);
 
  const set = (k: keyof ProviderForm, v: unknown) => { setForm((f) => ({ ...f, [k]: v })); setTestState("idle"); };
@@ -94,8 +90,6 @@ const ProviderPanel = forwardRef<ProviderPanelHandle, {
   const isNewTypeLocal = catalogTypes.some((t) => t.type_key === newType && t.is_local);
   setForm((f) => ({ ...f, provider_type: newType, api_base: isNewTypeLocal ? f.api_base : "" }));
   setTestState("idle");
-  setFetchedModels(null);
-  setFetchModelsError(null);
  }
 
  const resolvedType = form.provider_type === CUSTOM_TYPE_VALUE ? form.custom_type : form.provider_type;
@@ -104,30 +98,6 @@ const ProviderPanel = forwardRef<ProviderPanelHandle, {
  // Cualquier tipo permite sobrescribir la URL - el catálogo solo aporta un
  // valor por defecto; custom/local siempre la necesitan explícita.
  const showBaseUrl = true;
-
- async function handleFetchModels() {
-  if (!resolvedType) return;
-  setFetchingModels(true);
-  setFetchModelsError(null);
-  try {
-   let data: { models: { id: string; name: string }[] };
-   if (editing && !form.api_key) {
-    // Usar la key almacenada del proveedor guardado
-    ({ data } = await api.get(`/providers/${editing.id}/models`));
-   } else {
-    const payload: Record<string, unknown> = { provider_type: resolvedType, extra_headers: headersObject() };
-    if (form.api_key) payload.api_key = form.api_key;
-    if (form.api_base) payload.api_base = form.api_base;
-    ({ data } = await api.post("/providers/models", payload));
-   }
-   setFetchedModels(data.models);
-    toast({ type: "success", message: `${data.models.length} modelos cargados.`, duration: 2000 });
-   } catch (err: unknown) {
-    setFetchModelsError(getErrorMessage(err, "No se pudo obtener la lista de modelos"));
-   } finally {
-   setFetchingModels(false);
-  }
- }
 
  async function handleTest() {
   if (!resolvedType || !form.model_name) return;
@@ -199,50 +169,9 @@ const ProviderPanel = forwardRef<ProviderPanelHandle, {
     )}
    </div>
    <div>
-    <div className="flex items-center justify-between mb-1">
-     <label className="text-xs font-medium text-muted-foreground">Modelo</label>
-     {!isLocal && (
-      <Button
-       variant="ghost"
-       size="xs"
-       onClick={handleFetchModels}
-       disabled={fetchingModels || !resolvedType || (!form.api_key && !editing?.has_api_key)}
-       title={!form.api_key && !editing?.has_api_key ? "Ingrese una API key para obtener modelos reales" : "Obtener modelos reales del proveedor"}
-       className="text-muted-foreground hover:text-primary"
-      >
-       {fetchingModels
-        ? <Loader2 className="animate-spin" />
-        : <RefreshCw />}
-       {fetchedModels ? "Actualizar lista" : "Cargar modelos"}
-      </Button>
-     )}
-    </div>
-    {fetchModelsError && (
-     <p className="text-2xs text-destructive mb-1 flex items-center gap-1">
-      <AlertCircle className="w-3 h-3 flex-shrink-0" />{fetchModelsError}
-     </p>
-    )}
-    {fetchedModels ? (
-     <>
-      <Select
-       value={fetchedModels.some((m) => m.id === form.model_name) ? form.model_name : "__custom__"}
-       onChange={(e) => set("model_name", e.target.value === "__custom__" ? "" : e.target.value)}
-      >
-       {fetchedModels.map((m) => (
-        <SelectOption key={m.id} value={m.id}>{m.name}</SelectOption>
-       ))}
-       <SelectOption value="__custom__">Personalizado…</SelectOption>
-      </Select>
-      {!fetchedModels.some((m) => m.id === form.model_name) && (
-       <Input value={form.model_name} onChange={(e) => set("model_name", e.target.value)}
-        placeholder="nombre-del-modelo" className="mt-2" autoComplete="off" />
-      )}
-      <p className="text-3xs text-muted-foreground mt-1">{fetchedModels.length} modelos obtenidos del proveedor</p>
-     </>
-    ) : (
-     <Input value={form.model_name} onChange={(e) => set("model_name", e.target.value)}
-      placeholder="nombre-del-modelo" autoComplete="off" />
-    )}
+    <label className="block text-xs font-medium text-muted-foreground mb-1">Modelo</label>
+    <Input value={form.model_name} onChange={(e) => set("model_name", e.target.value)}
+     placeholder="nombre-del-modelo" autoComplete="off" />
    </div>
    {!isLocal && (
     <div>

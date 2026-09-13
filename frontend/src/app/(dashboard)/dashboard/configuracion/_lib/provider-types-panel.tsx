@@ -21,11 +21,11 @@ interface HeaderPair { key: string; value: string }
 
 interface CatalogForm {
  type_key: string; display_name: string; default_api_base: string;
- models_endpoint_path: string; is_local: boolean; notes: string; headers: HeaderPair[];
+ is_local: boolean; notes: string; headers: HeaderPair[];
 }
 const emptyForm = (): CatalogForm => ({
  type_key: "", display_name: "", default_api_base: "",
- models_endpoint_path: "/models", is_local: false, notes: "", headers: [],
+ is_local: false, notes: "", headers: [],
 });
 
 interface CatalogPanelHandle { save: () => void }
@@ -42,7 +42,6 @@ const CatalogPanel = forwardRef<CatalogPanelHandle, {
    setForm({
     type_key: editing.type_key, display_name: editing.display_name,
     default_api_base: editing.default_api_base ?? "",
-    models_endpoint_path: editing.models_endpoint_path || "/models",
     is_local: editing.is_local,
     notes: editing.notes ?? "",
     headers: Object.entries(editing.default_headers ?? {}).map(([key, value]) => ({ key, value })),
@@ -75,7 +74,6 @@ const CatalogPanel = forwardRef<CatalogPanelHandle, {
     type_key: form.type_key.trim(),
     display_name: form.display_name.trim(),
     default_api_base: form.default_api_base.trim() || null,
-    models_endpoint_path: form.models_endpoint_path.trim() || "/models",
     is_local: form.is_local,
     notes: form.notes.trim() || null,
     default_headers,
@@ -117,12 +115,6 @@ const CatalogPanel = forwardRef<CatalogPanelHandle, {
     </label>
     <Input value={form.default_api_base} onChange={(e) => set("default_api_base", e.target.value)}
      placeholder="https://api.ejemplo.com/v1" autoComplete="off" disabled={form.is_local} />
-   </div>
-   <div>
-    <label className="block text-xs font-medium text-muted-foreground mb-1">Ruta del listado de modelos</label>
-    <Input value={form.models_endpoint_path} onChange={(e) => set("models_endpoint_path", e.target.value)}
-     placeholder="/models" autoComplete="off" />
-    <p className="mt-1 text-2xs text-muted-foreground">La mayoría usa /models. Algunos proveedores difieren (ej. /serverless-models).</p>
    </div>
    <div>
     <div className="flex items-center justify-between mb-1">

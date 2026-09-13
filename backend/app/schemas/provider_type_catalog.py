@@ -11,7 +11,6 @@ class ProviderTypeCatalogCreate(BaseModel):
     display_name: str = Field(..., min_length=1, max_length=120)
     default_api_base: str | None = Field(None, max_length=512)
     default_headers: dict[str, str] = Field(default_factory=dict)
-    models_endpoint_path: str = Field("/models", min_length=1, max_length=120)
     is_local: bool = False
     notes: str | None = None
 
@@ -21,7 +20,6 @@ class ProviderTypeCatalogUpdate(BaseModel):
     display_name: str | None = Field(None, min_length=1, max_length=120)
     default_api_base: str | None = Field(None, max_length=512)
     default_headers: dict[str, str] | None = None
-    models_endpoint_path: str | None = Field(None, min_length=1, max_length=120)
     is_local: bool | None = None
     notes: str | None = None
 
@@ -32,7 +30,6 @@ class ProviderTypeCatalogOut(BaseModel):
     display_name: str
     default_api_base: str | None
     default_headers: dict[str, str]
-    models_endpoint_path: str
     is_builtin: bool
     is_local: bool
     notes: str | None

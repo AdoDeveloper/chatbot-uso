@@ -231,7 +231,6 @@ def upgrade() -> None:
         sa.Column("display_name",          sa.String(120), nullable=False),
         sa.Column("default_api_base",      sa.String(512), nullable=True),
         sa.Column("default_headers",       sa.JSON,        nullable=False, server_default=sa.text("('{}')")),
-        sa.Column("models_endpoint_path",  sa.String(120), nullable=False, server_default=sa.text("('/models')")),
         sa.Column("is_builtin",            sa.Boolean,     nullable=False, server_default=sa.false()),
         sa.Column("is_local",              sa.Boolean,     nullable=False, server_default=sa.false()),
         sa.Column("notes",                 sa.Text,        nullable=True),

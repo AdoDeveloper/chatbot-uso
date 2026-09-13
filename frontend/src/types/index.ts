@@ -85,7 +85,6 @@ export interface ProviderTypeCatalogItem {
   display_name: string;
   default_api_base: string | null;
   default_headers: Record<string, string>;
-  models_endpoint_path: string;
   is_builtin: boolean;
   is_local: boolean;
   notes: string | null;
