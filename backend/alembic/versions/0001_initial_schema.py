@@ -232,6 +232,7 @@ def upgrade() -> None:
         sa.Column("default_headers",       sa.JSON,        nullable=False, server_default=sa.text("('{}')")),
         sa.Column("models_endpoint_path",  sa.String(120), nullable=False, server_default=sa.text("('/models')")),
         sa.Column("is_builtin",            sa.Boolean,     nullable=False, server_default=sa.false()),
+        sa.Column("is_local",              sa.Boolean,     nullable=False, server_default=sa.false()),
         sa.Column("notes",                 sa.Text,        nullable=True),
         sa.Column("created_at",            mysql.DATETIME(fsp=6), server_default=sa.text("CURRENT_TIMESTAMP(6)"), nullable=False),
         sa.Column("updated_at",            mysql.DATETIME(fsp=6), server_default=sa.text("CURRENT_TIMESTAMP(6)"), nullable=False),

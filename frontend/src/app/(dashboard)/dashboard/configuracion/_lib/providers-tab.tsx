@@ -25,10 +25,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ProviderTypesPanel } from "./provider-types-panel";
 
-// Sin URL base propia: son locales al servidor del backend (Ollama/LM
-// Studio), cada instancia apunta a su propio host, no a un valor del catálogo.
-const LOCAL_PROVIDERS = new Set(["ollama", "lmstudio"]);
-
 const CUSTOM_TYPE_VALUE = "__custom__";
 
 interface ProviderForm {
@@ -76,15 +72,16 @@ const ProviderPanel = forwardRef<ProviderPanelHandle, {
  const set = (k: keyof ProviderForm, v: unknown) => { setForm((f) => ({ ...f, [k]: v })); setTestState("idle"); };
 
  function handleProviderTypeChange(newType: string) {
-  setForm((f) => ({ ...f, provider_type: newType, api_base: LOCAL_PROVIDERS.has(newType) ? f.api_base : "" }));
+  const isNewTypeLocal = catalogTypes.some((t) => t.type_key === newType && t.is_local);
+  setForm((f) => ({ ...f, provider_type: newType, api_base: isNewTypeLocal ? f.api_base : "" }));
   setTestState("idle");
   setFetchedModels(null);
   setFetchModelsError(null);
  }
 
  const resolvedType = form.provider_type === CUSTOM_TYPE_VALUE ? form.custom_type : form.provider_type;
- const isLocal = LOCAL_PROVIDERS.has(form.provider_type);
  const selectedCatalogEntry = catalogTypes.find((t) => t.type_key === form.provider_type) ?? null;
+ const isLocal = selectedCatalogEntry?.is_local ?? false;
  // Cualquier tipo permite sobrescribir la URL - el catálogo solo aporta un
  // valor por defecto; custom/local siempre la necesitan explícita.
  const showBaseUrl = true;

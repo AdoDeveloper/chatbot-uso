@@ -37,12 +37,12 @@ _BUILTIN_CATALOG: list[dict] = [
     {"type_key": "perplexity", "display_name": "Perplexity", "default_api_base": "https://api.perplexity.ai"},
     {
         "type_key": "ollama", "display_name": "Ollama (local)",
-        "default_api_base": None,
+        "default_api_base": None, "is_local": True,
         "notes": "URL local del servidor Ollama; se configura por instancia, no aquí.",
     },
     {
         "type_key": "lmstudio", "display_name": "LM Studio (local)",
-        "default_api_base": None,
+        "default_api_base": None, "is_local": True,
         "notes": "URL local del servidor LM Studio; se configura por instancia, no aquí.",
     },
     {
@@ -98,6 +98,7 @@ async def seed_provider_catalog(db: AsyncSession) -> None:
                 default_headers=item.get("default_headers", {}),
                 models_endpoint_path=item.get("models_endpoint_path", "/models"),
                 is_builtin=True,
+                is_local=item.get("is_local", False),
                 notes=item.get("notes"),
             ))
         else:
@@ -105,6 +106,7 @@ async def seed_provider_catalog(db: AsyncSession) -> None:
             row.default_api_base = item.get("default_api_base")
             row.default_headers = item.get("default_headers", {})
             row.models_endpoint_path = item.get("models_endpoint_path", "/models")
+            row.is_local = item.get("is_local", False)
             row.notes = item.get("notes")
 
     await db.commit()
@@ -135,6 +137,7 @@ async def create_type(db: AsyncSession, data: ProviderTypeCatalogCreate) -> Prov
         default_api_base=data.default_api_base,
         default_headers=data.default_headers,
         models_endpoint_path=data.models_endpoint_path,
+        is_local=data.is_local,
         notes=data.notes,
     )
     db.add(row)
@@ -165,6 +168,8 @@ async def update_type(
         row.default_headers = data.default_headers
     if data.models_endpoint_path is not None:
         row.models_endpoint_path = data.models_endpoint_path
+    if data.is_local is not None:
+        row.is_local = data.is_local
     if "notes" in data.model_fields_set:
         row.notes = data.notes or None
 

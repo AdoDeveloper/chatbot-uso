@@ -12,6 +12,7 @@ import type { ProviderTypeCatalogItem } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/composed/modal";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -20,11 +21,11 @@ interface HeaderPair { key: string; value: string }
 
 interface CatalogForm {
  type_key: string; display_name: string; default_api_base: string;
- models_endpoint_path: string; notes: string; headers: HeaderPair[];
+ models_endpoint_path: string; is_local: boolean; notes: string; headers: HeaderPair[];
 }
 const emptyForm = (): CatalogForm => ({
  type_key: "", display_name: "", default_api_base: "",
- models_endpoint_path: "/models", notes: "", headers: [],
+ models_endpoint_path: "/models", is_local: false, notes: "", headers: [],
 });
 
 interface CatalogPanelHandle { save: () => void }
@@ -42,6 +43,7 @@ const CatalogPanel = forwardRef<CatalogPanelHandle, {
     type_key: editing.type_key, display_name: editing.display_name,
     default_api_base: editing.default_api_base ?? "",
     models_endpoint_path: editing.models_endpoint_path || "/models",
+    is_local: editing.is_local,
     notes: editing.notes ?? "",
     headers: Object.entries(editing.default_headers ?? {}).map(([key, value]) => ({ key, value })),
    });
@@ -74,6 +76,7 @@ const CatalogPanel = forwardRef<CatalogPanelHandle, {
     display_name: form.display_name.trim(),
     default_api_base: form.default_api_base.trim() || null,
     models_endpoint_path: form.models_endpoint_path.trim() || "/models",
+    is_local: form.is_local,
     notes: form.notes.trim() || null,
     default_headers,
    };
@@ -101,12 +104,19 @@ const CatalogPanel = forwardRef<CatalogPanelHandle, {
     <Input value={form.display_name} onChange={(e) => set("display_name", e.target.value)}
      placeholder="ej. Together AI" autoComplete="off" />
    </div>
+   <div className="flex items-center justify-between py-1">
+    <div>
+     <p className="text-13 font-medium text-foreground">Servidor local</p>
+     <p className="text-2xs text-muted-foreground mt-0.5">Sin URL de catálogo compartida (ej. Ollama, LM Studio): cada instancia apunta a su propio host.</p>
+    </div>
+    <Switch checked={form.is_local} onCheckedChange={(v) => set("is_local", v)} />
+   </div>
    <div>
     <label className="block text-xs font-medium text-muted-foreground mb-1">
      URL base por defecto <span className="text-muted-foreground">(opcional)</span>
     </label>
     <Input value={form.default_api_base} onChange={(e) => set("default_api_base", e.target.value)}
-     placeholder="https://api.ejemplo.com/v1" autoComplete="off" />
+     placeholder="https://api.ejemplo.com/v1" autoComplete="off" disabled={form.is_local} />
    </div>
    <div>
     <label className="block text-xs font-medium text-muted-foreground mb-1">Ruta del listado de modelos</label>
@@ -209,7 +219,7 @@ export function ProviderTypesPanel({
          <TableCell><code className="text-2xs">{t.type_key}</code></TableCell>
          <TableCell><p className="text-13 font-medium text-foreground">{t.display_name}</p></TableCell>
          <TableCell className="hidden md:table-cell">
-          <p className="text-13 text-muted-foreground truncate max-w-64">{t.default_api_base ?? "—"}</p>
+          <p className="text-13 text-muted-foreground truncate max-w-64">{t.is_local ? "Local (por instancia)" : t.default_api_base ?? "—"}</p>
          </TableCell>
          <TableCell className="hidden lg:table-cell">
           {t.notes ? (
