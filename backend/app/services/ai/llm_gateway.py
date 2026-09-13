@@ -4,8 +4,8 @@ LLM Gateway - truly provider-agnostic streaming via httpx + native APIs.
 Adapter families:
   - OpenAICompatAdapter: OpenAI, Groq, OpenRouter, DeepSeek, Together,
     xAI, Ollama, Mistral, Fireworks, Perplexity, LMStudio, vLLM, Cerebras,
-    SambaNova, Lepton, Anyscale, OVHCloud, Cloudflare Workers AI,
-    NVIDIA NIM, ANY OpenAI-compatible endpoint
+    SambaNova, OVHCloud, Cloudflare Workers AI, NVIDIA NIM,
+    ANY OpenAI-compatible endpoint
   - AzureOpenAIAdapter: Azure OpenAI (different URL scheme + api-key header)
   - AnthropicAdapter: Anthropic /messages format
   - GeminiAdapter: Google AI Studio / Vertex generateContent format
@@ -348,9 +348,9 @@ class OpenAICompatAdapter(LLMAdapter):
 
     Covers: OpenAI, Groq, OpenRouter, DeepSeek, Together, xAI, Ollama,
     Mistral, Fireworks, Perplexity, LMStudio, vLLM, Cerebras, SambaNova,
-    NVIDIA NIM, Cloudflare Workers AI, Lepton, Anyscale, OVHCloud,
-    Scaleway, Nebius, Infomaniak, and ANY endpoint that implements
-    POST /chat/completions with the OpenAI request/response schema.
+    NVIDIA NIM, Cloudflare Workers AI, OVHCloud, Scaleway, Nebius,
+    Infomaniak, and ANY endpoint that implements POST /chat/completions
+    with the OpenAI request/response schema.
     """
 
     def __init__(

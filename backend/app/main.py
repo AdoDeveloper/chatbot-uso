@@ -31,6 +31,7 @@ from app.models.source import Source
 from app.services.ai.embedding import _get_dense_model, _get_sparse_model
 from app.services.ai.guardrails import _get_presidio_analyzer, _get_presidio_anonymizer
 from app.services.system import scheduler
+from app.services.system.provider_catalog import seed_provider_catalog
 from app.services.system.rbac import seed_rbac
 from app.services.system.seed import seed_defaults, seed_first_admin
 from app.services.system.settings import seed_default_settings
@@ -52,6 +53,7 @@ async def lifespan(app: FastAPI):
             await seed_first_admin(db)
             await seed_defaults(db)
             await seed_default_settings(db)
+            await seed_provider_catalog(db)
         except Exception:
             logger.exception("startup.seed_failed - revisar logs anteriores para detalle")
             raise

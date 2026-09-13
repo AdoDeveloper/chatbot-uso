@@ -35,6 +35,7 @@ def run_migrations() -> None:
 
 async def run_seed() -> None:
     from app.db.session import AsyncSessionLocal
+    from app.services.system.provider_catalog import seed_provider_catalog
     from app.services.system.rbac import seed_rbac
     from app.services.system.seed import seed_defaults, seed_first_admin
     from app.services.system.settings import seed_default_settings
@@ -45,6 +46,7 @@ async def run_seed() -> None:
         await seed_defaults(db)
         await seed_default_settings(db)
         await seed_rbac(db)
+        await seed_provider_catalog(db)
     print("Datos iniciales listos.")
 
 

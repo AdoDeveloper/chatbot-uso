@@ -593,12 +593,7 @@ async def get_source_quality(
         .where(ChatMessage.created_at >= since)
         .where(ChatMessage.created_at < _until)
         .where(ChatMessage.sources_json.is_not(None))
-        .where(
-            or_(
-                ChatConversation.browser.is_(None),
-                ChatConversation.browser.notin_(PLAYGROUND_BROWSERS),
-            )
-        )
+        .where(_source_filter())
     )
     from collections import defaultdict
     counts: dict[str, int] = defaultdict(int)
@@ -654,12 +649,7 @@ async def get_response_quality(
         .where(ChatMessage.role == MessageRole.assistant)
         .where(ChatMessage.created_at >= since)
         .where(ChatMessage.created_at < _until)
-        .where(
-            or_(
-                ChatConversation.browser.is_(None),
-                ChatConversation.browser.notin_(PLAYGROUND_BROWSERS),
-            )
-        )
+        .where(_source_filter())
     )
     avg_ratio, avg_faith, avg_rel, ratio_n, faith_n, rel_n = q.one()
     return AnalyticsResponseQuality(
