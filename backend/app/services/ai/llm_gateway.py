@@ -1055,13 +1055,18 @@ async def fetch_models(
         proveedor). Sin valor adivinado en código: cada proveedor documenta
         su propia ruta de listado y puede cambiarla sin aviso (ya pasó con
         Together AI y Azure) - forzar un default aquí solo reintroduce el
-        mismo riesgo de quedar desactualizado."""
+        mismo riesgo de quedar desactualizado. Es un dato opcional: no todo
+        proveedor expone un endpoint de listado (o el catálogo simplemente
+        no lo tiene configurado todavía), y eso no debe impedir usar el
+        proveedor - "Cargar modelos" es solo un atajo; el nombre del modelo
+        siempre se puede escribir a mano."""
         path = catalog_entry.models_endpoint_path if catalog_entry else None
         if not path:
             raise ValueError(
-                f"No hay una ruta de listado de modelos configurada para '{provider_type}'. "
-                "Búscala en la documentación de la API del proveedor (ej. \"/v1/models\") "
-                "y configúrala en Configuración → Tipos de proveedor."
+                f"'{provider_type}' no tiene configurada una ruta de listado de modelos, "
+                "así que no se puede autocompletar. Si el proveedor ofrece un endpoint para "
+                "esto, búscalo en su documentación y configúralo en Configuración → Tipos de "
+                "proveedor; si no, escribe el nombre del modelo directamente."
             )
         return path if path.startswith("/") else f"/{path}"
 
