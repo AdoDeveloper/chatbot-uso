@@ -72,9 +72,28 @@ _BUILTIN_CATALOG: list[dict] = [
         "notes": "La API real de Infomaniak parece requerir un product_id en el path (/1/ai/{product_id}/...). Verificar y ajustar la URL por despliegue antes de usar.",
     },
     {"type_key": "scaleway", "display_name": "Scaleway Generative APIs", "default_api_base": "https://api.scaleway.ai/v1"},
-    {"type_key": "anthropic", "display_name": "Anthropic", "default_api_base": "https://api.anthropic.com"},
-    {"type_key": "gemini", "display_name": "Google Gemini", "default_api_base": "https://generativelanguage.googleapis.com/v1beta"},
-    {"type_key": "cohere", "display_name": "Cohere", "default_api_base": "https://api.cohere.com/v2"},
+    {
+        "type_key": "anthropic", "display_name": "Anthropic",
+        "default_api_base": "https://api.anthropic.com",
+        "models_endpoint_path": "/v1/models",
+    },
+    {
+        "type_key": "gemini", "display_name": "Google Gemini",
+        "default_api_base": "https://generativelanguage.googleapis.com/v1beta",
+        "models_endpoint_path": "/models",
+    },
+    {
+        "type_key": "cohere", "display_name": "Cohere",
+        "default_api_base": "https://api.cohere.com/v2",
+        "models_endpoint_path": "/models",
+        "notes": "El listado de modelos usa v1 (api.cohere.com/v1), distinto del endpoint de chat (v2). La URL base de arriba es solo para chat.",
+    },
+    {
+        "type_key": "azure", "display_name": "Azure OpenAI",
+        "default_api_base": None,
+        "models_endpoint_path": "/openai/models",
+        "notes": "URL del recurso (ej. https://mi-recurso.openai.azure.com), sin /openai/deployments/... - se arma automáticamente por deployment. Requiere fijar la URL por instancia, no hay valor compartido entre recursos de Azure distintos.",
+    },
 ]
 
 

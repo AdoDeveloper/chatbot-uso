@@ -1048,11 +1048,21 @@ async def fetch_models(
     headers: dict[str, str] = {}
     resolved_base, catalog_headers = await _resolve_base_and_headers(provider_type, api_base)
     extra_headers = {**catalog_headers, **(instance_headers or {})}
+    catalog_entry = await _resolve_catalog_entry(provider_type)
+
+    def _models_path(default: str) -> str:
+        """models_endpoint_path del catálogo si el admin lo definió; si no,
+        el default real conocido de esta familia de API. Así una ruta que
+        cambie (o un proxy con otra ruta) se corrige desde el panel, no en
+        código, igual que ya pasa con los proveedores OpenAI-compat."""
+        path = catalog_entry.models_endpoint_path if catalog_entry else None
+        path = path or default
+        return path if path.startswith("/") else f"/{path}"
 
     try:
         if provider_type == "anthropic":
             base = (resolved_base or _ANTHROPIC_BASE).rstrip("/")
-            url = f"{base}/v1/models"
+            url = f"{base}{_models_path('/v1/models')}"
             headers.update(extra_headers)
             if api_key:
                 headers["x-api-key"] = api_key
@@ -1064,7 +1074,7 @@ async def fetch_models(
 
         elif provider_type == "gemini":
             base = (resolved_base or _GEMINI_BASE).rstrip("/")
-            url = f"{base}/models"
+            url = f"{base}{_models_path('/models')}"
             params: dict = {}
             if api_key:
                 params["key"] = api_key
@@ -1080,7 +1090,7 @@ async def fetch_models(
 
         elif provider_type == "cohere":
             base = (resolved_base or _COHERE_MODELS_BASE).rstrip("/")
-            url = f"{base}/models"
+            url = f"{base}{_models_path('/models')}"
             headers.update(extra_headers)
             if api_key:
                 headers["Authorization"] = f"Bearer {api_key}"
@@ -1099,7 +1109,7 @@ async def fetch_models(
                     "(ej. https://mi-recurso.openai.azure.com)."
                 )
             base = resolved_base.split("/openai/deployments/")[0].rstrip("/")
-            url = f"{base}/openai/models?api-version={_AZURE_API_VERSION}"
+            url = f"{base}{_models_path('/openai/models')}?api-version={_AZURE_API_VERSION}"
             headers.update(extra_headers)
             if api_key:
                 headers["api-key"] = api_key
@@ -1139,10 +1149,7 @@ async def fetch_models(
                     f"URL base desconocida para '{provider_type}'. "
                     "Configúrala en el proveedor o en Configuración → Tipos de proveedor."
                 )
-            catalog_entry = await _resolve_catalog_entry(provider_type)
-            models_path = catalog_entry.models_endpoint_path if catalog_entry else "/models"
-            models_path = models_path if models_path.startswith("/") else f"/{models_path}"
-            url = f"{base.rstrip('/')}{models_path}"
+            url = f"{base.rstrip('/')}{_models_path('/models')}"
             headers.update(extra_headers)
             if api_key:
                 headers["Authorization"] = f"Bearer {api_key}"
