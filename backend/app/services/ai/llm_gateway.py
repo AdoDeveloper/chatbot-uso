@@ -293,6 +293,13 @@ _ANTHROPIC_BASE = "https://api.anthropic.com"
 _GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta"
 _COHERE_BASE = "https://api.cohere.com/v2"          # endpoint de chat
 _COHERE_MODELS_BASE = "https://api.cohere.com/v1"   # endpoint de listado de modelos (solo v1)
+# Fecha fija que Anthropic exige en cada request (no es un "año de release" -
+# es su esquema real de versionado; sigue vigente y estable a la fecha).
+_ANTHROPIC_API_VERSION = "2023-06-01"
+# Última api-version estable de Azure OpenAI conocida. Azure la rota con
+# frecuencia; si un despliegue necesita otra, el admin puede pegar la URL
+# completa (con su propio ?api-version=...) en "URL base" del proveedor.
+_AZURE_API_VERSION = "2024-10-21"
 
 
 class LLMAdapter(ABC):
@@ -468,8 +475,7 @@ class AzureOpenAIAdapter(LLMAdapter):
         base = self.api_base
         if "/chat/completions" in base:
             return base
-        api_version = "2026-04-21"
-        return f"{base}/openai/deployments/{self.model_name}/chat/completions?api-version={api_version}"
+        return f"{base}/openai/deployments/{self.model_name}/chat/completions?api-version={_AZURE_API_VERSION}"
 
     async def stream_chat(
         self, messages: list[dict], temperature: float = 0.3, max_tokens: int = 1024
@@ -542,7 +548,7 @@ class AnthropicAdapter(LLMAdapter):
         return {
             "Content-Type": "application/json",
             "x-api-key": self.api_key or "",
-            "anthropic-version": "2023-06-01",
+            "anthropic-version": _ANTHROPIC_API_VERSION,
             **self.extra_headers,
         }
 
@@ -1050,7 +1056,7 @@ async def fetch_models(
             headers.update(extra_headers)
             if api_key:
                 headers["x-api-key"] = api_key
-            headers["anthropic-version"] = "2023-06-01"
+            headers["anthropic-version"] = _ANTHROPIC_API_VERSION
             r = await client.get(url, headers=headers, timeout=15)
             r.raise_for_status()
             items = r.json().get("data", [])
@@ -1082,6 +1088,48 @@ async def fetch_models(
             r.raise_for_status()
             items = r.json().get("models", [])
             models = [{"id": m.get("name", ""), "name": m.get("name", "")} for m in items if m.get("name")]
+
+        elif provider_type in ("azure", "azure_openai"):
+            # Azure NO habla el formato OpenAI-compat de /models: usa su
+            # propio endpoint versionado y devuelve deployments, no modelos
+            # base. Requiere la URL del recurso (sin /openai/deployments/...).
+            if not resolved_base:
+                raise ValueError(
+                    "URL base desconocida para Azure OpenAI. Configúrala en el proveedor "
+                    "(ej. https://mi-recurso.openai.azure.com)."
+                )
+            base = resolved_base.split("/openai/deployments/")[0].rstrip("/")
+            url = f"{base}/openai/models?api-version={_AZURE_API_VERSION}"
+            headers.update(extra_headers)
+            if api_key:
+                headers["api-key"] = api_key
+            r = await client.get(url, headers=headers, timeout=15)
+            r.raise_for_status()
+            items = r.json().get("data", [])
+            models = [{"id": m["id"], "name": m.get("id", m["id"])} for m in items if m.get("id")]
+
+        elif provider_type in ("bedrock", "aws_bedrock"):
+            # No es HTTP: usa el cliente "bedrock" (listado), distinto del
+            # cliente "bedrock-runtime" (inferencia) que usa BedrockAdapter.
+            import asyncio
+            try:
+                import boto3
+            except ImportError as exc:
+                raise ValueError(
+                    "Soporte para AWS Bedrock no instalado en el servidor (falta boto3)."
+                ) from exc
+
+            def _list():
+                region = resolved_base or "us-east-1"
+                client_bedrock = boto3.client("bedrock", region_name=region)
+                resp = client_bedrock.list_foundation_models()
+                return resp.get("modelSummaries", [])
+
+            summaries = await asyncio.get_running_loop().run_in_executor(None, _list)
+            models = [
+                {"id": m["modelId"], "name": m.get("modelName", m["modelId"])}
+                for m in summaries if m.get("modelId")
+            ]
 
         else:
             # OpenAI-compat: openai, groq, openrouter, deepseek, mistral, together, ollama…
