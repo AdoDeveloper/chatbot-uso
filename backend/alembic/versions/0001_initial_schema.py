@@ -209,6 +209,7 @@ def upgrade() -> None:
         sa.Column("model_name",            sa.String(120), nullable=False),
         sa.Column("api_key_encrypted",     sa.Text,        nullable=True),
         sa.Column("api_base",              sa.String(512), nullable=True),
+        sa.Column("extra_headers",         sa.JSON,        nullable=False, server_default=sa.text("('{}')")),
         sa.Column("dashboard_url",         sa.String(512), nullable=True),
         sa.Column("is_active",             sa.Boolean,     nullable=False, server_default=sa.true()),
         sa.Column("priority",              sa.Integer,     nullable=True),

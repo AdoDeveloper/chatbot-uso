@@ -164,20 +164,8 @@ def _is_retryable(exc: BaseException) -> bool:
 # proveedor. Cuando no lo hace, se resuelve contra provider_type_catalog
 # (tabla editable desde Configuración → Tipos de proveedor) - no hay lista
 # de proveedores hardcodeada en el código; el catálogo es la fuente de
-# verdad y puede corregirse sin desplegar nada.
-
-def _local_base_fallback(type_key: str) -> str | None:
-    """Únicos valores que siguen resueltos desde settings, no desde el
-    catálogo: son locales al servidor (Ollama/LMStudio/vLLM en la misma red
-    del backend), no URLs públicas de un proveedor externo."""
-    from app.core.config import get_settings
-    s = get_settings()
-    return {
-        "ollama": s.LLM_OLLAMA_BASE,
-        "lmstudio": s.LLM_LMSTUDIO_BASE,
-        "vllm": s.LLM_VLLM_BASE,
-    }.get(type_key)
-
+# verdad y puede corregirse sin desplegar nada, incluidos los tipos locales
+# (is_local) como Ollama o LM Studio.
 
 # Caché de filas del catálogo por type_key: evita una consulta a BD en cada
 # petición de chat. TTL corto para que una edición desde el panel se refleje
@@ -209,16 +197,13 @@ async def _resolve_catalog_entry(type_key: str) -> ProviderTypeCatalog | None:
 async def _resolve_base_and_headers(
     provider_type: str, api_base: str | None, fallback_base: str | None = None,
 ) -> tuple[str | None, dict[str, str]]:
-    """api_base explícito > catálogo editable > fallback local (Ollama/etc.)
-    > constante fija del adaptador (si el llamador la pasa como fallback_base)."""
+    """api_base explícito > catálogo editable > constante fija del adaptador
+    (si el llamador la pasa como fallback_base)."""
     if api_base:
         return api_base, {}
     entry = await _resolve_catalog_entry(provider_type)
     if entry and entry.default_api_base:
         return entry.default_api_base, (entry.default_headers or {})
-    local = _local_base_fallback(provider_type)
-    if local:
-        return local, (entry.default_headers if entry else {})
     return fallback_base, (entry.default_headers if entry else {})
 
 # Caché de metadata de /models por (base, modelo): evita una consulta extra
@@ -311,10 +296,14 @@ _COHERE_MODELS_BASE = "https://api.cohere.com/v1"   # endpoint de listado de mod
 
 
 class LLMAdapter(ABC):
-    def __init__(self, model_name: str, api_key: str | None, api_base: str | None):
+    def __init__(
+        self, model_name: str, api_key: str | None, api_base: str | None,
+        extra_headers: dict[str, str] | None = None,
+    ):
         self.model_name = model_name
         self.api_key = api_key
         self.api_base = api_base
+        self.extra_headers = extra_headers or {}
 
     @abstractmethod
     async def stream_chat(
@@ -462,13 +451,17 @@ class OpenAICompatAdapter(LLMAdapter):
 
 class AzureOpenAIAdapter(LLMAdapter):
 
-    def __init__(self, model_name: str, api_key: str | None, api_base: str | None):
-        super().__init__(model_name, api_key, (api_base or "").rstrip("/"))
+    def __init__(
+        self, model_name: str, api_key: str | None, api_base: str | None,
+        extra_headers: dict[str, str] | None = None,
+    ):
+        super().__init__(model_name, api_key, (api_base or "").rstrip("/"), extra_headers)
 
     def _headers(self) -> dict:
         h: dict[str, str] = {"Content-Type": "application/json"}
         if self.api_key:
             h["api-key"] = self.api_key
+        h.update(self.extra_headers)
         return h
 
     def _chat_url(self) -> str:
@@ -539,14 +532,18 @@ class AzureOpenAIAdapter(LLMAdapter):
 
 class AnthropicAdapter(LLMAdapter):
 
-    def __init__(self, model_name: str, api_key: str | None, api_base: str | None):
-        super().__init__(model_name, api_key, (api_base or _ANTHROPIC_BASE).rstrip("/"))
+    def __init__(
+        self, model_name: str, api_key: str | None, api_base: str | None,
+        extra_headers: dict[str, str] | None = None,
+    ):
+        super().__init__(model_name, api_key, (api_base or _ANTHROPIC_BASE).rstrip("/"), extra_headers)
 
     def _headers(self) -> dict:
         return {
             "Content-Type": "application/json",
             "x-api-key": self.api_key or "",
             "anthropic-version": "2023-06-01",
+            **self.extra_headers,
         }
 
     def _split_system(self, messages: list[dict]) -> tuple[str | None, list[dict]]:
@@ -625,13 +622,17 @@ class AnthropicAdapter(LLMAdapter):
 
 class GeminiAdapter(LLMAdapter):
 
-    def __init__(self, model_name: str, api_key: str | None, api_base: str | None):
-        super().__init__(model_name, api_key, (api_base or _GEMINI_BASE).rstrip("/"))
+    def __init__(
+        self, model_name: str, api_key: str | None, api_base: str | None,
+        extra_headers: dict[str, str] | None = None,
+    ):
+        super().__init__(model_name, api_key, (api_base or _GEMINI_BASE).rstrip("/"), extra_headers)
 
     def _headers(self) -> dict:
         h: dict[str, str] = {"Content-Type": "application/json"}
         if self.api_key:
             h["x-goog-api-key"] = self.api_key
+        h.update(self.extra_headers)
         return h
 
     def _to_gemini_contents(self, messages: list[dict]) -> tuple[str | None, list[dict]]:
@@ -711,8 +712,11 @@ class GeminiAdapter(LLMAdapter):
 
 class CohereAdapter(LLMAdapter):
 
-    def __init__(self, model_name: str, api_key: str | None, api_base: str | None):
-        super().__init__(model_name, api_key, (api_base or _COHERE_BASE).rstrip("/"))
+    def __init__(
+        self, model_name: str, api_key: str | None, api_base: str | None,
+        extra_headers: dict[str, str] | None = None,
+    ):
+        super().__init__(model_name, api_key, (api_base or _COHERE_BASE).rstrip("/"), extra_headers)
 
     def _headers(self, streaming: bool = False) -> dict:
         h: dict[str, str] = {"Content-Type": "application/json"}
@@ -722,6 +726,7 @@ class CohereAdapter(LLMAdapter):
             h["Accept"] = "application/json"
         if self.api_key:
             h["Authorization"] = f"Bearer {self.api_key}"
+        h.update(self.extra_headers)
         return h
 
     def _to_cohere_messages(self, messages: list[dict]) -> list[dict]:
@@ -803,9 +808,14 @@ class CohereAdapter(LLMAdapter):
 
 
 class BedrockAdapter(LLMAdapter):
+    # Headers HTTP no aplican: la autenticación es via credenciales AWS del
+    # entorno (boto3), no un header manual.
 
-    def __init__(self, model_name: str, api_key: str | None, api_base: str | None):
-        super().__init__(model_name, api_key, api_base)
+    def __init__(
+        self, model_name: str, api_key: str | None, api_base: str | None,
+        extra_headers: dict[str, str] | None = None,
+    ):
+        super().__init__(model_name, api_key, api_base, extra_headers)
         self._client = None
 
     def _get_bedrock_client(self):
@@ -902,6 +912,7 @@ async def _get_adapter(
     model_name: str,
     api_base: str | None,
     api_key: str | None,
+    instance_headers: dict[str, str] | None = None,
 ) -> LLMAdapter:
     pt = provider_type.lower().strip()
 
@@ -915,12 +926,13 @@ async def _get_adapter(
         log.debug("llm.adapter_selected", provider_type=pt, adapter=adapter_cls.__name__)
         # Cada adaptador ya conserva su propia constante fija (_ANTHROPIC_BASE
         # etc.) como último fallback si ni api_base ni el catálogo traen nada.
-        resolved_base, _headers = await _resolve_base_and_headers(pt, api_base)
-        return adapter_cls(model_name, api_key, resolved_base)
+        resolved_base, catalog_headers = await _resolve_base_and_headers(pt, api_base)
+        return adapter_cls(model_name, api_key, resolved_base, {**catalog_headers, **(instance_headers or {})})
 
     log.debug("llm.adapter_selected", provider_type=pt, adapter="OpenAICompatAdapter")
-    resolved_base, extra_headers = await _resolve_base_and_headers(pt, api_base)
-    return OpenAICompatAdapter(pt, model_name, api_key, resolved_base, extra_headers)
+    resolved_base, catalog_headers = await _resolve_base_and_headers(pt, api_base)
+    merged_headers = {**catalog_headers, **(instance_headers or {})}
+    return OpenAICompatAdapter(pt, model_name, api_key, resolved_base, merged_headers)
 
 
 # El prompt efectivo viene de la configuración; este es el respaldo para
@@ -957,12 +969,12 @@ async def stream_chat(
 
     plain_chain = [
         (str(provider.id), provider.name, provider.model_name, provider.provider_type,
-         provider.api_base, api_key)
+         provider.api_base, api_key, provider.extra_headers)
         for provider, api_key in chain
     ]
 
     last_error: Exception | None = None
-    for pid, provider_name, model_name, provider_type, api_base, api_key in plain_chain:
+    for pid, provider_name, model_name, provider_type, api_base, api_key, extra_headers in plain_chain:
         if _breaker.is_open(pid):
             log.info("llm.circuit_open_skip", provider=provider_name)
             continue
@@ -970,7 +982,7 @@ async def stream_chat(
         try:
             # _get_adapter() dentro del try: un proveedor mal configurado no debe
             # tumbar el bucle de fallback sin probar el resto de la cadena.
-            adapter = await _get_adapter(provider_name, provider_type, model_name, api_base, api_key)
+            adapter = await _get_adapter(provider_name, provider_type, model_name, api_base, api_key, extra_headers)
             log.info("llm.request", provider=provider_name, model=model_name,
                      adapter=type(adapter).__name__)
             async for token in adapter.stream_chat(messages, temperature, max_tokens):
@@ -1019,6 +1031,7 @@ async def fetch_models(
     provider_type: str,
     api_key: str | None = None,
     api_base: str | None = None,
+    instance_headers: dict[str, str] | None = None,
 ) -> list[dict]:
     """Devuelve los modelos disponibles del proveedor consultando su API.
 
@@ -1027,7 +1040,8 @@ async def fetch_models(
     """
     client = _get_http_client()
     headers: dict[str, str] = {}
-    resolved_base, extra_headers = await _resolve_base_and_headers(provider_type, api_base)
+    resolved_base, catalog_headers = await _resolve_base_and_headers(provider_type, api_base)
+    extra_headers = {**catalog_headers, **(instance_headers or {})}
 
     try:
         if provider_type == "anthropic":
@@ -1118,9 +1132,10 @@ async def test_connection(
     model_name: str,
     api_key: str | None = None,
     api_base: str | None = None,
+    extra_headers: dict[str, str] | None = None,
 ) -> dict:
     try:
-        adapter = await _get_adapter("test", provider_type, model_name, api_base, api_key)
+        adapter = await _get_adapter("test", provider_type, model_name, api_base, api_key, extra_headers)
     except Exception as exc:
         log.info("llm.test", provider_type=provider_type, model=model_name, success=False)
         return {"success": False, "latency_ms": None, "error": str(exc)}
@@ -1153,7 +1168,7 @@ async def grade_documents(
         {"role": "system", "content": prompt},
         {"role": "user", "content": f"Pregunta: {question}\n\nDocumentos:\n{doc_list}"},
     ]
-    adapter = await _get_adapter(provider.name, provider.provider_type, provider.model_name, provider.api_base, api_key)
+    adapter = await _get_adapter(provider.name, provider.provider_type, provider.model_name, provider.api_base, api_key, provider.extra_headers)
 
     def _parse(text: str) -> list[bool] | None:
         """Intenta extraer los juicios del texto. None si el formato no sirve."""
@@ -1233,7 +1248,7 @@ async def classify_topic(
         {"role": "system", "content": prompt},
         {"role": "user", "content": f"Pregunta: {question}"},
     ]
-    adapter = await _get_adapter(provider.name, provider.provider_type, provider.model_name, provider.api_base, api_key)
+    adapter = await _get_adapter(provider.name, provider.provider_type, provider.model_name, provider.api_base, api_key, provider.extra_headers)
     try:
         # El JSON del tema ocupa poco, pero un modelo de razonamiento gasta
         # parte del presupuesto antes de escribirlo: con 32 tokens la respuesta
@@ -1272,7 +1287,7 @@ async def _extract_statements(
         {"role": "system", "content": prompt},
         {"role": "user", "content": f"Respuesta: {answer[:2000]}"},
     ]
-    adapter = await _get_adapter(provider.name, provider.provider_type, provider.model_name, provider.api_base, api_key)
+    adapter = await _get_adapter(provider.name, provider.provider_type, provider.model_name, provider.api_base, api_key, provider.extra_headers)
     # 2000, no 512: mismo motivo que grade_documents - un modelo con
     # razonamiento oculto puede agotar un presupuesto chico antes de escribir
     # el JSON visible.
@@ -1320,7 +1335,7 @@ async def grade_faithfulness(
             {"role": "system", "content": prompt},
             {"role": "user", "content": f"Contexto:\n{context_text}\n\nStatements:\n{stmt_list}"},
         ]
-        adapter = await _get_adapter(provider.name, provider.provider_type, provider.model_name, provider.api_base, api_key)
+        adapter = await _get_adapter(provider.name, provider.provider_type, provider.model_name, provider.api_base, api_key, provider.extra_headers)
         text = await adapter.complete(messages, temperature=0.0, max_tokens=2000)
         if not text or not text.strip():
             return None
@@ -1374,7 +1389,7 @@ async def rewrite_query(
         {"role": "system", "content": system},
         {"role": "user", "content": question},
     ]
-    adapter = await _get_adapter(provider.name, provider.provider_type, provider.model_name, provider.api_base, api_key)
+    adapter = await _get_adapter(provider.name, provider.provider_type, provider.model_name, provider.api_base, api_key, provider.extra_headers)
     try:
         # Con `avoid` se sube la temperatura para variar la reformulación.
         temperature = 0.4 if avoid else 0.0

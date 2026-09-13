@@ -56,10 +56,6 @@ class Settings(BaseSettings):
     RATE_LIMIT_LOGIN_PER_MIN: int = 5
     RATE_LIMIT_REFRESH_PER_MIN: int = 30
 
-    LLM_OLLAMA_BASE: str = "http://localhost:11434/v1"
-    LLM_LMSTUDIO_BASE: str = "http://localhost:1234/v1"
-    LLM_VLLM_BASE: str = "http://localhost:8000/v1"
-
     MAX_INPUT_CHARS: int = 4000
 
     SMTP_HOST: str = "smtp.gmail.com"

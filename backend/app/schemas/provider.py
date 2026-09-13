@@ -13,6 +13,9 @@ class ProviderCreate(BaseModel):
     model_name: str = Field(..., min_length=1, max_length=120)
     api_key: str | None = Field(None, description="Plaintext - will be encrypted before storage")
     api_base: str | None = Field(None, max_length=512)
+    # Headers HTTP extra propios de esta instancia; se mezclan sobre los
+    # default_headers del tipo en provider_type_catalog (esta instancia gana).
+    extra_headers: dict[str, str] = Field(default_factory=dict)
     dashboard_url: str | None = Field(None, max_length=512)
     is_active: bool = True
     # None = fuera de cadena; 1 = principal; 2+ = fallback
@@ -25,6 +28,7 @@ class ProviderUpdate(BaseModel):
     model_name: str | None = Field(None, min_length=1, max_length=120)
     api_key: str | None = None    # None = sin cambio; "" = borrar clave
     api_base: str | None = Field(None, max_length=512)
+    extra_headers: dict[str, str] | None = None
     dashboard_url: str | None = Field(None, max_length=512)
     is_active: bool | None = None
     priority: int | None = Field(None, ge=1)  # None = quitar de la cadena
@@ -36,6 +40,7 @@ class ProviderTestRequest(BaseModel):
     model_name: str = Field(..., min_length=1, max_length=120)
     api_key: str | None = None
     api_base: str | None = None
+    extra_headers: dict[str, str] = Field(default_factory=dict)
 
 
 class ProviderTestResult(BaseModel):
@@ -50,6 +55,7 @@ class ProviderOut(BaseModel):
     provider_type: str
     model_name: str
     api_base: str | None
+    extra_headers: dict[str, str]
     dashboard_url: str | None
     has_api_key: bool
     is_active: bool
@@ -78,6 +84,7 @@ class ProviderModelsRequest(BaseModel):
     provider_type: str = Field(..., min_length=1, max_length=50)
     api_key: str | None = None
     api_base: str | None = None
+    extra_headers: dict[str, str] = Field(default_factory=dict)
 
 
 class ProviderModelItem(BaseModel):

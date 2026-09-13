@@ -66,6 +66,7 @@ export interface LLMProvider {
   provider_type: string;
   model_name: string;
   api_base: string | null;
+  extra_headers: Record<string, string>;
   dashboard_url: string | null;
   has_api_key: boolean;
   is_active: boolean;

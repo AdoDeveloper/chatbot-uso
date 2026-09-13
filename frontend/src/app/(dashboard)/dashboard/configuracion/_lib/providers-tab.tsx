@@ -27,14 +27,18 @@ import { ProviderTypesPanel } from "./provider-types-panel";
 
 const CUSTOM_TYPE_VALUE = "__custom__";
 
+interface HeaderPair { key: string; value: string }
+
 interface ProviderForm {
  name: string; provider_type: string; custom_type: string;
  model_name: string; api_key: string; api_base: string;
+ headers: HeaderPair[];
  dashboard_url: string; is_active: boolean; priority: string;
 }
 const emptyForm = (): ProviderForm => ({
  name: "", provider_type: "openai", custom_type: "", model_name: "",
- api_key: "", api_base: "", dashboard_url: "", is_active: true, priority: "",
+ api_key: "", api_base: "", headers: [],
+ dashboard_url: "", is_active: true, priority: "",
 });
 type TestState = "idle" | "testing" | "ok" | "fail";
 
@@ -61,7 +65,9 @@ const ProviderPanel = forwardRef<ProviderPanelHandle, {
    const isKnown = catalogTypes.some((t) => t.type_key === editing.provider_type);
    setForm({ name: editing.name, provider_type: isKnown ? editing.provider_type : CUSTOM_TYPE_VALUE,
     custom_type: isKnown ? "" : editing.provider_type, model_name: editing.model_name,
-    api_key: "", api_base: editing.api_base ?? "", dashboard_url: editing.dashboard_url ?? "",
+    api_key: "", api_base: editing.api_base ?? "",
+    headers: Object.entries(editing.extra_headers ?? {}).map(([key, value]) => ({ key, value })),
+    dashboard_url: editing.dashboard_url ?? "",
     is_active: editing.is_active,
     priority: editing.priority !== null ? String(editing.priority) : "" });
   } else { setForm(emptyForm()); }
@@ -70,6 +76,19 @@ const ProviderPanel = forwardRef<ProviderPanelHandle, {
  }, [editing, catalogTypes]);
 
  const set = (k: keyof ProviderForm, v: unknown) => { setForm((f) => ({ ...f, [k]: v })); setTestState("idle"); };
+
+ function addHeader() { setForm((f) => ({ ...f, headers: [...f.headers, { key: "", value: "" }] })); }
+ function updateHeader(i: number, field: "key" | "value", v: string) {
+  setForm((f) => ({ ...f, headers: f.headers.map((h, idx) => idx === i ? { ...h, [field]: v } : h) }));
+ }
+ function removeHeader(i: number) {
+  setForm((f) => ({ ...f, headers: f.headers.filter((_, idx) => idx !== i) }));
+ }
+ function headersObject(): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const h of form.headers) if (h.key.trim()) out[h.key.trim()] = h.value;
+  return out;
+ }
 
  function handleProviderTypeChange(newType: string) {
   const isNewTypeLocal = catalogTypes.some((t) => t.type_key === newType && t.is_local);
@@ -96,7 +115,7 @@ const ProviderPanel = forwardRef<ProviderPanelHandle, {
     // Usar la key almacenada del proveedor guardado
     ({ data } = await api.get(`/providers/${editing.id}/models`));
    } else {
-    const payload: Record<string, unknown> = { provider_type: resolvedType };
+    const payload: Record<string, unknown> = { provider_type: resolvedType, extra_headers: headersObject() };
     if (form.api_key) payload.api_key = form.api_key;
     if (form.api_base) payload.api_base = form.api_base;
     ({ data } = await api.post("/providers/models", payload));
@@ -119,7 +138,7 @@ const ProviderPanel = forwardRef<ProviderPanelHandle, {
     setTestState(data.success ? "ok" : "fail");
     if (data.success) setTestMs(data.latency_ms); else setTestMsg(data.error ?? "Error");
    } else {
-    const payload: Record<string, unknown> = { provider_type: resolvedType, model_name: form.model_name };
+    const payload: Record<string, unknown> = { provider_type: resolvedType, model_name: form.model_name, extra_headers: headersObject() };
     if (form.api_key) payload.api_key = form.api_key;
     if (form.api_base) payload.api_base = form.api_base;
     const { data } = await api.post("/providers/test", payload);
@@ -138,7 +157,8 @@ const ProviderPanel = forwardRef<ProviderPanelHandle, {
   try {
    const payload: Record<string, unknown> = {
     name: form.name, provider_type: resolvedType, model_name: form.model_name,
-    api_base: form.api_base || null, dashboard_url: form.dashboard_url || null,
+    api_base: form.api_base || null, extra_headers: headersObject(),
+    dashboard_url: form.dashboard_url || null,
     is_active: form.is_active,
     priority: form.priority !== "" ? Number(form.priority) : null,
    };
@@ -262,6 +282,31 @@ const ProviderPanel = forwardRef<ProviderPanelHandle, {
      )}
     </div>
    )}
+   <div>
+    <div className="flex items-center justify-between mb-1">
+     <label className="text-xs font-medium text-muted-foreground">
+      Headers HTTP extra <span className="text-muted-foreground font-normal">(opcional)</span>
+     </label>
+     <Button variant="ghost" size="xs" onClick={addHeader} className="text-muted-foreground hover:text-primary">
+      <Plus className="w-3 h-3" /> Agregar
+     </Button>
+    </div>
+    {form.headers.length === 0 ? (
+     <p className="text-2xs text-muted-foreground">Ninguno. Se suman a los del catálogo del tipo; en caso de choque, estos ganan.</p>
+    ) : (
+     <div className="space-y-2">
+      {form.headers.map((h, i) => (
+       <div key={i} className="flex gap-2 items-center">
+        <Input value={h.key} onChange={(e) => updateHeader(i, "key", e.target.value)} placeholder="nombre-header" className="flex-1" autoComplete="off" />
+        <Input value={h.value} onChange={(e) => updateHeader(i, "value", e.target.value)} placeholder="valor" className="flex-1" autoComplete="off" />
+        <Button variant="ghost" size="icon-xs" onClick={() => removeHeader(i)} aria-label="Quitar header" className="text-muted-foreground hover:text-destructive shrink-0">
+         <X className="w-3.5 h-3.5" />
+        </Button>
+       </div>
+      ))}
+     </div>
+    )}
+   </div>
    <div>
     <label className="block text-xs font-medium text-muted-foreground mb-1">
      URL del dashboard del proveedor <span className="text-muted-foreground">(opcional)</span>

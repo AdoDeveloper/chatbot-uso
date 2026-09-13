@@ -47,7 +47,7 @@ _BUILTIN_CATALOG: list[dict] = [
     },
     {
         "type_key": "vllm", "display_name": "vLLM (self-hosted)",
-        "default_api_base": None,
+        "default_api_base": None, "is_local": True,
         "notes": "vLLM rechaza con 400 los campos desconocidos en el payload (a diferencia de OpenAI/OpenRouter) - no forzar reasoning_effort sin confirmar soporte.",
     },
     {"type_key": "cerebras", "display_name": "Cerebras", "default_api_base": "https://api.cerebras.ai/v1"},

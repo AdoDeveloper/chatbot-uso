@@ -114,6 +114,7 @@ def _to_out(p: LLMProvider) -> ProviderOut:
         provider_type=p.provider_type,
         model_name=p.model_name,
         api_base=p.api_base,
+        extra_headers=p.extra_headers,
         dashboard_url=p.dashboard_url,
         has_api_key=p.api_key_encrypted is not None,
         is_active=p.is_active,
@@ -149,6 +150,7 @@ async def create_provider(db: AsyncSession, data: ProviderCreate) -> ProviderOut
         model_name=data.model_name,
         api_key_encrypted=await encrypt_secret_async(data.api_key) if data.api_key else None,
         api_base=data.api_base,
+        extra_headers=data.extra_headers,
         dashboard_url=data.dashboard_url,
         is_active=data.is_active,
         priority=data.priority,
@@ -175,6 +177,8 @@ async def update_provider(db: AsyncSession, provider_id: uuid.UUID, data: Provid
         provider.api_key_encrypted = await encrypt_secret_async(data.api_key) if data.api_key else None
     if data.api_base is not None:
         provider.api_base = data.api_base or None
+    if data.extra_headers is not None:
+        provider.extra_headers = data.extra_headers
     if "dashboard_url" in data.model_fields_set:
         provider.dashboard_url = data.dashboard_url or None
     if data.is_active is not None:

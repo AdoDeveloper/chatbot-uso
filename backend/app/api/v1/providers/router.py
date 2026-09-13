@@ -110,6 +110,7 @@ async def list_provider_models(
             provider_type=data.provider_type,
             api_key=data.api_key,
             api_base=data.api_base,
+            instance_headers=data.extra_headers,
         )
         return ProviderModelsResult(models=[ProviderModelItem(**m) for m in items])
     except ValueError as exc:
@@ -132,6 +133,7 @@ async def list_saved_provider_models(
             provider_type=provider.provider_type,
             api_key=api_key,
             api_base=provider.api_base,
+            instance_headers=provider.extra_headers,
         )
         return ProviderModelsResult(models=[ProviderModelItem(**m) for m in items])
     except ValueError as exc:
@@ -149,6 +151,7 @@ async def test_provider(
         model_name=data.model_name,
         api_key=data.api_key,
         api_base=data.api_base,
+        extra_headers=data.extra_headers,
     )
     return ProviderTestResult(**result)
 
@@ -173,6 +176,7 @@ async def test_saved_provider(
         model_name=provider.model_name,
         api_key=api_key,
         api_base=provider.api_base,
+        extra_headers=provider.extra_headers,
     )
     await settings_service.record_test_result(
         db, provider_id,
