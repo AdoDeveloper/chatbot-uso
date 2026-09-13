@@ -8,7 +8,7 @@ import { ScrollShadow } from "@/components/composed/scroll-shadow"
 function Table({ className, ...props }: React.HTMLAttributes<HTMLTableElement>) {
   return (
     <ScrollShadow className="w-full">
-      <table data-slot="table" className={cn("min-w-full caption-bottom text-sm", className)} {...props} />
+      <table data-slot="table" className={cn("min-w-full border-collapse caption-bottom text-sm", className)} {...props} />
     </ScrollShadow>
   )
 }
@@ -42,8 +42,12 @@ function TableHead({ className, sticky, ...props }: React.ThHTMLAttributes<HTMLT
       data-slot="table-head"
       className={cn(
         "h-9 px-3 text-left align-middle text-2xs font-semibold uppercase tracking-wider text-muted-foreground bg-muted [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
-        // max-w-* no basta en table-layout auto (una columna sin `width` absorbe el espacio sobrante); w-28 es el ancho medido que sí lo restringe.
-        sticky && "sticky right-0 z-10 w-28 border-l border-border/60 shadow-[-4px_0_6px_-4px_rgb(0_0_0/0.12)]",
+        // w-px + whitespace-nowrap: en table-layout auto esto no fuerza 1px
+        // real, sino que reduce la columna al mínimo que su contenido más
+        // ancho requiera (título "Acciones" vs. los botones de cada fila) -
+        // se ajusta por tabla en vez de reservar un ancho fijo igual para
+        // una sola acción que para varias.
+        sticky && "sticky right-0 z-10 w-px whitespace-nowrap border-l border-border/60 shadow-[-4px_0_6px_-4px_rgb(0_0_0/0.12)]",
         className
       )}
       {...props}
@@ -57,7 +61,7 @@ function TableCell({ className, sticky, ...props }: React.TdHTMLAttributes<HTMLT
       data-slot="table-cell"
       className={cn(
         "px-3 py-2 align-middle text-13 [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
-        sticky && "sticky right-0 z-10 w-28 bg-card border-l border-border/60 shadow-[-4px_0_6px_-4px_rgb(0_0_0/0.12)] group-hover:bg-muted/40",
+        sticky && "sticky right-0 z-10 w-px whitespace-nowrap bg-card border-l border-border/60 shadow-[-4px_0_6px_-4px_rgb(0_0_0/0.12)] group-hover:bg-muted/40",
         className
       )}
       {...props}

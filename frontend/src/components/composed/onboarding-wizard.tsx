@@ -26,7 +26,7 @@ const STEPS: StepDef[] = [
   {
     num: 1,
     title: "Conectar un proveedor de IA",
-    description: "El bot necesita un modelo (Groq, OpenAI, Gemini...) para generar respuestas. Sin esto nada más funcionará.",
+    description: "Requiere un modelo de IA (Groq, OpenAI, Gemini...) conectado para generar respuestas. Es el primer requisito del sistema.",
     icon: Bot,
     cta: "Configurar proveedor",
     href: "/dashboard/configuracion",
@@ -35,42 +35,42 @@ const STEPS: StepDef[] = [
   {
     num: 2,
     title: "Activar y probar el modelo",
-    description: "Marque el proveedor como activo y verifique con un mensaje de prueba que la API key responde.",
+    description: "Requiere marcar el proveedor como activo y confirmar con un mensaje de prueba que la API key responde.",
     icon: Zap,
     cta: "Activar modelo",
     href: "/dashboard/configuracion",
     isDone: (s) => s.providers_active,
-    blockedBecause: (s) => !s.providers_configured ? "Primero conecte un proveedor (paso 1)." : null,
+    blockedBecause: (s) => !s.providers_configured ? "Requiere completar primero la conexión de un proveedor (paso 1)." : null,
   },
   {
     num: 3,
     title: "Subir el primer documento",
-    description: "El chatbot solo responde sobre el contenido que usted le da. PDF, DOCX, URL o FAQ · todos sirven.",
+    description: "El chatbot solo responde sobre el contenido cargado en el sistema. Admite PDF, DOCX, URL o FAQ.",
     icon: Upload,
     cta: "Subir documento",
     href: "/dashboard/conocimiento/documentos",
     isDone: (s) => s.sources_uploaded,
-    blockedBecause: (s) => !s.providers_active ? "Active un modelo primero (paso 2)." : null,
+    blockedBecause: (s) => !s.providers_active ? "Requiere un modelo activo (paso 2)." : null,
   },
   {
     num: 4,
     title: "Aprobar el documento",
-    description: "Tras la ingestión, revise que el contenido es correcto y apruebe la fuente para que el bot la use.",
+    description: "Tras la ingestión, la fuente requiere revisión y aprobación antes de que el bot la utilice.",
     icon: ShieldCheck,
     cta: "Revisar fuentes",
     href: "/dashboard/conocimiento/documentos",
     isDone: (s) => s.sources_approved,
-    blockedBecause: (s) => !s.sources_uploaded ? "Suba un documento primero (paso 3)." : null,
+    blockedBecause: (s) => !s.sources_uploaded ? "Requiere un documento cargado (paso 3)." : null,
   },
   {
     num: 5,
     title: "Probar una pregunta",
-    description: "Verifique el flujo completo haciendo una pregunta de prueba al bot. Debe responder usando su documento.",
+    description: "Confirma el flujo completo con una pregunta de prueba al bot, que debe responder usando el documento cargado.",
     icon: MessageSquare,
     cta: "Probar consulta",
     href: "/dashboard/conocimiento/consulta",
     isDone: (s) => s.messages_sent > 0,
-    blockedBecause: (s) => !s.sources_approved ? "Aprueba al menos una fuente primero (paso 4)." : null,
+    blockedBecause: (s) => !s.sources_approved ? "Requiere al menos una fuente aprobada (paso 4)." : null,
   },
 ];
 
@@ -99,7 +99,7 @@ export function OnboardingWizard() {
             <h2 className="text-base font-semibold tracking-tight">Bienvenido al panel del chatbot USO</h2>
           </div>
           <p className="text-xs text-muted-foreground">
-            Para que el sistema funcione, complete estos {STEPS.length} pasos en orden.
+            El sistema requiere completar estos {STEPS.length} pasos en orden.
             El proceso suele tomar 5-10 minutos.
           </p>
         </div>
@@ -193,7 +193,7 @@ export function OnboardingWizard() {
       {/* Footer con refresh */}
       <div className="px-6 py-3 border-t border-border/40 bg-muted/30 flex items-center justify-between">
         <p className="text-xs text-muted-foreground">
-          Después de completar un paso, haga clic en &ldquo;Verificar&rdquo; para actualizar el estado.
+          El estado se actualiza al presionar &ldquo;Verificar progreso&rdquo; tras completar un paso.
         </p>
         <Button size="sm" variant="outline" onClick={handleRefresh} disabled={refreshing}>
           {refreshing ? "Verificando…" : "Verificar progreso"}

@@ -26,23 +26,23 @@ _BUILTIN_CATALOG: list[dict] = [
     {"type_key": "openrouter", "display_name": "OpenRouter", "default_api_base": "https://openrouter.ai/api/v1"},
     {"type_key": "deepseek", "display_name": "DeepSeek", "default_api_base": "https://api.deepseek.com/v1"},
     {"type_key": "together", "display_name": "Together AI", "default_api_base": "https://api.together.xyz/v1"},
-    {"type_key": "xai", "display_name": "xAI (Grok)", "default_api_base": "https://api.x.ai/v1"},
+    {"type_key": "xai", "display_name": "xAI", "default_api_base": "https://api.x.ai/v1"},
     {"type_key": "mistral", "display_name": "Mistral AI", "default_api_base": "https://api.mistral.ai/v1"},
     {"type_key": "fireworks", "display_name": "Fireworks AI", "default_api_base": "https://api.fireworks.ai/inference/v1"},
     {"type_key": "perplexity", "display_name": "Perplexity", "default_api_base": "https://api.perplexity.ai"},
     {
-        "type_key": "ollama", "display_name": "Ollama (local)",
-        "default_api_base": None, "is_local": True,
+        "type_key": "ollama", "display_name": "Ollama",
+        "default_api_base": None, "requires_api_key": False,
         "notes": "URL local del servidor Ollama; se configura por instancia, no aquí.",
     },
     {
-        "type_key": "lmstudio", "display_name": "LM Studio (local)",
-        "default_api_base": None, "is_local": True,
+        "type_key": "lmstudio", "display_name": "LM Studio",
+        "default_api_base": None, "requires_api_key": False,
         "notes": "URL local del servidor LM Studio; se configura por instancia, no aquí.",
     },
     {
-        "type_key": "vllm", "display_name": "vLLM (self-hosted)",
-        "default_api_base": None, "is_local": True,
+        "type_key": "vllm", "display_name": "vLLM",
+        "default_api_base": None, "requires_api_key": False,
         "notes": "vLLM rechaza con 400 los campos desconocidos en el payload (a diferencia de OpenAI/OpenRouter) - no forzar reasoning_effort sin confirmar soporte.",
     },
     {"type_key": "cerebras", "display_name": "Cerebras", "default_api_base": "https://api.cerebras.ai/v1"},
@@ -97,14 +97,14 @@ async def seed_provider_catalog(db: AsyncSession) -> None:
                 default_api_base=item.get("default_api_base"),
                 default_headers=item.get("default_headers", {}),
                 is_builtin=True,
-                is_local=item.get("is_local", False),
+                requires_api_key=item.get("requires_api_key", True),
                 notes=item.get("notes"),
             ))
         else:
             row.display_name = item["display_name"]
             row.default_api_base = item.get("default_api_base")
             row.default_headers = item.get("default_headers", {})
-            row.is_local = item.get("is_local", False)
+            row.requires_api_key = item.get("requires_api_key", True)
             row.notes = item.get("notes")
 
     await db.commit()
@@ -134,7 +134,7 @@ async def create_type(db: AsyncSession, data: ProviderTypeCatalogCreate) -> Prov
         display_name=data.display_name,
         default_api_base=data.default_api_base,
         default_headers=data.default_headers,
-        is_local=data.is_local,
+        requires_api_key=data.requires_api_key,
         notes=data.notes,
     )
     db.add(row)
@@ -163,8 +163,8 @@ async def update_type(
         row.default_api_base = data.default_api_base or None
     if data.default_headers is not None:
         row.default_headers = data.default_headers
-    if data.is_local is not None:
-        row.is_local = data.is_local
+    if data.requires_api_key is not None:
+        row.requires_api_key = data.requires_api_key
     if "notes" in data.model_fields_set:
         row.notes = data.notes or None
 

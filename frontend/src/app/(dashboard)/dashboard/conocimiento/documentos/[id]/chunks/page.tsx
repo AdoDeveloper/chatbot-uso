@@ -185,16 +185,19 @@ export default function SourceChunksPage() {
     </Card>
    ) : (
     <Card className="overflow-hidden">
-     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-border/60">
-      <div className="relative w-full sm:w-72">
-       <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" aria-hidden="true" />
-       <Input
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        placeholder="Buscar en página actual..."
-        aria-label="Buscar en chunks de la página actual"
-        className="pl-8 h-9"
-       />
+     <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 px-5 py-4 border-b border-border/60">
+      <div className="w-full sm:w-72">
+       <label className="block text-2xs font-medium text-muted-foreground mb-1">Buscar</label>
+       <div className="relative">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" aria-hidden="true" />
+        <Input
+         value={search}
+         onChange={(e) => setSearch(e.target.value)}
+         placeholder="Buscar en página actual..."
+         aria-label="Buscar en chunks de la página actual"
+         className="pl-8 h-9"
+        />
+       </div>
       </div>
       {search.trim() && data && (
        <p className="text-2xs text-muted-foreground">
@@ -283,7 +286,7 @@ export default function SourceChunksPage() {
             <button
              type="button"
              onClick={() => copyId(chunk.id)}
-             title={`ID Qdrant: ${chunk.id} (clic para copiar)`}
+             title={`ID Qdrant: ${chunk.id} · clic para copiar`}
              className="inline-flex items-center gap-0.5 py-1 -my-1 text-3xs font-mono text-muted-foreground hover:text-foreground transition rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
              aria-label={`Copiar ID del chunk ${shortId}`}
             >
@@ -398,7 +401,7 @@ export default function SourceChunksPage() {
       pageSize={pageSize}
       onPageChange={setPage}
       onPageSizeChange={(n) => { setPageSize(n); setPage(1); }}
-      itemLabel={warningFilter ? "chunks (filtro activo)" : "chunks"}
+      itemLabel={warningFilter ? "chunks · filtro activo" : "chunks"}
      />
     </Card>
    )}
@@ -504,7 +507,7 @@ function ChunkEditDialog({
      </div>
      <div>
       <label className="text-xs font-medium text-muted-foreground mb-1 block">
-       Razón del cambio <span className="font-normal">(opcional)</span>
+       Razón del cambio <span className="font-normal">· opcional</span>
       </label>
       <input
        value={reason}

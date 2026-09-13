@@ -247,18 +247,21 @@ function MetricasTab() {
   <div className="space-y-6">
    {/* Toggle de fuente + selector de periodo + exportar */}
    <div className="flex flex-wrap items-center justify-between gap-3">
-    <div className="flex flex-wrap items-center gap-3">
+    <div className="flex flex-wrap items-end gap-3">
      {/* Toggle de fuente */}
-     <SegmentedControl
-      ariaLabel="Fuente de datos"
-      value={source}
-      onChange={setSource}
-      options={[
-       { value: "production", label: "Producción", icon: Rocket },
-       { value: "playground", label: "Previsualizar", icon: Play },
-      ]}
-     />
-     <div className="w-px h-5 bg-border" />
+     <div>
+      <label className="block text-2xs font-medium text-muted-foreground mb-1">Fuente</label>
+      <SegmentedControl
+       ariaLabel="Fuente de datos"
+       value={source}
+       onChange={setSource}
+       options={[
+        { value: "production", label: "Producción", icon: Rocket },
+        { value: "playground", label: "Previsualizar", icon: Play },
+       ]}
+      />
+     </div>
+     <div className="w-px h-7 bg-border self-end" />
      {/* Selector de rango de fechas */}
      <PeriodFilter
       dateFrom={dateFrom}
@@ -285,7 +288,7 @@ function MetricasTab() {
       </Button>
      </DropdownMenuTrigger>
      <DropdownMenuContent align="end">
-      <DropdownMenuItem onClick={() => handleExport("xlsx")}>Excel (.xlsx)</DropdownMenuItem>
+      <DropdownMenuItem onClick={() => handleExport("xlsx")}>Excel · .xlsx</DropdownMenuItem>
       <DropdownMenuItem onClick={() => handleExport("pdf")}>PDF</DropdownMenuItem>
      </DropdownMenuContent>
     </DropdownMenu>
@@ -304,7 +307,7 @@ function MetricasTab() {
     <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-lg border-l-4 border-warning bg-warning/10 text-warning-foreground">
      <Play className="w-3.5 h-3.5 shrink-0 text-warning" />
      <span className="text-xs font-medium text-foreground">
-      Mostrando métricas de <strong>Previsualizar</strong> (sesiones de prueba internas).{" "}
+      Mostrando métricas de <strong>Previsualizar</strong>, sesiones de prueba internas.{" "}
       <Button
        type="button"
        variant="link"
@@ -501,7 +504,7 @@ function MetricasTab() {
        <CardTitle className="text-15">Actividad por periodo</CardTitle>
        <CardDescription>
         {activityWindow === "day"  && "Consultas por hora en las últimas 24 h"}
-        {activityWindow === "week" && "Consultas por día de la semana (últimos 30 días)"}
+        {activityWindow === "week" && "Consultas por día de la semana · últimos 30 días"}
         {activityWindow === "month" && "Consultas diarias en el último mes"}
         {activityWindow === "year" && "Consultas por mes en el último año"}
        </CardDescription>
@@ -705,7 +708,7 @@ function PeriodComparisonPanel({ comparison, loading }: {
 const CHANNEL_META: Record<string, { label: string; icon: typeof Globe; cls: string }> = {
  widget: { label: "Widget web", icon: Globe, cls: "text-primary" },
  api: { label: "API directa", icon: Code, cls: "text-brand-teal" },
- playground: { label: "Previsualizar (interno)", icon: Play, cls: "text-warning" },
+ playground: { label: "Previsualizar · interno", icon: Play, cls: "text-warning" },
  unknown: { label: "Desconocido", icon: Circle, cls: "text-muted-foreground" },
 };
 
@@ -910,7 +913,7 @@ function ResponseQualityPanel({ quality, loading }: { quality: AnalyticsResponse
     <div className="flex items-center justify-between">
      <div>
       <CardTitle className="text-15">Calidad de las respuestas del asistente</CardTitle>
-      <CardDescription>Qué tan bien fundamentadas están las respuestas en el contenido cargado (muestra evaluada automáticamente)</CardDescription>
+      <CardDescription>Qué tan bien fundamentadas están las respuestas en el contenido cargado, según una muestra evaluada automáticamente</CardDescription>
      </div>
      <ShieldCheck className="h-4 w-4 text-muted-foreground" />
     </div>
@@ -1012,7 +1015,7 @@ function CsatPanel({ csat, loading }: { csat: AnalyticsCsat | null; loading: boo
    <CardHeader>
     <div className="flex items-center justify-between">
      <div>
-      <CardTitle className="text-15">Satisfacción del cliente (CSAT)</CardTitle>
+      <CardTitle className="text-15">Satisfacción del cliente · CSAT</CardTitle>
       <CardDescription>Calificación de 1 a 5 estrellas al finalizar la conversación</CardDescription>
      </div>
      <Star className="h-4 w-4 text-muted-foreground" />

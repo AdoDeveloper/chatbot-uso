@@ -78,7 +78,7 @@ const TRIGGER_FIELD_HINTS: Partial<Record<EscalationTrigger, Record<string, stri
     keywords: "Si el mensaje del usuario contiene cualquiera de estas palabras, se escala inmediatamente.",
   },
   confidence_below: {
-    threshold: "La búsqueda combina texto y significado (RRF); sus puntajes son bajos, no de 0 a 1. Típico: 0.015–0.033.",
+    threshold: "La búsqueda combina texto y significado con RRF; sus puntajes son bajos, no de 0 a 1. Típico: 0.015–0.033.",
     consecutive: "Escala si las últimas N respuestas tuvieron confianza menor al umbral.",
   },
   loop_detected: {
@@ -596,7 +596,7 @@ export default function EscalamientoConfigPage() {
                     onChange={(e) => setRuleTestRagScores(e.target.value)}
                     placeholder="0.015, 0.012, 0.018"
                   />
-                  <p className="text-2xs text-muted-foreground">Escala típica del sistema: 0–0.033 (RRF), no 0–1.</p>
+                  <p className="text-2xs text-muted-foreground">Escala típica del sistema con RRF: 0–0.033, no 0–1.</p>
                 </div>
               )}
 
@@ -629,7 +629,7 @@ export default function EscalamientoConfigPage() {
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Resultado</p>
               {!ruleTestResult ? (
                 <p className="text-2xs text-muted-foreground italic">
-                  Completa el contexto y presiona &ldquo;Ejecutar prueba&rdquo; para ver si la regla se activaría.
+                  Al completar el contexto y ejecutar la prueba, se muestra si la regla se activaría.
                 </p>
               ) : (
                 <>

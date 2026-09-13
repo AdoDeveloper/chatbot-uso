@@ -201,7 +201,7 @@ export function AddSourcePanel({ open, onClose, onCreated }: {
 
         <div className="space-y-1.5">
           <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Descripción <span className="normal-case font-normal text-muted-foreground">(opcional)</span>
+            Descripción <span className="normal-case font-normal text-muted-foreground">· opcional</span>
           </Label>
           <textarea
             value={description} onChange={(e) => setDescription(e.target.value)}
@@ -212,7 +212,7 @@ export function AddSourcePanel({ open, onClose, onCreated }: {
 
         <div className="space-y-1.5">
           <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Etiquetas <span className="normal-case font-normal text-muted-foreground">(opcional)</span>
+            Etiquetas <span className="normal-case font-normal text-muted-foreground">· opcional</span>
           </Label>
           <TagInput value={tags} onChange={setTags} />
         </div>

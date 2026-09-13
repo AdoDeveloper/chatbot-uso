@@ -389,7 +389,7 @@ export function SourceRow({
             ) : (
               <>
                 <div className="rounded-md border border-border bg-muted/20 p-3 max-h-96 overflow-y-auto">
-                  <pre className="text-xs whitespace-pre-wrap font-mono leading-relaxed overflow-x-auto">{preview?.preview || "(vacío)"}</pre>
+                  <pre className="text-xs whitespace-pre-wrap font-mono leading-relaxed overflow-x-auto">{preview?.preview || "Vacío"}</pre>
                 </div>
                 {preview?.truncated && (
                   <p className="text-3xs text-muted-foreground mt-1 italic">Vista previa truncada a 4000 caracteres.</p>

@@ -236,7 +236,7 @@ function SourcesListContent() {
         <StatCard
           title="Totales"
           value={sources.length}
-          tip="Cantidad de fuentes (activas + con error + en proceso)."
+          tip="Cantidad de fuentes activas, con error o en proceso."
         />
         <StatCard
           title="Listas"
@@ -263,14 +263,18 @@ function SourcesListContent() {
         {/* Fila 1: búsqueda + acción primaria, siempre juntas y visibles.
             Los filtros de tags (que pueden crecer mucho) van en su propia
             fila para no empujar el botón "Agregar" fuera de vista. */}
-        <div className="flex items-center gap-3 px-5 py-4 border-b border-border/60">
-          <div className="relative flex-1 min-w-0 max-w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-            <Input
-              value={search} onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar fuentes..."
-              className="pl-8 h-8 w-full"
-            />
+        <div className="flex items-end gap-3 px-5 py-4 border-b border-border/60">
+          <div className="flex-1 min-w-0 max-w-64">
+            <label className="block text-2xs font-medium text-muted-foreground mb-1">Buscar</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+              <Input
+                value={search} onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buscar fuentes..."
+                aria-label="Buscar fuentes"
+                className="pl-8 h-8 w-full"
+              />
+            </div>
           </div>
 
           {can(PERM.KNOWLEDGE_UPDATE) && (

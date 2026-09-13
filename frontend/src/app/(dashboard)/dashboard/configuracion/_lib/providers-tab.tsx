@@ -87,17 +87,14 @@ const ProviderPanel = forwardRef<ProviderPanelHandle, {
  }
 
  function handleProviderTypeChange(newType: string) {
-  const isNewTypeLocal = catalogTypes.some((t) => t.type_key === newType && t.is_local);
-  setForm((f) => ({ ...f, provider_type: newType, api_base: isNewTypeLocal ? f.api_base : "" }));
+  setForm((f) => ({ ...f, provider_type: newType }));
   setTestState("idle");
  }
 
  const resolvedType = form.provider_type === CUSTOM_TYPE_VALUE ? form.custom_type : form.provider_type;
  const selectedCatalogEntry = catalogTypes.find((t) => t.type_key === form.provider_type) ?? null;
- const isLocal = selectedCatalogEntry?.is_local ?? false;
- // Cualquier tipo permite sobrescribir la URL - el catálogo solo aporta un
- // valor por defecto; custom/local siempre la necesitan explícita.
- const showBaseUrl = true;
+ const isOllamaOrLmStudio = form.provider_type === "ollama" || form.provider_type === "lmstudio";
+ const apiKeyRequired = selectedCatalogEntry?.requires_api_key ?? true;
 
  async function handleTest() {
   if (!resolvedType || !form.model_name) return;
@@ -173,48 +170,45 @@ const ProviderPanel = forwardRef<ProviderPanelHandle, {
     <Input value={form.model_name} onChange={(e) => set("model_name", e.target.value)}
      placeholder="nombre-del-modelo" autoComplete="off" />
    </div>
-   {!isLocal && (
-    <div>
-     <label className="block text-xs font-medium text-muted-foreground mb-1">
-      API Key {editing?.has_api_key && <span className="text-muted-foreground">(vacío = mantener actual)</span>}
-     </label>
-     <div className="relative">
-      <Input type={showKey ? "text" : "password"} value={form.api_key}
-       onChange={(e) => set("api_key", e.target.value)}
-       placeholder={editing?.has_api_key ? "••••••••••••••••" : "sk-..."}
-       className="pr-10" autoComplete="new-password" />
-      <button type="button" onClick={() => setShowKey((s) => !s)} className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50" aria-label={showKey ? "Ocultar API key" : "Mostrar API key"}>
-       {showKey ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
-      </button>
-     </div>
+   <div>
+    <label className="block text-xs font-medium text-muted-foreground mb-1">
+     API Key <span className="text-muted-foreground font-normal">
+      {editing?.has_api_key ? "· vacío para mantener la actual" : apiKeyRequired ? "· requerido" : "· opcional"}
+     </span>
+    </label>
+    <div className="relative">
+     <Input type={showKey ? "text" : "password"} value={form.api_key}
+      onChange={(e) => set("api_key", e.target.value)}
+      placeholder={editing?.has_api_key ? "••••••••••••••••" : "sk-..."}
+      className="pr-10" autoComplete="new-password" />
+     <button type="button" onClick={() => setShowKey((s) => !s)} className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50" aria-label={showKey ? "Ocultar API key" : "Mostrar API key"}>
+      {showKey ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
+     </button>
     </div>
-   )}
-   {showBaseUrl && (
-    <div>
-     <label className="block text-xs font-medium text-muted-foreground mb-1">
-      URL base {!isLocal && <span className="text-muted-foreground">(opcional - vacío usa el valor del catálogo)</span>}
-      {form.provider_type === "azure" && <span className="text-muted-foreground ml-1">(endpoint de Azure OpenAI)</span>}
-      {isLocal && <span className="text-muted-foreground ml-1">(endpoint local)</span>}
-     </label>
-     <Input value={form.api_base} onChange={(e) => set("api_base", e.target.value)}
-      placeholder={
-       form.provider_type === "azure" ? "https://mi-recurso.openai.azure.com"
-       : form.provider_type === "ollama" ? "http://<host>:11434/v1"
-       : form.provider_type === "lmstudio" ? "http://<host>:1234/v1"
-       : selectedCatalogEntry?.default_api_base ?? "https://..."
-      } />
-     {isLocal && (
-      <p className="mt-1 text-2xs text-muted-foreground">
-       Asegúrate de que {form.provider_type === "ollama" ? "Ollama" : "LM Studio"} esté accesible en la URL indicada.
-       {form.provider_type === "ollama" && " Escriba el nombre exacto del modelo (ej: llama3.2, gpt-oss:20b-cloud)."}
-      </p>
-     )}
-    </div>
-   )}
+   </div>
+   <div>
+    <label className="block text-xs font-medium text-muted-foreground mb-1">
+     URL base {selectedCatalogEntry?.default_api_base && <span className="text-muted-foreground">· opcional, vacío usa el valor del catálogo</span>}
+     {form.provider_type === "azure" && <span className="text-muted-foreground ml-1">· endpoint de Azure OpenAI</span>}
+    </label>
+    <Input value={form.api_base} onChange={(e) => set("api_base", e.target.value)}
+     placeholder={
+      form.provider_type === "azure" ? "https://mi-recurso.openai.azure.com"
+      : form.provider_type === "ollama" ? "http://<host>:11434/v1"
+      : form.provider_type === "lmstudio" ? "http://<host>:1234/v1"
+      : selectedCatalogEntry?.default_api_base ?? "https://..."
+     } />
+    {isOllamaOrLmStudio && (
+     <p className="mt-1 text-2xs text-muted-foreground">
+      Requiere que el servidor de {form.provider_type === "ollama" ? "Ollama" : "LM Studio"} esté accesible en esa URL.
+      {form.provider_type === "ollama" && " El nombre del modelo debe coincidir exactamente con el de Ollama, por ejemplo llama3.2 o gpt-oss:20b-cloud."}
+     </p>
+    )}
+   </div>
    <div>
     <div className="flex items-center justify-between mb-1">
      <label className="text-xs font-medium text-muted-foreground">
-      Headers HTTP extra <span className="text-muted-foreground font-normal">(opcional)</span>
+      Headers HTTP extra <span className="text-muted-foreground font-normal">· opcional</span>
      </label>
      <Button variant="ghost" size="xs" onClick={addHeader} className="text-muted-foreground hover:text-primary">
       <Plus className="w-3 h-3" /> Agregar
@@ -238,18 +232,18 @@ const ProviderPanel = forwardRef<ProviderPanelHandle, {
    </div>
    <div>
     <label className="block text-xs font-medium text-muted-foreground mb-1">
-     URL del dashboard del proveedor <span className="text-muted-foreground">(opcional)</span>
+     URL del dashboard del proveedor <span className="text-muted-foreground">· opcional</span>
     </label>
     <Input
      type="url" value={form.dashboard_url} onChange={(e) => set("dashboard_url", e.target.value)}
      placeholder="https://platform.openai.com/usage"
     />
     <p className="mt-1 text-2xs text-muted-foreground">
-     Si la completas, aparecerá un botón de acceso rápido en la tarjeta del proveedor.
+     Si se completa, se muestra un botón de acceso rápido en la tarjeta del proveedor.
     </p>
    </div>
    <div>
-    <label className="block text-xs font-medium text-muted-foreground mb-1">Posición en la cadena <span className="text-muted-foreground">(1=principal, 2+=fallback, vacío=fuera)</span></label>
+    <label className="block text-xs font-medium text-muted-foreground mb-1">Posición en la cadena <span className="text-muted-foreground">· 1 es principal, 2+ es fallback, vacío la deja fuera</span></label>
     <Input type="number" min={1} value={form.priority} onChange={(e) => set("priority", e.target.value)}
      placeholder="sin asignar" />
    </div>
@@ -265,7 +259,7 @@ const ProviderPanel = forwardRef<ProviderPanelHandle, {
      {testState === "testing" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
      Probar
     </Button>
-    {testState === "ok" && <p className="mt-1.5 flex items-center gap-1 text-xs text-success"><CheckCircle2 className="w-3.5 h-3.5" /> Conexión exitosa {testMs !== null && <span className="text-muted-foreground ml-1">({testMs} ms)</span>}</p>}
+    {testState === "ok" && <p className="mt-1.5 flex items-center gap-1 text-xs text-success"><CheckCircle2 className="w-3.5 h-3.5" /> Conexión exitosa {testMs !== null && <span className="text-muted-foreground ml-1">· {testMs} ms</span>}</p>}
     {testState === "fail" && <p className="mt-1.5 flex items-start gap-1 text-xs text-destructive"><AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" /><span className="break-all">{testMsg}</span></p>}
    </div>
   </div>

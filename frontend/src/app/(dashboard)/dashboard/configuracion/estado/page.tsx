@@ -305,8 +305,7 @@ function EstadoContent() {
           <p className="text-2xs text-muted-foreground mt-0.5">
             <strong>No es necesario ejecutarlas en uso normal</strong>: al eliminar
             un documento, los fragmentos del índice y el caché ya se limpian
-            automáticamente. Use estas herramientas solo si sospecha
-            desincronización.
+            automáticamente. Están pensadas para casos de desincronización.
           </p>
         </div>
 

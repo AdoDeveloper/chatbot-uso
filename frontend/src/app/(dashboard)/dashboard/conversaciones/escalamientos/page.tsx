@@ -182,7 +182,7 @@ function CaseCard({
           </div>
 
           <p className="text-13 text-foreground leading-snug line-clamp-2">
-            {conv.first_user_message ?? "(sin mensaje)"}
+            {conv.first_user_message ?? "Sin mensaje"}
           </p>
 
           {(conv.csat_reasons?.length > 0 || conv.csat_comment) && (
@@ -445,7 +445,7 @@ export default function EscalamientosPage() {
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-2 sm:flex sm:items-center sm:justify-end">
+          <div className="grid grid-cols-1 gap-2 sm:flex sm:items-end sm:justify-end">
             <DateRangeFilter
               size="sm"
               from={dateFrom}
@@ -454,17 +454,20 @@ export default function EscalamientosPage() {
               onToChange={(v) => { setDateTo(v); setPage(1); }}
             />
             {knownTags.length > 0 && (
-              <Select
-                value={tagFilter}
-                onChange={(e) => { setTagFilter(e.target.value); setPage(1); }}
-                className="h-8 text-13 min-w-0"
-                aria-label="Filtrar por tag"
-              >
-                <SelectOption value="">Todos los tags</SelectOption>
-                {knownTags.slice(0, 30).map((t) => (
-                  <SelectOption key={t.tag} value={t.tag}>#{t.tag} ({t.count})</SelectOption>
-                ))}
-              </Select>
+              <div className="min-w-0">
+                <label className="block text-2xs font-medium text-muted-foreground mb-1">Tag</label>
+                <Select
+                  value={tagFilter}
+                  onChange={(e) => { setTagFilter(e.target.value); setPage(1); }}
+                  className="h-7 text-xs min-w-0"
+                  aria-label="Filtrar por tag"
+                >
+                  <SelectOption value="">Todos</SelectOption>
+                  {knownTags.slice(0, 30).map((t) => (
+                    <SelectOption key={t.tag} value={t.tag}>#{t.tag} ({t.count})</SelectOption>
+                  ))}
+                </Select>
+              </div>
             )}
           </div>
         </div>

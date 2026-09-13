@@ -578,7 +578,7 @@ export default function PublicacionesPage() {
         }
       >
         <div className="space-y-2">
-          <Label>Descripción <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+          <Label>Descripción <span className="text-muted-foreground font-normal">· opcional</span></Label>
           <Input
             value={snapshotDesc}
             onChange={(e) => setSnapshotDesc(e.target.value)}

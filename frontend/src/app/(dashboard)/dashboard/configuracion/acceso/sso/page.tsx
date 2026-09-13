@@ -212,7 +212,7 @@ export default function SsoPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-15 font-semibold flex items-center gap-1.5">
-            <MicrosoftLogo className="w-4 h-4" /> Microsoft SSO (Azure AD)
+            <MicrosoftLogo className="w-4 h-4" /> Microsoft SSO · Azure AD
           </CardTitle>
           <CardDescription className="text-2xs">
             Inicio de sesión con cuentas corporativas de Microsoft 365.
@@ -271,7 +271,7 @@ export default function SsoPage() {
           {/* Dominios permitidos */}
           <div className="space-y-1">
             <label className="block text-2xs font-medium text-foreground">
-              Dominios permitidos <span className="font-normal text-muted-foreground">(opcional, separados por coma)</span>
+              Dominios permitidos <span className="font-normal text-muted-foreground">· opcional, separados por coma</span>
             </label>
             <Input
               value={allowedDomains}
@@ -285,7 +285,7 @@ export default function SsoPage() {
           {/* Redirect URI (solo lectura, para el registro de la app en Azure) */}
           <div className="space-y-1">
             <label className="block text-2xs font-medium text-muted-foreground">
-              Redirect URI <span className="font-normal">(copie esta URL en su app de Azure)</span>
+              Redirect URI <span className="font-normal">· copie esta URL en su app de Azure</span>
             </label>
             <div className="flex gap-2">
               <Input

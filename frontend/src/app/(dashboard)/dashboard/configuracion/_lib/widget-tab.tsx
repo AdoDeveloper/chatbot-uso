@@ -464,7 +464,7 @@ export function WidgetTab({ subtab, onPreview, config: configProp, setConfig: se
          placeholder="https://ejemplo.com/logo.png"
         />
         <p className="text-2xs text-muted-foreground mt-1">
-         PNG o SVG cuadrado recomendado (mín. 64×64 px). Reemplaza el ícono de robot cuando el toggle «Mostrar ícono» está activo.
+         PNG o SVG cuadrado recomendado, mínimo 64×64 px. Reemplaza el ícono de robot cuando el toggle «Mostrar ícono» está activo.
         </p>
        </div>
 
@@ -484,7 +484,7 @@ export function WidgetTab({ subtab, onPreview, config: configProp, setConfig: se
          checked={config.enable_feedback_icons ?? true} onChange={(v) => setConfig((c) => c ? { ...c, enable_feedback_icons: v } : c)} />
         <SettingToggle label="Menú de accesibilidad" description="Opción «Accesibilidad» en el menú del widget: tamaño de texto y alto contraste. Si se desactiva, tampoco se muestra el botón de leer en voz alta, sin importar el ajuste siguiente."
          checked={config.enable_accessibility ?? true} onChange={(v) => setConfig((c) => c ? { ...c, enable_accessibility: v } : c)} />
-        <SettingToggle label="Leer respuestas en voz alta" description="Muestra un botón para escuchar cada respuesta del asistente (requiere un navegador compatible)."
+        <SettingToggle label="Leer respuestas en voz alta" description="Muestra un botón para escuchar cada respuesta del asistente. Requiere un navegador compatible."
          checked={config.enable_tts ?? true} onChange={(v) => setConfig((c) => c ? { ...c, enable_tts: v } : c)} />
        </InlineDisclosure>
       </div>
@@ -499,7 +499,7 @@ export function WidgetTab({ subtab, onPreview, config: configProp, setConfig: se
        <SettingToggle label="Botón «Nueva conversación»" description="Permite al usuario reiniciar el chat sin recargar la página."
         checked={config.show_new_chat_button ?? true} onChange={(v) => setConfig((c) => c ? { ...c, show_new_chat_button: v } : c)} />
        <div className="pt-1">
-        <SettingToggle label="Encuesta de satisfacción (CSAT)" description="Al finalizar el chat, muestra una encuesta rápida de valoración y comentario."
+        <SettingToggle label="Encuesta de satisfacción · CSAT" description="Al finalizar el chat, muestra una encuesta rápida de valoración y comentario."
          checked={config.enable_csat ?? false} onChange={(v) => setConfig((c) => c ? { ...c, enable_csat: v } : c)} />
        </div>
        {config.enable_csat && (
@@ -586,7 +586,7 @@ export function WidgetTab({ subtab, onPreview, config: configProp, setConfig: se
       </pre>
       <p className="text-2xs text-muted-foreground mt-2">
        Carga el widget asíncronamente. Detecta automáticamente el dominio y lo valida contra la allowlist.
-       En aplicaciones móviles, cargue este mismo snippet dentro de un WebView.
+       En aplicaciones móviles, el mismo snippet puede cargarse dentro de un WebView.
       </p>
      </div>
      <WidgetApiKey
@@ -639,12 +639,12 @@ function WidgetUsageCaps({
       placeholder="Sin límite"
      />
      <p className="text-2xs text-muted-foreground mt-1">
-      Tope por sesión de usuario (ventana de 4h). Vacío = sin límite.
+      Tope por sesión de usuario, en una ventana de 4h. Vacío = sin límite.
      </p>
     </div>
 
     <div>
-     <label className="block text-xs font-medium text-muted-foreground mb-1.5">Mensajes por día (global)</label>
+     <label className="block text-xs font-medium text-muted-foreground mb-1.5">Mensajes por día · global</label>
      <Input
       type="number"
       min={1}

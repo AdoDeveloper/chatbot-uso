@@ -164,8 +164,7 @@ def _is_retryable(exc: BaseException) -> bool:
 # proveedor. Cuando no lo hace, se resuelve contra provider_type_catalog
 # (tabla editable desde Configuración → Tipos de proveedor) - no hay lista
 # de proveedores hardcodeada en el código; el catálogo es la fuente de
-# verdad y puede corregirse sin desplegar nada, incluidos los tipos locales
-# (is_local) como Ollama o LM Studio.
+# verdad y puede corregirse sin desplegar nada.
 
 # Caché de filas del catálogo por type_key: evita una consulta a BD en cada
 # petición de chat. TTL corto para que una edición desde el panel se refleje

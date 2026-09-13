@@ -12,20 +12,20 @@ import type { ProviderTypeCatalogItem } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/composed/modal";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Switch } from "@/components/ui/switch";
 
 interface HeaderPair { key: string; value: string }
 
 interface CatalogForm {
  type_key: string; display_name: string; default_api_base: string;
- is_local: boolean; notes: string; headers: HeaderPair[];
+ requires_api_key: boolean; notes: string; headers: HeaderPair[];
 }
 const emptyForm = (): CatalogForm => ({
  type_key: "", display_name: "", default_api_base: "",
- is_local: false, notes: "", headers: [],
+ requires_api_key: true, notes: "", headers: [],
 });
 
 interface CatalogPanelHandle { save: () => void }
@@ -42,7 +42,7 @@ const CatalogPanel = forwardRef<CatalogPanelHandle, {
    setForm({
     type_key: editing.type_key, display_name: editing.display_name,
     default_api_base: editing.default_api_base ?? "",
-    is_local: editing.is_local,
+    requires_api_key: editing.requires_api_key,
     notes: editing.notes ?? "",
     headers: Object.entries(editing.default_headers ?? {}).map(([key, value]) => ({ key, value })),
    });
@@ -74,7 +74,7 @@ const CatalogPanel = forwardRef<CatalogPanelHandle, {
     type_key: form.type_key.trim(),
     display_name: form.display_name.trim(),
     default_api_base: form.default_api_base.trim() || null,
-    is_local: form.is_local,
+    requires_api_key: form.requires_api_key,
     notes: form.notes.trim() || null,
     default_headers,
    };
@@ -92,29 +92,29 @@ const CatalogPanel = forwardRef<CatalogPanelHandle, {
  return (
   <div className="space-y-4">
    <div>
-    <label className="block text-xs font-medium text-muted-foreground mb-1">Clave (type_key)</label>
+    <label className="block text-xs font-medium text-muted-foreground mb-1">Clave · type_key</label>
     <Input value={form.type_key} onChange={(e) => set("type_key", e.target.value.trim().toLowerCase())}
      placeholder="ej. together" autoComplete="off" />
-    <p className="mt-1 text-2xs text-muted-foreground">Es el valor que se guarda en cada proveedor (provider_type). No usar espacios.</p>
+    <p className="mt-1 text-2xs text-muted-foreground">Es el valor que se guarda como provider_type en cada proveedor. No usar espacios.</p>
    </div>
    <div>
     <label className="block text-xs font-medium text-muted-foreground mb-1">Nombre para mostrar</label>
     <Input value={form.display_name} onChange={(e) => set("display_name", e.target.value)}
      placeholder="ej. Together AI" autoComplete="off" />
    </div>
-   <div className="flex items-center justify-between py-1">
-    <div>
-     <p className="text-13 font-medium text-foreground">Servidor local</p>
-     <p className="text-2xs text-muted-foreground mt-0.5">Sin URL de catálogo compartida (ej. Ollama, LM Studio): cada instancia apunta a su propio host.</p>
-    </div>
-    <Switch checked={form.is_local} onCheckedChange={(v) => set("is_local", v)} />
-   </div>
    <div>
     <label className="block text-xs font-medium text-muted-foreground mb-1">
-     URL base por defecto <span className="text-muted-foreground">(opcional)</span>
+     URL base por defecto <span className="text-muted-foreground">· opcional</span>
     </label>
     <Input value={form.default_api_base} onChange={(e) => set("default_api_base", e.target.value)}
-     placeholder="https://api.ejemplo.com/v1" autoComplete="off" disabled={form.is_local} />
+     placeholder="https://api.ejemplo.com/v1" autoComplete="off" />
+   </div>
+   <div className="flex items-center justify-between py-1">
+    <div>
+     <p className="text-13 font-medium text-foreground">Requiere API key</p>
+     <p className="text-2xs text-muted-foreground mt-0.5">Desactivar para servidores sin autenticación, como Ollama, LM Studio o vLLM.</p>
+    </div>
+    <Switch checked={form.requires_api_key} onCheckedChange={(v) => set("requires_api_key", v)} />
    </div>
    <div>
     <div className="flex items-center justify-between mb-1">
@@ -124,7 +124,7 @@ const CatalogPanel = forwardRef<CatalogPanelHandle, {
      </Button>
     </div>
     {form.headers.length === 0 ? (
-     <p className="text-2xs text-muted-foreground">Ninguno. Algunos proveedores requieren headers propios (ej. Cloudflare: cf-aig-gateway-id).</p>
+     <p className="text-2xs text-muted-foreground">Ninguno. Algunos proveedores requieren headers propios, por ejemplo Cloudflare necesita cf-aig-gateway-id.</p>
     ) : (
      <div className="space-y-2">
       {form.headers.map((h, i) => (
@@ -141,7 +141,7 @@ const CatalogPanel = forwardRef<CatalogPanelHandle, {
    </div>
    <div>
     <label className="block text-xs font-medium text-muted-foreground mb-1">
-     Notas <span className="text-muted-foreground">(opcional)</span>
+     Notas <span className="text-muted-foreground">· opcional</span>
     </label>
     <Input value={form.notes} onChange={(e) => set("notes", e.target.value)}
      placeholder="ej. Servicio descontinuado, requiere product_id, etc." autoComplete="off" />
@@ -201,6 +201,7 @@ export function ProviderTypesPanel({
         <TableHead>Clave</TableHead>
         <TableHead>Nombre</TableHead>
         <TableHead className="hidden md:table-cell">URL base</TableHead>
+        <TableHead className="hidden lg:table-cell">API key</TableHead>
         <TableHead className="hidden lg:table-cell">Notas</TableHead>
         <TableHead className="whitespace-nowrap text-right" sticky>Acciones</TableHead>
        </TableRow>
@@ -211,7 +212,10 @@ export function ProviderTypesPanel({
          <TableCell><code className="text-2xs">{t.type_key}</code></TableCell>
          <TableCell><p className="text-13 font-medium text-foreground">{t.display_name}</p></TableCell>
          <TableCell className="hidden md:table-cell">
-          <p className="text-13 text-muted-foreground truncate max-w-64">{t.is_local ? "Local (por instancia)" : t.default_api_base ?? "—"}</p>
+          <p className="text-13 text-muted-foreground truncate max-w-64">{t.default_api_base ?? "—"}</p>
+         </TableCell>
+         <TableCell className="hidden lg:table-cell">
+          <p className="text-13 text-muted-foreground">{t.requires_api_key ? "Sí" : "No"}</p>
          </TableCell>
          <TableCell className="hidden lg:table-cell">
           {t.notes ? (

@@ -102,7 +102,7 @@ function originMeta(browser: string | null): { label: string; cls: string } {
   return { label: "Previsualizador", cls: "bg-info/10 text-info border-info/20" };
  }
  if (browser && _PANEL_BROWSERS.has(browser)) {
-  return { label: "Panel (prueba)", cls: "bg-muted text-muted-foreground border-border" };
+  return { label: "Panel · prueba", cls: "bg-muted text-muted-foreground border-border" };
  }
  return { label: "Widget", cls: "bg-success/10 text-success border-success/20" };
 }
@@ -172,7 +172,7 @@ const STATUS_CHIPS: { value: StatusFilter; label: string }[] = [
 
 type OriginFilter = "all" | "widget" | "test";
 const ORIGIN_CHIPS: { value: OriginFilter; label: string }[] = [
- { value: "all", label: "Todos los orígenes" },
+ { value: "all", label: "Todos" },
  { value: "widget", label: "Solo widget" },
  { value: "test", label: "Solo pruebas" },
 ];
@@ -302,20 +302,23 @@ export default function HistorialPage() {
          </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent>
-         <DropdownMenuItem onClick={() => handleExport("xlsx")}>Excel (.xlsx)</DropdownMenuItem>
+         <DropdownMenuItem onClick={() => handleExport("xlsx")}>Excel · .xlsx</DropdownMenuItem>
          <DropdownMenuItem onClick={() => handleExport("pdf")}>PDF</DropdownMenuItem>
         </DropdownMenuContent>
        </DropdownMenu>
       </div>
-      <div className="relative">
-       <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" aria-hidden="true" />
-       <Input
-        className="pl-8 h-8"
-        placeholder="Buscar en mensajes..."
-        aria-label="Buscar en mensajes"
-        value={search}
-        onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-       />
+      <div>
+       <label className="block text-2xs font-medium text-muted-foreground mb-1">Buscar</label>
+       <div className="relative">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" aria-hidden="true" />
+        <Input
+         className="pl-8 h-8"
+         placeholder="Buscar en mensajes..."
+         aria-label="Buscar en mensajes"
+         value={search}
+         onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+        />
+       </div>
       </div>
       <DateRangeFilter
        size="sm"
@@ -325,7 +328,9 @@ export default function HistorialPage() {
        onToChange={(v) => { setDateTo(v); setPage(1); }}
       />
       {/* Chips de estado */}
-      <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="Filtrar por estado">
+      <div>
+       <label className="block text-2xs font-medium text-muted-foreground mb-1">Estado</label>
+       <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="Filtrar por estado">
        {STATUS_CHIPS.map((chip) => {
         const active = statusFilter === chip.value;
         return (
@@ -343,8 +348,11 @@ export default function HistorialPage() {
          </Button>
         );
        })}
+       </div>
       </div>
-      <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="Filtrar por origen">
+      <div>
+       <label className="block text-2xs font-medium text-muted-foreground mb-1">Origen</label>
+       <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="Filtrar por origen">
        {ORIGIN_CHIPS.map((chip) => {
         const active = originFilter === chip.value;
         return (
@@ -362,6 +370,7 @@ export default function HistorialPage() {
          </Button>
         );
        })}
+       </div>
       </div>
      </div>
 
@@ -393,7 +402,7 @@ export default function HistorialPage() {
         >
          <div className="flex items-center justify-between gap-2 mb-1">
           <span className="truncate text-13 text-foreground">
-           {c.first_user_message || <em className="text-muted-foreground">(sin mensajes)</em>}
+           {c.first_user_message || <em className="text-muted-foreground">Sin mensajes</em>}
           </span>
           <div className="flex items-center gap-1.5 shrink-0">
            <OriginBadge browser={c.browser} />

@@ -455,7 +455,7 @@ export default function NotificacionesHistorialPage() {
                   <p className="text-2xs text-muted-foreground">
                     Envío: <span className="font-medium text-foreground">{humanizeNext(draft)}</span>
                     {" a las "}
-                    <span className="font-mono text-foreground">{String(draft.hour).padStart(2, "0")}:{String(draft.minute).padStart(2, "0")} (El Salvador)</span>
+                    <span className="font-mono text-foreground">{String(draft.hour).padStart(2, "0")}:{String(draft.minute).padStart(2, "0")} hora de El Salvador</span>
                   </p>
                 </div>
               </>

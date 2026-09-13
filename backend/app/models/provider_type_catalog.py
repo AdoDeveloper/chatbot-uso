@@ -40,10 +40,10 @@ class ProviderTypeCatalog(Base):
     # Sembrado vs. creado por el admin - solo cosmético, no bloquea edición/borrado.
     is_builtin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="0")
 
-    # Servidor local del propio admin (Ollama, LM Studio): no tiene una URL
-    # base de catálogo compartida, cada instancia apunta a su propio host y
-    # el campo se vuelve obligatorio en el formulario de proveedor.
-    is_local: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="0")
+    # Si este tipo de proveedor exige API key para autenticarse (la mayoría
+    # de APIs cloud) o no (servidores propios como Ollama/LM Studio/vLLM,
+    # que normalmente no piden credenciales).
+    requires_api_key: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, server_default="1")
 
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 

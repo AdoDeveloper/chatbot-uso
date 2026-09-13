@@ -160,15 +160,15 @@ export const SaludTab = forwardRef<SaludTabHandle>(function SaludTab(_props, ref
               Actualizado {fmtRelative(lastChecked.toISOString())}
             </span>
           )}
+          <span className="text-2xs font-normal opacity-80">Actualizar cada</span>
           <select
             value={autoRefreshSec}
             onChange={(e) => setAutoRefreshSec(Number(e.target.value))}
             className="h-6 px-2 text-2xs border border-border bg-background rounded-md text-foreground"
-            title="Auto-refresh"
             aria-label="Intervalo de actualización automática"
           >
             {REFRESH_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>↻ {o.label}</option>
+              <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
           <Button
@@ -196,7 +196,7 @@ export const SaludTab = forwardRef<SaludTabHandle>(function SaludTab(_props, ref
       <Card className="overflow-hidden">
         <div className="px-5 py-3 border-b border-border">
           <PeriodFilter
-            ariaLabel="Período de salud (uptime e incidentes)"
+            ariaLabel="Período de salud, uptime e incidentes"
             dateFrom={dateFrom}
             dateTo={dateTo}
             onDateFromChange={setDateFrom}

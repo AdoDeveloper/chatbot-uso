@@ -89,8 +89,8 @@ export default function PendientesPage() {
           <h2 className="text-base font-semibold flex-1 min-w-0 truncate">Preguntas pendientes</h2>
         </div>
         <p className="text-2xs text-muted-foreground mt-0.5">
-           Consultas que el chatbot no pudo responder, agrupadas por tema. Conviértelas en FAQ
-           o márcalas como resueltas tras añadir el contenido fuente correspondiente.
+           Consultas que el chatbot no pudo responder, agrupadas por tema. Pueden convertirse en FAQ
+           o marcarse como resueltas tras añadir el contenido fuente correspondiente.
          </p>
       </div>
 

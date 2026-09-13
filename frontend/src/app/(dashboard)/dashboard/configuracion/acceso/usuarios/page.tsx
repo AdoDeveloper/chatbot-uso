@@ -268,7 +268,7 @@ function InvitePanel({ open, availableRoles, onClose, onCreated }: {
             </p>
           </div>
           <div className="w-full bg-card border border-border rounded-xl p-4 text-left">
-            <p className="text-2xs text-muted-foreground mb-1.5 font-medium uppercase tracking-wide">Enlace de acceso (respaldo)</p>
+            <p className="text-2xs text-muted-foreground mb-1.5 font-medium uppercase tracking-wide">Enlace de acceso de respaldo</p>
             <p className="text-xs text-foreground break-all leading-relaxed">{generatedUrl}</p>
           </div>
           <p className="text-2xs text-muted-foreground -mt-2">Si el correo no llega, comparte este enlace manualmente.</p>

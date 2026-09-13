@@ -15,7 +15,7 @@ const RAG_PRESETS = [
   {
    id: "equilibrado",
    label: "Equilibrado",
-   description: "Balance entre precisión y fluidez (recomendado)",
+   description: "Balance entre precisión y fluidez · recomendado",
    values: { top_k: 12, score_threshold: 0.0, temperature: 0.55, use_corrective_rag: true },
   },
  {
@@ -98,8 +98,8 @@ export function ParamsTab({ form, set }: { form: ChatbotSettings; set: (k: keyof
       label="Umbral de relevancia"
       valueBadge={form.score_threshold.toFixed(2)}
       help={{
-       description: "Puntaje mínimo que debe tener un fragmento para incluirse. La búsqueda combina texto y significado (RRF), cuyos puntajes se mueven en una escala baja, no de 0 a 1 completo.",
-       example: "0 = sin filtro (recomendado). Valores de 0.05 en adelante quedan fuera de la escala real y se ignoran automáticamente para no dejar al chatbot sin contexto.",
+       description: "Puntaje mínimo que debe tener un fragmento para incluirse. La búsqueda combina texto y significado con RRF, cuyos puntajes se mueven en una escala baja, no de 0 a 1 completo.",
+       example: "0 = sin filtro, recomendado. Valores de 0.05 en adelante quedan fuera de la escala real y se ignoran automáticamente para no dejar al chatbot sin contexto.",
       }}
      >
       <input type="range" min={0} max={0.05} step={0.01} value={form.score_threshold}

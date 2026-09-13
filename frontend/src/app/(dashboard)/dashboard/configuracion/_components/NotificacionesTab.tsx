@@ -18,9 +18,9 @@ const EVENT_LABELS: Record<NotificationEvent, string> = {
   provider_down: "Proveedor IA caído",
   provider_degraded: "Proveedor IA degradado",
   provider_misconfigured: "Proveedor IA mal configurado",
-  unanswered_digest: "Preguntas sin respuesta (diario)",
-  rate_limit_threshold: "Rate limit cerca del techo (≥80%)",
-  service_down: "Servicio degradado (MySQL/Redis/Qdrant)",
+  unanswered_digest: "Preguntas sin respuesta · diario",
+  rate_limit_threshold: "Rate limit cerca del techo · ≥80%",
+  service_down: "Servicio degradado · MySQL, Redis o Qdrant",
 };
 
 const ALL_EVENTS: NotificationEvent[] = [

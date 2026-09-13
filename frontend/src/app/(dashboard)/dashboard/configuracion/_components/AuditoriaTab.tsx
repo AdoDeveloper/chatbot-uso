@@ -56,7 +56,7 @@ function actorColor(name: string) {
 }
 
 const RESOURCE_TYPES = [
-  { value: "", label: "Todos los recursos" },
+  { value: "", label: "Todos" },
   { value: "source", label: "Fuentes" },
   { value: "user", label: "Usuarios" },
   { value: "provider", label: "Proveedores" },
@@ -162,7 +162,7 @@ export function AuditoriaTab() {
                     setExporting(null);
                   }
                 }}>
-                  {fmt === "xlsx" ? "Excel (.xlsx)" : "PDF"}
+                  {fmt === "xlsx" ? "Excel · .xlsx" : "PDF"}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
@@ -171,30 +171,35 @@ export function AuditoriaTab() {
       </div>
 
       {/* Toolbar fila 2: filtros secundarios */}
-      <div className="px-4 py-2 border-b border-border bg-muted/20 flex flex-col sm:flex-row sm:items-center gap-2 text-2xs">
+      <div className="px-4 py-2 border-b border-border bg-muted/20 flex flex-col sm:flex-row sm:items-end gap-2 text-2xs">
         <div className="grid grid-cols-2 sm:flex gap-2">
-          <select
-            value={resourceType}
-            onChange={(e) => { setResourceType(e.target.value); setPage(1); }}
-            className="h-7 px-2 text-xs border border-border rounded-lg bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 min-w-0"
-            aria-label="Filtrar por tipo de recurso"
-          >
-            {RESOURCE_TYPES.map((rt) => (
-              <option key={rt.value} value={rt.value}>{rt.label}</option>
-            ))}
-          </select>
-          <select
-            value={actorId}
-            onChange={(e) => { setActorId(e.target.value); setPage(1); }}
-            className="h-7 px-2 text-xs border border-border rounded-lg bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 min-w-0"
-            title="Filtrar por actor"
-            aria-label="Filtrar por actor"
-          >
-            <option value="">Todos los actores</option>
-            {actors.map((a) => (
-              <option key={a.id} value={a.id}>{a.name}</option>
-            ))}
-          </select>
+          <div className="min-w-0">
+            <label className="block font-medium text-muted-foreground mb-1">Recurso</label>
+            <select
+              value={resourceType}
+              onChange={(e) => { setResourceType(e.target.value); setPage(1); }}
+              className="h-7 px-2 text-xs border border-border rounded-lg bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 min-w-0"
+              aria-label="Filtrar por tipo de recurso"
+            >
+              {RESOURCE_TYPES.map((rt) => (
+                <option key={rt.value} value={rt.value}>{rt.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="min-w-0">
+            <label className="block font-medium text-muted-foreground mb-1">Actor</label>
+            <select
+              value={actorId}
+              onChange={(e) => { setActorId(e.target.value); setPage(1); }}
+              className="h-7 px-2 text-xs border border-border rounded-lg bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 min-w-0"
+              aria-label="Filtrar por actor"
+            >
+              <option value="">Todos</option>
+              {actors.map((a) => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </select>
+          </div>
         </div>
         <DateRangeFilter
           size="sm"
@@ -210,7 +215,7 @@ export function AuditoriaTab() {
               setSearch(""); setResourceType(""); setActorId("");
               setDateFrom(""); setDateTo(""); setPage(1);
             }}
-            className="text-2xs h-auto p-0 sm:ml-auto"
+            className="text-2xs h-7 p-0 sm:ml-auto"
           >
             Limpiar filtros
           </Button>

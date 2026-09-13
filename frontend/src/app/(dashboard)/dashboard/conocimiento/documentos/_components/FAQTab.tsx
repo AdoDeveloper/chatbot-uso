@@ -163,28 +163,34 @@ export default function FAQTab() {
           )}
         </div>
 
-        <div className="flex flex-col lg:flex-row lg:items-center gap-3 px-5 pt-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" aria-hidden="true" />
-            <Input
-              className="pl-8 h-9"
-              placeholder="Buscar por pregunta, respuesta o tag..."
-              aria-label="Buscar FAQ"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+        <div className="flex flex-col lg:flex-row lg:items-end gap-3 px-5 pt-4">
+          <div className="flex-1 max-w-md">
+            <label className="block text-2xs font-medium text-muted-foreground mb-1">Buscar</label>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" aria-hidden="true" />
+              <Input
+                className="pl-8 h-9"
+                placeholder="Buscar por pregunta, respuesta o tag..."
+                aria-label="Buscar FAQ"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-2xs font-medium text-muted-foreground mb-1">Estado</label>
+            <SegmentedControl
+              ariaLabel="Filtrar por estado"
+              variant="chip"
+              value={stateFilter}
+              onChange={setStateFilter}
+              options={[
+                { value: "all" as StateFilter, label: `Todas (${stats.total})` },
+                { value: "active" as StateFilter, label: `Activas (${stats.active})` },
+                { value: "inactive" as StateFilter, label: `Inactivas (${stats.inactive})` },
+              ]}
             />
           </div>
-          <SegmentedControl
-            ariaLabel="Filtrar por estado"
-            variant="chip"
-            value={stateFilter}
-            onChange={setStateFilter}
-            options={[
-              { value: "all" as StateFilter, label: `Todas (${stats.total})` },
-              { value: "active" as StateFilter, label: `Activas (${stats.active})` },
-              { value: "inactive" as StateFilter, label: `Inactivas (${stats.inactive})` },
-            ]}
-          />
         </div>
 
         {allTags.length > 0 && (
@@ -340,7 +346,7 @@ export default function FAQTab() {
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="faq-tags" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Tags <span className="normal-case font-normal">(separados por coma)</span>
+              Tags <span className="normal-case font-normal">· separados por coma</span>
             </Label>
             <Input
               id="faq-tags"

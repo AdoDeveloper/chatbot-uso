@@ -496,7 +496,7 @@ const KNOWN_PATTERN_CATEGORIES = [
                 <div>
                   <CardTitle className="text-15 font-semibold">Patrones de bloqueo</CardTitle>
                   <p className="text-2xs text-muted-foreground mt-0.5">
-                    {patterns.length} reglas activas. Los <b>built-in</b> son definidos por el sistema; los <b>custom</b> los crea y edita usted.
+                    {patterns.length} reglas activas. Los <b>built-in</b> son definidos por el sistema; los <b>custom</b> se crean y editan manualmente.
                   </p>
                 </div>
                 <div className="grid grid-cols-1 sm:flex sm:items-center sm:justify-end gap-2">
@@ -700,19 +700,19 @@ const KNOWN_PATTERN_CATEGORIES = [
                 {KNOWN_PATTERN_CATEGORIES.map((c) => (
                   <SelectOption key={c} value={c}>{c}</SelectOption>
                 ))}
-                <SelectOption value="__custom__">Otra (especificar)…</SelectOption>
+                <SelectOption value="__custom__">Otra · especificar…</SelectOption>
               </Select>
               {!KNOWN_PATTERN_CATEGORIES.includes(watchPattern("category") as typeof KNOWN_PATTERN_CATEGORIES[number]) && (
                 <Input {...registerPattern("category")} placeholder="Nombre de la categoría" />
               )}
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold uppercase tracking-wide">Ejemplo (opcional)</Label>
+              <Label className="text-xs font-semibold uppercase tracking-wide">Ejemplo · opcional</Label>
               <Input {...registerPattern("example")} placeholder="Texto de ejemplo que sería bloqueado" />
             </div>
             <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
               <input type="checkbox" {...registerPattern("enabled")} className="h-3.5 w-3.5 accent-primary" />
-              <span>Patrón activo (se evalúa en cada mensaje)</span>
+              <span>Patrón activo · se evalúa en cada mensaje</span>
             </label>
           </div>
         </div>

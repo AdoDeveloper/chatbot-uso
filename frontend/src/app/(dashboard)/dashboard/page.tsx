@@ -326,7 +326,7 @@ export default function DashboardPage() {
          >
           <UserRound className={`h-4 w-4 shrink-0 ${urgent ? "text-destructive" : "text-warning"}`} />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-13 font-medium">{c.first_user_message ?? "(sin mensaje)"}</p>
+            <p className="truncate text-13 font-medium">{c.first_user_message ?? "Sin mensaje"}</p>
             <p className="mt-0.5 text-2xs text-muted-foreground tabular-nums">
             {c.message_count} mensajes · esperando {timeLabel}
            </p>

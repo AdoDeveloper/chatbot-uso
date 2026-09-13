@@ -320,7 +320,7 @@ export function SeguridadTab() {
               {filteredSamples.map((s) => (
                 <div key={s.id} className="rounded-lg border border-border bg-card p-3 space-y-1.5">
                   <div className="flex items-start justify-between gap-2">
-                    <p className="text-13 flex-1 italic">&ldquo;{s.question_preview ?? "(sin texto)"}&rdquo;</p>
+                    <p className="text-13 flex-1 italic">&ldquo;{s.question_preview ?? "Sin texto"}&rdquo;</p>
                     <span className="text-3xs tabular-nums text-muted-foreground shrink-0">
                       {formatInProjectTz(s.created_at, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                     </span>

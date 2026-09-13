@@ -1321,7 +1321,7 @@ export function PlaygroundTab({
                     )}
                     <textarea
                       className={`w-full rounded-lg px-2.5 py-2 text-xs outline-none border resize-none mt-1 focus:border-(--csat-focus-color) ${highContrast ? "bg-black text-white border-white/40 placeholder:text-white/50" : "bg-background border-border placeholder:text-muted-foreground"}`}
-                      placeholder="Cuéntenos su experiencia (opcional)…"
+                      placeholder="Cuéntenos su experiencia, es opcional…"
                       maxLength={300}
                       rows={2}
                       value={csatComment}
