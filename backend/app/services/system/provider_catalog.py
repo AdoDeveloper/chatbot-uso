@@ -16,8 +16,6 @@ from app.schemas.provider_type_catalog import (
 
 log = structlog.get_logger()
 
-# Valores corregidos según investigación real (no solo documentación
-# oficial, también artículos/issues confirmando comportamiento actual).
 # lepton y anyscale quedan fuera a propósito: descontinuados (lepton desde
 # 20/05/2025, adyacente a la adquisición por NVIDIA; anyscale perdió el
 # acceso multi-tenant en agosto de 2024) - no tiene sentido sembrarlos como
