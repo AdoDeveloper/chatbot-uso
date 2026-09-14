@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { SeguridadTab } from "../../configuracion/_components/SeguridadTab";
 
 export default function SeguridadPage() {
-  redirect("/dashboard/actividad?tab=seguridad");
+  return <SeguridadTab />;
 }

@@ -2,6 +2,7 @@
 
 import { ShieldCheck } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
+import { AccesoTabs } from "./_components/AccesoTabs";
 
 export default function AccesoLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -11,6 +12,7 @@ export default function AccesoLayout({ children }: { children: React.ReactNode }
         title="Gestión de acceso"
         tip="Administre usuarios e inicio de sesión del panel."
       />
+      <AccesoTabs />
       {children}
     </div>
   );

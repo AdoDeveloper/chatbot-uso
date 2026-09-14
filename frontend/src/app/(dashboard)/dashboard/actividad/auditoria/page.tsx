@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { AuditoriaTab } from "../../configuracion/_components/AuditoriaTab";
 
 export default function AuditoriaPage() {
-  redirect("/dashboard/actividad?tab=auditoria");
+  return <AuditoriaTab />;
 }

@@ -1,8 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import dynamic from "next/dynamic";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Plus, Database, Search, X, XCircle, Loader2, RefreshCw, Trash2, Tag,
 } from "lucide-react";
@@ -15,21 +13,18 @@ import { useToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Skeleton } from "@/components/ui/skeleton";
-import { PageHeader } from "@/components/ui/page-header";
-import { StatCard } from "@/components/composed/stat-card";
 import { Modal } from "@/components/composed/modal";
 import { Card } from "@/components/ui/card";
 import { DataTable } from "@/components/composed/data-table";
 import { EmptyState } from "@/components/ui/empty-state";
+import { StatCard } from "@/components/composed/stat-card";
 
 import { SourceRow } from "./_components/SourceRow";
 import { AddSourcePanel } from "./_components/AddSourcePanel";
 import { ReplaceFileModal } from "./_components/ReplaceFileModal";
 import { mergeSources } from "./_components/sources-helpers";
 
-function SourcesListContent() {
+export default function SourcesPage() {
   const { confirm, toast } = useToast();
   const can = usePermission();
   const { data, loading, error, refetch: load, setData } = useApi<Source[]>("/sources");
@@ -480,47 +475,3 @@ function SourcesListContent() {
   );
 }
 
-const TabLoading = () => <div className="space-y-4 py-8">{[1,2,3].map(i => <Skeleton key={i} className="h-16 w-full" />)}</div>;
-const FAQTab = dynamic(
-  () => import("./_components/FAQTab").catch(
-    () => {
-      const FAQFallback = () => (
-        <div className="py-12 text-center text-muted-foreground">FAQ no disponible</div>
-      );
-      return FAQFallback;
-    }
-  ),
-  { loading: TabLoading }
-);
-
-const TAB_IDS = ["sources", "faq"] as const;
-type TabId = typeof TAB_IDS[number];
-
-export default function SourcesPage() {
-  const searchParams = useSearchParams();
-  const initialTab = useMemo<TabId>(() => {
-    const t = searchParams.get("tab");
-    return TAB_IDS.includes(t as TabId) ? (t as TabId) : "sources";
-  }, [searchParams]);
-  const [tab, setTab] = useState<TabId>(initialTab);
-  useEffect(() => { setTab(initialTab); }, [initialTab]);
-
-  return (
-    <div>
-      <PageHeader
-        icon={Database}
-        title="Documentos"
-        tip="Fuentes de datos y FAQ que alimentan al chatbot."
-      />
-      <Tabs value={tab} onValueChange={(v) => setTab(v as TabId)}>
-        <TabsList className="mb-6">
-          <TabsTrigger value="sources">Fuentes</TabsTrigger>
-          <TabsTrigger value="faq">FAQ</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="sources"><SourcesListContent /></TabsContent>
-        <TabsContent value="faq"><FAQTab /></TabsContent>
-      </Tabs>
-    </div>
-  );
-}

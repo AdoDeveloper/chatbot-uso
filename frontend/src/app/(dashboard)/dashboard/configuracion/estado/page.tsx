@@ -1,7 +1,7 @@
 "use client";
 
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { HeartPulse, Wrench, Loader2, Trash2, BarChart2, Database, Activity, List, X } from "lucide-react";
+import { Wrench, Loader2, Trash2, BarChart2, Database, List, X } from "lucide-react";
 import api from "@/lib/api";
 import { useApi, getErrorMessage, invalidateApiCache } from "@/hooks/use-api";
 import { useToast } from "@/components/ui/toast";
@@ -9,14 +9,10 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { PageHeader } from "@/components/ui/page-header";
 import { Modal } from "@/components/composed/modal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { FloatingSaveBar } from "../_lib/save-bar";
 import { SaludTab, type SaludTabHandle } from "../_components/SaludTab";
-import { LimitesTab, type LimitesTabHandle } from "../cuotas/_components/LimitesTab";
-import { TendenciaTab, type TendenciaTabHandle } from "../cuotas/_components/TendenciaTab";
 
 interface SyncResult {
   qdrant_chunks_total: number;
@@ -206,7 +202,7 @@ const CacheConfigCard = forwardRef<CacheConfigCardHandle>(function CacheConfigCa
   );
 });
 
-function EstadoContent() {
+export default function EstadoPage() {
   const { confirm, toast } = useToast();
   const [syncing, setSyncing] = useState(false);
   const [clearing, setClearing] = useState(false);
@@ -372,42 +368,3 @@ function EstadoContent() {
   );
 }
 
-function CuotasContent() {
-  const limitesRef = useRef<LimitesTabHandle>(null);
-  const tendenciaRef = useRef<TendenciaTabHandle>(null);
-  const [tab, setTab] = useState("config");
-
-  return (
-    <div>
-      <div className="flex items-center mb-4">
-        <h2 className="text-base font-semibold flex-1 min-w-0 truncate">Cuotas de uso</h2>
-      </div>
-      <Tabs value={tab} onValueChange={(v) => setTab(v)}>
-        <TabsList className="mb-6">
-          <TabsTrigger value="config">Límites</TabsTrigger>
-          <TabsTrigger value="tendencia">Tendencia</TabsTrigger>
-        </TabsList>
-        <TabsContent value="config"><LimitesTab ref={limitesRef} /></TabsContent>
-        <TabsContent value="tendencia"><TendenciaTab ref={tendenciaRef} /></TabsContent>
-      </Tabs>
-    </div>
-  );
-}
-
-export default function EstadoPage() {
-  return (
-    <div>
-      <PageHeader icon={HeartPulse} title="Estado del sistema" tip="Salud de los servicios, historial de incidentes, notificaciones y cuotas de uso del sistema." />
-
-      <Tabs defaultValue="estado">
-        <TabsList className="mb-6">
-          <TabsTrigger value="estado"><HeartPulse /> Estado</TabsTrigger>
-          <TabsTrigger value="cuotas"><Activity /> Cuotas</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="estado"><EstadoContent /></TabsContent>
-        <TabsContent value="cuotas"><CuotasContent /></TabsContent>
-      </Tabs>
-    </div>
-  );
-}

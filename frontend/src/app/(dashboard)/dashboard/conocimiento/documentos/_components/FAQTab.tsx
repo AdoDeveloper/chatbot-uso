@@ -22,8 +22,8 @@ import { Modal } from "@/components/composed/modal";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { DataTable } from "@/components/composed/data-table";
 
-// Tab "FAQ" dentro de Documentos. Se accede vía /conocimiento/documentos?tab=faq;
-// el header de página lo aporta la página padre Documentos.
+// Tab "FAQ" dentro de Documentos. Se accede vía /conocimiento/documentos/faq;
+// el header de página lo aporta el layout padre de Documentos.
 
 interface FAQForm {
   question: string;
