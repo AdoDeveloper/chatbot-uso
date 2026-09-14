@@ -14,6 +14,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { DateRangeFilter } from "@/components/composed/date-range-filter";
 import { Loading } from "@/components/ui/loading";
 import { Modal } from "@/components/composed/modal";
+import { Tooltip } from "@/components/ui/tooltip";
 import { formatInProjectTz } from "@/lib/datetime";
 
 function relativeTime(iso: string) {
@@ -313,16 +314,18 @@ export function AuditoriaTab() {
                 <span className="text-2xs font-mono text-muted-foreground/70">{entry.ip ?? "N/A"}</span>
               </td>
               <td className="px-3 py-2 align-top text-right sticky right-0 z-10 bg-card group-hover:bg-muted/40 border-l border-border/60">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-2 text-muted-foreground"
-                  disabled={!hasDetail}
-                  onClick={() => setDetail(entry)}
-                >
-                  <Eye className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline ml-1">Ver</span>
-                </Button>
+                <Tooltip content="Ver detalle">
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    className="text-muted-foreground"
+                    disabled={!hasDetail}
+                    onClick={() => setDetail(entry)}
+                    aria-label="Ver detalle"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                  </Button>
+                </Tooltip>
               </td>
             </tr>
           );

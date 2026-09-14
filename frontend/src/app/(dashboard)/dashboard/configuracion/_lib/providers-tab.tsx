@@ -15,7 +15,6 @@ import { useApi, getErrorMessage, invalidateApiCache } from "@/hooks/use-api";
 import { useToast } from "@/components/ui/toast";
 import type { LLMProvider, ProviderTypeCatalogItem } from "@/types";
 import { Button } from "@/components/ui/button";
-import { Tooltip } from "@/components/ui/tooltip";
 import { Switch } from "@/components/ui/switch";
 import { Modal } from "@/components/composed/modal";
 import { Input } from "@/components/ui/input";
@@ -521,14 +520,8 @@ function ProviderRow({
   <TableRow className={!p.is_active ? "opacity-50" : ""}>
    <TableCell>
     {inChain ? (
-     <div className="flex items-center gap-1.5">
-      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-3xs font-bold shrink-0 ${isMain ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
-       {p.priority}
-      </div>
-      <div className="flex flex-col gap-0.5 shrink-0">
-       <Tooltip content="Mover arriba"><Button variant="ghost" size="icon-xs" onClick={onMoveUp} disabled={!onMoveUp} aria-label={`Mover ${p.name} arriba en la cadena`} className="text-muted-foreground h-4 w-4"><ArrowUp aria-hidden="true" /></Button></Tooltip>
-       <Tooltip content="Mover abajo"><Button variant="ghost" size="icon-xs" onClick={onMoveDown} disabled={!onMoveDown} aria-label={`Mover ${p.name} abajo en la cadena`} className="text-muted-foreground h-4 w-4"><ArrowDown aria-hidden="true" /></Button></Tooltip>
-      </div>
+     <div className={`w-6 h-6 rounded-full flex items-center justify-center text-3xs font-bold shrink-0 ${isMain ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+      {p.priority}
      </div>
     ) : (
      <span className="text-muted-foreground">N/A</span>
@@ -564,10 +557,20 @@ function ProviderRow({
          Agregar a la cadena
         </DropdownMenuItem>
        ) : (
-        <DropdownMenuItem onClick={() => handleSetPriority(p, null)} className="whitespace-nowrap">
-         <Minus className="w-3.5 h-3.5 mr-2" />
-         Quitar de la cadena
-        </DropdownMenuItem>
+        <>
+         <DropdownMenuItem onClick={onMoveUp} disabled={!onMoveUp}>
+          <ArrowUp className="w-3.5 h-3.5 mr-2" />
+          Mover arriba
+         </DropdownMenuItem>
+         <DropdownMenuItem onClick={onMoveDown} disabled={!onMoveDown}>
+          <ArrowDown className="w-3.5 h-3.5 mr-2" />
+          Mover abajo
+         </DropdownMenuItem>
+         <DropdownMenuItem onClick={() => handleSetPriority(p, null)} className="whitespace-nowrap">
+          <Minus className="w-3.5 h-3.5 mr-2" />
+          Quitar de la cadena
+         </DropdownMenuItem>
+        </>
        )}
        <DropdownMenuItem onClick={() => handleQuickTest(p)} disabled={isTesting}>
         {isTesting ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <Zap className="w-3.5 h-3.5 mr-2" />}
