@@ -76,7 +76,7 @@ test.describe("Configuracion > Asistente", () => {
     await renamedRow.locator("button[role='switch']").click();
     await page.screenshot({ path: path.join(SHOT_DIR, "06-csat-motivo-toggle.png") });
 
-    await renamedRow.locator('button[title="Eliminar motivo"]').click();
+    await renamedRow.locator('button[aria-label="Eliminar motivo"]').click();
     const deleteConfirm = page.locator("div.fixed.inset-0.z-\\[200\\]");
     await expect(deleteConfirm.getByRole("heading")).toContainText(/eliminar/i);
     await deleteConfirm.getByRole("button", { name: /^eliminar$/i }).click();

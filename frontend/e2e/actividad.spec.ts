@@ -267,7 +267,7 @@ test.describe("Actividad > Seguridad", () => {
     }
     expect(consoleErrors, `console errors while changing security period:\n${consoleErrors.join("\n")}`).toEqual([]);
 
-    const ipBadge = page.locator('button[title="Filtrar por esta IP"]').first();
+    const ipBadge = page.getByRole("button", { name: /^\d+\.\d+\.\d+\.\d+$/ }).first();
     const hasSample = await ipBadge.waitFor({ state: "visible", timeout: 10_000 }).then(() => true).catch(() => false);
     if (!hasSample) {
       test.skip(true, "no hay mensajes bloqueados con IP en este entorno/periodo");

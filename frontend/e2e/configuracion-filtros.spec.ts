@@ -52,7 +52,7 @@ test.describe("Configuracion > Filtros", () => {
     await expect(patternRow).toBeVisible({ timeout: 10_000 });
     await page.screenshot({ path: path.join(SHOT_DIR, "02-creado.png") });
 
-    await patternRow.locator('button[title="Editar"]').click();
+    await patternRow.locator('button[aria-label="Editar"]').click();
     const editDialog = page.getByRole("dialog");
     await expect(editDialog.getByRole("heading", { name: /editar patrón custom/i })).toBeVisible();
     await editDialog.getByPlaceholder(/bloque de exec/i).fill(renamed);
@@ -63,7 +63,7 @@ test.describe("Configuracion > Filtros", () => {
     await expect(renamedRow).toBeVisible({ timeout: 10_000 });
     await page.screenshot({ path: path.join(SHOT_DIR, "03-editado.png") });
 
-    await renamedRow.locator('button[title="Eliminar"]').click();
+    await renamedRow.locator('button[aria-label="Eliminar"]').click();
     const confirmDialog = page.locator("div.fixed.inset-0.z-\\[200\\]");
     await expect(confirmDialog.getByRole("heading")).toContainText(/eliminar/i);
     await confirmDialog.getByRole("button", { name: /^eliminar$/i }).click();

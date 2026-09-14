@@ -32,20 +32,20 @@ test.describe("Configuracion > Acceso > Usuarios", () => {
     const row = page.locator("tr", { hasText: email });
     await expect(row).toBeVisible({ timeout: 10_000 });
 
-    await row.locator('button[title="Reenviar"]').click();
+    await row.locator('button[aria-label="Reenviar"]').click();
     const resendConfirm = page.locator("div.fixed.inset-0.z-\\[200\\]");
     await expect(resendConfirm.getByRole("heading")).toContainText(/reenviar/i);
     await resendConfirm.getByRole("button", { name: /reenviar/i }).click();
     await page.screenshot({ path: path.join(SHOT_DIR, "03-invitacion-reenviada.png") });
 
-    await row.locator('button[title="Revocar"]').click();
+    await row.locator('button[aria-label="Revocar"]').click();
     const revokeConfirm = page.locator("div.fixed.inset-0.z-\\[200\\]");
     await expect(revokeConfirm.getByRole("heading")).toContainText(/revocar/i);
     await revokeConfirm.getByRole("button", { name: /revocar/i }).click();
     await expect(row.getByText(/revocada/i)).toBeVisible({ timeout: 10_000 });
     await page.screenshot({ path: path.join(SHOT_DIR, "04-invitacion-revocada.png") });
 
-    await row.locator('button[title="Eliminar"]').click();
+    await row.locator('button[aria-label="Eliminar"]').click();
     const deleteConfirm = page.locator("div.fixed.inset-0.z-\\[200\\]");
     await expect(deleteConfirm.getByRole("heading")).toContainText(/eliminar/i);
     await deleteConfirm.getByRole("button", { name: /^eliminar$/i }).click();
@@ -59,7 +59,7 @@ test.describe("Configuracion > Acceso > Usuarios", () => {
 
     const ownRow = page.locator("tr", { hasText: E2E_USER! });
     await expect(ownRow).toBeVisible({ timeout: 10_000 });
-    await ownRow.locator('button[title="Editar"]').click();
+    await ownRow.locator('button[aria-label="Editar"]').click();
     const editDialog = page.getByRole("dialog");
     await expect(editDialog.getByRole("heading", { name: /editar usuario/i })).toBeVisible();
 
@@ -182,7 +182,7 @@ test.describe("Configuracion > Acceso > Usuarios", () => {
     const equipoTable = page.locator("table", { has: page.getByRole("columnheader", { name: /último acceso/i }) });
     const userRow = equipoTable.locator("tr", { hasText: email });
     await expect(userRow).toBeVisible({ timeout: 10_000 });
-    await userRow.locator('button[title="Editar"]').click();
+    await userRow.locator('button[aria-label="Editar"]').click();
     const editDialog = page.getByRole("dialog");
     await expect(editDialog.getByRole("heading", { name: /editar usuario/i })).toBeVisible();
 
@@ -203,7 +203,7 @@ test.describe("Configuracion > Acceso > Usuarios", () => {
     await expect(editDialog).not.toBeVisible({ timeout: 10_000 });
     await expect(userRow.getByText(/editor/i)).toBeVisible({ timeout: 10_000 });
 
-    await userRow.locator('button[title="Resetear contraseña"]').click();
+    await userRow.locator('button[aria-label="Resetear contraseña"]').click();
     const resetConfirm = page.locator("div.fixed.inset-0.z-\\[200\\]");
     await expect(resetConfirm.getByRole("heading")).toContainText(/resetear/i);
     await resetConfirm.getByRole("button", { name: /resetear/i }).click();
@@ -216,7 +216,7 @@ test.describe("Configuracion > Acceso > Usuarios", () => {
     await resetDialog.getByRole("button", { name: /entendido/i }).click();
     await expect(resetDialog).not.toBeVisible({ timeout: 5_000 });
 
-    await userRow.locator('button[title="Eliminar"]').click();
+    await userRow.locator('button[aria-label="Eliminar"]').click();
     const deleteConfirm = page.locator("div.fixed.inset-0.z-\\[200\\]");
     await expect(deleteConfirm.getByRole("heading")).toContainText(/eliminar/i);
     await deleteConfirm.getByRole("button", { name: /^eliminar$/i }).click();
