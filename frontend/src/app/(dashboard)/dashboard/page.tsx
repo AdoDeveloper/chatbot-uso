@@ -35,15 +35,12 @@ interface SecuritySummary {
  distinct_ips_failing: number;
 }
 
-// Cubre los status reales que emite /health (backend/app/api/v1/health/router.py).
 const SERVICE_STATUS_LABEL: Record<string, string> = {
  ok: "Operativo",
  degraded: "Degradado",
  error: "Error",
 };
 
-// Último recurso si el backend agrega un status nuevo sin actualizar el
-// diccionario: nunca mostrar el valor crudo en inglés.
 function formatServiceStatusFallback(value: string): string {
  return value.charAt(0).toUpperCase() + value.slice(1);
 }

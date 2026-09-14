@@ -30,8 +30,6 @@ export const STATUS_LABEL: Record<string, string> = {
   ready: "Listo", processing: "Procesando", pending: "Pendiente", error: "Error",
 };
 
-// Último recurso si el backend agrega un SourceType/SourceStatus nuevo sin
-// actualizar estos diccionarios: nunca mostrar el snake_case crudo.
 export function formatSourceFallback(value: string): string {
   return value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }

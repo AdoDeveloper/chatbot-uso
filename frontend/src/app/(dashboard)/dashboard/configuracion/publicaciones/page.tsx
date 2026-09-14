@@ -72,8 +72,6 @@ const SECTION_LABELS: Record<string, string> = {
   sources: "Fuentes", faq_entries: "FAQ",
 };
 
-// Último recurso si el backend agrega una sección nueva a ConfigVersion sin
-// actualizar este diccionario: nunca mostrar el snake_case crudo.
 function formatSectionFallback(value: string): string {
   return value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }

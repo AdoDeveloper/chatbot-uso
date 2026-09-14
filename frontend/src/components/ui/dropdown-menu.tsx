@@ -71,9 +71,6 @@ function DropdownMenuContent({ children, className, align = "end", side = "botto
     const spaceBelow = window.innerHeight - r.bottom
     const spaceAbove = r.top
     let effectiveSide = side
-    // Si el lado preferido no alcanza, flipea al opuesto siempre que tenga
-    // más espacio (no solo cuando también alcanza) - así nunca se corta
-    // contra el viewport, solo queda en el lado menos malo.
     if (side === "bottom" && spaceBelow < menuHeight + gap && spaceAbove > spaceBelow) {
       effectiveSide = "top"
     } else if (side === "top" && spaceAbove < menuHeight + gap && spaceBelow > spaceAbove) {
@@ -83,8 +80,6 @@ function DropdownMenuContent({ children, className, align = "end", side = "botto
     let top = effectiveSide === "bottom" ? r.bottom + gap : undefined
     let bottom = effectiveSide === "top" ? window.innerHeight - r.top + gap : undefined
 
-    // Red de seguridad: si ni el lado elegido tiene espacio suficiente,
-    // clampea contra el borde del viewport en vez de dejarlo fuera de pantalla.
     if (top !== undefined && top + menuHeight + gap > window.innerHeight) {
       top = Math.max(gap, window.innerHeight - menuHeight - gap)
     }

@@ -41,8 +41,6 @@ const ROLE_LABEL: Record<string, string> = {
   viewer: "Lector",
 };
 
-// Último recurso si el backend agrega un rol nuevo sin actualizar este
-// diccionario: nunca mostrar el valor crudo.
 function formatRoleFallback(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }

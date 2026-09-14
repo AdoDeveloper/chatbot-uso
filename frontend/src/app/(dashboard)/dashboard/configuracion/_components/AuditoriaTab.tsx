@@ -55,9 +55,6 @@ function actorColor(name: string) {
   return ACTOR_COLORS[h % ACTOR_COLORS.length];
 }
 
-// Debe cubrir exactamente los resource_type que emite log_action() en el
-// backend (grep "resource_type=" en backend/app) - si el backend agrega uno
-// nuevo y no se agrega aquí, formatFallback() lo muestra legible igual.
 const RESOURCE_TYPE_LABELS: Record<string, string> = {
   source: "Fuente",
   user: "Usuario",
@@ -71,10 +68,6 @@ const RESOURCE_TYPES = [
   ...Object.entries(RESOURCE_TYPE_LABELS).map(([value, label]) => ({ value, label })),
 ];
 
-// Igual que arriba: debe cubrir los action="module.verbo" que emite
-// log_action() (grep "action=" en backend/app). Nunca se debe mostrar el
-// valor crudo con puntos/guiones bajos - formatFallback() cubre lo que
-// falte aquí con una versión legible aunque no esté traducida.
 const ACTION_LABELS: Record<string, string> = {
   "auth.login": "Inicio de sesión",
   "auth.login_failed": "Inicio de sesión fallido",
@@ -100,8 +93,6 @@ const ACTION_LABELS: Record<string, string> = {
   "user.reset_password": "Restableció la contraseña de un usuario",
 };
 
-// Último recurso para cualquier valor no traducido: nunca mostrar
-// "module.some_action" crudo, al menos separar en palabras legibles.
 function formatFallback(value: string): string {
   return value.replace(/[._]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
