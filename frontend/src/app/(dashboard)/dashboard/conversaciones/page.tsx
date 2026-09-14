@@ -32,48 +32,17 @@ import { ConversacionesTabs } from "./_components/ConversacionesTabs";
 import { PageHeader } from "@/components/ui/page-header";
 import { TablePagination } from "@/components/composed/table-pagination";
 
-function MessageFeedbackBar({ messageId, currentFeedback }: { messageId: string; currentFeedback: MessageFeedback | null }) {
- const [fb, setFb] = useState<MessageFeedback | null>(currentFeedback);
- const { toast } = useToast();
-
- async function handleFeedback(type: MessageFeedback) {
-  if (fb === type) return;
-  const previous = fb;
-  setFb(type);
-  try {
-   await api.patch(`/conversations/messages/${messageId}/feedback`, { feedback: type });
-  } catch (err) {
-   setFb(previous);
-   toast({ type: "error", message: getErrorMessage(err, "No se pudo guardar la retroalimentación.") });
-  }
- }
-
+function MessageFeedbackBar({ currentFeedback }: { currentFeedback: MessageFeedback | null }) {
+ if (!currentFeedback) return null;
+ const isPositive = currentFeedback === "positive";
+ const Icon = isPositive ? ThumbsUp : ThumbsDown;
  return (
-  <div className="flex items-center gap-0.5 mt-1.5" role="group" aria-label="Retroalimentación de la respuesta">
-   <Button
-    type="button"
-    variant="ghost"
-    size="icon"
-    onClick={() => handleFeedback("positive")}
-    aria-label="Marcar como útil"
-    aria-pressed={fb === "positive"}
-    title="Útil"
-    className={`h-6 w-6 ${fb === "positive" ? "text-success bg-success/10 hover:bg-success/15" : "text-muted-foreground/40 hover:text-muted-foreground"}`}
-   >
-    <ThumbsUp className="h-3 w-3" aria-hidden="true" />
-   </Button>
-   <Button
-    type="button"
-    variant="ghost"
-    size="icon"
-    onClick={() => handleFeedback("negative")}
-    aria-label="Marcar como no útil"
-    aria-pressed={fb === "negative"}
-    title="No útil"
-    className={`h-6 w-6 ${fb === "negative" ? "text-destructive bg-destructive/10 hover:bg-destructive/15" : "text-muted-foreground/40 hover:text-muted-foreground"}`}
-   >
-    <ThumbsDown className="h-3 w-3" aria-hidden="true" />
-   </Button>
+  <div
+   className={`inline-flex items-center gap-1 mt-1.5 text-3xs font-medium ${isPositive ? "text-success" : "text-destructive"}`}
+   title={isPositive ? "El usuario marcó esta respuesta como útil" : "El usuario marcó esta respuesta como no útil"}
+  >
+   <Icon className="h-3 w-3 fill-current" aria-hidden="true" />
+   {isPositive ? "Útil" : "No útil"}
   </div>
  );
 }
@@ -294,9 +263,9 @@ export default function HistorialPage() {
        detalle ocupa toda la altura con botón volver, igual que en desktop
        pero como panel único en vez de split view. dvh en vez de vh: en
        móviles evita que la barra de navegador oculte contenido. */}
-   <div className="flex flex-col lg:flex-row gap-4 h-[calc(100dvh-19rem)] min-h-100">
+   <div className="flex flex-col lg:flex-row gap-4 h-[calc(100dvh-16rem)] min-h-100">
     {/* Lista de conversaciones */}
-    <Card className={`w-full lg:max-w-sm lg:shrink-0 overflow-hidden flex-col ${selected ? "hidden lg:flex" : "flex"}`}>
+    <Card className={`w-full lg:max-w-md lg:shrink-0 overflow-hidden flex-col ${selected ? "hidden lg:flex" : "flex"}`}>
      <div className="p-3 border-b space-y-2">
       <div className="flex items-center justify-between gap-2">
        <span className="text-2xs text-muted-foreground tabular-nums">{total} conversaciones</span>
@@ -312,54 +281,46 @@ export default function HistorialPage() {
         </DropdownMenuContent>
        </DropdownMenu>
       </div>
-      <div>
-       <label className="block text-2xs font-medium text-muted-foreground mb-1">Buscar</label>
-       <div className="relative">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" aria-hidden="true" />
-        <Input
-         className="pl-8 h-8"
-         placeholder="Buscar en mensajes..."
-         aria-label="Buscar en mensajes"
-         value={search}
-         onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-        />
-       </div>
+      <div className="relative">
+       <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" aria-hidden="true" />
+       <Input
+        className="pl-8 h-8"
+        placeholder="Buscar en mensajes..."
+        aria-label="Buscar en mensajes"
+        value={search}
+        onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+       />
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+       <Select
+        value={statusFilter}
+        onChange={(e) => { setStatusFilter(e.target.value as StatusFilter); setPage(1); }}
+        className="h-7 text-xs min-w-0"
+        aria-label="Filtrar por estado"
+       >
+        {STATUS_CHIPS.map((chip) => (
+         <SelectOption key={chip.value} value={chip.value}>{chip.label}</SelectOption>
+        ))}
+       </Select>
+       <Select
+        value={originFilter}
+        onChange={(e) => { setOriginFilter(e.target.value as OriginFilter); setPage(1); }}
+        className="h-7 text-xs min-w-0"
+        aria-label="Filtrar por origen"
+       >
+        {ORIGIN_CHIPS.map((chip) => (
+         <SelectOption key={chip.value} value={chip.value}>{chip.label}</SelectOption>
+        ))}
+       </Select>
       </div>
       <DateRangeFilter
        size="sm"
+       showLabels={false}
        from={dateFrom}
        to={dateTo}
        onFromChange={(v) => { setDateFrom(v); setPage(1); }}
        onToChange={(v) => { setDateTo(v); setPage(1); }}
       />
-      <div className="grid grid-cols-2 gap-2">
-       <div className="min-w-0">
-        <label className="block text-2xs font-medium text-muted-foreground mb-1">Estado</label>
-        <Select
-         value={statusFilter}
-         onChange={(e) => { setStatusFilter(e.target.value as StatusFilter); setPage(1); }}
-         className="h-7 text-xs min-w-0"
-         aria-label="Filtrar por estado"
-        >
-         {STATUS_CHIPS.map((chip) => (
-          <SelectOption key={chip.value} value={chip.value}>{chip.label}</SelectOption>
-         ))}
-        </Select>
-       </div>
-       <div className="min-w-0">
-        <label className="block text-2xs font-medium text-muted-foreground mb-1">Origen</label>
-        <Select
-         value={originFilter}
-         onChange={(e) => { setOriginFilter(e.target.value as OriginFilter); setPage(1); }}
-         className="h-7 text-xs min-w-0"
-         aria-label="Filtrar por origen"
-        >
-         {ORIGIN_CHIPS.map((chip) => (
-          <SelectOption key={chip.value} value={chip.value}>{chip.label}</SelectOption>
-         ))}
-        </Select>
-       </div>
-      </div>
      </div>
 
      <div className="flex-1 overflow-y-auto divide-y min-h-0">
@@ -470,10 +431,11 @@ export default function HistorialPage() {
           </p>
          )}
        </div>
-       <div className="flex-1 min-h-0 p-4 sm:p-6 space-y-4 overflow-y-auto">
+       <div className="flex-1 min-h-0 overflow-y-auto">
+        <div className="max-w-3xl mx-auto p-4 sm:p-6 space-y-4">
         {detail.messages.map((msg) => (
          <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-          <div className="max-w-[80%] sm:max-w-[75%]">
+          <div className="max-w-[85%] sm:max-w-[75%]">
            {msg.role === "assistant" ? (
             <div
              className="px-3.5 py-2.5 rounded-xl text-13 leading-relaxed wrap-break-word bg-muted rounded-bl-sm md-content"
@@ -493,12 +455,13 @@ export default function HistorialPage() {
               )}
              </div>
              <SourcesDisclosure sources={msg.sources_json} />
-             <MessageFeedbackBar messageId={msg.id} currentFeedback={msg.feedback} />
+             <MessageFeedbackBar currentFeedback={msg.feedback} />
             </>
            )}
           </div>
          </div>
         ))}
+        </div>
        </div>
       </>
      ) : selected ? (

@@ -212,7 +212,7 @@ export function ProviderTypesPanel({
          <TableCell><code className="text-2xs">{t.type_key}</code></TableCell>
          <TableCell><p className="text-13 font-medium text-foreground">{t.display_name}</p></TableCell>
          <TableCell className="hidden md:table-cell">
-          <p className="text-13 text-muted-foreground truncate max-w-64">{t.default_api_base ?? "—"}</p>
+          <p className="text-13 text-muted-foreground truncate max-w-64">{t.default_api_base ?? "-"}</p>
          </TableCell>
          <TableCell className="hidden lg:table-cell">
           <p className="text-13 text-muted-foreground">{t.requires_api_key ? "Sí" : "No"}</p>
@@ -223,7 +223,7 @@ export function ProviderTypesPanel({
             <AlertCircle className="w-3 h-3 flex-shrink-0" />
             <span className="truncate">{t.notes}</span>
            </span>
-          ) : <span className="text-muted-foreground">—</span>}
+          ) : <span className="text-muted-foreground">-</span>}
          </TableCell>
          <TableCell sticky className="whitespace-nowrap">
           <DropdownMenu>
