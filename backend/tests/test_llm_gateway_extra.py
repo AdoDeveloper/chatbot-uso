@@ -46,6 +46,7 @@ def _make_provider(**kwargs):
         provider_type="custom",
         model_name="my-model",
         api_base="https://custom.example.com/v1",
+        extra_headers={},
     )
     defaults.update(kwargs)
     return SimpleNamespace(**defaults)
