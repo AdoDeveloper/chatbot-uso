@@ -35,6 +35,19 @@ interface SecuritySummary {
  distinct_ips_failing: number;
 }
 
+// Cubre los status reales que emite /health (backend/app/api/v1/health/router.py).
+const SERVICE_STATUS_LABEL: Record<string, string> = {
+ ok: "Operativo",
+ degraded: "Degradado",
+ error: "Error",
+};
+
+// Último recurso si el backend agrega un status nuevo sin actualizar el
+// diccionario: nunca mostrar el valor crudo en inglés.
+function formatServiceStatusFallback(value: string): string {
+ return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
 
 export default function DashboardPage() {
   const { toast } = useToast();
@@ -209,7 +222,7 @@ export default function DashboardPage() {
             <span className="text-foreground truncate">{s.name}</span>
            </div>
            <span className={`tabular-nums shrink-0 ${ok ? "text-muted-foreground" : warn ? "text-warning font-semibold" : "text-destructive font-semibold"}`}>
-            {s.latency_ms != null ? `${s.latency_ms}ms` : s.status}
+            {s.latency_ms != null ? `${s.latency_ms}ms` : (SERVICE_STATUS_LABEL[s.status] ?? formatServiceStatusFallback(s.status))}
            </span>
           </div>
          );

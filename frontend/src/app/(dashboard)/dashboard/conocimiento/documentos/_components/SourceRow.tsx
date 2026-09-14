@@ -20,9 +20,10 @@ import { getErrorMessage } from "@/hooks/use-api";
 import {
   TYPE_LABEL, STATUS_BADGE, STATUS_LABEL, REVIEW_BADGE,
   TagInput, parseStage,
-  patchSourceDetails,
+  patchSourceDetails, formatSourceFallback,
 } from "./sources-helpers";
 import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/toast";
 import { usePermission } from "@/hooks/use-permission";
 import { PERM } from "@/lib/permissions";
@@ -226,14 +227,14 @@ export function SourceRow({
        <div className="flex items-center gap-1.5 min-w-0">
         <span className="font-semibold text-foreground text-13 truncate">{source.name}</span>
         <span className="text-3xs uppercase bg-muted text-muted-foreground px-1.5 py-0.5 rounded font-medium tracking-wide shrink-0">
-         {TYPE_LABEL[source.type] ?? source.type}
+         {TYPE_LABEL[source.type] ?? formatSourceFallback(source.type)}
         </span>
        </div>
       </TableCell>
      <TableCell className="hidden sm:table-cell">
       <div className="flex items-center gap-1.5">
        <Badge variant="outline" size="xs" className={`whitespace-nowrap border-transparent ${STATUS_BADGE[source.status]}`}>
-        {STATUS_LABEL[source.status] ?? source.status}
+        {STATUS_LABEL[source.status] ?? formatSourceFallback(source.status)}
        </Badge>
        {isBusy && stage && (
         <span className="text-3xs text-muted-foreground tabular-nums" title={stage.label}>
@@ -314,10 +315,12 @@ export function SourceRow({
           </DropdownMenuItem>
          )}
          {errorTooltip && (
-          <DropdownMenuItem disabled title={errorTooltip}>
-           <AlertCircle className="w-3.5 h-3.5 mr-2" />
-           Ver error
-          </DropdownMenuItem>
+          <Tooltip content={errorTooltip} side="left">
+           <DropdownMenuItem disabled>
+            <AlertCircle className="w-3.5 h-3.5 mr-2" />
+            Ver error
+           </DropdownMenuItem>
+          </Tooltip>
          )}
          {can(PERM.KNOWLEDGE_UPDATE) && !isError && !isBusy && (
           <DropdownMenuItem onClick={() => onReingest(source)} disabled={isBusy}>

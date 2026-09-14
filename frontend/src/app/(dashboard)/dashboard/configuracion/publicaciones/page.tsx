@@ -67,9 +67,16 @@ const TRIGGER_LABELS: Record<string, string> = {
 const SECTION_LABELS: Record<string, string> = {
   global_settings: "Configuración", llm_providers: "Proveedores LLM",
   widget_config: "Widget", escalation_rules: "Escalamiento",
+  escalation_channels: "Canales de escalamiento",
   notification_rules: "Notificaciones",
   sources: "Fuentes", faq_entries: "FAQ",
 };
+
+// Último recurso si el backend agrega una sección nueva a ConfigVersion sin
+// actualizar este diccionario: nunca mostrar el snake_case crudo.
+function formatSectionFallback(value: string): string {
+  return value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 /** Los valores de configuración pueden ser listas u objetos: String() los
  *  convertiría en "[object Object]". */
@@ -463,7 +470,7 @@ export default function PublicacionesPage() {
                         {isInProduction && <Badge className="text-3xs">Configuración actual</Badge>}
                         {v.trigger_source && (
                           <Badge variant="secondary" className="text-3xs">
-                            {TRIGGER_LABELS[v.trigger_source] || v.trigger_source}
+                            {TRIGGER_LABELS[v.trigger_source] || formatSectionFallback(v.trigger_source)}
                           </Badge>
                         )}
                       </div>
@@ -493,7 +500,7 @@ export default function PublicacionesPage() {
                         </p>
                       ) : activeSections.length === 1 ? (
                         <div>
-                          <h4 className="text-xs font-medium text-muted-foreground uppercase mb-2">{SECTION_LABELS[activeSections[0][0]] || activeSections[0][0]}</h4>
+                          <h4 className="text-xs font-medium text-muted-foreground uppercase mb-2">{SECTION_LABELS[activeSections[0][0]] || formatSectionFallback(activeSections[0][0])}</h4>
                           <DiffSection section={activeSections[0][0]} changes={activeSections[0][1]} />
                         </div>
                       ) : (
@@ -501,7 +508,7 @@ export default function PublicacionesPage() {
                           <TabsList className="mb-3">
                             {activeSections.map(([section, changes]) => (
                               <TabsTrigger key={section} value={section} className="gap-1 text-xs">
-                                {SECTION_LABELS[section] || section}
+                                {SECTION_LABELS[section] || formatSectionFallback(section)}
                                 <Badge variant="secondary" className="ml-1 h-4 text-3xs">{changes.length}</Badge>
                               </TabsTrigger>
                             ))}

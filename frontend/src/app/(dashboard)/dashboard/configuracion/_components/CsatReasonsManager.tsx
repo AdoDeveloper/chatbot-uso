@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip } from "@/components/ui/tooltip";
 
 interface CsatReason {
   id: string;
@@ -178,14 +179,15 @@ export function CsatReasonsManager() {
                 className="h-7 text-xs flex-1"
               />
             ) : (
-              <button
-                type="button"
-                onClick={() => startEdit(reason)}
-                className={`flex-1 text-left text-xs truncate ${reason.enabled ? "" : "text-muted-foreground line-through"}`}
-                title="Clic para editar"
-              >
-                {reason.label}
-              </button>
+              <Tooltip content="Clic para editar">
+                <button
+                  type="button"
+                  onClick={() => startEdit(reason)}
+                  className={`flex-1 text-left text-xs truncate ${reason.enabled ? "" : "text-muted-foreground line-through"}`}
+                >
+                  {reason.label}
+                </button>
+              </Tooltip>
             )}
 
             {savingId === reason.id ? (
@@ -194,14 +196,15 @@ export function CsatReasonsManager() {
               <Switch checked={reason.enabled} onCheckedChange={() => handleToggle(reason)} className="shrink-0" />
             )}
 
-            <button
-              type="button"
-              onClick={() => handleDelete(reason)}
-              className="text-muted-foreground hover:text-destructive transition-colors shrink-0"
-              title="Eliminar motivo"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
+            <Tooltip content="Eliminar motivo">
+              <button
+                type="button"
+                onClick={() => handleDelete(reason)}
+                className="text-muted-foreground hover:text-destructive transition-colors shrink-0"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </Tooltip>
           </div>
         ))}
 

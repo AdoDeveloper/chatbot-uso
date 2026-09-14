@@ -9,6 +9,7 @@ import { useApi, getErrorMessage } from "@/hooks/use-api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/composed/modal";
 import { useToast } from "@/components/ui/toast";
@@ -81,7 +82,7 @@ export default function PendientesPage() {
       <PageHeader
         icon={MessageSquare}
         title="Conversaciones"
-        tip="Historial del chatbot, preguntas sin responder y chats escalados."
+        tip="Preguntas que el chatbot no pudo responder."
       />
       <ConversacionesTabs />
       <div className="mb-4 pb-4 border-b border-border">
@@ -89,8 +90,8 @@ export default function PendientesPage() {
           <h2 className="text-base font-semibold flex-1 min-w-0 truncate">Preguntas pendientes</h2>
         </div>
         <p className="text-2xs text-muted-foreground mt-0.5">
-           Consultas que el chatbot no pudo responder, agrupadas por tema. Pueden convertirse en FAQ
-           o marcarse como resueltas tras añadir el contenido fuente correspondiente.
+           Agrupadas por tema. Pueden convertirse en FAQ o marcarse como resueltas tras añadir el
+           contenido fuente correspondiente.
          </p>
       </div>
 
@@ -167,39 +168,42 @@ export default function PendientesPage() {
                                   {formatInProjectTz(q.created_at, { dateStyle: "short", timeStyle: "short" })}
                                 </p>
                                 {q.conversation_id && (
-                                  <Link
-                                    href={`/dashboard/conversaciones?id=${q.conversation_id}`}
-                                    className="text-xs text-primary hover:underline flex items-center gap-0.5"
-                                    title="Ver la conversación original"
-                                  >
-                                    <ExternalLink className="w-3 h-3" />
-                                    Ver conversación
-                                  </Link>
+                                  <Tooltip content="Ver la conversación original">
+                                    <Link
+                                      href={`/dashboard/conversaciones?id=${q.conversation_id}`}
+                                      className="text-xs text-primary hover:underline flex items-center gap-0.5"
+                                    >
+                                      <ExternalLink className="w-3 h-3" />
+                                      Ver conversación
+                                    </Link>
+                                  </Tooltip>
                                 )}
                               </div>
                             </div>
                             <div className="flex items-center gap-1 shrink-0">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => openFaqModal(q)}
-                                className="gap-1.5 text-xs"
-                                title="Convertir esta pregunta en una FAQ con respuesta"
-                              >
-                                <Plus className="w-3.5 h-3.5" /> Crear FAQ
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleResolve(q.id)}
-                                disabled={resolving === q.id}
-                                className="gap-1.5 text-xs"
-                                title="Marcar como resuelta sin crear FAQ"
-                              >
-                                {resolving === q.id
-                                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                  : <CheckCircle className="w-3.5 h-3.5" />}
-                              </Button>
+                              <Tooltip content="Convertir esta pregunta en una FAQ con respuesta">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => openFaqModal(q)}
+                                  className="gap-1.5 text-xs"
+                                >
+                                  <Plus className="w-3.5 h-3.5" /> Crear FAQ
+                                </Button>
+                              </Tooltip>
+                              <Tooltip content="Marcar como resuelta sin crear FAQ">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleResolve(q.id)}
+                                  disabled={resolving === q.id}
+                                  className="gap-1.5 text-xs"
+                                >
+                                  {resolving === q.id
+                                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    : <CheckCircle className="w-3.5 h-3.5" />}
+                                </Button>
+                              </Tooltip>
                             </div>
                           </div>
                         </div>

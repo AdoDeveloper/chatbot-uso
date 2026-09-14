@@ -41,6 +41,12 @@ const ROLE_LABEL: Record<string, string> = {
   viewer: "Lector",
 };
 
+// Último recurso si el backend agrega un rol nuevo sin actualizar este
+// diccionario: nunca mostrar el valor crudo.
+function formatRoleFallback(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
 const ROLE_COLOR: Record<string, string> = {
   admin:  "bg-primary/10 text-primary",
   editor: "bg-brand-green/10 text-brand-green",
@@ -174,7 +180,7 @@ export default function InvitePage() {
           <p className="text-sm font-medium text-foreground">{info.email}</p>
           <div className="flex items-center gap-2">
             <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${ROLE_COLOR[info.role] ?? "bg-muted text-muted-foreground"}`}>
-              {ROLE_LABEL[info.role] ?? info.role}
+              {ROLE_LABEL[info.role] ?? formatRoleFallback(info.role)}
             </span>
             <span className="text-xs text-muted-foreground">
               Expira{" "}

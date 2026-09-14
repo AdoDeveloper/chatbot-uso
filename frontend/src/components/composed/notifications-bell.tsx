@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Bell, FileText, AlertCircle, UserRound, Plug, Inbox, Check } from "lucide-react";
+import { Bell, Inbox, Check } from "lucide-react";
 import api from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,6 +11,8 @@ import {
   DropdownMenuTrigger,
   useDropdownMenu,
 } from "@/components/ui/dropdown-menu";
+import { EVENT_META, formatEventFallback } from "@/lib/notification-labels";
+import { Tooltip } from "@/components/ui/tooltip";
 
 // Bell del header con dropdown de notificaciones reales. Polling cada 30s,
 // marca como leída al click, link al historial completo en /sistema/notificaciones.
@@ -31,18 +33,6 @@ interface InboxResponse {
   unread_count: number;
   items: InboxItem[];
 }
-
-const EVENT_META: Record<string, { label: string; icon: typeof FileText; href?: string }> = {
-  doc_ready: { label: "Documento procesado", icon: FileText, href: "/dashboard/conocimiento/documentos" },
-  doc_error: { label: "Error procesando documento", icon: AlertCircle, href: "/dashboard/conocimiento/documentos" },
-  escalation: { label: "Chat escalado a humano", icon: UserRound, href: "/dashboard/conversaciones?status=escalated" },
-  provider_down: { label: "Proveedor IA caído", icon: Plug, href: "/dashboard/configuracion/proveedores" },
-  provider_degraded: { label: "Proveedor IA degradado", icon: Plug, href: "/dashboard/configuracion/proveedores" },
-  provider_misconfigured: { label: "Proveedor IA mal configurado", icon: Plug, href: "/dashboard/configuracion/proveedores" },
-  service_down: { label: "Servicio degradado", icon: Plug, href: "/dashboard/configuracion/proveedores" },
-  rate_limit_threshold: { label: "Cerca del límite de cuotas", icon: AlertCircle, href: "/dashboard/configuracion/cuotas" },
-  unanswered_digest: { label: "Resumen diario", icon: Inbox, href: "/dashboard/conversaciones/pendientes" },
-};
 
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -179,7 +169,7 @@ function NotificationsPanel({
         ) : (
           <div className="divide-y divide-border">
             {data.items.map((item) => {
-              const meta = EVENT_META[item.event] ?? { label: item.event, icon: Bell };
+              const meta = EVENT_META[item.event] ?? { label: formatEventFallback(item.event), icon: Bell };
               const Icon = meta.icon;
               const itemUnread = !item.read_at;
               const failed = item.status === "failed";
@@ -201,15 +191,16 @@ function NotificationsPanel({
                     <p className="text-3xs text-muted-foreground mt-0.5">{timeAgo(item.created_at)}</p>
                   </div>
                   {itemUnread && (
-                    <button
-                      type="button"
-                      title="Marcar como leída"
-                      aria-label="Marcar como leída"
-                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); markRead(item.id); }}
-                      className="mt-0.5 p-1 rounded text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-primary hover:bg-primary/10 transition-opacity shrink-0"
-                    >
-                      <Check className="w-3 h-3" />
-                    </button>
+                    <Tooltip content="Marcar como leída">
+                      <button
+                        type="button"
+                        aria-label="Marcar como leída"
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); markRead(item.id); }}
+                        className="mt-0.5 p-1 rounded text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-primary hover:bg-primary/10 transition-opacity shrink-0"
+                      >
+                        <Check className="w-3 h-3" />
+                      </button>
+                    </Tooltip>
                   )}
                 </div>
               );

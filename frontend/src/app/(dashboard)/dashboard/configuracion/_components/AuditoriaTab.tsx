@@ -55,17 +55,56 @@ function actorColor(name: string) {
   return ACTOR_COLORS[h % ACTOR_COLORS.length];
 }
 
+// Debe cubrir exactamente los resource_type que emite log_action() en el
+// backend (grep "resource_type=" en backend/app) - si el backend agrega uno
+// nuevo y no se agrega aquí, formatFallback() lo muestra legible igual.
+const RESOURCE_TYPE_LABELS: Record<string, string> = {
+  source: "Fuente",
+  user: "Usuario",
+  llm_provider: "Proveedor",
+  provider_type_catalog: "Tipo de proveedor",
+  conversation: "Conversación",
+};
+
 const RESOURCE_TYPES = [
   { value: "", label: "Todos" },
-  { value: "source", label: "Fuentes" },
-  { value: "user", label: "Usuarios" },
-  { value: "provider", label: "Proveedores" },
-  { value: "settings", label: "Configuración" },
-  { value: "faq", label: "FAQ" },
-  { value: "widget", label: "Widget" },
-  { value: "ip", label: "IP / Seguridad" },
-  { value: "llm_provider", label: "LLM provider" },
+  ...Object.entries(RESOURCE_TYPE_LABELS).map(([value, label]) => ({ value, label })),
 ];
+
+// Igual que arriba: debe cubrir los action="module.verbo" que emite
+// log_action() (grep "action=" en backend/app). Nunca se debe mostrar el
+// valor crudo con puntos/guiones bajos - formatFallback() cubre lo que
+// falte aquí con una versión legible aunque no esté traducida.
+const ACTION_LABELS: Record<string, string> = {
+  "auth.login": "Inicio de sesión",
+  "auth.login_failed": "Inicio de sesión fallido",
+  "auth.login_sso": "Inicio de sesión con SSO",
+  "auth.login_sso_failed": "Inicio de sesión con SSO fallido",
+  "auth.change_password": "Cambio de contraseña",
+  "conversation.delete": "Eliminó una conversación",
+  "provider.create": "Creó un proveedor",
+  "provider.update": "Editó un proveedor",
+  "provider.delete": "Eliminó un proveedor",
+  "provider.reorder": "Reordenó la cadena de proveedores",
+  "provider.failure": "Falla de proveedor",
+  "provider_type.create": "Creó un tipo de proveedor",
+  "provider_type.update": "Editó un tipo de proveedor",
+  "provider_type.delete": "Eliminó un tipo de proveedor",
+  "source.upload": "Subió una fuente",
+  "source.approve": "Aprobó una fuente",
+  "source.reject": "Rechazó una fuente",
+  "source.replace_file": "Reemplazó el archivo de una fuente",
+  "source.delete": "Eliminó una fuente",
+  "user.update": "Editó un usuario",
+  "user.delete": "Eliminó un usuario",
+  "user.reset_password": "Restableció la contraseña de un usuario",
+};
+
+// Último recurso para cualquier valor no traducido: nunca mostrar
+// "module.some_action" crudo, al menos separar en palabras legibles.
+function formatFallback(value: string): string {
+  return value.replace(/[._]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 interface ActorOption { id: string; name: string; }
 
@@ -272,10 +311,12 @@ export function AuditoriaTab() {
                 </div>
               </td>
               <td className="px-3 py-2 align-top">
-                <p className="text-13 text-muted-foreground leading-snug">{entry.action}</p>
+                <p className="text-13 text-muted-foreground leading-snug">{ACTION_LABELS[entry.action] ?? formatFallback(entry.action)}</p>
               </td>
               <td className="px-3 py-2 align-top hidden md:table-cell">
-                <span className="text-2xs text-muted-foreground">{entry.resource_type ?? "N/A"}</span>
+                <span className="text-2xs text-muted-foreground">
+                  {entry.resource_type ? (RESOURCE_TYPE_LABELS[entry.resource_type] ?? formatFallback(entry.resource_type)) : "N/A"}
+                </span>
               </td>
               <td className="px-3 py-2 align-top hidden sm:table-cell">
                 <span className="text-2xs font-mono text-muted-foreground/70">{entry.ip ?? "N/A"}</span>
@@ -316,13 +357,15 @@ export function AuditoriaTab() {
               </div>
               <div className="min-w-0">
                 <p className="font-semibold text-foreground truncate">{detail.actor_name ?? "sistema"}</p>
-                <p className="text-2xs text-muted-foreground">{detail.action}</p>
+                <p className="text-2xs text-muted-foreground">{ACTION_LABELS[detail.action] ?? formatFallback(detail.action)}</p>
               </div>
             </div>
 
             <dl className="grid grid-cols-[140px_1fr] gap-x-3 gap-y-2 text-2xs">
               <dt className="text-muted-foreground">Recurso</dt>
-              <dd className="text-foreground break-all">{detail.resource_type ?? "N/A"}</dd>
+              <dd className="text-foreground break-all">
+                {detail.resource_type ? (RESOURCE_TYPE_LABELS[detail.resource_type] ?? formatFallback(detail.resource_type)) : "N/A"}
+              </dd>
               <dt className="text-muted-foreground">Resource ID</dt>
               <dd className="text-foreground break-all font-mono">{detail.resource_id ?? "N/A"}</dd>
               <dt className="text-muted-foreground">IP</dt>

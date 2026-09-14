@@ -24,7 +24,8 @@ import { TablePagination } from "@/components/composed/table-pagination";
 import { StatCard } from "@/components/composed/stat-card";
 import { PageHeader } from "@/components/ui/page-header";
 import { formatInProjectTz } from "@/lib/datetime";
-import { TRIGGER_LABEL_SHORT } from "@/lib/escalation-labels";
+import { TRIGGER_LABEL_SHORT, formatTriggerFallback } from "@/lib/escalation-labels";
+import { CONVERSATION_STATUS_LABEL } from "@/lib/conversation-labels";
 
 interface EscalationMetrics {
   days: number;
@@ -93,7 +94,7 @@ function MetricsPanel({ metrics, loading }: { metrics: EscalationMetrics | null;
           <div className="space-y-2">
             {triggerEntries.map(([trigger, count]) => {
               const pct = triggerTotal > 0 ? Math.round((count / triggerTotal) * 100) : 0;
-              const label = TRIGGER_LABEL_SHORT[trigger as EscalationTrigger | "manual"] ?? trigger;
+              const label = TRIGGER_LABEL_SHORT[trigger as EscalationTrigger | "manual" | "user_consent"] ?? formatTriggerFallback(trigger);
               return (
                 <div key={trigger} className="flex items-center gap-3">
                   <span className="text-13 text-foreground w-40 shrink-0 truncate">{label}</span>
@@ -118,16 +119,16 @@ function deviceLabel(browser: string | null) {
 }
 
 type BadgeVariant = "secondary" | "warning" | "info" | "success" | "muted";
-const STATUS_BADGE: Record<ConversationStatus, { label: string; variant: BadgeVariant }> = {
-  active:       { label: "Activa",      variant: "secondary" },
-  escalated:    { label: "Pendiente",   variant: "warning"   },
-  resolved:     { label: "Resuelto",    variant: "success"   },
+const STATUS_BADGE_VARIANT: Record<ConversationStatus, BadgeVariant> = {
+  active:       "secondary",
+  escalated:    "warning",
+  resolved:     "success",
 };
 
 type FilterState = "escalated" | "resolved";
 
 const FILTER_LABELS: Record<FilterState, string> = {
-  escalated:    "Pendientes",
+  escalated:    "Sin resolver",
   resolved:     "Resueltos",
 };
 
@@ -148,7 +149,7 @@ function CaseCard({
   resolving: boolean;
   csatReasonLabels: Record<string, string>;
 }) {
-  const badge = STATUS_BADGE[conv.status];
+  const badgeVariant = STATUS_BADGE_VARIANT[conv.status];
 
   return (
     <Card className={selected ? "border-primary/50 bg-primary/5" : undefined}>
@@ -162,17 +163,22 @@ function CaseCard({
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <Badge variant={badge.variant} size="xs">{badge.label}</Badge>
+            <Badge variant={badgeVariant} size="xs">{CONVERSATION_STATUS_LABEL[conv.status]}</Badge>
             <span className="text-2xs text-muted-foreground font-mono">#{conv.id.slice(0, 8)}</span>
             <span className="text-2xs text-muted-foreground">{deviceLabel(conv.browser)}</span>
             {conv.csat_score != null && (
               <Badge variant="success" size="xs">CSAT {conv.csat_score}/5</Badge>
             )}
-            {conv.escalation_trigger_reason && (
-              <Badge variant="warning" size="xs" className="max-w-40 sm:max-w-56 truncate" title={conv.escalation_trigger_reason}>
-                {TRIGGER_DISPLAY[conv.escalation_trigger_reason.split(":")[0]?.trim() as keyof typeof TRIGGER_DISPLAY] ?? conv.escalation_trigger_reason}
-              </Badge>
-            )}
+            {conv.escalation_trigger_reason && (() => {
+              const [prefix, ...rest] = conv.escalation_trigger_reason.split(":");
+              const detail = rest.join(":").trim();
+              const label = TRIGGER_DISPLAY[prefix?.trim() as keyof typeof TRIGGER_DISPLAY] ?? formatTriggerFallback(prefix?.trim() ?? conv.escalation_trigger_reason);
+              return (
+                <Badge variant="warning" size="xs" className="max-w-40 sm:max-w-56 truncate" title={conv.escalation_trigger_reason}>
+                  {detail ? `${label}: ${detail}` : label}
+                </Badge>
+              );
+            })()}
             {(conv.tags ?? []).slice(0, 4).map((t) => (
               <Badge key={t} variant="outline" size="xs">#{t}</Badge>
             ))}
@@ -417,7 +423,7 @@ export default function EscalamientosPage() {
       <PageHeader
         icon={MessageSquare}
         title="Conversaciones"
-        tip="Historial del chatbot, preguntas sin responder y chats escalados."
+        tip="Casos que requirieron o requieren atención humana."
       />
 
       <ConversacionesTabs />

@@ -11,6 +11,7 @@ import { StatCard } from "@/components/composed/stat-card";
 import { PeriodFilter } from "@/components/composed/period-filter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/toast";
 import { formatInProjectTz } from "@/lib/datetime";
 
@@ -327,18 +328,19 @@ export function SeguridadTab() {
                   </div>
                   <div className="flex items-center gap-2 text-2xs">
                     {s.ip ? (
-                      <button
-                        type="button"
-                        title="Filtrar por esta IP"
-                        onClick={() => setIpFilter(s.ip === ipFilter ? null : s.ip)}
-                        className={`inline-flex items-center px-1.5 py-0.5 rounded border font-mono text-2xs transition-colors ${
-                          s.ip === ipFilter
-                            ? "border-primary/40 bg-primary/10 text-primary"
-                            : "border-border bg-muted hover:border-primary/40 hover:bg-primary/5"
-                        }`}
-                      >
-                        {s.ip}
-                      </button>
+                      <Tooltip content="Filtrar por esta IP">
+                        <button
+                          type="button"
+                          onClick={() => setIpFilter(s.ip === ipFilter ? null : s.ip)}
+                          className={`inline-flex items-center px-1.5 py-0.5 rounded border font-mono text-2xs transition-colors ${
+                            s.ip === ipFilter
+                              ? "border-primary/40 bg-primary/10 text-primary"
+                              : "border-border bg-muted hover:border-primary/40 hover:bg-primary/5"
+                          }`}
+                        >
+                          {s.ip}
+                        </button>
+                      </Tooltip>
                     ) : (
                       <Badge variant="outline" className="font-mono">N/A</Badge>
                     )}

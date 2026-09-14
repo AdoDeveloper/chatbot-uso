@@ -13,6 +13,7 @@ import { TRIGGER_LABEL_LONG } from "@/lib/escalation-labels";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -291,7 +292,7 @@ export default function EscalamientoConfigPage() {
                         />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <p className="text-13 font-medium truncate min-w-0" title={rule.name}>{rule.name}</p>
+                            <Tooltip content={rule.name}><p className="text-13 font-medium truncate min-w-0">{rule.name}</p></Tooltip>
                             <Badge variant={rule.enabled ? "success" : "secondary"} className="text-3xs shrink-0">
                               {rule.enabled ? "Activa" : "Inactiva"}
                             </Badge>

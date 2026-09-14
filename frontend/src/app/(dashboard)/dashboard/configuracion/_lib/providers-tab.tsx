@@ -15,6 +15,7 @@ import { useApi, getErrorMessage, invalidateApiCache } from "@/hooks/use-api";
 import { useToast } from "@/components/ui/toast";
 import type { LLMProvider, ProviderTypeCatalogItem } from "@/types";
 import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 import { Switch } from "@/components/ui/switch";
 import { Modal } from "@/components/composed/modal";
 import { Input } from "@/components/ui/input";
@@ -181,9 +182,11 @@ const ProviderPanel = forwardRef<ProviderPanelHandle, {
       onChange={(e) => set("api_key", e.target.value)}
       placeholder={editing?.has_api_key ? "••••••••••••••••" : "sk-..."}
       className="pr-10" autoComplete="new-password" />
-     <button type="button" onClick={() => setShowKey((s) => !s)} className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50" aria-label={showKey ? "Ocultar API key" : "Mostrar API key"}>
-      {showKey ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
-     </button>
+     {form.api_key && (
+      <button type="button" onClick={() => setShowKey((s) => !s)} className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50" aria-label={showKey ? "Ocultar API key" : "Mostrar API key"}>
+       {showKey ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
+      </button>
+     )}
     </div>
    </div>
    <div>
@@ -523,8 +526,8 @@ function ProviderRow({
        {p.priority}
       </div>
       <div className="flex flex-col gap-0.5 shrink-0">
-       <Button variant="ghost" size="icon-xs" onClick={onMoveUp} disabled={!onMoveUp} title="Mover arriba" aria-label={`Mover ${p.name} arriba en la cadena`} className="text-muted-foreground h-4 w-4"><ArrowUp aria-hidden="true" /></Button>
-       <Button variant="ghost" size="icon-xs" onClick={onMoveDown} disabled={!onMoveDown} title="Mover abajo" aria-label={`Mover ${p.name} abajo en la cadena`} className="text-muted-foreground h-4 w-4"><ArrowDown aria-hidden="true" /></Button>
+       <Tooltip content="Mover arriba"><Button variant="ghost" size="icon-xs" onClick={onMoveUp} disabled={!onMoveUp} aria-label={`Mover ${p.name} arriba en la cadena`} className="text-muted-foreground h-4 w-4"><ArrowUp aria-hidden="true" /></Button></Tooltip>
+       <Tooltip content="Mover abajo"><Button variant="ghost" size="icon-xs" onClick={onMoveDown} disabled={!onMoveDown} aria-label={`Mover ${p.name} abajo en la cadena`} className="text-muted-foreground h-4 w-4"><ArrowDown aria-hidden="true" /></Button></Tooltip>
       </div>
      </div>
     ) : (

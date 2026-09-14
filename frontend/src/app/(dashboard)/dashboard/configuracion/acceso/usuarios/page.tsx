@@ -17,6 +17,7 @@ import {
   Copy, XCircle, AlertCircle, Check, X, Save, Loader2, Send, KeyRound, RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Modal } from "@/components/composed/modal";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -541,13 +542,13 @@ function UsuariosTab() {
               <TableCell sticky className="whitespace-nowrap">
                 <div className="flex w-full items-center gap-1 justify-end">
                   {(canUpdateUsers || u.id === me?.id) && (
-                    <Button variant="ghost" size="icon-xs" onClick={() => setEditUser(u)} title="Editar"><Pencil className="h-3.5 w-3.5" /></Button>
+                    <Tooltip content="Editar"><Button variant="ghost" size="icon-xs" onClick={() => setEditUser(u)} aria-label="Editar"><Pencil className="h-3.5 w-3.5" /></Button></Tooltip>
                   )}
                   {canManageUsers && u.id !== me?.id && (
-                    <Button variant="ghost" size="icon-xs" onClick={() => handleResetPassword(u)} title="Resetear contraseña"><KeyRound className="h-3.5 w-3.5" /></Button>
+                    <Tooltip content="Resetear contraseña"><Button variant="ghost" size="icon-xs" onClick={() => handleResetPassword(u)} aria-label="Resetear contraseña"><KeyRound className="h-3.5 w-3.5" /></Button></Tooltip>
                   )}
                   {canDeleteUsers && (
-                    <Button variant="ghost" size="icon-xs" onClick={() => handleDelete(u)} disabled={u.id === me?.id} title="Eliminar" className="hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></Button>
+                    <Tooltip content="Eliminar"><Button variant="ghost" size="icon-xs" onClick={() => handleDelete(u)} disabled={u.id === me?.id} aria-label="Eliminar" className="hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></Button></Tooltip>
                   )}
                 </div>
               </TableCell>
@@ -599,16 +600,16 @@ function UsuariosTab() {
               <TableCell sticky className="whitespace-nowrap">
                 <div className="flex w-full items-center gap-1 justify-end">
                   {status === "active" && (
-                    <Button variant="ghost" size="icon-xs" onClick={() => handleCopyInvite(inv.token)} title="Copiar enlace"><Copy className="w-3.5 h-3.5" /></Button>
+                    <Tooltip content="Copiar enlace"><Button variant="ghost" size="icon-xs" onClick={() => handleCopyInvite(inv.token)} aria-label="Copiar enlace"><Copy className="w-3.5 h-3.5" /></Button></Tooltip>
                   )}
                   {canManageUsers && status !== "accepted" && (
-                    <Button variant="ghost" size="icon-xs" onClick={() => handleResendInvite(inv)} title="Reenviar"><RefreshCw className="w-3.5 h-3.5" /></Button>
+                    <Tooltip content="Reenviar"><Button variant="ghost" size="icon-xs" onClick={() => handleResendInvite(inv)} aria-label="Reenviar"><RefreshCw className="w-3.5 h-3.5" /></Button></Tooltip>
                   )}
                   {canManageUsers && status === "active" && (
-                    <Button variant="ghost" size="icon-xs" onClick={() => handleRevokeInvite(inv)} className="hover:text-destructive" title="Revocar"><XCircle className="w-3.5 h-3.5" /></Button>
+                    <Tooltip content="Revocar"><Button variant="ghost" size="icon-xs" onClick={() => handleRevokeInvite(inv)} className="hover:text-destructive" aria-label="Revocar"><XCircle className="w-3.5 h-3.5" /></Button></Tooltip>
                   )}
                   {canManageUsers && status !== "active" && (
-                    <Button variant="ghost" size="icon-xs" onClick={() => handleDeleteInvite(inv)} className="hover:text-destructive" title="Eliminar"><Trash2 className="w-3.5 h-3.5" /></Button>
+                    <Tooltip content="Eliminar"><Button variant="ghost" size="icon-xs" onClick={() => handleDeleteInvite(inv)} className="hover:text-destructive" aria-label="Eliminar"><Trash2 className="w-3.5 h-3.5" /></Button></Tooltip>
                   )}
                 </div>
               </TableCell>

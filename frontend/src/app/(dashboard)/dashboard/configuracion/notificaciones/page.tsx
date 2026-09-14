@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell, FileText, AlertCircle, UserRound, Plug, Inbox, Loader2, Clock, Mail, MailOpen, Check } from "lucide-react";
+import { Bell, Loader2, Clock, Mail, MailOpen, Check } from "lucide-react";
 import { useApi, getErrorMessage, invalidateApiCache } from "@/hooks/use-api";
 import { useToast } from "@/components/ui/toast";
 import api from "@/lib/api";
@@ -21,6 +21,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { FloatingSaveBar } from "../_lib/save-bar";
 import { NotificacionesTab } from "../_components/NotificacionesTab";
+import { EVENT_META, formatEventFallback } from "@/lib/notification-labels";
 
 interface ReportSchedule {
   unit: "daily" | "weekly" | "monthly" | "yearly";
@@ -59,18 +60,6 @@ interface NotificationsPage {
 const CHANNEL_LABEL: Record<string, string> = {
   email: "Correo",
   in_app: "En la app",
-};
-
-const EVENT_META: Record<string, { label: string; icon: typeof FileText }> = {
-  doc_ready: { label: "Documento procesado", icon: FileText },
-  doc_error: { label: "Error procesando documento", icon: AlertCircle },
-  escalation: { label: "Chat escalado a humano", icon: UserRound },
-  provider_down: { label: "Proveedor IA caído", icon: Plug },
-  provider_degraded: { label: "Proveedor IA degradado", icon: Plug },
-  provider_misconfigured: { label: "Proveedor IA mal configurado", icon: Plug },
-  unanswered_digest: { label: "Resumen diario", icon: Inbox },
-  rate_limit_threshold: { label: "Límite de solicitudes cerca del máximo", icon: AlertCircle },
-  service_down: { label: "Servicio degradado", icon: AlertCircle },
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -265,7 +254,7 @@ export default function NotificacionesHistorialPage() {
             data={items}
             rowKey={(item) => item.id}
             renderRow={(item) => {
-              const meta = EVENT_META[item.event] ?? { label: item.event, icon: Bell };
+              const meta = EVENT_META[item.event] ?? { label: formatEventFallback(item.event), icon: Bell };
               const Icon = meta.icon;
               const anyFailed = item.channels.some((c) => c.status === "failed");
               return (
@@ -291,7 +280,7 @@ export default function NotificacionesHistorialPage() {
                               : `${c.recipients} ${c.recipients === 1 ? "destinatario" : "destinatarios"}`
                           }
                         >
-                          {CHANNEL_LABEL[c.channel] ?? c.channel}
+                          {CHANNEL_LABEL[c.channel] ?? formatEventFallback(c.channel)}
                           {c.channel === "in_app" && c.recipients > 1 ? ` (${c.recipients})` : ""}
                         </Badge>
                       ))}

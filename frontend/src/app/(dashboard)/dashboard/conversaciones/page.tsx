@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
  MessageSquare, Search, ThumbsUp, ThumbsDown, Download,
- FileText, Zap, Database, Route, ChevronDown, Trash2, Star,
+ FileText, Zap, Database, Route, ChevronDown, Trash2, Star, ArrowLeft,
 } from "lucide-react";
 import api from "@/lib/api";
 import { useApi, getErrorMessage } from "@/hooks/use-api";
@@ -13,12 +13,14 @@ import { usePermission } from "@/hooks/use-permission";
 import { PERM } from "@/lib/permissions";
 import { timeAgo } from "@/lib/utils";
 import { renderMarkdown } from "@/lib/render-markdown";
+import { CONVERSATION_STATUS_LABEL } from "@/lib/conversation-labels";
 import type {
   ChatConversationDetail, ChatConversationOut, ChatMessageOut, ConversationStatus, MessageFeedback,
 } from "@/types";
 
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Select, SelectOption } from "@/components/ui/select";
 import { DateRangeFilter } from "@/components/composed/date-range-filter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -283,15 +285,18 @@ export default function HistorialPage() {
    <PageHeader
     icon={MessageSquare}
     title="Conversaciones"
-    tip="Historial del chatbot, preguntas sin responder y chats escalados."
+    tip="Historial completo de conversaciones del chatbot."
    />
    <ConversacionesTabs />
 
-   {/* Responsive: apilado en mobile, split panel de altura fija desde lg (como Gmail/Slack).
-       dvh en vez de vh: en móviles evita que la barra de navegador oculte contenido. */}
-   <div className="flex flex-col lg:flex-row gap-4 lg:h-[calc(100dvh-19rem)] lg:min-h-100">
+   {/* Responsive: en mobile, lista y detalle nunca se apilan en el mismo
+       scroll - al seleccionar una conversación la lista se oculta y el
+       detalle ocupa toda la altura con botón volver, igual que en desktop
+       pero como panel único en vez de split view. dvh en vez de vh: en
+       móviles evita que la barra de navegador oculte contenido. */}
+   <div className="flex flex-col lg:flex-row gap-4 h-[calc(100dvh-19rem)] min-h-100">
     {/* Lista de conversaciones */}
-    <Card className="w-full lg:max-w-sm lg:shrink-0 overflow-hidden flex flex-col">
+    <Card className={`w-full lg:max-w-sm lg:shrink-0 overflow-hidden flex-col ${selected ? "hidden lg:flex" : "flex"}`}>
      <div className="p-3 border-b space-y-2">
       <div className="flex items-center justify-between gap-2">
        <span className="text-2xs text-muted-foreground tabular-nums">{total} conversaciones</span>
@@ -327,54 +332,37 @@ export default function HistorialPage() {
        onFromChange={(v) => { setDateFrom(v); setPage(1); }}
        onToChange={(v) => { setDateTo(v); setPage(1); }}
       />
-      {/* Chips de estado */}
-      <div>
-       <label className="block text-2xs font-medium text-muted-foreground mb-1">Estado</label>
-       <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="Filtrar por estado">
-       {STATUS_CHIPS.map((chip) => {
-        const active = statusFilter === chip.value;
-        return (
-         <Button
-          key={chip.value}
-          type="button"
-          role="tab"
-          aria-selected={active}
-          variant={active ? "default" : "outline"}
-          size="xs"
-          onClick={() => { setStatusFilter(chip.value); setPage(1); }}
-          className="h-6 px-2.5 text-2xs rounded-full"
-         >
-          {chip.label}
-         </Button>
-        );
-       })}
+      <div className="grid grid-cols-2 gap-2">
+       <div className="min-w-0">
+        <label className="block text-2xs font-medium text-muted-foreground mb-1">Estado</label>
+        <Select
+         value={statusFilter}
+         onChange={(e) => { setStatusFilter(e.target.value as StatusFilter); setPage(1); }}
+         className="h-7 text-xs min-w-0"
+         aria-label="Filtrar por estado"
+        >
+         {STATUS_CHIPS.map((chip) => (
+          <SelectOption key={chip.value} value={chip.value}>{chip.label}</SelectOption>
+         ))}
+        </Select>
        </div>
-      </div>
-      <div>
-       <label className="block text-2xs font-medium text-muted-foreground mb-1">Origen</label>
-       <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="Filtrar por origen">
-       {ORIGIN_CHIPS.map((chip) => {
-        const active = originFilter === chip.value;
-        return (
-         <Button
-          key={chip.value}
-          type="button"
-          role="tab"
-          aria-selected={active}
-          variant={active ? "default" : "outline"}
-          size="xs"
-          onClick={() => { setOriginFilter(chip.value); setPage(1); }}
-          className="h-6 px-2.5 text-2xs rounded-full"
-         >
-          {chip.label}
-         </Button>
-        );
-       })}
+       <div className="min-w-0">
+        <label className="block text-2xs font-medium text-muted-foreground mb-1">Origen</label>
+        <Select
+         value={originFilter}
+         onChange={(e) => { setOriginFilter(e.target.value as OriginFilter); setPage(1); }}
+         className="h-7 text-xs min-w-0"
+         aria-label="Filtrar por origen"
+        >
+         {ORIGIN_CHIPS.map((chip) => (
+          <SelectOption key={chip.value} value={chip.value}>{chip.label}</SelectOption>
+         ))}
+        </Select>
        </div>
       </div>
      </div>
 
-     <div className="flex-1 overflow-y-auto divide-y max-h-[60vh] lg:max-h-none min-h-0">
+     <div className="flex-1 overflow-y-auto divide-y min-h-0">
       {loading ? (
        <div className="p-4 space-y-3">{[1,2,3,4,5].map(i => <Skeleton key={i} className="h-14 w-full" />)}</div>
       ) : conversations.length === 0 ? (
@@ -408,7 +396,7 @@ export default function HistorialPage() {
            <OriginBadge browser={c.browser} />
            <CsatBadge score={c.csat_score} />
            <Badge variant={statusBadgeVariant(c.status)} className="text-3xs shrink-0">
-            {c.status}
+            {CONVERSATION_STATUS_LABEL[c.status]}
            </Badge>
           </div>
          </div>
@@ -434,13 +422,23 @@ export default function HistorialPage() {
     </Card>
 
     {/* Panel de detalle */}
-    <Card className="flex-1 overflow-hidden flex flex-col min-h-100">
+    <Card className={`flex-1 overflow-hidden flex-col min-h-100 ${selected ? "flex" : "hidden lg:flex"}`}>
      {detail ? (
       <>
        <div className="px-6 py-3 border-b bg-muted/30">
         <div className="flex items-center justify-between gap-2 mb-1">
          <div className="flex items-center gap-2 min-w-0">
-          <Badge variant={statusBadgeVariant(detail.status)} className="text-3xs">{detail.status}</Badge>
+          <Button
+           type="button"
+           variant="ghost"
+           size="icon"
+           onClick={() => setSelected(null)}
+           aria-label="Volver a la lista"
+           className="lg:hidden h-7 w-7 -ml-1.5 shrink-0 text-muted-foreground"
+          >
+           <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          </Button>
+          <Badge variant={statusBadgeVariant(detail.status)} className="text-3xs">{CONVERSATION_STATUS_LABEL[detail.status]}</Badge>
           <OriginBadge browser={detail.browser} />
           <CsatBadge score={detail.csat_score} />
           <p className="text-2xs font-mono text-muted-foreground truncate">{detail.session_id}</p>
@@ -503,6 +501,10 @@ export default function HistorialPage() {
         ))}
        </div>
       </>
+     ) : selected ? (
+      <div className="flex-1 p-6 space-y-4">
+       {[1, 2, 3].map((i) => <Skeleton key={i} className="h-14 w-full" />)}
+      </div>
      ) : (
       <div className="flex-1 flex flex-col items-center justify-center p-8">
        <EmptyState icon={MessageSquare} title="Seleccione una conversación" description="Los mensajes aparecerán aquí" />

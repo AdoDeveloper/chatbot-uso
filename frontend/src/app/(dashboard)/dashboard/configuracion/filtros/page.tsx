@@ -22,6 +22,7 @@ import { useToast } from "@/components/ui/toast";
 import { FloatingSaveBar } from "../_lib/save-bar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -52,15 +53,6 @@ interface TestResult {
   matched_category?: string | null;
   matched_pattern?: string | null;
 }
-
-const CATEGORY_LABELS: Record<string, string> = {
-  override: "Override de instrucciones",
-  role: "Secuestro de rol",
-  obfuscation: "Ofuscación",
-  markup: "Inyección de markup",
-  jailbreak: "Jailbreak",
-  exfiltration: "Exfiltración del prompt",
-};
 
 const ALL_PII: { key: string; label: string; example: string }[] = [
   { key: "PHONE_NUMBER", label: "Teléfonos", example: "+503 7777-7777" },
@@ -524,7 +516,7 @@ const KNOWN_PATTERN_CATEGORIES = [
                         >
                           <div className="flex items-center gap-2">
                             {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                            <span className="text-13 font-medium">{CATEGORY_LABELS[cat] ?? cat}</span>
+                            <span className="text-13 font-medium">{cat}</span>
                             <Badge variant="outline" className="text-3xs tabular-nums">{items.length} patrones</Badge>
                           </div>
                           {blocked > 0 && (
@@ -570,36 +562,42 @@ const KNOWN_PATTERN_CATEGORIES = [
                                     )}
                                   </div>
                                   <div className="flex items-center gap-0.5 shrink-0">
-                                    <Button
-                                      variant="ghost"
-                                      size="icon-xs"
-                                      onClick={() => loadImpact(p)}
-                                      disabled={loadingImpactId === p.id}
-                                      title="Calcular bloqueos en últimos 7 días"
-                                      className="text-muted-foreground hover:text-primary opacity-60 group-hover:opacity-100 transition-opacity"
-                                    >
-                                      {loadingImpactId === p.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <BarChart3 className="w-3.5 h-3.5" />}
-                                    </Button>
+                                    <Tooltip content="Calcular bloqueos en últimos 7 días">
+                                      <Button
+                                        variant="ghost"
+                                        size="icon-xs"
+                                        onClick={() => loadImpact(p)}
+                                        disabled={loadingImpactId === p.id}
+                                        aria-label="Calcular bloqueos en últimos 7 días"
+                                        className="text-muted-foreground hover:text-primary opacity-60 group-hover:opacity-100 transition-opacity"
+                                      >
+                                        {loadingImpactId === p.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <BarChart3 className="w-3.5 h-3.5" />}
+                                      </Button>
+                                    </Tooltip>
                                     {isCustom && (
                                       <>
-                                        <Button
-                                          variant="ghost"
-                                          size="icon-xs"
-                                          onClick={() => openEditPattern(p)}
-                                          title="Editar"
-                                          className="text-muted-foreground hover:text-primary"
-                                        >
-                                          <Pencil className="w-3.5 h-3.5" />
-                                        </Button>
-                                        <Button
-                                          variant="ghost"
-                                          size="icon-xs"
-                                          onClick={() => deletePattern(p)}
-                                          title="Eliminar"
-                                          className="text-muted-foreground hover:text-destructive"
-                                        >
-                                          <Trash2 className="w-3.5 h-3.5" />
-                                        </Button>
+                                        <Tooltip content="Editar">
+                                          <Button
+                                            variant="ghost"
+                                            size="icon-xs"
+                                            onClick={() => openEditPattern(p)}
+                                            aria-label="Editar"
+                                            className="text-muted-foreground hover:text-primary"
+                                          >
+                                            <Pencil className="w-3.5 h-3.5" />
+                                          </Button>
+                                        </Tooltip>
+                                        <Tooltip content="Eliminar">
+                                          <Button
+                                            variant="ghost"
+                                            size="icon-xs"
+                                            onClick={() => deletePattern(p)}
+                                            aria-label="Eliminar"
+                                            className="text-muted-foreground hover:text-destructive"
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                          </Button>
+                                        </Tooltip>
                                       </>
                                     )}
                                   </div>

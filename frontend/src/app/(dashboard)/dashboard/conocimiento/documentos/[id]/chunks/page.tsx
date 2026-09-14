@@ -19,6 +19,7 @@ import { useToast } from "@/components/ui/toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -283,16 +284,17 @@ export default function SourceChunksPage() {
             <Badge variant="secondary" className="font-mono text-xs">{chunk.chunk_index}</Badge>
            </TableCell>
            <TableCell className="align-top hidden lg:table-cell">
-            <button
-             type="button"
-             onClick={() => copyId(chunk.id)}
-             title={`ID Qdrant: ${chunk.id} · clic para copiar`}
-             className="inline-flex items-center gap-0.5 py-1 -my-1 text-3xs font-mono text-muted-foreground hover:text-foreground transition rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-             aria-label={`Copiar ID del chunk ${shortId}`}
-            >
-             <Copy className="w-3 h-3" aria-hidden="true" />
-             {shortId}
-            </button>
+            <Tooltip content={`ID Qdrant: ${chunk.id} · clic para copiar`}>
+             <button
+              type="button"
+              onClick={() => copyId(chunk.id)}
+              className="inline-flex items-center gap-0.5 py-1 -my-1 text-3xs font-mono text-muted-foreground hover:text-foreground transition rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+              aria-label={`Copiar ID del chunk ${shortId}`}
+             >
+              <Copy className="w-3 h-3" aria-hidden="true" />
+              {shortId}
+             </button>
+            </Tooltip>
            </TableCell>
            <TableCell className="text-2xs text-muted-foreground truncate max-w-40 align-top hidden md:table-cell">
             {chunk.section || "N/A"}
@@ -305,12 +307,11 @@ export default function SourceChunksPage() {
              {chunk.text}
             </p>
             <div className="flex items-center gap-2 mt-1.5">
-             <span
-              className="text-3xs tabular-nums text-muted-foreground"
-              title={`${charCount} caracteres`}
-             >
-              {charCount.toLocaleString()} chars
-             </span>
+             <Tooltip content={`${charCount} caracteres`}>
+              <span className="text-3xs tabular-nums text-muted-foreground">
+               {charCount.toLocaleString()} chars
+              </span>
+             </Tooltip>
             </div>
             {isExpanded && chunk.parent_text && (
              <div className="mt-3 rounded-lg bg-muted p-3 text-xs border border-border">
