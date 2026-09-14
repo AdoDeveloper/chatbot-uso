@@ -22,7 +22,7 @@ fs.mkdirSync(SHOT_DIR, { recursive: true });
 test.describe("Configuracion > Acceso > SSO", () => {
   test("editar y guardar dominios permitidos", async ({ page }) => {
     await page.goto("/dashboard/configuracion/acceso/sso");
-    await expect(page.getByText("Microsoft SSO (Azure AD)")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("Microsoft SSO · Azure AD")).toBeVisible({ timeout: 10_000 });
 
     const domainsInput = page.getByPlaceholder(/empresa\.com, filial\.com/i);
     const original = await domainsInput.inputValue();

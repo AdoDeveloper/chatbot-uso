@@ -40,7 +40,7 @@ test.describe("Configuracion > Proveedores", () => {
 
     await page.screenshot({ path: path.join(SHOT_DIR, "01-crear-formulario.png") });
 
-    await createDialog.getByRole("button", { name: /^agregar$/i }).click();
+    await createDialog.getByRole("button", { name: /^agregar$/i }).last().click();
     await expect(createDialog).not.toBeVisible({ timeout: 10_000 });
 
     const row = page.locator("tr", { hasText: name });
@@ -148,7 +148,7 @@ test.describe("Configuracion > Proveedores", () => {
     await createDialog.getByPlaceholder("https://...").fill("https://example.invalid/v1");
     // Lo pone directo en la cadena vía el campo de prioridad, evitando un round-trip extra por dropdown.
     await createDialog.locator('input[type="number"]').fill("1");
-    await createDialog.getByRole("button", { name: /^agregar$/i }).click();
+    await createDialog.getByRole("button", { name: /^agregar$/i }).last().click();
     await expect(createDialog).not.toBeVisible({ timeout: 10_000 });
 
     const row = page.locator("tr", { hasText: name });

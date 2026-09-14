@@ -98,7 +98,7 @@ test.describe("Configuracion > Filtros", () => {
     await categoryToggle.click();
     const firstPatternRow = firstCategory.locator("div.group").first();
     await expect(firstPatternRow).toBeVisible({ timeout: 10_000 });
-    const impactBtn = firstPatternRow.getByTitle(/calcular bloqueos/i);
+    const impactBtn = firstPatternRow.getByRole("button", { name: /calcular bloqueos/i });
     await impactBtn.click();
     await expect(impactBtn).toBeEnabled({ timeout: 15_000 });
     await categoryToggle.click();

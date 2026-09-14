@@ -76,7 +76,7 @@ test.describe("Configuracion > Asistente > Apariencia", () => {
       await expect(sw).toHaveAttribute("aria-checked", String(was));
     }
 
-    const csatSwitch = page.getByText(/encuesta de satisfacción \(csat\)/i).locator("../..").locator('[role="switch"]');
+    const csatSwitch = page.getByText(/encuesta de satisfacción/i).locator("../..").locator('[role="switch"]');
     const csatWasOn = (await csatSwitch.getAttribute("aria-checked")) === "true";
     if (!csatWasOn) await csatSwitch.click();
     await expect(page.getByPlaceholder(/cómo calificarías esta conversación/i)).toBeVisible({ timeout: 5_000 });
@@ -99,7 +99,7 @@ test.describe("Configuracion > Asistente > Apariencia", () => {
     await page.goto("/dashboard/configuracion/asistente?tab=apariencia");
     await expect(page.getByText(/controles de conversación/i)).toBeVisible({ timeout: 10_000 });
 
-    const csatSwitch = page.getByText(/encuesta de satisfacción \(csat\)/i).locator("../..").locator('[role="switch"]');
+    const csatSwitch = page.getByText(/encuesta de satisfacción/i).locator("../..").locator('[role="switch"]');
     const csatWasOn = (await csatSwitch.getAttribute("aria-checked")) === "true";
     if (!csatWasOn) await csatSwitch.click();
     await expect(page.getByText(/motivos seleccionables/i)).toBeVisible({ timeout: 5_000 });
@@ -128,7 +128,7 @@ test.describe("Configuracion > Asistente > Apariencia", () => {
     await reasonSwitch.click();
     await expect(reasonSwitch).toHaveAttribute("aria-checked", "true", { timeout: 5_000 });
 
-    await page.getByTitle("Eliminar motivo").last().click();
+    await page.getByRole("button", { name: "Eliminar motivo" }).last().click();
     const confirmDialog = page.locator("div.fixed.inset-0.z-\\[200\\]");
     await expect(confirmDialog.getByRole("heading")).toContainText(/eliminar/i);
     await confirmDialog.getByRole("button", { name: /^eliminar$/i }).click();

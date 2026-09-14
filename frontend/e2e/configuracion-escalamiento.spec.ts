@@ -121,7 +121,7 @@ test.describe("Configuracion > Escalamiento", () => {
     const testDialog = page.getByRole("dialog").nth(1);
     await expect(testDialog).toBeVisible({ timeout: 5_000 });
     await expect(testDialog.getByText(/probar regla/i)).toBeVisible();
-    await expect(testDialog.getByText(/completa el contexto/i)).toBeVisible();
+    await expect(testDialog.getByText(/completar el contexto/i)).toBeVisible();
 
     await testDialog.getByPlaceholder("180").fill("200");
     await testDialog.getByRole("button", { name: /ejecutar prueba/i }).click();

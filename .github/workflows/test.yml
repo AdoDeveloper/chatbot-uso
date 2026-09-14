@@ -229,7 +229,7 @@ jobs:
 
       - name: Run Playwright tests
         working-directory: frontend
-        run: npx playwright test --update-snapshots
+        run: npx playwright test
         env:
           # 127.0.0.1 explícito, no "localhost": el runner de GitHub Actions
           # resuelve "localhost" a IPv6 (::1) antes que a IPv4 y Chromium (a
@@ -260,14 +260,6 @@ jobs:
         with:
           name: playwright-report
           path: frontend/playwright-report/
-          retention-days: 7
-
-      - name: Upload updated snapshots
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: updated-snapshots
-          path: frontend/e2e/*.spec.ts-snapshots/*-linux.png
           retention-days: 7
 
       - name: Tear down
