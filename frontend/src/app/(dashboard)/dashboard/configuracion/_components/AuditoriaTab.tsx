@@ -142,7 +142,7 @@ export function AuditoriaTab() {
     { id: "action", header: "Acción" },
     { id: "resource_type", header: "Recurso", className: "w-32", hideBelow: "md" },
     { id: "ip", header: "IP", className: "w-28", hideBelow: "sm" },
-    { id: "detail", header: "Detalle", className: "w-20 text-right", sticky: true },
+    { id: "detail", header: "Acciones", className: "w-20 text-right", sticky: true },
   ];
 
   if (loading) return <Loading title="Auditoría" />;
