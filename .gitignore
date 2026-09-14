@@ -60,3 +60,4 @@ widget/dist/
 # Backend uploads and local vector store
 backend/uploads/
 backend/qdrant_storage/
+frontend/e2e/*.spec.ts-snapshots/*-win32.png
