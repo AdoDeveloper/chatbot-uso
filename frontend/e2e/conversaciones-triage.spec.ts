@@ -30,9 +30,9 @@ test.describe("Conversaciones > Escalamientos", () => {
     const resueltosChip = page.getByRole("button", { name: /^resueltos$/i });
     await resueltosChip.click();
     await expect(page.getByRole("heading", { name: /^resueltos$/i })).toBeVisible({ timeout: 10_000 });
-    const pendientesChip = page.getByRole("button", { name: /^pendientes$/i });
-    await pendientesChip.click();
-    await expect(page.getByRole("heading", { name: /^pendientes$/i })).toBeVisible({ timeout: 10_000 });
+    const sinResolverChip = page.getByRole("button", { name: /^sin resolver$/i });
+    await sinResolverChip.click();
+    await expect(page.getByRole("heading", { name: /^sin resolver$/i })).toBeVisible({ timeout: 10_000 });
 
     // Tag filter select - only rendered when at least one tag exists in the system.
     const tagSelect = page.locator("select");
@@ -132,7 +132,7 @@ test.describe("Conversaciones > Pendientes", () => {
     await expect(page.getByRole("heading", { name: /pendientes|conversaciones/i }).first()).toBeVisible({ timeout: 10_000 });
     await page.screenshot({ path: path.join(SHOT_DIR, "03-pendientes.png") });
 
-    const resolveButton = page.locator('button[title="Marcar como resuelta sin crear FAQ"]').first();
+    const resolveButton = page.locator('button[aria-label="Marcar como resuelta sin crear FAQ"]').first();
     const hasPending = await resolveButton
       .waitFor({ state: "visible", timeout: 15_000 })
       .then(() => true)
@@ -152,7 +152,7 @@ test.describe("Conversaciones > Pendientes", () => {
     await page.goto("/dashboard/conversaciones/pendientes");
     await expect(page.getByRole("heading", { name: /pendientes|conversaciones/i }).first()).toBeVisible({ timeout: 10_000 });
 
-    const faqButton = page.locator('button[title="Convertir esta pregunta en una FAQ con respuesta"]').first();
+    const faqButton = page.locator('button[aria-label="Convertir esta pregunta en una FAQ con respuesta"]').first();
     const hasPending = await faqButton
       .waitFor({ state: "visible", timeout: 15_000 })
       .then(() => true)

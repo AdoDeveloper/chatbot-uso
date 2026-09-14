@@ -197,6 +197,7 @@ export default function PendientesPage() {
                                   size="sm"
                                   onClick={() => handleResolve(q.id)}
                                   disabled={resolving === q.id}
+                                  aria-label="Marcar como resuelta sin crear FAQ"
                                   className="gap-1.5 text-xs"
                                 >
                                   {resolving === q.id

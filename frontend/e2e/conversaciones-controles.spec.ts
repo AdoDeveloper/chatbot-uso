@@ -22,12 +22,11 @@ test.describe("Conversaciones > controles de lista y detalle", () => {
     await page.waitForTimeout(500);
     await searchInput.fill("");
 
-    // Scoped to the "Filtrar por estado" tablist - the page-level ConversacionesTabs nav also uses role="tab" with an overlapping "Todas" label, making an unscoped query ambiguous.
-    const statusTablist = page.getByRole("tablist", { name: /filtrar por estado/i });
-    for (const label of ["Todas", "Activas", "Resueltas"]) {
-      const chip = statusTablist.getByRole("tab", { name: label });
-      await chip.click();
-      await expect(chip).toHaveAttribute("aria-selected", "true");
+    const statusSelect = page.getByRole("combobox", { name: /filtrar por estado/i });
+    for (const [value, label] of [["all", "Todas"], ["active", "Activas"], ["resolved", "Resueltas"]]) {
+      await statusSelect.selectOption(value);
+      await expect(statusSelect).toHaveValue(value);
+      await expect(statusSelect.locator(`option[value="${value}"]`)).toHaveText(label);
     }
 
     const dateInputs = page.locator('input[type="date"]');

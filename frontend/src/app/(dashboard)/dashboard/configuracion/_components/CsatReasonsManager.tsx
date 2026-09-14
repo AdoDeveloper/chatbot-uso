@@ -200,6 +200,7 @@ export function CsatReasonsManager() {
               <button
                 type="button"
                 onClick={() => handleDelete(reason)}
+                aria-label="Eliminar motivo"
                 className="text-muted-foreground hover:text-destructive transition-colors shrink-0"
               >
                 <Trash2 className="w-3.5 h-3.5" />
