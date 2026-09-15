@@ -11,6 +11,8 @@ import {
 import api from "@/lib/api";
 import { useApi, getErrorMessage, invalidateApiCache } from "@/hooks/use-api";
 import { useToast } from "@/components/ui/toast";
+import { usePermission } from "@/hooks/use-permission";
+import { PERM } from "@/lib/permissions";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatCard } from "@/components/composed/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -142,12 +144,13 @@ function DiffSection({ section, changes }: { section: string; changes: DiffChang
 }
 
 function PendingSourcesList({
-  sources, reviewing, onApprove, onReject,
+  sources, reviewing, onApprove, onReject, canReview,
 }: {
   sources: Source[];
   reviewing: string | null;
   onApprove: (s: Source) => void;
   onReject: (s: Source) => void;
+  canReview: boolean;
 }) {
   const [showAll, setShowAll] = useState(false);
   const visible = showAll ? sources : sources.slice(0, 3);
@@ -164,6 +167,7 @@ function PendingSourcesList({
                 {s.type.toUpperCase()} · {s.chunk_count ?? 0} fragmentos
               </p>
             </div>
+            {canReview && (
             <div className="flex items-center gap-1.5 shrink-0">
               <Button size="sm" variant="outline" onClick={() => onApprove(s)} disabled={reviewing === s.id}
                 className="h-6 px-2 text-2xs gap-1 border-success/40 text-success hover:bg-success/10 hover:border-success/60">
@@ -175,6 +179,7 @@ function PendingSourcesList({
                 <Ban className="w-3 h-3" /> Rechazar
               </Button>
             </div>
+            )}
           </div>
         ))}
       </div>
@@ -194,6 +199,9 @@ function PendingSourcesList({
 
 export default function PublicacionesPage() {
   const { toast } = useToast();
+  const can = usePermission();
+  const canReview = can(PERM.KNOWLEDGE_MANAGE);
+  const canUpdate = can(PERM.BOT_SETTINGS_UPDATE);
 
   const [, setRefreshing] = useState(false);
   const [reviewing, setReviewing] = useState<string | null>(null);
@@ -391,6 +399,7 @@ export default function PublicacionesPage() {
               reviewing={reviewing}
               onApprove={handleApprove}
               onReject={(s) => setRejectTarget({ source: s, reason: "" })}
+              canReview={canReview}
             />
           )}
         </div>
@@ -405,6 +414,7 @@ export default function PublicacionesPage() {
             Historial
           </h2>
           <div className="flex items-center gap-2 shrink-0">
+            {canUpdate && (
             <Button
               variant="outline"
               size="sm"
@@ -413,6 +423,7 @@ export default function PublicacionesPage() {
             >
               <Save className="h-3.5 w-3.5" /> Guardar punto de restauración
             </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
@@ -479,7 +490,7 @@ export default function PublicacionesPage() {
                       </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      {!isInProduction && (
+                      {!isInProduction && canUpdate && (
                         <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setRollbackTarget(v); }} className="gap-1 text-2xs h-7">
                           <RotateCcw className="h-3 w-3" /> Restaurar
                         </Button>

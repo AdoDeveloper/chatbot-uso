@@ -409,7 +409,7 @@ def upgrade() -> None:
         sa.Column("status",        sa.String(20),  nullable=False),
         sa.Column("error_message", sa.Text,        nullable=True),
         sa.Column("payload_json",  sa.JSON,        nullable=False, server_default=sa.text("('{}')") ),
-        sa.Column("user_id",       sa.Uuid(native_uuid=False), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=True),
+        sa.Column("user_id",       sa.Uuid(native_uuid=False), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
         sa.Column("created_at",    mysql.DATETIME(fsp=6), server_default=sa.text("CURRENT_TIMESTAMP(6)"), nullable=False),
         sa.Column("read_at",       mysql.DATETIME(fsp=6), nullable=True),
     )

@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { Bell, Loader2, Clock, Mail, MailOpen, Check } from "lucide-react";
 import { useApi, getErrorMessage, invalidateApiCache } from "@/hooks/use-api";
 import { useToast } from "@/components/ui/toast";
+import { usePermission } from "@/hooks/use-permission";
+import { PERM } from "@/lib/permissions";
 import api from "@/lib/api";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -109,6 +111,8 @@ function humanizeNext(s: ReportSchedule): string {
 
 export default function NotificacionesHistorialPage() {
   const { toast } = useToast();
+  const can = usePermission();
+  const canUpdate = can(PERM.NOTIFICATIONS_UPDATE);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
 
@@ -450,7 +454,7 @@ export default function NotificacionesHistorialPage() {
               </>
             </CardContent>
           </Card>
-          <FloatingSaveBar dirty={dirty} saving={saving} onSave={saveSchedule} />
+          {canUpdate && <FloatingSaveBar dirty={dirty} saving={saving} onSave={saveSchedule} />}
           </>
           )}
         </TabsContent>
@@ -478,7 +482,7 @@ export default function NotificacionesHistorialPage() {
                   ) : (
                     <Switch
                       checked={emailEnabled}
-                      disabled={togglingEmail}
+                      disabled={togglingEmail || !canUpdate}
                       onCheckedChange={toggleEmail}
                       aria-label="Activar correos"
                     />

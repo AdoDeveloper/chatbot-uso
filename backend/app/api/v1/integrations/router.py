@@ -9,7 +9,9 @@ from app.core.permissions import P
 from app.core.rate_limit import RateLimitExceeded, check_rate_limit
 from app.db.session import get_db
 from app.models.global_setting import GlobalSetting
+from app.models.user import User
 from app.services.notifications import smtp
+from app.services.system import audit as audit_svc
 
 router = APIRouter(prefix="/integrations", tags=["integrations"])
 
@@ -85,10 +87,20 @@ async def get_auth_methods(
 @router.put("/auth-methods", response_model=AuthMethodsConfigOut)
 async def update_auth_methods(
     body: AuthMethodsConfig,
+    req: Request,
     db: AsyncSession = Depends(get_db),
-    _: object = Depends(_admin),
+    current_user: User = Depends(_admin),
 ):
     await _set_row(db, "auth_credentials_enabled", body.credentials_enabled)
+    await audit_svc.log_action(
+        db,
+        action="integrations.auth_methods.update",
+        resource_type="integration",
+        actor_id=current_user.id,
+        meta={"credentials_enabled": body.credentials_enabled},
+        ip=req.client.host if req.client else None,
+        user_agent=req.headers.get("user-agent"),
+    )
     await db.commit()
     return AuthMethodsConfigOut(credentials_enabled=body.credentials_enabled)
 
@@ -141,11 +153,21 @@ async def get_oauth(
 @router.put("/oauth", response_model=OAuthConfigOut)
 async def update_oauth(
     body: OAuthConfig,
+    req: Request,
     db: AsyncSession = Depends(get_db),
-    _: object = Depends(_admin),
+    current_user: User = Depends(_admin),
 ):
     await _set_row(db, "oauth_allowed_domains", body.allowed_domains)
     await _set_row(db, "oauth_active", body.is_active)
+    await audit_svc.log_action(
+        db,
+        action="integrations.oauth.update",
+        resource_type="integration",
+        actor_id=current_user.id,
+        meta={"allowed_domains": body.allowed_domains, "is_active": body.is_active},
+        ip=req.client.host if req.client else None,
+        user_agent=req.headers.get("user-agent"),
+    )
     await db.commit()
 
     from app.core.config import get_settings

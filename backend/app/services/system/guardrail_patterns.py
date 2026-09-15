@@ -25,7 +25,7 @@ async def _load_custom_list(db: AsyncSession) -> list[dict]:
 
 async def _save_custom_list(db: AsyncSession, items: list[dict]) -> None:
     await db.merge(GlobalSetting(key="injection_patterns_custom", value=items))
-    await db.commit()
+    await db.flush()
     await reload_custom_patterns(db)
 
 

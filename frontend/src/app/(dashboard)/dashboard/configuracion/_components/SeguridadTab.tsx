@@ -13,6 +13,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/toast";
+import { usePermission } from "@/hooks/use-permission";
+import { PERM } from "@/lib/permissions";
 import { formatInProjectTz } from "@/lib/datetime";
 
 interface SecuritySummary {
@@ -47,6 +49,8 @@ function isoDay(d: Date): string {
 
 export function SeguridadTab() {
   const { toast } = useToast();
+  const can = usePermission();
+  const canUpdate = can(PERM.SYSTEM_UPDATE);
   const today = isoDay(new Date());
   const [dateFrom, setDateFrom] = useState(isoDay(new Date(Date.now() - 6 * 86400000)));
   const [dateTo, setDateTo] = useState(today);
@@ -219,7 +223,7 @@ export function SeguridadTab() {
                         <span className="text-3xs tabular-nums text-muted-foreground">
                           {formatInProjectTz(g.last_attempt_at, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                         </span>
-                        {isThrottled && g.ip && (
+                        {isThrottled && g.ip && canUpdate && (
                           <Button
                             size="sm"
                             variant="outline"
@@ -268,6 +272,7 @@ export function SeguridadTab() {
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <span className="text-2xs tabular-nums text-muted-foreground">expira en {t.ttl_seconds < 60 ? `${t.ttl_seconds}s` : `${Math.floor(t.ttl_seconds / 60)}m`}</span>
+                    {canUpdate && (
                     <Button
                       size="sm"
                       variant="outline"
@@ -280,6 +285,7 @@ export function SeguridadTab() {
                         : <LockOpen className="w-3 h-3" />}
                       Desbloquear
                     </Button>
+                    )}
                   </div>
                 </div>
               ))}

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,7 +17,9 @@ from app.core.rate_limit import (
 )
 from app.db.session import get_db
 from app.models.rate_limit_event import RateLimitEvent
+from app.models.user import User
 from app.schemas.common import OperationStatus
+from app.services.system import audit as audit_svc
 
 router = APIRouter(prefix="/rate-limits", tags=["system:rate-limits"])
 _reader = require_perm(P.SYSTEM_READ)
@@ -54,14 +56,24 @@ async def get_config(
 @router.put("/config", response_model=OperationStatus)
 async def update_config(
     body: RateLimitConfig,
+    req: Request,
     db: AsyncSession = Depends(get_db),
-    _=Depends(_admin),
+    current_user: User = Depends(_admin),
 ) -> OperationStatus:
     """Persiste los límites de tasa del chat en GlobalSetting."""
     from app.models.global_setting import GlobalSetting
     from app.services.system.settings import invalidate_runtime_overrides
     await db.merge(GlobalSetting(key="rate_limit_chat_per_min", value=body.chat_per_min))
     await db.merge(GlobalSetting(key="rate_limit_chat_per_hour", value=body.chat_per_hour))
+    await audit_svc.log_action(
+        db,
+        action="rate_limits.update_config",
+        resource_type="system",
+        actor_id=current_user.id,
+        meta={"chat_per_min": body.chat_per_min, "chat_per_hour": body.chat_per_hour},
+        ip=req.client.host if req.client else None,
+        user_agent=req.headers.get("user-agent"),
+    )
     await db.commit()
     invalidate_runtime_overrides()
     return OperationStatus()
@@ -82,9 +94,24 @@ async def list_throttled(
 
 
 @router.delete("/reset/{ip}", response_model=OperationStatus)
-async def unblock_ip(ip: str, _=Depends(_admin)) -> OperationStatus:
+async def unblock_ip(
+    ip: str,
+    req: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(_admin),
+) -> OperationStatus:
     """Limpia los contadores de rate-limit para una IP - la desbloquea de inmediato."""
     await reset_ip(ip)
+    await audit_svc.log_action(
+        db,
+        action="rate_limits.unblock_ip",
+        resource_type="system",
+        actor_id=current_user.id,
+        resource_id=ip,
+        ip=req.client.host if req.client else None,
+        user_agent=req.headers.get("user-agent"),
+    )
+    await db.commit()
     return OperationStatus()
 
 

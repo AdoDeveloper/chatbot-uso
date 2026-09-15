@@ -8,6 +8,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { getErrorMessage, invalidateApiCache } from "@/hooks/use-api";
 import { useToast } from "@/components/ui/toast";
+import { usePermission } from "@/hooks/use-permission";
+import { PERM } from "@/lib/permissions";
 import type { ProviderTypeCatalogItem } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/composed/modal";
@@ -154,6 +156,8 @@ export function ProviderTypesPanel({
  catalogTypes, onChanged,
 }: { catalogTypes: ProviderTypeCatalogItem[]; onChanged: () => void }) {
  const { toast, confirm } = useToast();
+ const can = usePermission();
+ const canUpdate = can(PERM.BOT_SETTINGS_UPDATE);
  const [panelOpen, setPanelOpen] = useState(false);
  const [editing, setEditing] = useState<ProviderTypeCatalogItem | null>(null);
  const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -181,11 +185,13 @@ export function ProviderTypesPanel({
      <p className="text-sm font-semibold text-foreground">Tipos de proveedor</p>
      <p className="text-2xs text-muted-foreground mt-0.5">Catálogo editable de URL base y headers por defecto para cada tipo de proveedor.</p>
     </div>
+    {canUpdate && (
     <div className="grid grid-cols-1 sm:flex sm:justify-end gap-2">
      <Button size="sm" variant="outline" className="gap-1.5" onClick={() => { setEditing(null); setPanelOpen(true); }}>
       <Plus className="w-3.5 h-3.5" /> Agregar tipo
      </Button>
     </div>
+    )}
    </div>
    {catalogTypes.length === 0 ? (
     <EmptyState
@@ -226,6 +232,7 @@ export function ProviderTypesPanel({
           ) : <span className="text-muted-foreground">-</span>}
          </TableCell>
          <TableCell sticky className="whitespace-nowrap">
+          {canUpdate && (
           <DropdownMenu>
            <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground">
@@ -241,6 +248,7 @@ export function ProviderTypesPanel({
             </DropdownMenuItem>
            </DropdownMenuContent>
           </DropdownMenu>
+          )}
          </TableCell>
         </TableRow>
        ))}

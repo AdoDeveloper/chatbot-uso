@@ -114,6 +114,52 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     setDialog(null);
   }
 
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const dialogTriggerRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!dialog) return;
+    dialogTriggerRef.current = document.activeElement as HTMLElement | null;
+    const focusable = dialogRef.current?.querySelector<HTMLElement>(
+      'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    );
+    focusable?.focus();
+  }, [dialog]);
+
+  useEffect(() => {
+    if (!dialog) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        handleConfirm(false);
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const el = dialogRef.current;
+      if (!el) return;
+      const focusables = Array.from(
+        el.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )
+      );
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => {
+      document.removeEventListener("keydown", handler);
+      dialogTriggerRef.current?.focus?.();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dialog]);
+
   // Memoizado para no re-renderizar todos los consumidores de useToast() en cada aparición/desaparición de un toast.
   const ctxValue = useMemo(() => ({ toast, confirm }), [toast, confirm]);
 
@@ -152,7 +198,12 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       {dialog && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50" onClick={() => handleConfirm(false)} />
-          <div className="relative bg-card text-card-foreground rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 border border-border">
+          <div
+            ref={dialogRef}
+            role="alertdialog"
+            aria-modal="true"
+            className="relative bg-card text-card-foreground rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 border border-border"
+          >
             <div className="px-6 pt-6 pb-4">
               <div className="flex items-start gap-3">
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${

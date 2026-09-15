@@ -1,15 +1,17 @@
 """Cache management endpoints - view stats, list entries, clear, configure."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import require_perm
 from app.core.permissions import P
 from app.db.session import get_db
+from app.models.user import User
 from app.schemas.common import DeletedCount, OperationStatus
 from app.services.ai import semantic_cache as cache_svc
+from app.services.system import audit as audit_svc
 
 router = APIRouter(prefix="/cache", tags=["system:cache"])
 _reader = require_perm(P.SYSTEM_READ)
@@ -60,28 +62,58 @@ async def list_entries(
 
 
 @router.delete("/clear", response_model=DeletedCount)
-async def clear_cache(_=Depends(_admin)) -> DeletedCount:
+async def clear_cache(
+    req: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(_admin),
+) -> DeletedCount:
     """Vacía todo el caché semántico. Devuelve el número de entradas borradas."""
     deleted = await cache_svc.clear_all()
+    await audit_svc.log_action(
+        db,
+        action="cache.clear",
+        resource_type="system",
+        actor_id=current_user.id,
+        meta={"deleted": deleted},
+        ip=req.client.host if req.client else None,
+        user_agent=req.headers.get("user-agent"),
+    )
+    await db.commit()
     return DeletedCount(deleted=deleted)
 
 
 @router.delete("/entry/{key}", response_model=OperationStatus)
-async def delete_entry(key: str, _=Depends(_admin)) -> OperationStatus:
+async def delete_entry(
+    key: str,
+    req: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(_admin),
+) -> OperationStatus:
     """Borra una entrada específica del caché por su key Redis."""
     if not await cache_svc.delete_entry(key):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="La clave indicada no pertenece al caché de respuestas.",
         )
+    await audit_svc.log_action(
+        db,
+        action="cache.delete_entry",
+        resource_type="system",
+        actor_id=current_user.id,
+        resource_id=key,
+        ip=req.client.host if req.client else None,
+        user_agent=req.headers.get("user-agent"),
+    )
+    await db.commit()
     return OperationStatus()
 
 
 @router.patch("/config", response_model=OperationStatus)
 async def update_config(
     body: CacheConfigUpdate,
+    req: Request,
     db: AsyncSession = Depends(get_db),
-    _=Depends(_admin),
+    current_user: User = Depends(_admin),
 ) -> OperationStatus:
     """Actualiza la configuración del caché semántico (TTL, threshold, on/off)."""
     updates = {}
@@ -96,6 +128,15 @@ async def update_config(
         from app.services.system.settings import invalidate_runtime_overrides
         for k, v in updates.items():
             await db.merge(GlobalSetting(key=k, value=v))
+        await audit_svc.log_action(
+            db,
+            action="cache.update_config",
+            resource_type="system",
+            actor_id=current_user.id,
+            meta=updates,
+            ip=req.client.host if req.client else None,
+            user_agent=req.headers.get("user-agent"),
+        )
         await db.commit()
         invalidate_runtime_overrides()
     return OperationStatus()

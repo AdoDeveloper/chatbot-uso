@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,6 +20,7 @@ from app.schemas.unanswered import (
     UnansweredGroupList,
     UnansweredQuestionOut,
 )
+from app.services.system import audit as audit_svc
 
 router = APIRouter(prefix="/unanswered", tags=["unanswered"])
 
@@ -77,6 +78,7 @@ async def list_grouped(
 @router.post("/{question_id}/resolve", status_code=status.HTTP_204_NO_CONTENT)
 async def resolve_question(
     question_id: uuid.UUID,
+    req: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_perm(P.CONVERSATIONS_UPDATE)),
 ):
@@ -92,6 +94,16 @@ async def resolve_question(
     q.status = UnansweredStatus.resolved
     q.resolved_by_id = current_user.id
     q.resolved_at = datetime.now(timezone.utc)
+    await audit_svc.log_action(
+        db,
+        action="unanswered.resolve",
+        resource_type="unanswered_question",
+        actor_id=current_user.id,
+        resource_id=str(q.id),
+        meta={"question": q.question},
+        ip=req.client.host if req.client else None,
+        user_agent=req.headers.get("user-agent"),
+    )
     await db.commit()
 
 
@@ -99,6 +111,7 @@ async def resolve_question(
 async def create_faq_from_unanswered(
     question_id: uuid.UUID,
     body: CreateFAQFromUnanswered,
+    req: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(_require_conversations_update_and_knowledge_create),
 ):
@@ -127,5 +140,15 @@ async def create_faq_from_unanswered(
     q.status = UnansweredStatus.resolved
     q.resolved_by_id = current_user.id
     q.resolved_at = datetime.now(timezone.utc)
+    await audit_svc.log_action(
+        db,
+        action="unanswered.create_faq",
+        resource_type="unanswered_question",
+        actor_id=current_user.id,
+        resource_id=str(q.id),
+        meta={"question": q.question, "faq_id": str(entry.id)},
+        ip=req.client.host if req.client else None,
+        user_agent=req.headers.get("user-agent"),
+    )
     await db.commit()
     return {"faq_id": str(entry.id)}

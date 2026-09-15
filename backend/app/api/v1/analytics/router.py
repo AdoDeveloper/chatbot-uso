@@ -3,12 +3,13 @@ from __future__ import annotations
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import require_perm
 from app.core.permissions import P
 from app.db.session import get_db
+from app.models.user import User
 from app.schemas.analytics import (
     AnalyticsChannels,
     AnalyticsCsat,
@@ -27,6 +28,7 @@ from app.schemas.analytics import (
     PeriodComparison,
 )
 from app.services.monitoring import analytics as svc
+from app.services.system import audit as audit_svc
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
@@ -250,11 +252,23 @@ async def cache_stats(
 @router.post("/export")
 async def export_analytics(
     body: dict,
+    req: Request,
     format: str = Query("xlsx", pattern="^(xlsx|pdf)$"),
-    _: object = Depends(require_perm(P.ANALYTICS_READ)),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_perm(P.ANALYTICS_READ)),
 ):
     from app.services.ingestion.export import excel_response, pdf_response
     rows = body.get("rows", [])
+    await audit_svc.log_action(
+        db,
+        action="analytics.export",
+        resource_type="analytics",
+        actor_id=current_user.id,
+        meta={"format": format, "row_count": len(rows)},
+        ip=req.client.host if req.client else None,
+        user_agent=req.headers.get("user-agent"),
+    )
+    await db.commit()
     if format == "pdf":
         return pdf_response(rows, "estadisticas", title="Estadísticas del Chatbot")
     return excel_response(rows, "estadisticas", sheet_name="Estadísticas", title="Estadísticas del Chatbot")

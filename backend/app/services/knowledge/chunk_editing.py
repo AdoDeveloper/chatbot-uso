@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import uuid
 from collections import Counter
 
@@ -117,6 +118,11 @@ async def edit_chunk(
         # no-op: return the chunk as-is without re-embedding
         return await get_chunk(db, point_id=point_id)
 
+    previous_body = previous_text
+    child_prefix_match = re.match(r"^\[Sección:.*?\]\n", previous_text)
+    if child_prefix_match:
+        previous_body = previous_text[child_prefix_match.end():]
+
     source_id_str = existing.get("source_id")
     if not source_id_str:
         raise HTTPException(status_code=500, detail="Chunk sin source_id en payload")
@@ -136,6 +142,13 @@ async def edit_chunk(
     # 2. Recalcular warnings (usa el tamaño de chunk del .env para mantener consistencia con la ingesta)
     new_warnings = compute_warnings(new_text, get_env_settings().CHATBOT_CHUNK_PARENT_SIZE)
 
+    # 2b. Recomponer parent_text para que el contexto que ve el LLM refleje la edición
+    previous_parent_text = existing.get("parent_text")
+    new_parent_text = previous_parent_text
+    parent_id = existing.get("parent_id")
+    if previous_parent_text and previous_body and previous_body in previous_parent_text:
+        new_parent_text = previous_parent_text.replace(previous_body, new_text, 1)
+
     # 3. Upsert de vuelta en Qdrant (mismo point_id = actualización)
     from qdrant_client.models import PointStruct, SparseVector
     client = vector_store._get_client()
@@ -144,6 +157,7 @@ async def edit_chunk(
     new_payload.pop("id", None)
     new_payload["text"] = new_text
     new_payload["warnings"] = new_warnings
+    new_payload["parent_text"] = new_parent_text
     await client.upsert(
         collection_name=vector_store.COLLECTION,
         points=[
@@ -161,6 +175,17 @@ async def edit_chunk(
         ],
         wait=True,
     )
+
+    if new_parent_text != previous_parent_text and parent_id:
+        from qdrant_client.models import FieldCondition, Filter, MatchValue
+        siblings_filter = Filter(
+            must=[FieldCondition(key="parent_id", match=MatchValue(value=parent_id))]
+        )
+        await client.set_payload(
+            collection_name=vector_store.COLLECTION,
+            payload={"parent_text": new_parent_text},
+            points=siblings_filter,
+        )
 
     # 4. Fila de auditoría
     edit = ChunkEdit(
@@ -196,7 +221,7 @@ async def edit_chunk(
         chunk_index=existing.get("chunk_index", 0),
         section=existing.get("section"),
         parent_id=existing.get("parent_id"),
-        parent_text=existing.get("parent_text"),
+        parent_text=new_parent_text,
         warnings=new_warnings,
         is_discarded=bool(existing.get("is_discarded", False)),
         was_edited=True,

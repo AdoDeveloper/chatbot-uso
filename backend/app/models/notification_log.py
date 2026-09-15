@@ -28,7 +28,7 @@ class NotificationLog(Base):
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     payload_json: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False, server_default=sa_text("('{}')"))
     user_id: Mapped[uuid.UUID | None] = mapped_column(
-        Uuid(native_uuid=False), ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+        Uuid(native_uuid=False), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True).with_variant(mysql.DATETIME(fsp=6), "mysql"),

@@ -41,9 +41,10 @@ async def check_rate_limit(
     try:
         redis = redis_mod.get_redis()
         key = f"rl:{key_prefix}:{identifier}:{window_seconds}"
-        count = await redis.incr(key)
-        if count == 1:
-            await redis.expire(key, window_seconds)
+        pipe = redis.pipeline()
+        pipe.incr(key)
+        pipe.expire(key, window_seconds, nx=True)
+        count, _ = await pipe.execute()
         if count > max_requests:
             ttl = await redis.ttl(key)
             raise RateLimitExceeded(retry_after=max(ttl, 1))

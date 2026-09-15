@@ -9,6 +9,8 @@ import { Switch } from "@/components/ui/switch";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
+import { usePermission } from "@/hooks/use-permission";
+import { PERM } from "@/lib/permissions";
 import { Loading } from "@/components/ui/loading";
 
 const EVENT_LABELS: Record<NotificationEvent, string> = {
@@ -33,6 +35,8 @@ const CHANNEL_LABELS: Record<NotificationChannel, string> = { email: "Email" };
 
 export function NotificacionesTab() {
   const { toast } = useToast();
+  const can = usePermission();
+  const canUpdate = can(PERM.NOTIFICATIONS_UPDATE);
   const { data: rulesData, loading, setData: setRules } = useApi<NotificationRule[]>("/notifications/rules");
   const rules = rulesData ?? [];
   const [toggling, setToggling] = useState<string | null>(null);
@@ -99,7 +103,7 @@ export function NotificacionesTab() {
                       ) : (
                         <Switch
                           checked={rule?.enabled ?? false}
-                          disabled={!rule}
+                          disabled={!rule || !canUpdate}
                           onCheckedChange={() => toggle(event, ch)}
                         />
                       )}

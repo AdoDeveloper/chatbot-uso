@@ -8,6 +8,8 @@ import {
 import Link from "next/link";
 import api from "@/lib/api";
 import { useApi, getErrorMessage } from "@/hooks/use-api";
+import { usePermission } from "@/hooks/use-permission";
+import { PERM } from "@/lib/permissions";
 import { useToast } from "@/components/ui/toast";
 import type { ChatConversationOut, ConversationStatus, ConversationTag, EscalationTrigger } from "@/types";
 import { Input } from "@/components/ui/input";
@@ -141,6 +143,7 @@ function CaseCard({
   onResolve,
   resolving,
   csatReasonLabels,
+  canResolve,
 }: {
   conv: ChatConversationOut;
   selected: boolean;
@@ -148,6 +151,7 @@ function CaseCard({
   onResolve: (id: string) => void;
   resolving: boolean;
   csatReasonLabels: Record<string, string>;
+  canResolve: boolean;
 }) {
   const badgeVariant = STATUS_BADGE_VARIANT[conv.status];
 
@@ -231,7 +235,7 @@ function CaseCard({
         </div>
 
         <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap sm:flex-nowrap">
-          {conv.status === "escalated" && (
+          {conv.status === "escalated" && canResolve && (
             <Button
               variant="outline"
               size="sm"
@@ -262,6 +266,8 @@ interface ConversationPage {
 
 export default function EscalamientosPage() {
   const { toast, confirm } = useToast();
+  const can = usePermission();
+  const canUpdate = can(PERM.CONVERSATIONS_UPDATE);
   const [filter, setFilter] = useState<FilterState>("escalated");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
@@ -500,6 +506,7 @@ export default function EscalamientosPage() {
                 onResolve={resolveOne}
                 csatReasonLabels={csatReasonLabels}
                 resolving={resolvingIds.has(conv.id)}
+                canResolve={canUpdate}
               />
             ))}
           </div>
@@ -526,42 +533,46 @@ export default function EscalamientosPage() {
           <Button size="sm" variant="ghost" onClick={clearSelection} className="h-7 px-2 text-xs">
             <XIcon className="w-3 h-3 mr-1" /> Limpiar
           </Button>
-          <div className="h-6 w-px bg-border" />
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={bulkResolve}
-            disabled={bulkBusy}
-            className="gap-1.5 text-xs h-7"
-          >
-            {bulkBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
-            Marcar resueltas
-          </Button>
-          <div className="h-6 w-px bg-border" />
-          <Input
-            value={bulkTagInput}
-            onChange={(e) => setBulkTagInput(e.target.value)}
-            placeholder="tag..."
-            className="h-7 text-xs w-28"
-          />
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => bulkApply("add_tag")}
-            disabled={bulkBusy || !bulkTagInput.trim()}
-            className="gap-1.5 text-xs h-7"
-          >
-            <Tag className="w-3 h-3" /> +Tag
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => bulkApply("remove_tag")}
-            disabled={bulkBusy || !bulkTagInput.trim()}
-            className="gap-1.5 text-xs h-7 text-muted-foreground"
-          >
-            {bulkBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : null} −Tag
-          </Button>
+          {canUpdate && (
+            <>
+              <div className="h-6 w-px bg-border" />
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={bulkResolve}
+                disabled={bulkBusy}
+                className="gap-1.5 text-xs h-7"
+              >
+                {bulkBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
+                Marcar resueltas
+              </Button>
+              <div className="h-6 w-px bg-border" />
+              <Input
+                value={bulkTagInput}
+                onChange={(e) => setBulkTagInput(e.target.value)}
+                placeholder="tag..."
+                className="h-7 text-xs w-28"
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => bulkApply("add_tag")}
+                disabled={bulkBusy || !bulkTagInput.trim()}
+                className="gap-1.5 text-xs h-7"
+              >
+                <Tag className="w-3 h-3" /> +Tag
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => bulkApply("remove_tag")}
+                disabled={bulkBusy || !bulkTagInput.trim()}
+                className="gap-1.5 text-xs h-7 text-muted-foreground"
+              >
+                {bulkBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : null} −Tag
+              </Button>
+            </>
+          )}
         </div>
       )}
     </div>

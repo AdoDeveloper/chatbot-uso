@@ -32,7 +32,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
-function InlineTagEditor({ source, onUpdated }: { source: Source; onUpdated: () => void }) {
+function InlineTagEditor({ source, onUpdated, canEdit }: { source: Source; onUpdated: () => void; canEdit: boolean }) {
   const { toast } = useToast();
   const [editing, setEditing] = useState(false);
   const [tags, setTags] = useState<string[]>(source.tags ?? []);
@@ -77,12 +77,14 @@ function InlineTagEditor({ source, onUpdated }: { source: Source; onUpdated: () 
             {tag}
           </span>
         ))}
-        <button
-          onClick={() => setEditing(true)}
-          className="px-2 py-0.5 text-2xs text-muted-foreground border border-dashed border-border rounded-full hover:border-muted-foreground hover:text-foreground transition"
-        >
-          Editar
-        </button>
+        {canEdit && (
+          <button
+            onClick={() => setEditing(true)}
+            className="px-2 py-0.5 text-2xs text-muted-foreground border border-dashed border-border rounded-full hover:border-muted-foreground hover:text-foreground transition"
+          >
+            Editar
+          </button>
+        )}
       </div>
 
       <Modal
@@ -261,7 +263,7 @@ export function SourceRow({
       <span className="tabular-nums text-13">{source.chunk_count.toLocaleString()}</span>
      </TableCell>
      <TableCell className="hidden lg:table-cell">
-      <InlineTagEditor source={source} onUpdated={onUpdated} />
+      <InlineTagEditor source={source} onUpdated={onUpdated} canEdit={can(PERM.KNOWLEDGE_UPDATE)} />
      </TableCell>
      <TableCell sticky className="whitespace-nowrap">
       <div className="flex justify-end">

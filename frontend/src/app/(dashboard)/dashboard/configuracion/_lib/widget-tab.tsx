@@ -8,6 +8,8 @@ import {
 import api from "@/lib/api";
 import { useApi, getErrorMessage, invalidateApiCache } from "@/hooks/use-api";
 import { useToast } from "@/components/ui/toast";
+import { usePermission } from "@/hooks/use-permission";
+import { PERM } from "@/lib/permissions";
 import type { WidgetConfig } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -47,9 +49,10 @@ function SettingToggle({ label, description, checked, onChange }: {
  );
 }
 
-function WidgetApiKey({ config, onRegenerated }: {
+function WidgetApiKey({ config, onRegenerated, canUpdate }: {
  config: WidgetConfig | null;
  onRegenerated: (c: WidgetConfig) => void;
+ canUpdate: boolean;
 }) {
  const { toast, confirm } = useToast();
  const [copying, setCopying] = useState(false);
@@ -100,6 +103,7 @@ function WidgetApiKey({ config, onRegenerated }: {
     <Button variant="outline" size="sm" className="h-9 px-3" onClick={handleCopy}>
      {copying ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}
     </Button>
+    {canUpdate && (
     <Button
      variant="destructive"
      size="sm"
@@ -113,6 +117,7 @@ function WidgetApiKey({ config, onRegenerated }: {
       ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
       : <RefreshCw className="w-3.5 h-3.5" />}
     </Button>
+    )}
    </div>
   </div>
  );
@@ -354,6 +359,8 @@ interface WidgetTabProps {
 
 export function WidgetTab({ subtab, onPreview, config: configProp, setConfig: setConfigProp }: WidgetTabProps) {
  const { toast } = useToast();
+ const can = usePermission();
+ const canUpdate = can(PERM.BOT_SETTINGS_UPDATE);
  const [configOwn, setConfigOwn] = useState<WidgetConfig | null>(null);
  const [savedConfig, setSavedConfig] = useState<WidgetConfig | null>(null);
  const [captacionOpen, setCaptacionOpen] = useState(false);
@@ -592,6 +599,7 @@ export function WidgetTab({ subtab, onPreview, config: configProp, setConfig: se
      <WidgetApiKey
       config={config}
       onRegenerated={(c) => { setConfig(c); setSavedConfig(c); refetchEmbed(); }}
+      canUpdate={canUpdate}
      />
      <DomainAllowlist config={config} setConfig={setConfig} />
     </div>
@@ -601,7 +609,7 @@ export function WidgetTab({ subtab, onPreview, config: configProp, setConfig: se
     <WidgetUsageCaps config={config} setConfig={setConfig} />
    )}
 
-   <FloatingSaveBar dirty={isDirty} saving={saving} onSave={handleSave} onDiscard={handleDiscard} />
+   {canUpdate && <FloatingSaveBar dirty={isDirty} saving={saving} onSave={handleSave} onDiscard={handleDiscard} />}
   </div>
  );
 }

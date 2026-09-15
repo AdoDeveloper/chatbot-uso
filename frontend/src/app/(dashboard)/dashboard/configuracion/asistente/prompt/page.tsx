@@ -7,7 +7,7 @@ import { PromptTab, ParamsTab, FloatingSaveBar } from "../../_lib/tabs";
 import { useAsistenteForm } from "../_lib/asistente-context";
 
 export default function PromptPage() {
-  const { form, set, loadingSettings, isDirty, saving, handleSave, handleDiscard } = useAsistenteForm();
+  const { form, set, loadingSettings, isDirty, saving, handleSave, handleDiscard, canUpdate } = useAsistenteForm();
 
   if (loadingSettings) {
     return (
@@ -39,7 +39,7 @@ export default function PromptPage() {
           </div>
         </Link>
       </div>
-      <FloatingSaveBar dirty={isDirty} saving={saving} onSave={handleSave} onDiscard={handleDiscard} />
+      {canUpdate && <FloatingSaveBar dirty={isDirty} saving={saving} onSave={handleSave} onDiscard={handleDiscard} />}
     </>
   );
 }

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -34,6 +34,7 @@ from app.services.system.report_schedule import (
 from app.services.system.report_schedule import (
     upsert_report_schedule,
 )
+from app.services.system import audit as audit_svc
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
@@ -135,19 +136,32 @@ async def get_report_schedule_config(
 @router.put("/report-schedule", response_model=ReportSchedule)
 async def update_report_schedule_config(
     body: ReportSchedule,
+    req: Request,
     db: AsyncSession = Depends(get_db),
-    _: object = Depends(require_perm(P.NOTIFICATIONS_UPDATE)),
+    current_user: User = Depends(require_perm(P.NOTIFICATIONS_UPDATE)),
 ):
     """Configura la cadencia del reporte (unidad + día/mes + hora UTC)."""
-    return await upsert_report_schedule(db, body)
+    result = await upsert_report_schedule(db, body)
+    await audit_svc.log_action(
+        db,
+        action="report_schedule.update",
+        resource_type="notification",
+        actor_id=current_user.id,
+        meta=body.model_dump(),
+        ip=req.client.host if req.client else None,
+        user_agent=req.headers.get("user-agent"),
+    )
+    await db.commit()
+    return result
 
 
 @router.put("/rules/{rule_id}", response_model=NotificationRuleOut)
 async def update_rule(
     rule_id: uuid.UUID,
     body: NotificationRuleUpdate,
+    req: Request,
     db: AsyncSession = Depends(get_db),
-    _: object = Depends(require_perm(P.NOTIFICATIONS_UPDATE)),
+    current_user: User = Depends(require_perm(P.NOTIFICATIONS_UPDATE)),
 ):
     result = await db.execute(select(NotificationRule).where(NotificationRule.id == rule_id))
     rule = result.scalar_one_or_none()
@@ -157,6 +171,16 @@ async def update_rule(
     if body.target is not None:
         rule.target = body.target
     rule.config_json = body.config_json
+    await audit_svc.log_action(
+        db,
+        action="notification_rule.update",
+        resource_type="notification",
+        actor_id=current_user.id,
+        resource_id=str(rule.id),
+        meta={"event": rule.event, "channel": rule.channel, "enabled": rule.enabled},
+        ip=req.client.host if req.client else None,
+        user_agent=req.headers.get("user-agent"),
+    )
     await db.commit()
     refreshed = await db.execute(
         select(NotificationRule)
@@ -175,8 +199,9 @@ class EmailToggleOut(BaseModel):
 @router.put("/rules/email/toggle", response_model=EmailToggleOut)
 async def toggle_email_channel(
     body: ChannelToggleIn,
+    req: Request,
     db: AsyncSession = Depends(get_db),
-    _: object = Depends(require_perm(P.NOTIFICATIONS_UPDATE)),
+    current_user: User = Depends(require_perm(P.NOTIFICATIONS_UPDATE)),
 ):
     """Activa o desactiva el canal email para TODOS los eventos a la vez.
 
@@ -190,6 +215,15 @@ async def toggle_email_channel(
     rules = list(result.scalars().all())
     for rule in rules:
         rule.enabled = body.enabled
+    await audit_svc.log_action(
+        db,
+        action="notification_rule.toggle_email",
+        resource_type="notification",
+        actor_id=current_user.id,
+        meta={"enabled": body.enabled, "affected": len(rules)},
+        ip=req.client.host if req.client else None,
+        user_agent=req.headers.get("user-agent"),
+    )
     await db.commit()
     return EmailToggleOut(enabled=body.enabled, affected=len(rules))
 

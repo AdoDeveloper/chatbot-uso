@@ -6,6 +6,8 @@ import { GripVertical, Loader2, Plus, Trash2 } from "lucide-react";
 import api from "@/lib/api";
 import { useApi, getErrorMessage, invalidateApiCache } from "@/hooks/use-api";
 import { useToast } from "@/components/ui/toast";
+import { usePermission } from "@/hooks/use-permission";
+import { PERM } from "@/lib/permissions";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
@@ -21,6 +23,8 @@ interface CsatReason {
 export function CsatReasonsManager() {
   const { data, loading, error, setData } = useApi<CsatReason[]>("/widget/csat-reasons");
   const { toast, confirm } = useToast();
+  const can = usePermission();
+  const canUpdate = can(PERM.BOT_SETTINGS_UPDATE);
   const [newLabel, setNewLabel] = useState("");
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -155,17 +159,19 @@ export function CsatReasonsManager() {
         {reasons.map((reason) => (
           <div
             key={reason.id}
-            draggable
-            onDragStart={() => setDraggedId(reason.id)}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={() => handleDrop(reason.id)}
+            draggable={canUpdate}
+            onDragStart={() => canUpdate && setDraggedId(reason.id)}
+            onDragOver={(e) => canUpdate && e.preventDefault()}
+            onDrop={() => canUpdate && handleDrop(reason.id)}
             className={`flex items-center gap-2 rounded-lg border border-border bg-background px-2.5 py-1.5 ${
               draggedId === reason.id ? "opacity-50" : ""
             }`}
           >
-            <GripVertical className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0 cursor-grab" />
+            {canUpdate && (
+              <GripVertical className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0 cursor-grab" />
+            )}
 
-            {editingId === reason.id ? (
+            {canUpdate && editingId === reason.id ? (
               <Input
                 autoFocus
                 value={editingLabel}
@@ -178,7 +184,7 @@ export function CsatReasonsManager() {
                 maxLength={120}
                 className="h-7 text-xs flex-1"
               />
-            ) : (
+            ) : canUpdate ? (
               <Tooltip content="Clic para editar">
                 <button
                   type="button"
@@ -188,24 +194,30 @@ export function CsatReasonsManager() {
                   {reason.label}
                 </button>
               </Tooltip>
+            ) : (
+              <span className={`flex-1 text-left text-xs truncate ${reason.enabled ? "" : "text-muted-foreground line-through"}`}>
+                {reason.label}
+              </span>
             )}
 
             {savingId === reason.id ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground shrink-0" />
             ) : (
-              <Switch checked={reason.enabled} onCheckedChange={() => handleToggle(reason)} className="shrink-0" />
+              <Switch checked={reason.enabled} onCheckedChange={() => handleToggle(reason)} disabled={!canUpdate} className="shrink-0" />
             )}
 
-            <Tooltip content="Eliminar motivo">
-              <button
-                type="button"
-                onClick={() => handleDelete(reason)}
-                aria-label="Eliminar motivo"
-                className="text-muted-foreground hover:text-destructive transition-colors shrink-0"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            </Tooltip>
+            {canUpdate && (
+              <Tooltip content="Eliminar motivo">
+                <button
+                  type="button"
+                  onClick={() => handleDelete(reason)}
+                  aria-label="Eliminar motivo"
+                  className="text-muted-foreground hover:text-destructive transition-colors shrink-0"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </Tooltip>
+            )}
           </div>
         ))}
 
@@ -214,25 +226,27 @@ export function CsatReasonsManager() {
         )}
       </div>
 
-      <div className="flex items-center gap-2 pt-1">
-        <Input
-          value={newLabel}
-          onChange={(e) => setNewLabel(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-          placeholder="Nuevo motivo…"
-          maxLength={120}
-          className="h-7 text-xs flex-1"
-        />
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          disabled={!newLabel.trim() || creating}
-          onClick={handleCreate}
-        >
-          {creating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-        </Button>
-      </div>
+      {canUpdate && (
+        <div className="flex items-center gap-2 pt-1">
+          <Input
+            value={newLabel}
+            onChange={(e) => setNewLabel(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+            placeholder="Nuevo motivo…"
+            maxLength={120}
+            className="h-7 text-xs flex-1"
+          />
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={!newLabel.trim() || creating}
+            onClick={handleCreate}
+          >
+            {creating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

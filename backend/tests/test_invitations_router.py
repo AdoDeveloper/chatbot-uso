@@ -248,11 +248,10 @@ class TestResendInvitation:
         await db_session.refresh(inv)
         assert inv.is_expired is False
 
-    async def test_reactivates_revoked_invitation(self, client, admin_user, auth_headers, db_session):
+    async def test_rejects_revoked_invitation(self, client, admin_user, auth_headers, db_session):
         inv = await _make_invitation(db_session, active=False)
         r = await client.post(f"/api/v1/users/invitations/{inv.id}/resend", headers=auth_headers(admin_user))
-        assert r.status_code == 200
-        assert r.json()["is_active"] is True
+        assert r.status_code == 409
 
     async def test_rejects_already_accepted_invitation(self, client, admin_user, auth_headers, db_session):
         inv = await _make_invitation(db_session, accepted=True, active=False)

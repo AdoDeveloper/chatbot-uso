@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useApi, getErrorMessage, invalidateApiCache } from "@/hooks/use-api";
 import { useToast } from "@/components/ui/toast";
+import { usePermission } from "@/hooks/use-permission";
+import { PERM } from "@/lib/permissions";
 import type { LLMProvider, ProviderTypeCatalogItem } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -270,6 +272,8 @@ const ProviderPanel = forwardRef<ProviderPanelHandle, {
 
 export function ProvidersTab() {
  const { toast, confirm } = useToast();
+ const can = usePermission();
+ const canUpdate = can(PERM.BOT_SETTINGS_UPDATE);
  const { data: providersData, loading, refetch: fetchProviders, setData: setProviders } =
   useApi<LLMProvider[]>("/providers");
  const providers = providersData ?? [];
@@ -366,11 +370,13 @@ export function ProvidersTab() {
       <p className="text-sm font-semibold text-foreground">Cadena de proveedores</p>
       <p className="text-2xs text-muted-foreground mt-0.5">Proveedor 1 = principal · 2+ = fallback automático</p>
      </div>
+     {canUpdate && (
      <div className="grid grid-cols-1 sm:flex sm:justify-end gap-2">
       <Button size="sm" className="gap-1.5" onClick={() => { setEditing(null); setPanelOpen(true); }}>
        <Plus className="w-3.5 h-3.5" /> Agregar
       </Button>
      </div>
+     )}
     </div>
     {loading ? (
      <div className="p-5 space-y-3">
@@ -398,11 +404,11 @@ export function ProvidersTab() {
       icon={Zap}
       title="Sin proveedores configurados"
       description="Agregue un proveedor LLM para que el chatbot pueda responder."
-      action={
+      action={canUpdate ? (
        <Button variant="outline" size="sm" className="gap-1.5" onClick={() => { setEditing(null); setPanelOpen(true); }}>
         <Plus className="w-3.5 h-3.5" /> Agregar el primero
        </Button>
-      }
+      ) : undefined}
      />
     ) : (
      <div className="overflow-x-auto">
@@ -434,6 +440,7 @@ export function ProvidersTab() {
          setEditing={setEditing}
          setPanelOpen={setPanelOpen}
          chainCount={chainCount}
+         canUpdate={canUpdate}
         />
        ))}
        {offChainProviders.map((p) => (
@@ -450,6 +457,7 @@ export function ProvidersTab() {
          setEditing={setEditing}
          setPanelOpen={setPanelOpen}
          chainCount={chainCount}
+         canUpdate={canUpdate}
         />
        ))}
       </TableBody>
@@ -496,12 +504,13 @@ interface ProviderRowProps {
  setEditing: (p: LLMProvider | null) => void;
  setPanelOpen: (b: boolean) => void;
  chainCount: number;
+ canUpdate: boolean;
 }
 
 function ProviderRow({
  p, inChain, onMoveUp, onMoveDown,
   testingId, handleQuickTest, handleSetPriority,
- handleDelete, deletingId, setEditing, setPanelOpen, chainCount,
+ handleDelete, deletingId, setEditing, setPanelOpen, chainCount, canUpdate,
 }: ProviderRowProps) {
  const isMain = p.priority === 1;
  const isTesting = testingId === p.id;
@@ -551,7 +560,7 @@ function ProviderRow({
        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
-       {!inChain ? (
+       {canUpdate && (!inChain ? (
         <DropdownMenuItem onClick={() => handleSetPriority(p, chainCount + 1)} className="whitespace-nowrap">
          <Plus className="w-3.5 h-3.5 mr-2" />
          Agregar a la cadena
@@ -571,7 +580,7 @@ function ProviderRow({
           Quitar de la cadena
          </DropdownMenuItem>
         </>
-       )}
+       ))}
        <DropdownMenuItem onClick={() => handleQuickTest(p)} disabled={isTesting}>
         {isTesting ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <Zap className="w-3.5 h-3.5 mr-2" />}
         Probar conexión
@@ -582,15 +591,19 @@ function ProviderRow({
          Dashboard
         </DropdownMenuItem>
        )}
-       <DropdownMenuSeparator />
-       <DropdownMenuItem onClick={() => { setEditing(p); setPanelOpen(true); }}>
-        <Pencil className="w-3.5 h-3.5 mr-2" />
-        Editar
-       </DropdownMenuItem>
-       <DropdownMenuItem onClick={() => handleDelete(p)} disabled={!!deletingId} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-        <Trash2 className="w-3.5 h-3.5 mr-2" />
-        Eliminar
-       </DropdownMenuItem>
+       {canUpdate && (
+        <>
+         <DropdownMenuSeparator />
+         <DropdownMenuItem onClick={() => { setEditing(p); setPanelOpen(true); }}>
+          <Pencil className="w-3.5 h-3.5 mr-2" />
+          Editar
+         </DropdownMenuItem>
+         <DropdownMenuItem onClick={() => handleDelete(p)} disabled={!!deletingId} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+          <Trash2 className="w-3.5 h-3.5 mr-2" />
+          Eliminar
+         </DropdownMenuItem>
+        </>
+       )}
       </DropdownMenuContent>
      </DropdownMenu>
     </TableCell>

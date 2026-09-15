@@ -102,6 +102,8 @@ async def resend_invitation(
 ) -> Invitation:
     if invitation.accepted_at is not None:
         raise HTTPException(status_code=409, detail="La invitación ya fue aceptada.")
+    if not invitation.is_active:
+        raise HTTPException(status_code=409, detail="La invitación fue revocada. Cree una nueva en su lugar.")
     invitation.token = secrets.token_urlsafe(48)
     invitation.expires_at = datetime.now(timezone.utc) + timedelta(days=expires_in_days)
     invitation.is_active = True

@@ -8,6 +8,8 @@ import { Mail, Plus, Send, Loader2, Pencil, X, Check, UserRound, Beaker, Trash2,
 import api from "@/lib/api";
 import { useApi, getErrorMessage } from "@/hooks/use-api";
 import { useToast } from "@/components/ui/toast";
+import { usePermission } from "@/hooks/use-permission";
+import { PERM } from "@/lib/permissions";
 import type { EscalationRule, EscalationTrigger, RuleTestResult, TriggerSchemaOut } from "@/types";
 import { TRIGGER_LABEL_LONG } from "@/lib/escalation-labels";
 
@@ -89,6 +91,8 @@ const TRIGGER_FIELD_HINTS: Partial<Record<EscalationTrigger, Record<string, stri
 
 export default function EscalamientoConfigPage() {
   const { toast } = useToast();
+  const can = usePermission();
+  const canUpdate = can(PERM.ESCALATION_UPDATE);
   const { data: rulesData, loading, error: rulesError, setData: setRules } =
     useApi<EscalationRule[]>("/escalation/rules");
   const rules = rulesData ?? [];
@@ -264,6 +268,7 @@ export default function EscalamientoConfigPage() {
                   <CardTitle className="text-15 font-semibold">Reglas de escalamiento</CardTitle>
                   <CardDescription>Condiciones que activan la transferencia</CardDescription>
                 </div>
+                {canUpdate && (
                 <div className="grid grid-cols-1 sm:flex sm:justify-end">
                   <Button
                     variant="ghost"
@@ -274,6 +279,7 @@ export default function EscalamientoConfigPage() {
                     <Plus className="w-3.5 h-3.5" /> Agregar
                   </Button>
                 </div>
+                )}
               </div>
             </CardHeader>
             <CardContent className="pt-4">
@@ -287,7 +293,7 @@ export default function EscalamientoConfigPage() {
                         <Switch
                           checked={rule.enabled}
                           onCheckedChange={() => handleToggleRule(rule)}
-                          disabled={toggling === rule.id}
+                          disabled={toggling === rule.id || !canUpdate}
                           className="shrink-0 mt-0.5"
                         />
                         <div className="flex-1 min-w-0">
@@ -332,6 +338,7 @@ export default function EscalamientoConfigPage() {
                             );
                           })()}
                         </div>
+                        {canUpdate && (
                         <div className="flex items-center gap-1 shrink-0">
                           <Button
                             variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground"
@@ -370,6 +377,7 @@ export default function EscalamientoConfigPage() {
                             <X className="w-3.5 h-3.5" />
                           </Button>
                         </div>
+                        )}
                       </div>
                     </li>
                   ))}
@@ -411,7 +419,7 @@ export default function EscalamientoConfigPage() {
                   variant="outline"
                   size="sm"
                   onClick={handleSmtpPing}
-                  disabled={pinging}
+                  disabled={pinging || !canUpdate}
                   className="gap-1.5 shrink-0"
                 >
                   {pinging ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}

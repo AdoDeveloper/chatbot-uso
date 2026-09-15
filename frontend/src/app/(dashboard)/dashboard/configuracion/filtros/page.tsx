@@ -19,6 +19,8 @@ import Link from "next/link";
 import api from "@/lib/api";
 import { useApi, getErrorMessage } from "@/hooks/use-api";
 import { useToast } from "@/components/ui/toast";
+import { usePermission } from "@/hooks/use-permission";
+import { PERM } from "@/lib/permissions";
 import { FloatingSaveBar } from "../_lib/save-bar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -63,6 +65,8 @@ const ALL_PII: { key: string; label: string; example: string }[] = [
 
 export default function FiltrosPage() {
   const { toast, confirm } = useToast();
+  const can = usePermission();
+  const canUpdate = can(PERM.SYSTEM_MANAGE);
   interface CategoryImpact { category: string; count: number }
 
   const { data: configData, loading: loadingConfig, setData: setConfig } =
@@ -285,6 +289,7 @@ const KNOWN_PATTERN_CATEGORIES = [
                 </div>
                 <Switch
                   checked={watch("enabled")}
+                  disabled={!canUpdate}
                   onCheckedChange={(v) => setValue("enabled", v, { shouldDirty: true })}
                 />
               </div>
@@ -378,7 +383,7 @@ const KNOWN_PATTERN_CATEGORIES = [
               </div>
             </CardContent>
           </Card>
-          <FloatingSaveBar dirty={dirty} saving={saving} onSave={onSaveConfig} onDiscard={() => resetG()} />
+          {canUpdate && <FloatingSaveBar dirty={dirty} saving={saving} onSave={onSaveConfig} onDiscard={() => resetG()} />}
           </>
           )}
 
@@ -493,9 +498,11 @@ const KNOWN_PATTERN_CATEGORIES = [
                 </div>
                 <div className="grid grid-cols-1 sm:flex sm:items-center sm:justify-end gap-2">
                   <Badge variant="outline" className="text-3xs justify-center sm:justify-start">{patterns.length} patrones</Badge>
-                  <Button size="sm" onClick={openCreatePattern} className="gap-1.5 h-7">
-                    <Plus className="w-3.5 h-3.5" /> Nuevo patrón
-                  </Button>
+                  {canUpdate && (
+                    <Button size="sm" onClick={openCreatePattern} className="gap-1.5 h-7">
+                      <Plus className="w-3.5 h-3.5" /> Nuevo patrón
+                    </Button>
+                  )}
                 </div>
               </div>
             </CardHeader>
@@ -574,7 +581,7 @@ const KNOWN_PATTERN_CATEGORIES = [
                                         {loadingImpactId === p.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <BarChart3 className="w-3.5 h-3.5" />}
                                       </Button>
                                     </Tooltip>
-                                    {isCustom && (
+                                    {isCustom && canUpdate && (
                                       <>
                                         <Tooltip content="Editar">
                                           <Button

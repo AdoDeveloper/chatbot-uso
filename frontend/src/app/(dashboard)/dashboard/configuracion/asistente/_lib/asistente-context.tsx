@@ -15,6 +15,7 @@ export interface AsistenteFormContextValue {
   saving: boolean;
   handleSave: () => Promise<void>;
   handleDiscard: () => void;
+  canUpdate: boolean;
 }
 
 export const AsistenteFormContext = createContext<AsistenteFormContextValue | null>(null);

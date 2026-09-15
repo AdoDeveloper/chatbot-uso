@@ -224,18 +224,26 @@ function clearHistory(apiUrl: string, apiKey: string): void {
   try { window.localStorage.removeItem(storageKey(apiUrl, apiKey)); } catch { /* ignore */ }
 }
 
+function randomSessionSuffix(): string {
+  if (typeof window !== "undefined" && window.crypto?.getRandomValues) {
+    const bytes = window.crypto.getRandomValues(new Uint8Array(16));
+    return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  return `${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`;
+}
+
 function getSessionId(apiUrl: string, apiKey: string): string {
   if (typeof window === "undefined") return "";
   const key = `${storageKey(apiUrl, apiKey)}:sid`;
   try {
     let sid = window.localStorage.getItem(key);
     if (!sid) {
-      sid = (window.crypto?.randomUUID?.() ?? `sid-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+      sid = window.crypto?.randomUUID?.() ?? `sid-${Date.now()}-${randomSessionSuffix()}`;
       window.localStorage.setItem(key, sid);
     }
     return sid;
   } catch {
-    return `sid-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    return `sid-${Date.now()}-${randomSessionSuffix()}`;
   }
 }
 
@@ -636,8 +644,11 @@ function ChatWidget({
 
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 15000);
     fetch(`${apiUrl}/api/v1/widget/public/config`, {
       headers: apiKey ? { "X-Widget-Key": apiKey } : {},
+      signal: controller.signal,
     })
       .then((r) => {
         if (!r.ok) throw new Error(`config ${r.status}`);
@@ -688,8 +699,9 @@ function ChatWidget({
         setOfflineMode(true);
 
         setConfigReady(true);
-      });
-    return () => { cancelled = true; };
+      })
+      .finally(() => window.clearTimeout(timeoutId));
+    return () => { cancelled = true; controller.abort(); window.clearTimeout(timeoutId); };
   }, [apiUrl, apiKey, retryTick]);
 
   const prevBusyRef = useRef(false);

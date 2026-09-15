@@ -6,14 +6,16 @@ tipo. Si no hay reglas configuradas para el evento, no se envía nada.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import require_perm
 from app.core.permissions import P
 from app.db.session import get_db
+from app.models.user import User
 from app.services.monitoring.alerts import run_all_checks
+from app.services.system import audit as audit_svc
 
 router = APIRouter(prefix="/alerts", tags=["system:alerts"])
 _admin = require_perm(P.SYSTEM_MANAGE)
@@ -26,11 +28,22 @@ class AlertsCheckResult(BaseModel):
 
 @router.post("/run", response_model=AlertsCheckResult)
 async def run_proactive_checks(
+    req: Request,
     db: AsyncSession = Depends(get_db),
-    _=Depends(_admin),
+    current_user: User = Depends(_admin),
 ) -> AlertsCheckResult:
     """Ejecuta los checks proactivos (service_down, rate_limit_threshold)."""
     counters = await run_all_checks(db)
+    await audit_svc.log_action(
+        db,
+        action="alerts.run_proactive_checks",
+        resource_type="system",
+        actor_id=current_user.id,
+        meta={"fired_by_check": counters, "total_fired": sum(counters.values())},
+        ip=req.client.host if req.client else None,
+        user_agent=req.headers.get("user-agent"),
+    )
+    await db.commit()
     return AlertsCheckResult(
         fired_by_check=counters,
         total_fired=sum(counters.values()),

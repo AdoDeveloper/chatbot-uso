@@ -5,6 +5,8 @@ import { Bot, Download, Upload } from "lucide-react";
 import api from "@/lib/api";
 import { useApi, getErrorMessage, invalidateApiCache } from "@/hooks/use-api";
 import { useToast } from "@/components/ui/toast";
+import { usePermission } from "@/hooks/use-permission";
+import { PERM } from "@/lib/permissions";
 import type { ChatbotSettings, WidgetConfig } from "@/types";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
@@ -14,6 +16,8 @@ import { AsistenteTabs } from "./_components/AsistenteTabs";
 
 export default function AsistenteLayout({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
+  const can = usePermission();
+  const canUpdate = can(PERM.BOT_SETTINGS_UPDATE);
   const { data: settings, loading: loadingSettings, refetch: refetchSettings } = useApi<ChatbotSettings>("/settings");
   const { data: widgetConfig, loading: loadingWidget } = useApi<WidgetConfig>("/widget/config");
   const loading = loadingSettings;
@@ -106,11 +110,15 @@ export default function AsistenteLayout({ children }: { children: React.ReactNod
         tip="Identidad, apariencia, prompt maestro y parámetros del motor RAG."
         action={
           <>
-            <input ref={fileInputRef} type="file" accept=".json" className="hidden" onChange={handleImport} />
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => fileInputRef.current?.click()} disabled={importing || loading}>
-              <Upload className="w-3.5 h-3.5" />
-              {importing ? "Importando…" : "Importar"}
-            </Button>
+            {canUpdate && (
+              <>
+                <input ref={fileInputRef} type="file" accept=".json" className="hidden" onChange={handleImport} />
+                <Button variant="outline" size="sm" className="gap-1.5" onClick={() => fileInputRef.current?.click()} disabled={importing || loading}>
+                  <Upload className="w-3.5 h-3.5" />
+                  {importing ? "Importando…" : "Importar"}
+                </Button>
+              </>
+            )}
             <Button variant="outline" size="sm" className="gap-1.5" onClick={handleExport} disabled={loading}>
               <Download className="w-3.5 h-3.5" />
               Exportar
@@ -125,7 +133,7 @@ export default function AsistenteLayout({ children }: { children: React.ReactNod
         value={{
           form, set, loadingSettings,
           widgetForm, setWidgetForm, widgetConfig: widgetConfig ?? null, loadingWidget,
-          isDirty, saving, handleSave, handleDiscard,
+          isDirty, saving, handleSave, handleDiscard, canUpdate,
         }}
       >
         {children}

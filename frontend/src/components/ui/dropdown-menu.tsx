@@ -30,6 +30,18 @@ function DropdownMenu({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener("mousedown", handler)
   }, [open])
 
+  React.useEffect(() => {
+    if (!open) return
+    const trigger = wrapperRef.current?.querySelector<HTMLElement>('[aria-expanded="true"]')
+    const keyHandler = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return
+      setOpen(false)
+      trigger?.focus()
+    }
+    document.addEventListener("keydown", keyHandler)
+    return () => document.removeEventListener("keydown", keyHandler)
+  }, [open])
+
   return (
     <DropdownCtx.Provider value={{ open, setOpen, wrapperRef, portalRef }}>
       <div ref={wrapperRef} className="relative inline-block">{children}</div>

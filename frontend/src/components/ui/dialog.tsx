@@ -51,6 +51,7 @@ function DialogContent({
 }: React.HTMLAttributes<HTMLDivElement> & { hideCloseButton?: boolean }) {
   const { open, onOpenChange } = React.useContext(DialogCtx)
   const triggerRef = React.useRef<HTMLElement | null>(null)
+  const contentRef = React.useRef<HTMLDivElement | null>(null)
   const onOpenChangeRef = React.useRef(onOpenChange)
   onOpenChangeRef.current = onOpenChange
 
@@ -61,12 +62,42 @@ function DialogContent({
 
   React.useEffect(() => {
     if (!open) return
+    const el = contentRef.current
+    if (!el) return
+    const focusable = el.querySelector<HTMLElement>(
+      'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )
+    focusable?.focus()
+  }, [open])
+
+  React.useEffect(() => {
+    if (!open) return
     const close = () => onOpenChangeRef.current(false)
     openDialogStack.push(close)
     const handler = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return
-      // Solo se cierra el diálogo superior (el abierto más recientemente).
-      if (openDialogStack[openDialogStack.length - 1] === close) close()
+      if (e.key === "Escape") {
+        // Solo se cierra el diálogo superior (el abierto más recientemente).
+        if (openDialogStack[openDialogStack.length - 1] === close) close()
+        return
+      }
+      if (e.key !== "Tab") return
+      const el = contentRef.current
+      if (!el) return
+      const focusables = Array.from(
+        el.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )
+      ).filter((node) => node.offsetParent !== null)
+      if (focusables.length === 0) return
+      const first = focusables[0]
+      const last = focusables[focusables.length - 1]
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault()
+        first.focus()
+      }
     }
     document.addEventListener("keydown", handler)
     lockBodyScroll()
@@ -85,6 +116,7 @@ function DialogContent({
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="fixed inset-0 bg-black/50 animate-in fade-in-0" onClick={() => onOpenChange(false)} />
       <div
+        ref={contentRef}
         role="dialog"
         aria-modal="true"
         className={cn(

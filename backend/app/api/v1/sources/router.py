@@ -285,28 +285,51 @@ class BulkTagRequest(BaseModel):
 @router.post("/bulk/delete", status_code=status.HTTP_204_NO_CONTENT)
 async def bulk_delete(
     body: BulkSourceIds,
+    req: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_perm(P.KNOWLEDGE_DELETE)),
 ):
     await sources_svc.bulk_delete_sources(db, source_ids=list(body.source_ids))
+    await audit_svc.log_action(
+        db,
+        action="source.bulk_delete",
+        resource_type="source",
+        actor_id=current_user.id,
+        meta={"count": len(body.source_ids), "source_ids": [str(i) for i in body.source_ids]},
+        ip=req.client.host if req.client else None,
+        user_agent=req.headers.get("user-agent"),
+    )
+    await db.commit()
 
 
 @router.post("/bulk/reingest", response_model=BulkQueueResult)
 async def bulk_reingest(
     body: BulkSourceIds,
     background: BackgroundTasks,
+    req: Request,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_perm(P.KNOWLEDGE_UPDATE)),
+    current_user: User = Depends(require_perm(P.KNOWLEDGE_UPDATE)),
 ):
     count = await sources_svc.bulk_reingest_sources(db, source_ids=list(body.source_ids), background=background)
+    await audit_svc.log_action(
+        db,
+        action="source.bulk_reingest",
+        resource_type="source",
+        actor_id=current_user.id,
+        meta={"count": count, "source_ids": [str(i) for i in body.source_ids]},
+        ip=req.client.host if req.client else None,
+        user_agent=req.headers.get("user-agent"),
+    )
+    await db.commit()
     return BulkQueueResult(queued=count)
 
 
 @router.post("/bulk/tag", response_model=OperationStatus)
 async def bulk_tag(
     body: BulkTagRequest,
+    req: Request,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_perm(P.KNOWLEDGE_UPDATE)),
+    current_user: User = Depends(require_perm(P.KNOWLEDGE_UPDATE)),
 ):
     ids = list(body.source_ids)
     result = await db.execute(
@@ -322,6 +345,15 @@ async def bulk_tag(
             existing_tags -= set(body.tags)
         meta["tags"] = sorted(existing_tags)
         source.meta = meta
+    await audit_svc.log_action(
+        db,
+        action="source.bulk_tag",
+        resource_type="source",
+        actor_id=current_user.id,
+        meta={"count": len(sources), "action": body.action, "tags": body.tags},
+        ip=req.client.host if req.client else None,
+        user_agent=req.headers.get("user-agent"),
+    )
     await db.commit()
     return OperationStatus()
 

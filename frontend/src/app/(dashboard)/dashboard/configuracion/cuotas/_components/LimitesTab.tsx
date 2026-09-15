@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
+import { usePermission } from "@/hooks/use-permission";
+import { PERM } from "@/lib/permissions";
 import { Loading } from "@/components/ui/loading";
 import { FloatingSaveBar } from "../../_lib/save-bar";
 
@@ -22,6 +24,8 @@ export interface LimitesTabHandle {
 
 export const LimitesTab = forwardRef<LimitesTabHandle>(function LimitesTab(_props, ref) {
   const { toast, confirm } = useToast();
+  const can = usePermission();
+  const canUpdate = can(PERM.SYSTEM_UPDATE);
   const { data: configData, loading: loadingConfig, error: configError, refetch: refetchConfig } =
     useApi<RateLimitConfig>("/rate-limits/config");
   const { data: throttledData, loading: loadingThrottled, error: throttledError, refetch: refetchThrottled, setData: setThrottled } =
@@ -94,13 +98,13 @@ export const LimitesTab = forwardRef<LimitesTabHandle>(function LimitesTab(_prop
         <CardContent className="space-y-4">
           <div>
             <label className="text-xs font-medium block mb-1">Chat por minuto / IP</label>
-            <Input type="number" min={1} value={config.chat_per_min}
+            <Input type="number" min={1} value={config.chat_per_min} disabled={!canUpdate}
               onChange={(e) => setConfig({ ...config, chat_per_min: Number(e.target.value) })}
               className="max-w-32" />
           </div>
           <div>
             <label className="text-xs font-medium block mb-1">Chat por hora / IP</label>
-            <Input type="number" min={1} value={config.chat_per_hour}
+            <Input type="number" min={1} value={config.chat_per_hour} disabled={!canUpdate}
               onChange={(e) => setConfig({ ...config, chat_per_hour: Number(e.target.value) })}
               className="max-w-32" />
           </div>
@@ -127,9 +131,11 @@ export const LimitesTab = forwardRef<LimitesTabHandle>(function LimitesTab(_prop
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant="outline" className="text-destructive border-destructive/40">Throttle</Badge>
-                    <Button variant="ghost" size="sm" onClick={() => unblockIp(t.ip)} className="gap-1.5">
-                      <Unlock className="w-3.5 h-3.5" /> Desbloquear
-                    </Button>
+                    {canUpdate && (
+                      <Button variant="ghost" size="sm" onClick={() => unblockIp(t.ip)} className="gap-1.5">
+                        <Unlock className="w-3.5 h-3.5" /> Desbloquear
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -138,7 +144,7 @@ export const LimitesTab = forwardRef<LimitesTabHandle>(function LimitesTab(_prop
         </CardContent>
       </Card>
 
-      <FloatingSaveBar dirty={dirty} saving={saving} onSave={saveConfig} />
+      {canUpdate && <FloatingSaveBar dirty={dirty} saving={saving} onSave={saveConfig} />}
     </div>
   );
 });

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import require_perm
@@ -22,6 +22,7 @@ from app.services.ai.embedding import embed_texts_async
 from app.services.ai.llm_gateway import grade_documents
 from app.services.ingestion import vector_store
 from app.services.knowledge import chunk_editing
+from app.services.system import audit as audit_svc
 from app.services.system import settings as settings_service
 
 router = APIRouter(prefix="/chunks", tags=["chunks"])
@@ -66,19 +67,45 @@ async def edit_chunk(
 @router.post("/{point_id}/discard", response_model=ChunkOut)
 async def discard_chunk(
     point_id: str,
+    req: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_perm(P.KNOWLEDGE_UPDATE)),
 ):
-    return await chunk_editing.set_discarded(db, point_id=point_id, value=True, user=current_user)
+    result = await chunk_editing.set_discarded(db, point_id=point_id, value=True, user=current_user)
+    await audit_svc.log_action(
+        db,
+        action="chunk.discard",
+        resource_type="chunk",
+        actor_id=current_user.id,
+        resource_id=point_id,
+        meta={"source_id": result.source_id},
+        ip=req.client.host if req.client else None,
+        user_agent=req.headers.get("user-agent"),
+    )
+    await db.commit()
+    return result
 
 
 @router.post("/{point_id}/restore", response_model=ChunkOut)
 async def restore_chunk(
     point_id: str,
+    req: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_perm(P.KNOWLEDGE_UPDATE)),
 ):
-    return await chunk_editing.set_discarded(db, point_id=point_id, value=False, user=current_user)
+    result = await chunk_editing.set_discarded(db, point_id=point_id, value=False, user=current_user)
+    await audit_svc.log_action(
+        db,
+        action="chunk.restore",
+        resource_type="chunk",
+        actor_id=current_user.id,
+        resource_id=point_id,
+        meta={"source_id": result.source_id},
+        ip=req.client.host if req.client else None,
+        user_agent=req.headers.get("user-agent"),
+    )
+    await db.commit()
+    return result
 
 
 @router.get("/{point_id}/history", response_model=list[ChunkEditOut])

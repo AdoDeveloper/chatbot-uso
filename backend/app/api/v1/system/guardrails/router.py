@@ -1,7 +1,7 @@
 """Guardrails configuration & injection log endpoints."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,8 +11,10 @@ from app.core.permissions import P
 from app.db.session import get_db
 from app.models.audit_log import AuditLog
 from app.models.global_setting import GlobalSetting
+from app.models.user import User
 from app.schemas.common import OperationStatus
 from app.services.ai.guardrails import reload_custom_patterns, validate_input
+from app.services.system import audit as audit_svc
 from app.services.system import guardrail_patterns as patterns_svc
 
 router = APIRouter(prefix="/guardrails", tags=["system:guardrails"])
@@ -60,6 +62,13 @@ class GuardrailConfig(BaseModel):
     injection_patterns_count: int
 
 
+class GuardrailConfigUpdate(BaseModel):
+    guardrails_enabled: bool | None = None
+    max_input_chars: int | None = Field(None, ge=1, le=50000)
+    max_output_tokens: int | None = Field(None, ge=1, le=32000)
+    pii_entities: list[str] | None = None
+
+
 class GuardrailTestRequest(BaseModel):
     text: str
 
@@ -100,19 +109,24 @@ async def get_config(
 
 @router.patch("/config", response_model=OperationStatus)
 async def update_config(
-    body: dict,
+    body: GuardrailConfigUpdate,
+    req: Request,
     db: AsyncSession = Depends(get_db),
-    _=Depends(_admin),
+    current_user: User = Depends(_admin),
 ) -> OperationStatus:
-    """Actualiza la configuración de guardrails (enabled, max chars, max tokens, PII).
-
-    Solo persiste claves whitelisteadas para prevenir inyección en GlobalSetting.
-    """
     from app.services.system.settings import invalidate_runtime_overrides
-    allowed = {"guardrails_enabled", "max_input_chars", "max_output_tokens", "pii_entities"}
-    for k, v in body.items():
-        if k in allowed:
-            await db.merge(GlobalSetting(key=k, value=v))
+    updates = body.model_dump(exclude_unset=True)
+    for k, v in updates.items():
+        await db.merge(GlobalSetting(key=k, value=v))
+    await audit_svc.log_action(
+        db,
+        action="guardrails.update_config",
+        resource_type="system",
+        actor_id=current_user.id,
+        meta=updates,
+        ip=req.client.host if req.client else None,
+        user_agent=req.headers.get("user-agent"),
+    )
     await db.commit()
     invalidate_runtime_overrides()
     return OperationStatus()
@@ -131,13 +145,25 @@ async def list_patterns(
 @router.post("/patterns", response_model=InjectionPattern, status_code=201)
 async def create_pattern(
     body: PatternCreate,
+    req: Request,
     db: AsyncSession = Depends(get_db),
-    _=Depends(_admin),
+    current_user: User = Depends(_admin),
 ):
     entry = await patterns_svc.create_pattern(
         db, regex=body.regex, label=body.label, category=body.category,
         example=body.example, enabled=body.enabled,
     )
+    await audit_svc.log_action(
+        db,
+        action="guardrails.pattern.create",
+        resource_type="system",
+        actor_id=current_user.id,
+        resource_id=entry["id"],
+        meta={"label": entry["label"]},
+        ip=req.client.host if req.client else None,
+        user_agent=req.headers.get("user-agent"),
+    )
+    await db.commit()
     return InjectionPattern(**entry)
 
 
@@ -145,20 +171,43 @@ async def create_pattern(
 async def update_pattern(
     pattern_id: str,
     body: PatternUpdate,
+    req: Request,
     db: AsyncSession = Depends(get_db),
-    _=Depends(_admin),
+    current_user: User = Depends(_admin),
 ):
     entry = await patterns_svc.update_pattern(db, pattern_id=pattern_id, changes=body.model_dump(exclude_unset=True))
+    await audit_svc.log_action(
+        db,
+        action="guardrails.pattern.update",
+        resource_type="system",
+        actor_id=current_user.id,
+        resource_id=pattern_id,
+        meta={"label": entry["label"]},
+        ip=req.client.host if req.client else None,
+        user_agent=req.headers.get("user-agent"),
+    )
+    await db.commit()
     return InjectionPattern(**entry)
 
 
 @router.delete("/patterns/{pattern_id}", response_model=OperationStatus)
 async def delete_pattern(
     pattern_id: str,
+    req: Request,
     db: AsyncSession = Depends(get_db),
-    _=Depends(_admin),
+    current_user: User = Depends(_admin),
 ) -> OperationStatus:
     await patterns_svc.delete_pattern(db, pattern_id=pattern_id)
+    await audit_svc.log_action(
+        db,
+        action="guardrails.pattern.delete",
+        resource_type="system",
+        actor_id=current_user.id,
+        resource_id=pattern_id,
+        ip=req.client.host if req.client else None,
+        user_agent=req.headers.get("user-agent"),
+    )
+    await db.commit()
     return OperationStatus()
 
 

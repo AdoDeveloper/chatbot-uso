@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import require_perm
@@ -12,6 +12,7 @@ from app.db.session import get_db
 from app.models.user import User
 from app.schemas.faq import FAQCreate, FAQOut, FAQUpdate
 from app.services.knowledge import faq as svc
+from app.services.system import audit as audit_svc
 
 router = APIRouter(prefix="/faq", tags=["faq"])
 
@@ -27,6 +28,7 @@ async def list_faqs(
 @router.post("", response_model=FAQOut, status_code=status.HTTP_201_CREATED)
 async def create_faq(
     body: FAQCreate,
+    req: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_perm(P.KNOWLEDGE_CREATE)),
 ):
@@ -37,6 +39,16 @@ async def create_faq(
         tags=body.tags,
         is_active=body.is_active,
         created_by_id=current_user.id,
+    )
+    await audit_svc.log_action(
+        db,
+        action="faq.create",
+        resource_type="faq",
+        actor_id=current_user.id,
+        resource_id=str(entry.id),
+        meta={"question": entry.question},
+        ip=req.client.host if req.client else None,
+        user_agent=req.headers.get("user-agent"),
     )
     await db.commit()
     await db.refresh(entry)
@@ -59,13 +71,24 @@ async def get_faq(
 async def update_faq(
     faq_id: uuid.UUID,
     body: FAQUpdate,
+    req: Request,
     db: AsyncSession = Depends(get_db),
-    _: object = Depends(require_perm(P.KNOWLEDGE_UPDATE)),
+    current_user: User = Depends(require_perm(P.KNOWLEDGE_UPDATE)),
 ):
     entry = await svc.get_faq(db, faq_id)
     if not entry:
         raise NotFoundError("FAQ no encontrada")
     entry = await svc.update_faq(db, entry, **body.model_dump(exclude_unset=True))
+    await audit_svc.log_action(
+        db,
+        action="faq.update",
+        resource_type="faq",
+        actor_id=current_user.id,
+        resource_id=str(entry.id),
+        meta={"question": entry.question},
+        ip=req.client.host if req.client else None,
+        user_agent=req.headers.get("user-agent"),
+    )
     await db.commit()
     await db.refresh(entry)
     return FAQOut.model_validate(entry)
@@ -74,11 +97,22 @@ async def update_faq(
 @router.delete("/{faq_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_faq(
     faq_id: uuid.UUID,
+    req: Request,
     db: AsyncSession = Depends(get_db),
-    _: object = Depends(require_perm(P.KNOWLEDGE_DELETE)),
+    current_user: User = Depends(require_perm(P.KNOWLEDGE_DELETE)),
 ):
     entry = await svc.get_faq(db, faq_id)
     if not entry:
         raise NotFoundError("FAQ no encontrada")
+    await audit_svc.log_action(
+        db,
+        action="faq.delete",
+        resource_type="faq",
+        actor_id=current_user.id,
+        resource_id=str(entry.id),
+        meta={"question": entry.question},
+        ip=req.client.host if req.client else None,
+        user_agent=req.headers.get("user-agent"),
+    )
     await svc.delete_faq(db, entry)
     await db.commit()
