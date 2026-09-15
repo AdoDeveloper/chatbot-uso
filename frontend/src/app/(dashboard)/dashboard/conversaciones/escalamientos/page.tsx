@@ -20,7 +20,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ConversacionesTabs } from "../_components/ConversacionesTabs";
-import { SegmentedControl } from "@/components/composed/segmented-control";
 import { DateRangeFilter } from "@/components/composed/date-range-filter";
 import { TablePagination } from "@/components/composed/table-pagination";
 import { StatCard } from "@/components/composed/stat-card";
@@ -447,17 +446,21 @@ export default function EscalamientosPage() {
               </Badge>
             )}
           </div>
-          <div className="flex items-center flex-wrap">
-            <SegmentedControl
-              ariaLabel="Filtrar por estado"
-              variant="chip"
-              value={filter}
-              onChange={(v) => { setFilter(v); setPage(1); }}
-              options={(Object.keys(FILTER_LABELS) as FilterState[]).map((key) => ({ value: key, label: FILTER_LABELS[key] }))}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 gap-2 sm:flex sm:items-end sm:justify-end">
+          <div className="grid grid-cols-1 gap-2 sm:flex sm:items-end">
+            <div className="min-w-0">
+              <label className="block text-2xs font-medium text-muted-foreground mb-1">Estado</label>
+              <Select
+                value={filter}
+                onChange={(e) => { setFilter(e.target.value as FilterState); setPage(1); }}
+                className="h-7 text-xs min-w-0"
+                aria-label="Filtrar por estado"
+              >
+                {(Object.keys(FILTER_LABELS) as FilterState[]).map((key) => (
+                  <SelectOption key={key} value={key}>{FILTER_LABELS[key]}</SelectOption>
+                ))}
+              </Select>
+            </div>
+            <div className="sm:flex-1" />
             <DateRangeFilter
               size="sm"
               from={dateFrom}
