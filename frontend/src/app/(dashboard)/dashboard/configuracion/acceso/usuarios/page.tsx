@@ -382,12 +382,15 @@ function UsuariosTab() {
   // filtrarlas en la query las haría desaparecer en vez de marcarlas.
   const { data: invitationsData, refetch: loadInvitations } =
     useApi<{ items: Invitation[]; total: number }>(`/users/invitations?page=${invitesPage}&page_size=${invitesPageSize}`);
+  const { data: activeInvitationsData, refetch: refetchActiveInvitationsCount } =
+    useApi<{ total: number }>("/users/invitations?active_only=true&page=1&page_size=1");
   const { data: summaryData } = useApi<{ total_members: number; active: number; no_access_yet: number; admins: number }>("/users/summary");
   const { data: rolesData } = useApi<Role[]>("/rbac/roles");
   const users = usersData?.items ?? [];
   const usersTotal = usersData?.total ?? 0;
   const invitations = invitationsData?.items ?? [];
   const invitationsTotal = invitationsData?.total ?? 0;
+  const activeInvitationsTotal = activeInvitationsData?.total ?? 0;
   const availableRoles = rolesData ?? [];
 
   useEffect(() => {
@@ -423,10 +426,15 @@ function UsuariosTab() {
     navigator.clipboard.writeText(buildInviteUrl(token)).then(() => toast({ type: "success", message: "Enlace copiado.", duration: 1500 }));
   };
 
+  const refreshInvitations = () => {
+    loadInvitations();
+    refetchActiveInvitationsCount();
+  };
+
   const handleRevokeInvite = async (inv: Invitation) => {
     const ok = await confirm({ title: "¿Revocar invitación?", message: `El enlace enviado a ${inv.email} dejará de funcionar`, confirmText: "Revocar", variant: "danger" });
     if (ok) {
-      try { await api.delete(`/users/invitations/${inv.id}`); loadInvitations(); }
+      try { await api.delete(`/users/invitations/${inv.id}`); refreshInvitations(); }
       catch (err) { toast({ type: "error", message: getErrorMessage(err, "No se pudo revocar la invitación.") }); }
     }
   };
@@ -442,7 +450,7 @@ function UsuariosTab() {
     try {
       await api.delete(`/users/invitations/${inv.id}/permanent`);
       toast({ type: "success", message: "Invitación eliminada.", duration: 1500 });
-      loadInvitations();
+      refreshInvitations();
     } catch (err) {
       toast({ type: "error", message: getErrorMessage(err, "No se pudo eliminar la invitación.") });
     }
@@ -458,7 +466,7 @@ function UsuariosTab() {
     try {
       await api.post(`/users/invitations/${inv.id}/resend`);
       toast({ type: "success", message: "Invitación reenviada." });
-      loadInvitations();
+      refreshInvitations();
     } catch (err) {
       toast({ type: "error", message: getErrorMessage(err, "No se pudo reenviar la invitación.") });
     }
@@ -469,7 +477,7 @@ function UsuariosTab() {
   return (
     <div className="space-y-6">
       <EditUserPanel key={editUser?.id} user={editUser} meId={me?.id} availableRoles={availableRoles} onClose={() => setEditUser(null)} onSaved={loadUsers} />
-      <InvitePanel key={inviteOpen ? "open" : "closed"} open={inviteOpen} availableRoles={availableRoles} onClose={() => setInviteOpen(false)} onCreated={loadInvitations} />
+      <InvitePanel key={inviteOpen ? "open" : "closed"} open={inviteOpen} availableRoles={availableRoles} onClose={() => setInviteOpen(false)} onCreated={refreshInvitations} />
       <ResetPasswordResultModal result={resetResult} onClose={() => setResetResult(null)} />
 
       {/* Stats: conteos agregados del equipo completo, independientes de la
@@ -557,12 +565,12 @@ function UsuariosTab() {
         />
       </Card>
 
-      {/* Invitaciones pendientes */}
+      {/* Historial de invitaciones: incluye pendientes, aceptadas, expiradas y revocadas (ver badge de Estado por fila) */}
       <Card className="overflow-hidden">
         <div className="flex items-center gap-2 px-5 py-4 border-b border-border/60">
-          <h3 className="text-sm font-semibold text-foreground">Invitaciones pendientes</h3>
-          {invitationsTotal > 0 && (
-            <Badge variant="warning" size="xs">{invitationsTotal}</Badge>
+          <h3 className="text-sm font-semibold text-foreground">Invitaciones</h3>
+          {activeInvitationsTotal > 0 && (
+            <Badge variant="warning" size="xs">{activeInvitationsTotal} pendiente{activeInvitationsTotal !== 1 ? "s" : ""}</Badge>
           )}
         </div>
         <DataTable

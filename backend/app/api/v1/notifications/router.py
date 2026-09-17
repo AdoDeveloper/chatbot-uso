@@ -28,13 +28,13 @@ from app.schemas.notification import (
 )
 from app.schemas.report_schedule import ReportSchedule
 from app.services.notifications.audience import visible_events as _visible_events
+from app.services.system import audit as audit_svc
 from app.services.system.report_schedule import (
     get_report_schedule as load_report_schedule,
 )
 from app.services.system.report_schedule import (
     upsert_report_schedule,
 )
-from app.services.system import audit as audit_svc
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
