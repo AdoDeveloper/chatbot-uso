@@ -26,16 +26,15 @@ test.describe("Conversaciones > Escalamientos", () => {
     await page.goto("/dashboard/conversaciones/escalamientos");
     await expect(page.getByRole("heading", { name: /escalamientos|conversaciones/i }).first()).toBeVisible({ timeout: 10_000 });
 
-    // SegmentedControl: both filter states, unconditionally safe (read-only).
-    const resueltosChip = page.getByRole("button", { name: /^resueltos$/i });
-    await resueltosChip.click();
+    // Select de estado: both filter states, unconditionally safe (read-only).
+    const statusSelect = page.getByLabel(/filtrar por estado/i);
+    await statusSelect.selectOption("resolved");
     await expect(page.getByRole("heading", { name: /^resueltos$/i })).toBeVisible({ timeout: 10_000 });
-    const sinResolverChip = page.getByRole("button", { name: /^sin resolver$/i });
-    await sinResolverChip.click();
+    await statusSelect.selectOption("escalated");
     await expect(page.getByRole("heading", { name: /^sin resolver$/i })).toBeVisible({ timeout: 10_000 });
 
     // Tag filter select - only rendered when at least one tag exists in the system.
-    const tagSelect = page.locator("select");
+    const tagSelect = page.getByLabel(/filtrar por tag/i);
     if (await tagSelect.isVisible().catch(() => false)) {
       const options = await tagSelect.locator("option").allTextContents();
       if (options.length > 1) {

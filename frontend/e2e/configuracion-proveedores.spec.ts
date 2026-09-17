@@ -158,16 +158,19 @@ test.describe("Configuracion > Proveedores", () => {
     await page.getByRole("menuitem", { name: /probar conexión/i }).click();
     await expect(page.getByText(/falló la conexión|conexión exitosa/i)).toBeVisible({ timeout: 45_000 });
 
-    // Con más de un proveedor encadenado ejercita el reordenamiento real; si es el único, ambas flechas quedan deshabilitadas (estado inerte esperado, se valida ese caso).
-    const downBtn = row.getByRole("button", { name: new RegExp(`Mover ${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} abajo`, "i") });
-    const isDisabled = await downBtn.isDisabled();
+    // Con más de un proveedor encadenado ejercita el reordenamiento real; si es el único, el item queda deshabilitado (estado inerte esperado, se valida ese caso).
+    await row.getByRole("button").last().click();
+    const downItem = page.getByRole("menuitem", { name: /^mover abajo$/i });
+    await expect(downItem).toBeVisible({ timeout: 5_000 });
+    const isDisabled = await downItem.isDisabled();
     if (!isDisabled) {
-      await downBtn.click();
+      await downItem.click();
       await page.waitForTimeout(1000);
-      const upBtn = row.getByRole("button", { name: new RegExp(`Mover ${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} arriba`, "i") });
-      await upBtn.click();
+      await row.getByRole("button").last().click();
+      const upItem = page.getByRole("menuitem", { name: /^mover arriba$/i });
+      await upItem.click();
     } else {
-      await expect(downBtn).toBeDisabled();
+      await page.keyboard.press("Escape");
     }
 
     await expect(async () => {
