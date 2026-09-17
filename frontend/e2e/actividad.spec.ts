@@ -83,7 +83,7 @@ const srcRes = await request.get(`${baseURL}/api/v1/sources?page_size=100`, {
 
 test.describe("Actividad > Auditoria", () => {
   test("exportar el log de auditoria", async ({ page }) => {
-    await page.goto("/dashboard/actividad?tab=auditoria");
+    await page.goto("/dashboard/actividad/auditoria");
     await expect(page.getByRole("button", { name: /exportar/i })).toBeVisible({ timeout: 10_000 });
     await page.screenshot({ path: path.join(SHOT_DIR, "01-auditoria.png") });
 
@@ -97,7 +97,7 @@ test.describe("Actividad > Auditoria", () => {
 
   test("filtrar por accion, recurso, actor y fecha; limpiar filtros; ver detalle de una entrada", async ({ page }) => {
     const consoleErrors: string[] = [];
-    await page.goto("/dashboard/actividad?tab=auditoria");
+    await page.goto("/dashboard/actividad/auditoria");
     page.on("pageerror", (e) => consoleErrors.push(String(e)));
     await expect(page.getByPlaceholder(/filtrar por acción/i)).toBeVisible({ timeout: 10_000 });
 
@@ -155,8 +155,8 @@ test.describe("Actividad > Auditoria", () => {
 
 test.describe("Actividad > Inyecciones", () => {
   test("ver el listado de intentos de inyeccion detectados", async ({ page }) => {
-    await page.goto("/dashboard/actividad?tab=inyecciones");
-    await expect(page).toHaveURL(/tab=inyecciones/, { timeout: 10_000 });
+    await page.goto("/dashboard/actividad/inyecciones");
+    await expect(page).toHaveURL(/\/actividad\/inyecciones/, { timeout: 10_000 });
     await page.screenshot({ path: path.join(SHOT_DIR, "03-inyecciones.png") });
   });
 });
@@ -181,7 +181,7 @@ test.describe("Actividad > Seguridad", () => {
         }).catch(() => {});
       }
 
-      await page.goto("/dashboard/actividad?tab=seguridad");
+      await page.goto("/dashboard/actividad/seguridad");
       await expect(page.getByText(/usuarios con límite activo/i).first()).toBeVisible({ timeout: 10_000 });
       await page.screenshot({ path: path.join(SHOT_DIR, "04-seguridad.png") });
 
@@ -235,7 +235,7 @@ test.describe("Actividad > Seguridad", () => {
         // lectura es lo que más ayuda bajo contención real de CI.
         await fireThrottleBurst(attempt === 1 ? sessionId : `${sessionId}-retry${attempt}`);
         if (attempt === 1) {
-          await page.goto("/dashboard/actividad?tab=seguridad", { timeout: 30_000 });
+          await page.goto("/dashboard/actividad/seguridad", { timeout: 30_000 });
           await expect(page.getByText(/logins fallidos por ip/i)).toBeVisible({ timeout: 20_000 });
           await page.screenshot({ path: path.join(SHOT_DIR, "07-logins-fallidos.png") });
         } else {
@@ -253,7 +253,7 @@ test.describe("Actividad > Seguridad", () => {
 
   test("filtro de periodo de seguridad, y click en una IP de un mensaje bloqueado filtra la lista", async ({ page }) => {
     const consoleErrors: string[] = [];
-    await page.goto("/dashboard/actividad?tab=seguridad");
+    await page.goto("/dashboard/actividad/seguridad");
     page.on("pageerror", (e) => consoleErrors.push(String(e)));
     // .first(): "Intentos fallidos" (título de la StatCard) y "Sin intentos
     // fallidos" (empty-state cuando no hay registros) matchean ambos este

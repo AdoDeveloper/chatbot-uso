@@ -15,7 +15,7 @@ fs.mkdirSync(SHOT_DIR, { recursive: true });
 test.describe("Configuracion > Asistente > Previsualizar", () => {
   test("abrir/cerrar el launcher, cambiar alcance Todos/Aprobados, enviar un mensaje real", async ({ page }) => {
     const consoleErrors: string[] = [];
-    await page.goto("/dashboard/configuracion/asistente?tab=previsualizar");
+    await page.goto("/dashboard/configuracion/asistente/previsualizar");
     page.on("pageerror", (e) => consoleErrors.push(String(e)));
     await expect(page.getByText(/vista previa/i).first()).toBeVisible({ timeout: 10_000 });
 
@@ -51,7 +51,7 @@ test.describe("Configuracion > Asistente > Previsualizar", () => {
   });
 
   test("escalamiento: prompt si/no, formulario de contacto (correo y whatsapp) con validacion", async ({ page }) => {
-    await page.goto("/dashboard/configuracion/asistente?tab=previsualizar");
+    await page.goto("/dashboard/configuracion/asistente/previsualizar");
     await expect(page.getByPlaceholder(/escribe un mensaje/i)).toBeVisible({ timeout: 10_000 });
 
     const input = page.getByPlaceholder(/escribe un mensaje/i);
@@ -93,7 +93,7 @@ test.describe("Configuracion > Asistente > Previsualizar", () => {
   });
 
   test("menu kebab: nueva conversacion, panel de accesibilidad (tamaño de texto, alto contraste), finalizar chat", async ({ page }) => {
-    await page.goto("/dashboard/configuracion/asistente?tab=previsualizar");
+    await page.goto("/dashboard/configuracion/asistente/previsualizar");
     await expect(page.getByPlaceholder(/escribe un mensaje/i)).toBeVisible({ timeout: 10_000 });
 
     const kebabBtn = page.getByRole("button", { name: /más opciones/i });

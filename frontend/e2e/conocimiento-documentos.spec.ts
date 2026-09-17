@@ -97,7 +97,7 @@ test.describe("Conocimiento > Documentos > FAQ", () => {
     const question = `E2E Pregunta ${Date.now()}`;
     const renamedQuestion = `${question} (editada)`;
 
-    await page.goto("/dashboard/conocimiento/documentos?tab=faq");
+    await page.goto("/dashboard/conocimiento/documentos/faq");
     await expect(page.getByRole("tab", { name: /faq/i })).toBeVisible({ timeout: 10_000 });
     await page.getByRole("tab", { name: /^faq$/i }).click();
 
@@ -138,7 +138,7 @@ test.describe("Conocimiento > Documentos > FAQ", () => {
     const question = `E2E FAQ Filtros ${Date.now()}`;
     const uniqueTag = `e2e-tag-${Date.now()}`;
 
-    await page.goto("/dashboard/conocimiento/documentos?tab=faq");
+    await page.goto("/dashboard/conocimiento/documentos/faq");
     await page.getByRole("tab", { name: /^faq$/i }).click();
     await expect(page.getByRole("button", { name: /nueva entrada/i })).toBeVisible({ timeout: 10_000 });
 

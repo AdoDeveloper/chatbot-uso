@@ -14,7 +14,7 @@ fs.mkdirSync(SHOT_DIR, { recursive: true });
 
 test.describe("Configuracion > Asistente > Apariencia", () => {
   test("selector de posicion (4 esquinas), color, iconos y toggles avanzados, restaurado", async ({ page }) => {
-    await page.goto("/dashboard/configuracion/asistente?tab=apariencia");
+    await page.goto("/dashboard/configuracion/asistente/apariencia");
     await expect(page.getByText(/posición en pantalla/i)).toBeVisible({ timeout: 10_000 });
 
     const positions = ["Superior izquierda", "Superior derecha", "Inferior izquierda", "Inferior derecha"];
@@ -64,7 +64,7 @@ test.describe("Configuracion > Asistente > Apariencia", () => {
   });
 
   test("controles de conversacion: toggles y encuesta CSAT con pregunta personalizada, restaurado", async ({ page }) => {
-    await page.goto("/dashboard/configuracion/asistente?tab=apariencia");
+    await page.goto("/dashboard/configuracion/asistente/apariencia");
     await expect(page.getByText(/controles de conversación/i)).toBeVisible({ timeout: 10_000 });
 
     for (const label of [/escalamiento a un humano/i, /botón «finalizar chat»/i, /botón «nueva conversación»/i]) {
@@ -96,7 +96,7 @@ test.describe("Configuracion > Asistente > Apariencia", () => {
   });
 
   test("motivos CSAT: crear, editar, activar/desactivar, reordenar y eliminar, restaurado", async ({ page }) => {
-    await page.goto("/dashboard/configuracion/asistente?tab=apariencia");
+    await page.goto("/dashboard/configuracion/asistente/apariencia");
     await expect(page.getByText(/controles de conversación/i)).toBeVisible({ timeout: 10_000 });
 
     const csatSwitch = page.getByText(/encuesta de satisfacción/i).locator("../..").locator('[role="switch"]');
@@ -143,7 +143,7 @@ test.describe("Configuracion > Asistente > Apariencia", () => {
   });
 
   test("captacion: toggle, etiqueta del boton, mensaje proactivo con contador y preview, sugerencias rapidas, restaurado", async ({ page }) => {
-    await page.goto("/dashboard/configuracion/asistente?tab=apariencia");
+    await page.goto("/dashboard/configuracion/asistente/apariencia");
     await expect(page.getByText(/^captación$/i)).toBeVisible({ timeout: 10_000 });
 
     const captacionSwitch = page.getByText(/^captación$/i).locator("../..").locator('[role="switch"]');
@@ -184,7 +184,7 @@ test.describe("Configuracion > Asistente > Apariencia", () => {
 
 test.describe("Configuracion > Asistente > Integración", () => {
   test("snippet de script, copiar codigo, agregar y quitar un dominio permitido, restaurado", async ({ page }) => {
-    await page.goto("/dashboard/configuracion/asistente?tab=integracion");
+    await page.goto("/dashboard/configuracion/asistente/integracion");
     await expect(page.getByRole("heading", { name: /código de integración/i })).toBeVisible({ timeout: 10_000 });
 
     await expect(page.locator("pre")).toContainText("script", { timeout: 5_000 });
@@ -225,7 +225,7 @@ test.describe("Configuracion > Asistente > Integración", () => {
 
 test.describe("Configuracion > Asistente > Límites", () => {
   test("caps anti-abuso: mensajes por sesion y por dia, editar y restaurar", async ({ page }) => {
-    await page.goto("/dashboard/configuracion/asistente?tab=limites");
+    await page.goto("/dashboard/configuracion/asistente/limites");
     await expect(page.getByText(/caps anti-abuso/i)).toBeVisible({ timeout: 10_000 });
 
     const perSessionInput = page.locator('input[type="number"]').first();

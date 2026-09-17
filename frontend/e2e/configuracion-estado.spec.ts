@@ -45,8 +45,7 @@ test.describe("Configuracion > Estado", () => {
   });
 
   test("editar y guardar limites de cuota (chat por minuto/hora)", async ({ page }) => {
-    await page.goto("/dashboard/configuracion/estado");
-    await page.getByRole("tab", { name: /cuotas/i }).click();
+    await page.goto("/dashboard/configuracion/estado/cuotas/limites");
     await expect(page.getByText(/límites configurados/i)).toBeVisible({ timeout: 10_000 });
 
     const perMinInput = page.getByText(/chat por minuto/i).locator("..").locator("input[type='number']");
@@ -123,11 +122,9 @@ test.describe("Configuracion > Estado", () => {
 
   test("tab Tendencia: cambiar el rango de fechas sin excepcion", async ({ page }) => {
     const consoleErrors: string[] = [];
-    await page.goto("/dashboard/configuracion/estado");
+    await page.goto("/dashboard/configuracion/estado/cuotas/tendencia");
     page.on("pageerror", (e) => consoleErrors.push(String(e)));
 
-    await page.getByRole("tab", { name: /cuotas/i }).click();
-    await page.getByRole("tab", { name: /tendencia/i }).click();
     await expect(page.getByText(/uso vs\. límite/i)).toBeVisible({ timeout: 10_000 });
 
     const dateInputs = page.locator('input[type="date"]');

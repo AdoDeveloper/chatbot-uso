@@ -25,7 +25,7 @@ test.describe("Configuracion > Asistente", () => {
   });
 
   test("editar y guardar el nombre del chatbot (tab Widget)", async ({ page }) => {
-    await page.goto("/dashboard/configuracion/asistente?tab=apariencia");
+    await page.goto("/dashboard/configuracion/asistente/apariencia");
     await expect(page.getByText(/^identidad$/i).first()).toBeVisible({ timeout: 10_000 });
 
     const nameInput = page.getByText("Nombre del chatbot", { exact: true }).locator("..").locator("input");
@@ -45,7 +45,7 @@ test.describe("Configuracion > Asistente", () => {
   });
 
   test("gestionar motivos CSAT (crear, editar, activar/desactivar, eliminar)", async ({ page }) => {
-    await page.goto("/dashboard/configuracion/asistente?tab=apariencia");
+    await page.goto("/dashboard/configuracion/asistente/apariencia");
     await expect(page.getByText(/encuesta de satisfacción/i)).toBeVisible({ timeout: 10_000 });
 
     const csatToggle = page.getByText(/encuesta de satisfacción/i).locator("../..").locator("button[role='switch']");
@@ -94,7 +94,7 @@ test.describe("Configuracion > Asistente", () => {
 
   test("tab Prompt: mensajes automaticos (saludo, bloqueo, sin-servicio) editables y restaurados", async ({ page }) => {
     test.setTimeout(60_000);
-    await page.goto("/dashboard/configuracion/asistente?tab=prompt");
+    await page.goto("/dashboard/configuracion/asistente/prompt");
     await expect(page.getByText(/prompt del sistema/i).first()).toBeVisible({ timeout: 10_000 });
 
     const systemPromptCard = page.getByText(/prompt del sistema/i);
@@ -137,7 +137,7 @@ test.describe("Configuracion > Asistente", () => {
 
   test("tab Prompt: presets rapidos de parametros RAG, sliders y switch de revision de relevancia, restaurado", async ({ page }) => {
 
-    await page.goto("/dashboard/configuracion/asistente?tab=prompt");
+    await page.goto("/dashboard/configuracion/asistente/prompt");
     await expect(page.getByText(/perfil del asistente/i)).toBeVisible({ timeout: 10_000 });
 
     const tempSlider = page.locator('input[type="range"]').nth(2); // top_k, score_threshold, then temperature
