@@ -27,6 +27,9 @@ test.describe("Configuracion > Escalamiento", () => {
     const createDialog = page.getByRole("dialog");
     await expect(createDialog.getByRole("heading", { name: /nueva regla/i })).toBeVisible();
     await createDialog.getByPlaceholder(/nombre de la regla/i).fill(name);
+    // Tipo explicito y exclusivo de este test - evita el 409 de "trigger_type duplicado"
+    // si otro test/worker, o una regla ya existente en el entorno, usa el mismo tipo.
+    await createDialog.locator("select").selectOption("confidence_below");
     await page.screenshot({ path: path.join(SHOT_DIR, "01-crear-formulario.png") });
     await createDialog.getByRole("button", { name: /^guardar$/i }).click();
     await expect(createDialog).not.toBeVisible({ timeout: 10_000 });
@@ -178,6 +181,8 @@ test.describe("Configuracion > Escalamiento", () => {
     await page.getByRole("button", { name: /agregar/i }).click();
     const createDialog = page.getByRole("dialog");
     await createDialog.getByPlaceholder(/nombre de la regla/i).fill(name);
+    // Tipo explicito y exclusivo de este test - ver comentario equivalente en el primer test del archivo.
+    await createDialog.locator("select").selectOption("loop_detected");
     await createDialog.getByRole("button", { name: /^guardar$/i }).click();
     await expect(createDialog).not.toBeVisible({ timeout: 10_000 });
 
