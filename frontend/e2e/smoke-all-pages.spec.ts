@@ -21,18 +21,31 @@ test.skip(!E2E_USER || !E2E_PASS, "E2E_USER / E2E_PASS not set - skipping");
 
 // Estas rutas listan/grafican datos que otros specs crean/borran a lo largo
 // de la corrida (invitaciones, usuarios, notificaciones, conversaciones de
-// prueba de rate-limit) - su alto de página varía según cuánto quede
-// acumulado en ese momento (confirmado en CI: 4045px, 3660px y 4190px en
-// intentos consecutivos de la misma corrida para estadisticas), así que una
-// comparación de píxeles de página completa nunca converge en un baseline
-// estable.
+// prueba de rate-limit, proveedores, versiones, log de auditoria) - su alto
+// de página varía según cuánto quede acumulado en ese momento y en qué orden
+// terminaron de correr los demás specs (confirmado en CI: la misma ruta dio
+// 2172px, 1348px y otras alturas en corridas consecutivas del mismo commit
+// sin cambios), así que una comparación de píxeles de página completa nunca
+// converge en un baseline estable.
 const DYNAMIC_HEIGHT_ROUTES = new Set([
+  "/dashboard",
+  "/dashboard/conversaciones/escalamientos",
+  "/dashboard/actividad/auditoria",
+  "/dashboard/configuracion",
+  "/dashboard/configuracion/asistente",
+  "/dashboard/configuracion/asistente/apariencia",
+  "/dashboard/configuracion/widget",
   "/dashboard/configuracion/notificaciones",
   "/dashboard/configuracion/acceso",
+  "/dashboard/configuracion/acceso/sso",
   "/dashboard/configuracion/acceso/usuarios",
-  "/dashboard/estadisticas",
+  "/dashboard/configuracion/estado",
   "/dashboard/configuracion/estado/cuotas",
   "/dashboard/configuracion/estado/cuotas/limites",
+  "/dashboard/configuracion/estado/cuotas/tendencia",
+  "/dashboard/configuracion/proveedores",
+  "/dashboard/configuracion/publicaciones",
+  "/dashboard/estadisticas",
 ]);
 
 const ROUTES = [
