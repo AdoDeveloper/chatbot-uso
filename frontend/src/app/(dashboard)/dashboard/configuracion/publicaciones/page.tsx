@@ -324,7 +324,7 @@ export default function PublicacionesPage() {
 
   const hasPendingSources = pendingSources.length > 0;
 
-  const activeVersionId = versions.find((v) => v.is_active)?.id;
+  const lastSnapshotId = versions.find((v) => v.is_active)?.id;
   const displayed = showAllSnapshots ? versions : versions.slice(0, 10);
   const activeSections = diff ? Object.entries(diff.sections).filter(([, changes]) => changes.length > 0) : [];
 
@@ -459,15 +459,15 @@ export default function PublicacionesPage() {
             {displayed.map((v) => {
               const TriggerIcon = TRIGGER_ICONS[v.trigger_source || "manual"] || Settings;
               const isExpanded = expandedId === v.id;
-              const isInProduction = v.id === activeVersionId;
+              const isLastSnapshot = v.id === lastSnapshotId;
               const isRollback = v.trigger_source === "rollback";
               const isManual = v.trigger_source === "manual";
 
               return (
-                <Card key={v.id} className={`overflow-hidden ${isInProduction ? "border-primary/30 bg-primary/2" : isManual || isRollback ? "border-dashed opacity-75" : ""}`}>
+                <Card key={v.id} className={`overflow-hidden ${isLastSnapshot ? "border-primary/30 bg-primary/2" : isManual || isRollback ? "border-dashed opacity-75" : ""}`}>
                   <button onClick={() => handleExpand(v)} className="w-full text-left px-5 py-3 flex items-center gap-3 hover:bg-muted/30 transition-colors">
                     <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                      isInProduction ? "bg-primary text-primary-foreground" :
+                      isLastSnapshot ? "bg-primary text-primary-foreground" :
                       isRollback ? "bg-warning/10 text-warning" :
                       "bg-muted/50 text-muted-foreground"
                     }`}>
@@ -476,7 +476,7 @@ export default function PublicacionesPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-13">v{v.version_number}</span>
-                        {isInProduction && <Badge className="text-3xs">Configuración actual</Badge>}
+                        {isLastSnapshot && <Badge className="text-3xs">Último registro</Badge>}
                         {v.trigger_source && (
                           <Badge variant="secondary" className="text-3xs">
                             {TRIGGER_LABELS[v.trigger_source] || formatSectionFallback(v.trigger_source)}
@@ -490,7 +490,7 @@ export default function PublicacionesPage() {
                       </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      {!isInProduction && canUpdate && (
+                      {!isLastSnapshot && canUpdate && (
                         <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setRollbackTarget(v); }} className="gap-1 text-2xs h-7">
                           <RotateCcw className="h-3 w-3" /> Restaurar
                         </Button>
@@ -580,7 +580,7 @@ export default function PublicacionesPage() {
         open={snapshotOpen}
         onClose={() => { setSnapshotOpen(false); setSnapshotDesc(""); }}
         title="Guardar punto de restauración"
-        subtitle="Guarde el estado actual como punto de restauración. No afecta la versión activa en el widget."
+        subtitle="Guarde el estado actual como punto de restauración en el historial. El chatbot ya usa esta configuración en vivo; esto no cambia su comportamiento, solo agrega un punto al que volver más tarde."
         footer={
           <>
             <Button variant="outline" size="sm" className="gap-1.5" onClick={() => { setSnapshotOpen(false); setSnapshotDesc(""); }}>
