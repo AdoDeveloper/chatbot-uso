@@ -472,8 +472,6 @@ function UsuariosTab() {
     }
   };
 
-  const pendingInvites = invitations;
-
   return (
     <div className="space-y-6">
       <EditUserPanel key={editUser?.id} user={editUser} meId={me?.id} availableRoles={availableRoles} onClose={() => setEditUser(null)} onSaved={loadUsers} />
@@ -574,8 +572,8 @@ function UsuariosTab() {
           )}
         </div>
         <DataTable
-          empty={<EmptyState icon={CheckCircle} title="Sin invitaciones pendientes" description="Todas las invitaciones han sido aceptadas o no hay ninguna activa." className="py-8" />}
-          pagination={pendingInvites.length > 0 ? { page: invitesPage, pageSize: invitesPageSize, total: invitationsTotal, onPageChange: setInvitesPage, onPageSizeChange: (n) => { setInvitesPageSize(n); setInvitesPage(1); }, itemLabel: "invitaciones" } : undefined}
+          empty={<EmptyState icon={CheckCircle} title="Sin invitaciones" description="Todavía no se ha invitado a nadie." className="py-8" />}
+          pagination={invitations.length > 0 ? { page: invitesPage, pageSize: invitesPageSize, total: invitationsTotal, onPageChange: setInvitesPage, onPageSizeChange: (n) => { setInvitesPageSize(n); setInvitesPage(1); }, itemLabel: "invitaciones" } : undefined}
           noCard
           columns={[
             { id: "destinatario", header: "Destinatario" },
@@ -584,7 +582,7 @@ function UsuariosTab() {
             { id: "expira", header: "Expira", className: "w-32", hideBelow: "sm" },
             { id: "acciones", header: "Acciones", className: "whitespace-nowrap", sticky: true },
           ]}
-          data={pendingInvites}
+          data={invitations}
           rowKey={(inv) => inv.id}
           renderRow={(inv) => {
             const status = inviteStatus(inv);
@@ -610,7 +608,7 @@ function UsuariosTab() {
                   {status === "active" && (
                     <Tooltip content="Copiar enlace"><Button variant="ghost" size="icon-xs" onClick={() => handleCopyInvite(inv.token)} aria-label="Copiar enlace"><Copy className="w-3.5 h-3.5" /></Button></Tooltip>
                   )}
-                  {canManageUsers && status !== "accepted" && (
+                  {canManageUsers && (status === "active" || status === "expired") && (
                     <Tooltip content="Reenviar"><Button variant="ghost" size="icon-xs" onClick={() => handleResendInvite(inv)} aria-label="Reenviar"><RefreshCw className="w-3.5 h-3.5" /></Button></Tooltip>
                   )}
                   {canManageUsers && status === "active" && (
