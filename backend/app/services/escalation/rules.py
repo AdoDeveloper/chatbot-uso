@@ -22,7 +22,22 @@ async def list_rules(db: AsyncSession) -> list[EscalationRule]:
     return list(result.scalars().all())
 
 
+async def _assert_trigger_type_available(
+    db: AsyncSession, *, trigger_type: EscalationTrigger, exclude_rule_id: uuid.UUID | None = None
+) -> None:
+    query = select(EscalationRule.id).where(EscalationRule.trigger_type == trigger_type)
+    if exclude_rule_id is not None:
+        query = query.where(EscalationRule.id != exclude_rule_id)
+    result = await db.execute(query)
+    if result.scalar_one_or_none() is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="Ya existe una regla con este tipo de activación. Edite la regla existente en vez de crear una duplicada.",
+        )
+
+
 async def create_rule(db: AsyncSession, *, data: dict) -> EscalationRule:
+    await _assert_trigger_type_available(db, trigger_type=data["trigger_type"])
     rule = EscalationRule(**data)
     db.add(rule)
     await db.commit()
@@ -35,6 +50,9 @@ async def update_rule(db: AsyncSession, *, rule_id: uuid.UUID, changes: dict) ->
     rule = result.scalar_one_or_none()
     if not rule:
         raise NotFoundError("Regla no encontrada")
+    new_trigger_type = changes.get("trigger_type")
+    if new_trigger_type is not None and new_trigger_type != rule.trigger_type:
+        await _assert_trigger_type_available(db, trigger_type=new_trigger_type, exclude_rule_id=rule_id)
     for k, v in changes.items():
         setattr(rule, k, v)
     await db.commit()

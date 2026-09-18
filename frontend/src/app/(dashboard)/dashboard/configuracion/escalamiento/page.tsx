@@ -401,7 +401,7 @@ export default function EscalamientoConfigPage() {
                   <p className="text-13 font-medium">Administradores del sistema</p>
                   <p className="text-2xs text-muted-foreground leading-snug mt-0.5">
                     Cuando un usuario acepta ser contactado, el correo se envía automáticamente
-                    a todos los usuarios <span className="font-medium">activos</span> registrados en el sistema.
+                    a todos los <span className="font-medium">administradores activos</span> registrados en el sistema.
                     Para añadir o quitar destinatarios, gestiona los usuarios desde el menú de Usuarios.
                   </p>
                 </div>

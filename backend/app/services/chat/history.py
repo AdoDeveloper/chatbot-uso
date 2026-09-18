@@ -167,6 +167,7 @@ async def list_conversations(
     tag: str | None = None,
     source: str = "production",
     origin: str = "all",
+    escalated_only: bool = False,
 ) -> tuple[list[ChatConversation], int]:
     offset = (page - 1) * page_size
 
@@ -200,6 +201,10 @@ async def list_conversations(
     if status_filter is not None:
         base = base.where(ChatConversation.status == status_filter)
         count_base = count_base.where(ChatConversation.status == status_filter)
+
+    if escalated_only:
+        base = base.where(ChatConversation.escalated_at.is_not(None))
+        count_base = count_base.where(ChatConversation.escalated_at.is_not(None))
 
     # Búsqueda de texto: encuentra conversaciones con mensajes coincidentes
     if search and search.strip():

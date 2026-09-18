@@ -17,6 +17,7 @@ import { usePermission } from "@/hooks/use-permission";
 import { PERM } from "@/lib/permissions";
 import type { LLMProvider, ProviderTypeCatalogItem } from "@/types";
 import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 import { Switch } from "@/components/ui/switch";
 import { Modal } from "@/components/composed/modal";
 import { Input } from "@/components/ui/input";
@@ -529,9 +530,11 @@ function ProviderRow({
   <TableRow className={!p.is_active ? "opacity-50" : ""}>
    <TableCell>
     {inChain ? (
-     <div className={`w-6 h-6 rounded-full flex items-center justify-center text-3xs font-bold shrink-0 ${isMain ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
-      {p.priority}
-     </div>
+     <Tooltip content={p.is_active ? undefined : "Fuera de la cadena efectiva mientras esté inactivo: el chatbot la salta en el fallback en vivo."}>
+      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-3xs font-bold shrink-0 ${isMain ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"} ${!p.is_active ? "ring-1 ring-dashed ring-destructive/50" : ""}`}>
+       {p.priority}
+      </div>
+     </Tooltip>
     ) : (
      <span className="text-muted-foreground">N/A</span>
     )}

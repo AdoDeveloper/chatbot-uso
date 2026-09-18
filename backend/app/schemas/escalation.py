@@ -20,6 +20,7 @@ class EscalationRuleCreate(BaseModel):
 class EscalationRuleUpdate(BaseModel):
     name: str | None = None
     description: str | None = None
+    trigger_type: EscalationTrigger | None = None
     trigger_config: dict[str, Any] | None = None
     enabled: bool | None = None
 

@@ -63,6 +63,7 @@ async def list_conversations(
     tag: str | None = Query(None),
     source: str = _SourceQ,
     origin: str = _OriginQ,
+    escalated_only: bool = Query(False),
     db: AsyncSession = Depends(get_db),
     _: object = Depends(require_perm(P.CONVERSATIONS_READ)),
 ):
@@ -70,6 +71,7 @@ async def list_conversations(
         db, page=page, page_size=page_size,
         search=search, date_from=date_from, date_to=date_to,
         status_filter=status_filter, tag=tag, source=source, origin=origin,
+        escalated_only=escalated_only,
     )
     conv_ids = [c.id for c in convs]
     first_msgs = await svc.fetch_first_user_messages(db, conv_ids)

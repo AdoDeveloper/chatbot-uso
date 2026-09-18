@@ -292,6 +292,7 @@ export default function EscalamientosPage() {
       page: String(page),
       page_size: String(pageSize),
       source: "production",
+      escalated_only: "true",
     });
     if (tagFilter) params.set("tag", tagFilter);
     if (dateFrom) params.set("date_from", new Date(dateFrom).toISOString());

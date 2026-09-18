@@ -73,6 +73,14 @@ export default function SourcesPage() {
   }, [hasBusy, setSources]);
 
   const handleReingest = async (s: Source) => {
+    if (s.review_status === "aprobada") {
+      const ok = await confirm({
+        title: `¿Reingestar "${s.name}"?`,
+        message: "Esta fuente está aprobada y el chatbot la usa en sus respuestas. Al reingestarla quedará pendiente de revisión y dejará de estar disponible hasta que se apruebe de nuevo.",
+        confirmText: "Reingestar", variant: "danger",
+      });
+      if (!ok) return;
+    }
     setSources((prev) => prev.map((x) => x.id === s.id ? { ...x, status: "pending" as const, error_message: null, progress_stage: null } : x));
     try {
       invalidateApiCache("/sources");
@@ -170,6 +178,16 @@ export default function SourcesPage() {
   }
 
   async function bulkReingestSelected() {
+    const selectedSources = sources.filter((s) => selectedIds.has(s.id));
+    const approvedCount = selectedSources.filter((s) => s.review_status === "aprobada").length;
+    if (approvedCount > 0) {
+      const ok = await confirm({
+        title: "¿Reingestar fuentes seleccionadas?",
+        message: `${approvedCount} de las fuentes seleccionadas ${approvedCount === 1 ? "está aprobada" : "están aprobadas"} y en uso por el chatbot. Al reingestarlas quedarán pendientes de revisión y dejarán de estar disponibles hasta que se aprueben de nuevo.`,
+        confirmText: "Reingestar", variant: "danger",
+      });
+      if (!ok) return;
+    }
     setBulkBusy(true);
     try {
       invalidateApiCache("/sources");
