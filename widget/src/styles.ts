@@ -713,17 +713,32 @@ export const STYLES = `
 
 .kebab-menu {
   position: absolute;
-  top: calc(100% + 6px);
+  top: calc(100% + 10px);
   right: 0;
   background: #fff;
   border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.14), 0 2px 8px rgba(0,0,0,0.06);
+  padding: 6px;
 
   width: max-content;
   overflow: hidden;
   z-index: 10;
-  animation: kebab-in 0.14s ease;
+  animation: kebab-in 0.16s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.kebab-menu::before {
+  content: "";
+  position: absolute;
+  top: -5px;
+  right: 14px;
+  width: 10px;
+  height: 10px;
+  background: #fff;
+  border-left: 1px solid #e5e7eb;
+  border-top: 1px solid #e5e7eb;
+  transform: rotate(45deg);
+  border-radius: 2px 0 0 0;
 }
 
 @keyframes kebab-in {
@@ -736,33 +751,47 @@ export const STYLES = `
   align-items: center;
   gap: 10px;
   width: 100%;
-  min-height: 44px;
-  padding: 11px 14px;
+  min-height: 40px;
+  padding: 9px 12px;
   background: none;
   border: none;
-  font-size: 14px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 500;
   font-family: inherit;
   color: #374151;
   cursor: pointer;
   text-align: left;
   white-space: nowrap;
-  transition: background 0.12s;
+  transition: background 0.12s, color 0.12s;
+}
+
+.kebab-item svg {
+  color: var(--color-primary);
+  flex-shrink: 0;
+  transition: color 0.12s;
 }
 
 .kebab-item:hover {
-  background: #f3f4f6;
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+  color: var(--color-primary);
 }
 
 .kebab-item + .kebab-item {
-  border-top: 1px solid #f3f4f6;
+  margin-top: 2px;
 }
 
 .kebab-item-end {
   color: #ef4444;
 }
 
+.kebab-item-end svg {
+  color: #ef4444;
+}
+
 .kebab-item-end:hover {
   background: #fef2f2;
+  color: #dc2626;
 }
 
 .offline-panel {
@@ -1444,7 +1473,9 @@ export const STYLES = `
 }
 
 .panel[data-contrast="high"] .kebab-menu { border: 2px solid #000; }
+.panel[data-contrast="high"] .kebab-menu::before { border-color: #000; }
 .panel[data-contrast="high"] .kebab-item { color: #000; }
+.panel[data-contrast="high"] .kebab-item svg { color: #000; }
 .panel[data-contrast="high"] .header-status { color: #fff; }
 
 .panel[data-contrast="high"] .a11y-panel-title,

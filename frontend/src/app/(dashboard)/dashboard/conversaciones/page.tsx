@@ -349,23 +349,19 @@ export default function HistorialPage() {
          aria-pressed={selected === c.id}
          className={`w-full text-left px-4 py-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50 ${selected === c.id ? "bg-primary/5" : "hover:bg-muted/50"}`}
         >
-         <div className="flex items-center justify-between gap-2 mb-1">
+         <div className="flex items-baseline justify-between gap-2 mb-1">
           <span className="truncate text-13 text-foreground">
            {c.first_user_message || <em className="text-muted-foreground">Sin mensajes</em>}
           </span>
-          <div className="flex items-center gap-1.5 shrink-0">
-           <OriginBadge browser={c.browser} />
-           <CsatBadge score={c.csat_score} />
-           <Badge variant={statusBadgeVariant(c.status)} className="text-3xs shrink-0">
-            {CONVERSATION_STATUS_LABEL[c.status]}
-           </Badge>
-          </div>
+          <span className="text-2xs text-muted-foreground shrink-0 tabular-nums">{timeAgo(c.last_message_at)}</span>
          </div>
-<div className="flex items-center gap-2 text-2xs text-muted-foreground min-w-0">
-           <span className="shrink-0">{timeAgo(c.last_message_at)}</span>
-          <span aria-hidden="true" className="shrink-0">·</span>
-          <span className="shrink-0">{c.message_count} msgs</span>
-          {c.browser && <><span aria-hidden="true" className="shrink-0">·</span><span className="truncate min-w-0">{c.browser}</span></>}
+         <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-2xs text-muted-foreground shrink-0">{c.message_count} msgs</span>
+          <Badge variant={statusBadgeVariant(c.status)} className="text-3xs shrink-0">
+           {CONVERSATION_STATUS_LABEL[c.status]}
+          </Badge>
+          <OriginBadge browser={c.browser} />
+          <CsatBadge score={c.csat_score} />
          </div>
         </button>
        ))
@@ -402,7 +398,6 @@ export default function HistorialPage() {
           <Badge variant={statusBadgeVariant(detail.status)} className="text-3xs">{CONVERSATION_STATUS_LABEL[detail.status]}</Badge>
           <OriginBadge browser={detail.browser} />
           <CsatBadge score={detail.csat_score} />
-          <p className="text-2xs font-mono text-muted-foreground truncate">{detail.session_id}</p>
          </div>
          {can(PERM.CONVERSATIONS_DELETE) && (
           <Button
@@ -417,8 +412,10 @@ export default function HistorialPage() {
           </Button>
          )}
         </div>
-<p className="text-2xs text-muted-foreground">
+<p className="text-2xs text-muted-foreground truncate">
           {timeAgo(detail.last_message_at)} · {detail.browser ?? "Desconocido"} · {detail.message_count} mensajes
+          {" · "}
+          <span className="font-mono" title={detail.session_id}>{detail.session_id.slice(0, 8)}…</span>
          </p>
          {(detail.csat_comment || detail.csat_reasons.length > 0) && (
           <p className="text-2xs text-muted-foreground mt-1">
