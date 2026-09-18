@@ -25,7 +25,7 @@ async def list_rules(db: AsyncSession) -> list[EscalationRule]:
 async def _assert_trigger_type_available(
     db: AsyncSession, *, trigger_type: EscalationTrigger, exclude_rule_id: uuid.UUID | None = None
 ) -> None:
-    query = select(EscalationRule.id).where(EscalationRule.trigger_type == trigger_type)
+    query = select(EscalationRule.id).where(EscalationRule.trigger_type == trigger_type).limit(1)
     if exclude_rule_id is not None:
         query = query.where(EscalationRule.id != exclude_rule_id)
     result = await db.execute(query)
