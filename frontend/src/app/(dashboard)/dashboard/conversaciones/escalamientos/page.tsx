@@ -74,7 +74,6 @@ function MetricsPanel({ metrics, loading }: { metrics: EscalationMetrics | null;
           value={formatDuration(metrics?.avg_resolution_seconds ?? null)}
           description="Promedio"
           icon={Timer}
-          accent="teal"
           loading={loading}
         />
         <StatCard
@@ -82,7 +81,6 @@ function MetricsPanel({ metrics, loading }: { metrics: EscalationMetrics | null;
           value={metrics?.csat_avg != null ? `${metrics.csat_avg.toFixed(1)}/5` : "-"}
           description="De quienes valoraron"
           icon={Star}
-          accent="amber"
           loading={loading}
         />
       </div>
