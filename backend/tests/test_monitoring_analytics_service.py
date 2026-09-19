@@ -429,6 +429,23 @@ class TestSnapshotForRangeAndPeriodComparison:
             "¿el corte se truncó a medianoche UTC en vez de local?"
         )
 
+    async def test_latency_deltas_none_with_small_sample(self, db_session):
+        """Con menos de 5 mensajes en cualquiera de los dos períodos, un solo
+        outlier puede mover el promedio/P95 entero - los deltas de latencia
+        deben ser None, no un número que se lea como tendencia real."""
+        conv = _conv(started_at=NOW)
+        db_session.add(conv)
+        await db_session.flush()
+        db_session.add(_msg(
+            conv.id, role=MessageRole.assistant, latency_ms=50000, created_at=NOW,
+        ))
+        await db_session.commit()
+
+        result = await svc.get_period_comparison(db_session, days=7, until=NOW)
+        assert result.current.avg_latency_sample_size == 1
+        assert result.deltas["avg_latency_ms"] is None
+        assert result.deltas["p95_latency_ms"] is None
+
 
 class TestClassifyChannel:
     def test_playground_browser_wins_regardless_of_origin(self):
@@ -703,6 +720,44 @@ class TestGetDashboard:
         100%, no 0% ni una división por cero."""
         result = await svc.get_dashboard(db_session)
         assert result.resolution_rate == 100.0
+
+    async def test_latency_delta_is_none_with_small_sample(self, db_session):
+        """Con pocos mensajes (< 5) en el período actual o el anterior, un solo
+        mensaje lento puede mover el promedio entero - el delta debe ser None
+        en vez de un número que se lea como tendencia real de rendimiento."""
+        conv = _conv(started_at=NOW)
+        db_session.add(conv)
+        await db_session.flush()
+        # Solo 1 mensaje con latencia esta semana (< 5) -> delta no confiable.
+        db_session.add(_msg(
+            conv.id, role=MessageRole.assistant, latency_ms=50000, created_at=NOW,
+        ))
+        await db_session.commit()
+
+        result = await svc.get_dashboard(db_session)
+        assert result.avg_latency_sample_size == 1
+        assert result.avg_latency_delta is None
+
+    async def test_latency_delta_is_computed_with_enough_samples(self, db_session):
+        """Con >= 5 mensajes en ambos períodos, el delta sí se calcula."""
+        conv = _conv(started_at=NOW)
+        prev_conv = _conv(started_at=NOW - timedelta(days=10))
+        db_session.add_all([conv, prev_conv])
+        await db_session.flush()
+        db_session.add_all([
+            _msg(conv.id, role=MessageRole.assistant, latency_ms=2000, created_at=NOW)
+            for _ in range(5)
+        ] + [
+            _msg(prev_conv.id, role=MessageRole.assistant, latency_ms=1000,
+                 created_at=NOW - timedelta(days=10))
+            for _ in range(5)
+        ])
+        await db_session.commit()
+
+        result = await svc.get_dashboard(db_session)
+        assert result.avg_latency_sample_size == 5
+        assert result.avg_latency_delta is not None
+        assert result.avg_latency_delta == pytest.approx(1000.0)
 
 
 class TestGetHeatmap:

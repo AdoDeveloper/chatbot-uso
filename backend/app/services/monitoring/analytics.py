@@ -198,7 +198,9 @@ async def get_dashboard(db: AsyncSession, source: str = "production") -> Analyti
         .where(pf)
         .order_by(ChatMessage.latency_ms)
     )
-    p95_latency_ms = float(_percentile([v for v in _lat_vals_q.scalars().all() if v is not None], 0.95))
+    _lat_vals = [v for v in _lat_vals_q.scalars().all() if v is not None]
+    p95_latency_ms = float(_percentile(_lat_vals, 0.95))
+    latency_sample_size = len(_lat_vals)
 
     queries_week_q = await db.execute(
         select(func.count(ChatMessage.id))
@@ -210,7 +212,7 @@ async def get_dashboard(db: AsyncSession, source: str = "production") -> Analyti
     queries_week = int(queries_week_q.scalar_one() or 0)
 
     lat_prev_q = await db.execute(
-        select(func.avg(ChatMessage.latency_ms))
+        select(func.avg(ChatMessage.latency_ms), func.count(ChatMessage.id))
         .join(ChatConversation)
         .where(ChatMessage.role == MessageRole.assistant)
         .where(ChatMessage.latency_ms.is_not(None))
@@ -218,8 +220,13 @@ async def get_dashboard(db: AsyncSession, source: str = "production") -> Analyti
         .where(ChatMessage.created_at < week_start)
         .where(pf)
     )
-    prev_latency = float(lat_prev_q.scalar_one() or 0) / 1000
+    _prev_avg, prev_latency_sample_size = lat_prev_q.one()
+    prev_latency = float(_prev_avg or 0) / 1000
     latency_delta = round(avg_latency - prev_latency, 2)
+    # Con muestras chicas (tipico en trafico bajo) un solo mensaje lento puede
+    # mover el promedio semanas enteras - se marca cuando cualquiera de los dos
+    # periodos tiene pocos datos, para que el frontend no lo lea como tendencia real.
+    latency_delta_reliable = latency_sample_size >= 5 and prev_latency_sample_size >= 5
 
     src_q = await db.execute(
         select(func.count(Source.id))
@@ -245,7 +252,8 @@ async def get_dashboard(db: AsyncSession, source: str = "production") -> Analyti
         resolution_rate_delta=resolution_delta,
         unique_users_today=unique_users_today,
         avg_latency_ms=avg_latency * 1000,
-        avg_latency_delta=latency_delta * 1000,
+        avg_latency_delta=latency_delta * 1000 if latency_delta_reliable else None,
+        avg_latency_sample_size=latency_sample_size,
         p95_latency_ms=p95_latency_ms,
         active_sources=active_sources,
         unanswered_pending=unanswered_pending,
@@ -736,7 +744,9 @@ async def _snapshot_for_range(
         .where(pf)
         .order_by(ChatMessage.latency_ms)
     )
-    p95_latency = float(_percentile([v for v in _lat_vals2_q.scalars().all() if v is not None], 0.95))
+    _lat_vals2 = [v for v in _lat_vals2_q.scalars().all() if v is not None]
+    p95_latency = float(_percentile(_lat_vals2, 0.95))
+    latency_sample_size = len(_lat_vals2)
 
     return PeriodSnapshot(
         range_start=range_start.date().isoformat(),
@@ -745,6 +755,7 @@ async def _snapshot_for_range(
         unique_sessions=sessions,
         containment_rate=containment_rate,
         avg_latency_ms=avg_latency,
+        avg_latency_sample_size=latency_sample_size,
         p95_latency_ms=p95_latency,
     )
 
@@ -772,12 +783,17 @@ async def get_period_comparison(
             return None
         return round((a - b) / b * 100, 2)
 
+    # Con pocas muestras (tipico en trafico bajo) un solo mensaje lento puede
+    # mover el promedio/P95 entero - se oculta el delta cuando cualquiera de
+    # los dos periodos tiene menos de 5 mensajes, para no leerlo como tendencia real.
+    latency_reliable = current.avg_latency_sample_size >= 5 and previous.avg_latency_sample_size >= 5
+
     deltas: dict[str, float | None] = {
         "queries": _delta(current.queries, previous.queries),
         "unique_sessions": _delta(current.unique_sessions, previous.unique_sessions),
         "containment_rate": round(current.containment_rate - previous.containment_rate, 2),
-        "avg_latency_ms": _delta(current.avg_latency_ms, previous.avg_latency_ms),
-        "p95_latency_ms": _delta(current.p95_latency_ms, previous.p95_latency_ms),
+        "avg_latency_ms": _delta(current.avg_latency_ms, previous.avg_latency_ms) if latency_reliable else None,
+        "p95_latency_ms": _delta(current.p95_latency_ms, previous.p95_latency_ms) if latency_reliable else None,
     }
 
     return PeriodComparison(current=current, previous=previous, deltas=deltas)

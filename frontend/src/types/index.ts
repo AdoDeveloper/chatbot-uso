@@ -173,7 +173,8 @@ export interface AnalyticsDashboard {
   resolution_rate_delta: number;
   unique_users_today: number;
   avg_latency_ms: number;        // P50
-  avg_latency_delta: number;
+  avg_latency_delta: number | null;   // null = muestra actual o anterior < 5 mensajes (poco fiable)
+  avg_latency_sample_size: number;    // cantidad de mensajes usados en avg_latency_ms
   p95_latency_ms: number;        // P95
   active_sources: number;
   unanswered_pending: number;
@@ -186,6 +187,7 @@ export interface PeriodSnapshot {
   unique_sessions: number;
   containment_rate: number;      // % de sesiones no escaladas (autoservicio), no "resueltas"
   avg_latency_ms: number;
+  avg_latency_sample_size: number;
   p95_latency_ms: number;
 }
 

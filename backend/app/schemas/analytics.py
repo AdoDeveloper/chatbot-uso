@@ -38,7 +38,8 @@ class AnalyticsDashboard(BaseModel):
     resolution_rate_delta: float
     unique_users_today: int
     avg_latency_ms: float                  # P50 (alias mantenido por retrocompat)
-    avg_latency_delta: float
+    avg_latency_delta: float | None        # None si la muestra actual o anterior es < 5 mensajes (poco fiable)
+    avg_latency_sample_size: int = 0       # cantidad de mensajes usados en avg_latency_ms
     p95_latency_ms: float = 0              # P95
     active_sources: int
     unanswered_pending: int
@@ -142,6 +143,7 @@ class PeriodSnapshot(BaseModel):
     unique_sessions: int
     containment_rate: float    # % de sesiones no escaladas (autoservicio), no "resueltas"
     avg_latency_ms: float
+    avg_latency_sample_size: int = 0   # cantidad de mensajes usados en avg_latency_ms/p95_latency_ms
     p95_latency_ms: float
 
 

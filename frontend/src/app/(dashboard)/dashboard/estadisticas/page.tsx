@@ -325,7 +325,15 @@ function MetricasTab() {
     <StatCard title="Consultas hoy" value={metrics ? String(metrics.queries_today) : "-"} delta={metrics?.queries_today_delta} deltaLabel="vs. ayer" icon={MessageSquare} loading={loading} />
     <StatCard title="Tasa de resolución" value={metrics ? `${metrics.resolution_rate}%` : "-"} delta={metrics?.resolution_rate_delta} deltaLabel="vs. semana anterior" icon={TrendingUp} loading={loading} />
     <StatCard title="Sesiones hoy" value={metrics ? String(metrics.unique_users_today) : "-"} icon={Users} loading={loading} />
-    <StatCard title="Latencia promedio" value={metrics ? `${(metrics.avg_latency_ms / 1000).toFixed(1)}s` : "-"} delta={metrics?.avg_latency_delta != null ? Number((metrics.avg_latency_delta / 1000).toFixed(2)) : null} deltaUnit="s" deltaLabel="vs. semana anterior" icon={Clock} loading={loading} />
+    <StatCard
+     title="Latencia promedio"
+     value={metrics ? `${(metrics.avg_latency_ms / 1000).toFixed(1)}s` : "-"}
+     delta={metrics?.avg_latency_delta != null ? Number((metrics.avg_latency_delta / 1000).toFixed(2)) : null}
+     deltaUnit="s"
+     deltaLabel={metrics ? `${metrics.avg_latency_sample_size} mensaje${metrics.avg_latency_sample_size === 1 ? "" : "s"} · vs. semana anterior` : "vs. semana anterior"}
+     icon={Clock}
+     loading={loading}
+    />
    </div>
 
    {/* Fase 5 - Comparativa entre períodos + canal + cache */}
@@ -647,12 +655,17 @@ function PeriodComparisonPanel({ comparison, loading }: {
   return `${s.toLocaleDateString("es", opts)} → ${e.toLocaleDateString("es", opts)}`;
  };
 
- const rows: Array<{ label: string; current: string; previous: string; delta: number | null; invertColor?: boolean; absolute?: boolean }> = [
+ // Con pocas muestras (tipico en trafico bajo) un solo mensaje lento puede
+ // mover el promedio/P95 entero - se avisa el tamaño de muestra en vez de
+ // dejar que un delta grande se lea como una tendencia real de rendimiento.
+ const latencySampleNote = `${comparison.current.avg_latency_sample_size} vs. ${comparison.previous.avg_latency_sample_size} mensajes`;
+
+ const rows: Array<{ label: string; current: string; previous: string; delta: number | null; invertColor?: boolean; absolute?: boolean; note?: string }> = [
   { label: "Consultas", current: String(comparison.current.queries), previous: String(comparison.previous.queries), delta: comparison.deltas.queries ?? null },
   { label: "Sesiones únicas", current: String(comparison.current.unique_sessions), previous: String(comparison.previous.unique_sessions), delta: comparison.deltas.unique_sessions ?? null },
   { label: "Contención (sin escalar)", current: fmtPct(comparison.current.containment_rate), previous: fmtPct(comparison.previous.containment_rate), delta: comparison.deltas.containment_rate ?? null, absolute: true },
-  { label: "Latencia promedio", current: fmtMs(comparison.current.avg_latency_ms), previous: fmtMs(comparison.previous.avg_latency_ms), delta: comparison.deltas.avg_latency_ms ?? null, invertColor: true },
-  { label: "Latencia P95", current: fmtMs(comparison.current.p95_latency_ms), previous: fmtMs(comparison.previous.p95_latency_ms), delta: comparison.deltas.p95_latency_ms ?? null, invertColor: true },
+  { label: "Latencia promedio", current: fmtMs(comparison.current.avg_latency_ms), previous: fmtMs(comparison.previous.avg_latency_ms), delta: comparison.deltas.avg_latency_ms ?? null, invertColor: true, note: latencySampleNote },
+  { label: "Latencia P95", current: fmtMs(comparison.current.p95_latency_ms), previous: fmtMs(comparison.previous.p95_latency_ms), delta: comparison.deltas.p95_latency_ms ?? null, invertColor: true, note: latencySampleNote },
  ];
 
  return (
@@ -700,6 +713,7 @@ function PeriodComparisonPanel({ comparison, loading }: {
            : `${delta >= 0 ? "+" : ""}${delta.toFixed(1)}%`}
          </div>
         </div>
+        {r.note && <p className="text-3xs text-muted-foreground mt-1">{r.note}</p>}
        </div>
       );
      })}
