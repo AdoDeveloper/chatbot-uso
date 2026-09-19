@@ -31,10 +31,10 @@ class TimeSeriesPoint(BaseModel):
 
 class AnalyticsDashboard(BaseModel):
     queries_today: int
-    queries_today_delta: float
+    queries_today_delta: float | None      # None = sin consultas ayer, delta indefinido
     queries_yesterday: int = 0
     queries_week: int = 0                  # últimos 7 días
-    resolution_rate: float                 # tasa de resolución sin escalar (hoy)
+    resolution_rate: float                 # % de preguntas sin responder ya resueltas (semana)
     resolution_rate_delta: float
     unique_users_today: int
     avg_latency_ms: float                  # P50 (alias mantenido por retrocompat)
@@ -140,7 +140,7 @@ class PeriodSnapshot(BaseModel):
     range_end: str
     queries: int
     unique_sessions: int
-    resolution_rate: float
+    containment_rate: float    # % de sesiones no escaladas (autoservicio), no "resueltas"
     avg_latency_ms: float
     p95_latency_ms: float
 
@@ -149,7 +149,8 @@ class PeriodComparison(BaseModel):
     """Compara dos rangos: el actual vs el anterior de igual longitud."""
     current: PeriodSnapshot
     previous: PeriodSnapshot
-    deltas: dict[str, float]  # campo → delta porcentual ((curr - prev) / prev * 100)
+    # campo → delta porcentual ((curr - prev) / prev * 100); None si prev=0 (indefinido)
+    deltas: dict[str, float | None]
 
 
 class ChannelStat(BaseModel):
@@ -215,6 +216,7 @@ class CsatTrendPoint(BaseModel):
 class AnalyticsCsat(BaseModel):
     total: int                             # conversaciones con score en el periodo
     avg_score: float | None                # promedio 1-5, None si total=0
+    satisfied_rate: float | None           # % con score 4-5, None si total=0 (comparable a benchmarks externos)
     distribution: dict[str, int]           # "1".."5" -> cantidad
     trend: list[CsatTrendPoint]
     top_reasons: list[CsatReasonCount]

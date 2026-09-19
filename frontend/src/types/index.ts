@@ -166,10 +166,10 @@ export interface ChatConversationDetail extends ChatConversationOut {
 
 export interface AnalyticsDashboard {
   queries_today: number;
-  queries_today_delta: number;
+  queries_today_delta: number | null;  // null = sin consultas ayer, delta indefinido
   queries_yesterday: number;
   queries_week: number;
-  resolution_rate: number;
+  resolution_rate: number;             // % de preguntas sin responder ya resueltas (semana)
   resolution_rate_delta: number;
   unique_users_today: number;
   avg_latency_ms: number;        // P50
@@ -184,7 +184,7 @@ export interface PeriodSnapshot {
   range_end: string;
   queries: number;
   unique_sessions: number;
-  resolution_rate: number;
+  containment_rate: number;      // % de sesiones no escaladas (autoservicio), no "resueltas"
   avg_latency_ms: number;
   p95_latency_ms: number;
 }
@@ -192,7 +192,7 @@ export interface PeriodSnapshot {
 export interface PeriodComparison {
   current: PeriodSnapshot;
   previous: PeriodSnapshot;
-  deltas: Record<string, number>;
+  deltas: Record<string, number | null>;  // null = base del período anterior era 0 (indefinido)
 }
 
 export interface ChannelStat {

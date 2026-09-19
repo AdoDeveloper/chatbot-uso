@@ -119,44 +119,57 @@ async def get_dashboard(db: AsyncSession, source: str = "production") -> Analyti
         .where(ChatMessage.created_at < today_start)
         .where(pf)
     )
-    queries_yesterday = q_yesterday.scalar_one() or 1
+    queries_yesterday = q_yesterday.scalar_one() or 0
 
-    queries_delta = round((queries_today - queries_yesterday) / queries_yesterday * 100, 1)
-
-    total_conv_q = await db.execute(
-        select(func.count(ChatConversation.id))
-        .where(ChatConversation.started_at >= week_start)
-        .where(pf)
+    # Base 0 -> delta indefinido ("nuevo"), no 0% (sin cambio, falso) ni un
+    # porcentaje inflado por sustituir el denominador por 1.
+    queries_delta = (
+        round((queries_today - queries_yesterday) / queries_yesterday * 100, 1)
+        if queries_yesterday else None
     )
-    total_conv = total_conv_q.scalar_one() or 1
 
-    unresolved_q = await db.execute(
+    # resolution_rate: preguntas sin responder resueltas / total de la semana,
+    # misma entidad en numerador y denominador (igual patrón que get_topics).
+    # Antes restaba UnansweredQuestion de ChatConversation, entidades distintas.
+    total_questions_q = await db.execute(
         select(func.count(UnansweredQuestion.id))
         .join(ChatConversation, UnansweredQuestion.conversation_id == ChatConversation.id, isouter=True)
         .where(UnansweredQuestion.created_at >= week_start)
-        .where(UnansweredQuestion.status == UnansweredStatus.open)
         .where(pf)
     )
-    unresolved = unresolved_q.scalar_one() or 0
-    resolution_rate = round(max(0, (total_conv - unresolved) / total_conv * 100), 1)
+    total_questions = total_questions_q.scalar_one() or 0
 
-    prev_unresolved_q = await db.execute(
+    resolved_q = await db.execute(
+        select(func.count(UnansweredQuestion.id))
+        .join(ChatConversation, UnansweredQuestion.conversation_id == ChatConversation.id, isouter=True)
+        .where(UnansweredQuestion.created_at >= week_start)
+        .where(UnansweredQuestion.status == UnansweredStatus.resolved)
+        .where(pf)
+    )
+    resolved_questions = resolved_q.scalar_one() or 0
+    # Sin preguntas sin responder en la semana = nada que resolver = 100%.
+    resolution_rate = round(resolved_questions / total_questions * 100, 1) if total_questions else 100.0
+
+    prev_total_questions_q = await db.execute(
         select(func.count(UnansweredQuestion.id))
         .join(ChatConversation, UnansweredQuestion.conversation_id == ChatConversation.id, isouter=True)
         .where(UnansweredQuestion.created_at >= prev_week_start)
         .where(UnansweredQuestion.created_at < week_start)
-        .where(UnansweredQuestion.status == UnansweredStatus.open)
         .where(pf)
     )
-    prev_unresolved = prev_unresolved_q.scalar_one() or 0
-    prev_total_q = await db.execute(
-        select(func.count(ChatConversation.id))
-        .where(ChatConversation.started_at >= prev_week_start)
-        .where(ChatConversation.started_at < week_start)
+    prev_total_questions = prev_total_questions_q.scalar_one() or 0
+    prev_resolved_q = await db.execute(
+        select(func.count(UnansweredQuestion.id))
+        .join(ChatConversation, UnansweredQuestion.conversation_id == ChatConversation.id, isouter=True)
+        .where(UnansweredQuestion.created_at >= prev_week_start)
+        .where(UnansweredQuestion.created_at < week_start)
+        .where(UnansweredQuestion.status == UnansweredStatus.resolved)
         .where(pf)
     )
-    prev_total = prev_total_q.scalar_one() or 1
-    prev_resolution = max(0, (prev_total - prev_unresolved) / prev_total * 100)
+    prev_resolved_questions = prev_resolved_q.scalar_one() or 0
+    prev_resolution = (
+        round(prev_resolved_questions / prev_total_questions * 100, 1) if prev_total_questions else 100.0
+    )
     resolution_delta = round(resolution_rate - prev_resolution, 1)
 
     unique_q = await db.execute(
@@ -698,7 +711,9 @@ async def _snapshot_for_range(
         .where(pf)
     )
     escalated = int(escalated_q.scalar_one() or 0)
-    resolution_rate = round(max(0.0, (sessions - escalated) / max(1, sessions) * 100), 2) if sessions else 0.0
+    # % de sesiones que NO llegaron a escalar (autoservicio) - "tasa de contención",
+    # no una tasa de resolución real (una sesión no escalada no implica que quedó resuelta).
+    containment_rate = round(max(0.0, (sessions - escalated) / sessions * 100), 2) if sessions else 0.0
 
     avg_q = await db.execute(
         select(func.avg(ChatMessage.latency_ms))
@@ -728,7 +743,7 @@ async def _snapshot_for_range(
         range_end=(range_end - timedelta(seconds=1)).date().isoformat(),
         queries=queries,
         unique_sessions=sessions,
-        resolution_rate=resolution_rate,
+        containment_rate=containment_rate,
         avg_latency_ms=avg_latency,
         p95_latency_ms=p95_latency,
     )
@@ -751,15 +766,16 @@ async def get_period_comparison(
     current = await _snapshot_for_range(db, range_start=cur_start, range_end=end, source=source)
     previous = await _snapshot_for_range(db, range_start=prev_start, range_end=prev_end, source=source)
 
-    def _delta(a: float, b: float) -> float:
+    def _delta(a: float, b: float) -> float | None:
+        # Base 0: el cambio es indefinido ("nuevo"), no 0% (sin cambio, falso).
         if b <= 0:
-            return 0.0
+            return None
         return round((a - b) / b * 100, 2)
 
-    deltas = {
+    deltas: dict[str, float | None] = {
         "queries": _delta(current.queries, previous.queries),
         "unique_sessions": _delta(current.unique_sessions, previous.unique_sessions),
-        "resolution_rate": round(current.resolution_rate - previous.resolution_rate, 2),
+        "containment_rate": round(current.containment_rate - previous.containment_rate, 2),
         "avg_latency_ms": _delta(current.avg_latency_ms, previous.avg_latency_ms),
         "p95_latency_ms": _delta(current.p95_latency_ms, previous.p95_latency_ms),
     }
@@ -1003,6 +1019,11 @@ async def get_csat(
         total += cnt
         score_sum += score * cnt
     avg_score = round(score_sum / total, 2) if total else None
+    # % de conversaciones con score 4-5 ("satisfecho"), la definición de CSAT
+    # más comparable con benchmarks externos de industria (Zendesk, HubSpot),
+    # a diferencia del promedio 1-5 que no es directamente comparable con un %.
+    satisfied = distribution["4"] + distribution["5"]
+    satisfied_rate = round(satisfied / total * 100, 1) if total else None
 
     day_fmt = sql_date_format(db, ChatConversation.created_at, "%Y-%m-%d")
     trend_result = await db.execute(
@@ -1040,6 +1061,7 @@ async def get_csat(
     return AnalyticsCsat(
         total=total,
         avg_score=avg_score,
+        satisfied_rate=satisfied_rate,
         distribution=distribution,
         trend=trend,
         top_reasons=top_reasons,

@@ -75,10 +75,10 @@ import {
 } from "@/components/ui/chart";
 
 // ── Colors ── (palette v2: institutional blues + forest green accent)
-const CHART_NAVY = "hsl(var(--color-brand-navy))";
-const CHART_TEAL = "hsl(var(--color-brand-teal))";
-const CHART_GREEN = "hsl(var(--color-brand-green))";
-const CHART_GOLD = "hsl(var(--color-warning))";
+const CHART_NAVY = "var(--color-brand-navy)";
+const CHART_TEAL = "var(--color-brand-teal)";
+const CHART_GREEN = "var(--color-brand-green)";
+const CHART_GOLD = "var(--color-warning)";
 const rateColor = (r: number) => r >= 90 ? "text-success" : r >= 70 ? "text-warning" : "text-destructive";
 
 const topicsChartConfig = {
@@ -91,7 +91,7 @@ const volumeChartConfig = {
 
 const latencyChartConfig = {
  avg_ms: { label: "Promedio", color: CHART_NAVY },
- p95_ms: { label: "P95", color: "hsl(var(--color-destructive))" },
+ p95_ms: { label: "P95", color: "var(--color-destructive)" },
 } satisfies ChartConfig;
 
 interface RouteStat { route: string; count: number; percentage: number }
@@ -102,7 +102,7 @@ interface AnalyticsFeedback { summary: FeedbackSummary; trend: FeedbackTrend[] }
 interface CsatReasonCount { id: string; label: string; count: number }
 interface CsatTrendPoint { date: string; avg_score: number; total: number }
 interface AnalyticsCsat {
- total: number; avg_score: number | null; distribution: Record<string, number>;
+ total: number; avg_score: number | null; satisfied_rate: number | null; distribution: Record<string, number>;
  trend: CsatTrendPoint[]; top_reasons: CsatReasonCount[]; days: number;
 }
 interface AnalyticsResponseQuality {
@@ -124,7 +124,7 @@ interface ActivityData {
 
 
 
-const PIE_COLORS = [CHART_NAVY, CHART_TEAL, CHART_GREEN, "hsl(var(--color-warning))", "hsl(var(--color-destructive))", "hsl(var(--color-brand-cornflower))"];
+const PIE_COLORS = [CHART_NAVY, CHART_TEAL, CHART_GREEN, "var(--color-warning)", "var(--color-destructive)", "var(--color-brand-cornflower)"];
 const ROUTE_LABELS: Record<string, string> = { greeting: "Saludo", factual: "Factual", complex: "Complejo" };
 
 function MetricasTab() {
@@ -458,7 +458,7 @@ function MetricasTab() {
       ) : (
        <ChartContainer config={{}} className="aspect-auto! h-56">
         <PieChart>
-         <Pie data={routes} dataKey="count" nameKey="route" cx="50%" cy="50%" outerRadius={80} innerRadius={40} paddingAngle={3} label={({ route, percentage }: { route: string; percentage: number }) => `${ROUTE_LABELS[route] ?? route} ${percentage.toFixed(0)}%`}>
+         <Pie data={routes} dataKey="count" nameKey="route" cx="50%" cy="50%" outerRadius={80} innerRadius={40} paddingAngle={routes.length > 1 ? 3 : 0} label={({ route, percentage }: { route: string; percentage: number }) => `${ROUTE_LABELS[route] ?? route} ${percentage.toFixed(0)}%`}>
           {routes.map((_, i) => <RCell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
          </Pie>
          <ChartTooltip content={<ChartTooltipContent hideLabel formatter={(value, name) => [`${ROUTE_LABELS[String(name)] ?? name}: `, String(value)]} />} />
@@ -647,12 +647,12 @@ function PeriodComparisonPanel({ comparison, loading }: {
   return `${s.toLocaleDateString("es", opts)} → ${e.toLocaleDateString("es", opts)}`;
  };
 
- const rows: Array<{ label: string; current: string; previous: string; delta: number; invertColor?: boolean; absolute?: boolean }> = [
-  { label: "Consultas", current: String(comparison.current.queries), previous: String(comparison.previous.queries), delta: comparison.deltas.queries ?? 0 },
-  { label: "Sesiones únicas", current: String(comparison.current.unique_sessions), previous: String(comparison.previous.unique_sessions), delta: comparison.deltas.unique_sessions ?? 0 },
-  { label: "Resolución sin escalar", current: fmtPct(comparison.current.resolution_rate), previous: fmtPct(comparison.previous.resolution_rate), delta: comparison.deltas.resolution_rate ?? 0, absolute: true },
-  { label: "Latencia promedio", current: fmtMs(comparison.current.avg_latency_ms), previous: fmtMs(comparison.previous.avg_latency_ms), delta: comparison.deltas.avg_latency_ms ?? 0, invertColor: true },
-  { label: "Latencia P95", current: fmtMs(comparison.current.p95_latency_ms), previous: fmtMs(comparison.previous.p95_latency_ms), delta: comparison.deltas.p95_latency_ms ?? 0, invertColor: true },
+ const rows: Array<{ label: string; current: string; previous: string; delta: number | null; invertColor?: boolean; absolute?: boolean }> = [
+  { label: "Consultas", current: String(comparison.current.queries), previous: String(comparison.previous.queries), delta: comparison.deltas.queries ?? null },
+  { label: "Sesiones únicas", current: String(comparison.current.unique_sessions), previous: String(comparison.previous.unique_sessions), delta: comparison.deltas.unique_sessions ?? null },
+  { label: "Contención (sin escalar)", current: fmtPct(comparison.current.containment_rate), previous: fmtPct(comparison.previous.containment_rate), delta: comparison.deltas.containment_rate ?? null, absolute: true },
+  { label: "Latencia promedio", current: fmtMs(comparison.current.avg_latency_ms), previous: fmtMs(comparison.previous.avg_latency_ms), delta: comparison.deltas.avg_latency_ms ?? null, invertColor: true },
+  { label: "Latencia P95", current: fmtMs(comparison.current.p95_latency_ms), previous: fmtMs(comparison.previous.p95_latency_ms), delta: comparison.deltas.p95_latency_ms ?? null, invertColor: true },
  ];
 
  return (
@@ -677,12 +677,14 @@ function PeriodComparisonPanel({ comparison, loading }: {
    <CardContent>
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
      {rows.map((r) => {
-      const positive = r.delta > 0;
-      const zero = r.delta === 0;
+      const delta = r.delta;
+      const noPrevData = delta == null;
+      const positive = !noPrevData && delta > 0;
+      const zero = !noPrevData && delta === 0;
       const good = r.invertColor ? !positive && !zero : positive && !zero;
-      const bad = r.invertColor ? positive : !positive && !zero && r.delta < 0;
-      const Icon = zero ? Minus : positive ? ArrowUp : ArrowDown;
-      const cls = zero ? "text-muted-foreground" : good ? "text-success" : bad ? "text-destructive" : "text-muted-foreground";
+      const bad = r.invertColor ? positive : !positive && !zero && !noPrevData && delta < 0;
+      const Icon = noPrevData || zero ? Minus : positive ? ArrowUp : ArrowDown;
+      const cls = noPrevData || zero ? "text-muted-foreground" : good ? "text-success" : bad ? "text-destructive" : "text-muted-foreground";
       return (
        <div key={r.label} className="border border-border rounded-lg p-4 bg-card hover:border-border/80 transition-colors">
         <p className="text-3xs uppercase tracking-wider text-muted-foreground font-semibold mb-2">{r.label}</p>
@@ -691,9 +693,11 @@ function PeriodComparisonPanel({ comparison, loading }: {
          <span className="text-3xs text-muted-foreground tabular-nums">vs. {r.previous}</span>
          <div className={`flex items-center gap-0.5 text-2xs font-semibold tabular-nums ${cls}`}>
           <Icon className="w-3 h-3" />
-          {r.absolute
-           ? `${r.delta >= 0 ? "+" : ""}${r.delta.toFixed(1)} pp`
-           : `${r.delta >= 0 ? "+" : ""}${r.delta.toFixed(1)}%`}
+          {delta == null
+           ? "N/D"
+           : r.absolute
+           ? `${delta >= 0 ? "+" : ""}${delta.toFixed(1)} pp`
+           : `${delta >= 0 ? "+" : ""}${delta.toFixed(1)}%`}
          </div>
         </div>
        </div>
@@ -742,7 +746,7 @@ function ChannelsPanel({ channels, loading }: { channels: ChannelStat[]; loading
            <span className="text-13 font-medium">{meta.label}</span>
            <span className="text-2xs text-muted-foreground tabular-nums">{c.count} · {c.percentage.toFixed(1)}%</span>
           </div>
-          <Progress value={c.percentage} className="h-1.5" />
+          <Progress value={c.percentage} className="h-1.5" indicatorClassName="bg-foreground/70" />
          </div>
         </div>
        );
@@ -803,7 +807,7 @@ function CacheStatsPanel({ cache, loading }: { cache: CacheStats | null; loading
 
 const feedbackChartConfig = {
  positive: { label: "Positivo", color: CHART_GREEN },
- negative: { label: "Negativo", color: "hsl(var(--color-destructive))" },
+ negative: { label: "Negativo", color: "var(--color-destructive)" },
 } satisfies ChartConfig;
 
 function FeedbackPanel({ feedback, loading }: { feedback: AnalyticsFeedback | null; loading: boolean }) {
@@ -859,7 +863,7 @@ function FeedbackPanel({ feedback, loading }: { feedback: AnalyticsFeedback | nu
       {/* Barra de tasa positiva */}
       <div className="space-y-1.5">
        <div className="flex justify-between text-2xs text-muted-foreground">
-        <span>Tasa de satisfacción</span>
+        <span>Tasa de reacciones positivas</span>
         <span className={`font-semibold ${s!.positive_rate >= 70 ? "text-success" : s!.positive_rate >= 50 ? "text-warning" : "text-destructive"}`}>
          {s!.positive_rate.toFixed(1)}%
         </span>
@@ -871,12 +875,12 @@ function FeedbackPanel({ feedback, loading }: { feedback: AnalyticsFeedback | nu
       {trend.length > 1 && (
        <ChartContainer config={feedbackChartConfig} className="h-36 w-full">
         <AreaChart data={trend} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
-         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+         <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
          <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(v: string) => v.slice(5)} />
          <YAxis tick={{ fontSize: 10 }} />
          <ChartTooltip content={<ChartTooltipContent />} />
          <Area type="monotone" dataKey="positive" stackId="1" stroke={CHART_GREEN} fill={CHART_GREEN} fillOpacity={0.3} />
-         <Area type="monotone" dataKey="negative" stackId="1" stroke="hsl(var(--color-destructive))" fill="hsl(var(--color-destructive))" fillOpacity={0.3} />
+         <Area type="monotone" dataKey="negative" stackId="1" stroke="var(--color-destructive)" fill="var(--color-destructive)" fillOpacity={0.3} />
         </AreaChart>
        </ChartContainer>
       )}
@@ -945,7 +949,7 @@ function ResponseQualityPanel({ quality, loading }: { quality: AnalyticsResponse
        />
        <QualityMetricCard
         label="Relevancia de la respuesta"
-        help="Qué tan directamente la respuesta aborda lo que la persona preguntó."
+        help="Similitud semántica directa entre la pregunta y la respuesta (aproximación por embeddings, no una evaluación completa de si la respuesta contesta la pregunta)."
         value={quality!.avg_answer_relevance_score}
         sampleSize={quality!.answer_relevance_sample_size}
         pct={pct}
@@ -1031,7 +1035,7 @@ function CsatPanel({ csat, loading }: { csat: AnalyticsCsat | null; loading: boo
     ) : (
      <div className="space-y-6">
       {/* Fila de resumen */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
        <div className="flex flex-col items-center justify-center gap-1 rounded-xl border border-border bg-muted/30 py-3">
         <span className="text-2xl font-bold tabular-nums">{csat!.total}</span>
         <span className="text-2xs text-muted-foreground">Valoraciones recibidas</span>
@@ -1041,6 +1045,12 @@ function CsatPanel({ csat, loading }: { csat: AnalyticsCsat | null; loading: boo
          <Star className="w-4 h-4 fill-current" />{csat!.avg_score?.toFixed(2) ?? "N/A"}
         </span>
         <span className="text-2xs text-muted-foreground">Promedio sobre 5</span>
+       </div>
+       <div className="flex flex-col items-center justify-center gap-1 rounded-xl border border-success/30 bg-success/5 py-3">
+        <span className="text-2xl font-bold tabular-nums text-success">
+         {csat!.satisfied_rate != null ? `${csat!.satisfied_rate.toFixed(0)}%` : "N/A"}
+        </span>
+        <span className="text-2xs text-muted-foreground">Satisfechos (4-5 estrellas)</span>
        </div>
       </div>
 
@@ -1077,7 +1087,7 @@ function CsatPanel({ csat, loading }: { csat: AnalyticsCsat | null; loading: boo
       {trend.length > 1 && (
        <ChartContainer config={csatChartConfig} className="h-36 w-full">
         <LineChart data={trend} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
-         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+         <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
          <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(v: string) => v.slice(5)} />
          <YAxis tick={{ fontSize: 10 }} domain={[1, 5]} />
          <ChartTooltip content={<ChartTooltipContent />} />

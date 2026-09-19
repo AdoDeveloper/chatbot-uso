@@ -338,7 +338,7 @@ class TestSnapshotForRangeAndPeriodComparison:
         )
         assert snap.queries == 0
         assert snap.unique_sessions == 0
-        assert snap.resolution_rate == 0.0
+        assert snap.containment_rate == 0.0
         assert snap.avg_latency_ms == 0.0
         assert snap.p95_latency_ms == 0.0
 
@@ -363,13 +363,14 @@ class TestSnapshotForRangeAndPeriodComparison:
         )
         assert snap.queries == 2
         assert snap.unique_sessions == 2
-        # 1 of 2 sessions escalated -> resolution rate 50%
-        assert snap.resolution_rate == 50.0
+        # 1 of 2 sessions escalated -> containment rate 50%
+        assert snap.containment_rate == 50.0
         assert snap.avg_latency_ms == 2000.0
 
     async def test_period_comparison_deltas_with_previous_zero(self, db_session):
-        """When the previous period has zero baseline, _delta returns 0.0
-        instead of dividing by zero (b <= 0 branch)."""
+        """When the previous period has zero baseline, _delta returns None
+        (indefinido/"nuevo") instead of dividing by zero or reporting a
+        misleading 0.0 ("sin cambio")."""
         conv = _conv(started_at=NOW)
         db_session.add(conv)
         await db_session.flush()
@@ -379,9 +380,9 @@ class TestSnapshotForRangeAndPeriodComparison:
         result = await svc.get_period_comparison(db_session, days=7, until=NOW)
         assert result.current.queries == 1
         assert result.previous.queries == 0
-        assert result.deltas["queries"] == 0.0
-        assert result.deltas["resolution_rate"] == round(
-            result.current.resolution_rate - result.previous.resolution_rate, 2
+        assert result.deltas["queries"] is None
+        assert result.deltas["containment_rate"] == round(
+            result.current.containment_rate - result.previous.containment_rate, 2
         )
 
     async def test_period_comparison_positive_delta(self, db_session):
@@ -659,6 +660,49 @@ class TestGetDashboard:
             "el mensaje de las 19:30 hora SV no se contó como 'hoy' - "
             "¿volvió a truncarse a medianoche UTC en vez de local?"
         )
+
+    async def test_queries_delta_is_none_when_no_queries_yesterday(self, db_session):
+        """Sin consultas ayer, el delta debe ser indefinido (None), no 0%
+        (falso 'sin cambio') ni un porcentaje inflado por sustituir el
+        denominador 0 por 1."""
+        conv = _conv(started_at=NOW)
+        db_session.add(conv)
+        await db_session.flush()
+        db_session.add(_msg(conv.id, role=MessageRole.user, created_at=NOW))
+        await db_session.commit()
+
+        result = await svc.get_dashboard(db_session)
+        assert result.queries_today == 1
+        assert result.queries_yesterday == 0
+        assert result.queries_today_delta is None
+
+    async def test_resolution_rate_uses_unanswered_questions_ratio(self, db_session):
+        """resolution_rate = preguntas sin responder resueltas / total de la
+        semana (misma entidad en numerador y denominador), no una resta entre
+        ChatConversation y UnansweredQuestion."""
+        conv = _conv(started_at=NOW)
+        db_session.add(conv)
+        await db_session.flush()
+        db_session.add_all([
+            UnansweredQuestion(
+                id=uuid.uuid4(), conversation_id=conv.id, question="q1",
+                status=UnansweredStatus.resolved, created_at=NOW,
+            ),
+            UnansweredQuestion(
+                id=uuid.uuid4(), conversation_id=conv.id, question="q2",
+                status=UnansweredStatus.open, created_at=NOW,
+            ),
+        ])
+        await db_session.commit()
+
+        result = await svc.get_dashboard(db_session)
+        assert result.resolution_rate == 50.0
+
+    async def test_resolution_rate_is_100_when_no_unanswered_questions(self, db_session):
+        """Sin preguntas sin responder en la semana, no hay nada que resolver:
+        100%, no 0% ni una división por cero."""
+        result = await svc.get_dashboard(db_session)
+        assert result.resolution_rate == 100.0
 
 
 class TestGetHeatmap:

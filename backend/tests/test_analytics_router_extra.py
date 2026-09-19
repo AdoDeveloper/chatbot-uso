@@ -73,6 +73,9 @@ class TestCsatAggregation:
         assert body["distribution"]["4"] == 2
         assert body["distribution"]["2"] == 1
         assert body["avg_score"] == round((4 + 4 + 2) / 3, 2)
+        # satisfied_rate: % con score 4-5 (2 de 3), comparable a benchmarks
+        # externos de industria a diferencia del promedio 1-5.
+        assert body["satisfied_rate"] == round(2 / 3 * 100, 1)
 
     async def test_excludes_conversations_outside_date_range(self, client, admin_user, auth_headers, db_session):
         from datetime import datetime, timedelta, timezone
@@ -87,7 +90,9 @@ class TestCsatAggregation:
 
         r = await client.get("/api/v1/analytics/csat?days=30", headers=auth_headers(admin_user))
         assert r.status_code == 200
-        assert r.json()["total"] == 0
+        body = r.json()
+        assert body["total"] == 0
+        assert body["satisfied_rate"] is None
 
 
 class TestEffectiveDaysDateRange:

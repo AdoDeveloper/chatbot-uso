@@ -378,10 +378,10 @@ async def _build_report_sections(
                         "Variación": _fmt_delta(comp.deltas.get("unique_sessions")),
                     },
                     {
-                        "Métrica": "Tasa de resolución (%)",
-                        curr_label: f"{c.resolution_rate:.1f}",
-                        prev_label: f"{p.resolution_rate:.1f}",
-                        "Variación": _fmt_delta(comp.deltas.get("resolution_rate")),
+                        "Métrica": "Tasa de contención (%)",
+                        curr_label: f"{c.containment_rate:.1f}",
+                        prev_label: f"{p.containment_rate:.1f}",
+                        "Variación": _fmt_delta(comp.deltas.get("containment_rate")),
                     },
                     {
                         "Métrica": "Latencia promedio (ms)",
@@ -482,7 +482,7 @@ async def _build_report_sections(
             summary_parts.append(
                 f"Durante el período se registraron {c.queries} consultas en "
                 f"{c.unique_sessions} sesiones únicas{delta_txt}. "
-                f"La tasa de resolución fue del {c.resolution_rate:.1f}% con una "
+                f"La tasa de contención (sin escalar a un agente) fue del {c.containment_rate:.1f}% con una "
                 f"latencia promedio de {c.avg_latency_ms / 1000:.1f} segundos."
             )
         if topics.topics:
