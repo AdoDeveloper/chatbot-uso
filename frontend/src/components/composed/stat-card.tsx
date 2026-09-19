@@ -24,11 +24,10 @@ interface StatCardProps {
   compact?: boolean
 }
 
-// Patrón Stripe/Linear: chip de ícono sutil, sin borde izquierdo pesado.
 const ACCENT_MAP = {
-  primary: { bg: "bg-primary/10", text: "text-primary" },
-  teal:    { bg: "bg-brand-teal/10", text: "text-brand-teal" },
-  green:   { bg: "bg-brand-green/12", text: "text-brand-green" },
+  primary: { bg: "bg-muted", text: "text-muted-foreground" },
+  teal:    { bg: "bg-muted", text: "text-muted-foreground" },
+  green:   { bg: "bg-muted", text: "text-muted-foreground" },
   amber:   { bg: "bg-warning/10", text: "text-warning" },
   red:     { bg: "bg-destructive/10", text: "text-destructive" },
 }

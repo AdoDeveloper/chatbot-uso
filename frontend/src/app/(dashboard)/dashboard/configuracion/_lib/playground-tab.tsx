@@ -125,8 +125,10 @@ function saveA11yPrefs(prefs: A11yPrefs): void {
 function SourceCard({
   source, score, text, index,
 }: { source: string; score: number; text: string; index: number }) {
+  // Hex literal (no var()): se concatena con un sufijo de alfa más abajo, lo que
+  // requiere un hex de 6 dígitos, no una referencia a variable CSS.
   const color =
-    score > 0.7 ? "hsl(var(--color-success))" : score > 0.4 ? "#ca8a04" : "hsl(var(--color-destructive))";
+    score > 0.7 ? "#14742F" : score > 0.4 ? "#854D0E" : "#B91C1C";
   return (
     <div className="border border-border rounded-lg p-2.5 space-y-1.5 bg-card">
       <div className="flex items-center gap-1.5">
