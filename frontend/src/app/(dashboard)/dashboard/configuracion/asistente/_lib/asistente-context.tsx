@@ -9,6 +9,8 @@ export interface AsistenteFormContextValue {
   loadingSettings: boolean;
   widgetForm: WidgetConfig | null;
   setWidgetForm: React.Dispatch<React.SetStateAction<WidgetConfig | null>>;
+  savedWidgetForm: WidgetConfig | null;
+  setSavedWidgetForm: React.Dispatch<React.SetStateAction<WidgetConfig | null>>;
   widgetConfig: WidgetConfig | null;
   loadingWidget: boolean;
   isDirty: boolean;

@@ -50,7 +50,7 @@ function isoDay(d: Date): string {
 export function SeguridadTab() {
   const { toast } = useToast();
   const can = usePermission();
-  const canUpdate = can(PERM.SYSTEM_UPDATE);
+  const canUpdate = can(PERM.SYSTEM_MANAGE);
   const today = isoDay(new Date());
   const [dateFrom, setDateFrom] = useState(isoDay(new Date(Date.now() - 6 * 86400000)));
   const [dateTo, setDateTo] = useState(today);

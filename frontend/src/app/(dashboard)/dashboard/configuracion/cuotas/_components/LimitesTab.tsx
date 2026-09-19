@@ -25,7 +25,7 @@ export interface LimitesTabHandle {
 export const LimitesTab = forwardRef<LimitesTabHandle>(function LimitesTab(_props, ref) {
   const { toast, confirm } = useToast();
   const can = usePermission();
-  const canUpdate = can(PERM.SYSTEM_UPDATE);
+  const canUpdate = can(PERM.SYSTEM_MANAGE);
   const { data: configData, loading: loadingConfig, error: configError, refetch: refetchConfig } =
     useApi<RateLimitConfig>("/rate-limits/config");
   const { data: throttledData, loading: loadingThrottled, error: throttledError, refetch: refetchThrottled, setData: setThrottled } =
@@ -59,6 +59,10 @@ export const LimitesTab = forwardRef<LimitesTabHandle>(function LimitesTab(_prop
     if (!config) return;
     if (config.chat_per_min < 1 || config.chat_per_hour < 1 || !Number.isFinite(config.chat_per_min) || !Number.isFinite(config.chat_per_hour)) {
       toast({ type: "error", message: "Los límites deben ser números mayores a 0." });
+      return;
+    }
+    if (config.chat_per_min > 1000 || config.chat_per_hour > 100000) {
+      toast({ type: "error", message: "El máximo permitido es 1000 por minuto y 100000 por hora." });
       return;
     }
     setSaving(true);
@@ -98,13 +102,13 @@ export const LimitesTab = forwardRef<LimitesTabHandle>(function LimitesTab(_prop
         <CardContent className="space-y-4">
           <div>
             <label className="text-xs font-medium block mb-1">Chat por minuto / IP</label>
-            <Input type="number" min={1} value={config.chat_per_min} disabled={!canUpdate}
+            <Input type="number" min={1} max={1000} value={config.chat_per_min} disabled={!canUpdate}
               onChange={(e) => setConfig({ ...config, chat_per_min: Number(e.target.value) })}
               className="max-w-32" />
           </div>
           <div>
             <label className="text-xs font-medium block mb-1">Chat por hora / IP</label>
-            <Input type="number" min={1} value={config.chat_per_hour} disabled={!canUpdate}
+            <Input type="number" min={1} max={100000} value={config.chat_per_hour} disabled={!canUpdate}
               onChange={(e) => setConfig({ ...config, chat_per_hour: Number(e.target.value) })}
               className="max-w-32" />
           </div>

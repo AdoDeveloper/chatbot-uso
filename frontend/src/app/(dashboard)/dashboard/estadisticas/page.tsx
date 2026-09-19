@@ -325,7 +325,7 @@ function MetricasTab() {
     <StatCard title="Consultas hoy" value={metrics ? String(metrics.queries_today) : "-"} delta={metrics?.queries_today_delta} deltaLabel="vs. ayer" icon={MessageSquare} loading={loading} />
     <StatCard title="Tasa de resolución" value={metrics ? `${metrics.resolution_rate}%` : "-"} delta={metrics?.resolution_rate_delta} deltaLabel="vs. semana anterior" icon={TrendingUp} loading={loading} />
     <StatCard title="Sesiones hoy" value={metrics ? String(metrics.unique_users_today) : "-"} icon={Users} loading={loading} />
-    <StatCard title="Latencia promedio" value={metrics ? `${(metrics.avg_latency_ms / 1000).toFixed(1)}s` : "-"} delta={metrics?.avg_latency_delta} deltaLabel="vs. semana anterior" icon={Clock} loading={loading} />
+    <StatCard title="Latencia promedio" value={metrics ? `${(metrics.avg_latency_ms / 1000).toFixed(1)}s` : "-"} delta={metrics?.avg_latency_delta != null ? Number((metrics.avg_latency_delta / 1000).toFixed(2)) : null} deltaUnit="s" deltaLabel="vs. semana anterior" icon={Clock} loading={loading} />
    </div>
 
    {/* Fase 5 - Comparativa entre períodos + canal + cache */}

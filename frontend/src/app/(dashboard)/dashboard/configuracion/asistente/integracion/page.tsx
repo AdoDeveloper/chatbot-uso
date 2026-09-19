@@ -7,7 +7,7 @@ import { useAsistenteForm } from "../_lib/asistente-context";
 
 export default function IntegracionPage() {
   const router = useRouter();
-  const { loadingSettings, loadingWidget, widgetForm, setWidgetForm } = useAsistenteForm();
+  const { loadingSettings, loadingWidget, widgetForm, setWidgetForm, savedWidgetForm, setSavedWidgetForm } = useAsistenteForm();
 
   if (loadingSettings || loadingWidget) {
     return (
@@ -23,6 +23,8 @@ export default function IntegracionPage() {
       onPreview={() => router.push("/dashboard/configuracion/asistente/previsualizar")}
       config={widgetForm}
       setConfig={setWidgetForm}
+      savedConfig={savedWidgetForm}
+      setSavedConfig={setSavedWidgetForm}
     />
   );
 }

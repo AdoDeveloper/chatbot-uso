@@ -28,7 +28,10 @@ export default function AsistenteLayout({ children }: { children: React.ReactNod
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [widgetForm, setWidgetForm] = useState<WidgetConfig | null>(null);
-  useEffect(() => { if (widgetConfig) setWidgetForm(widgetConfig); }, [widgetConfig]);
+  const [savedWidgetForm, setSavedWidgetForm] = useState<WidgetConfig | null>(null);
+  useEffect(() => {
+    if (widgetConfig) { setWidgetForm(widgetConfig); setSavedWidgetForm(widgetConfig); }
+  }, [widgetConfig]);
 
   const isDirty = savedForm !== null && JSON.stringify(form) !== JSON.stringify(savedForm);
 
@@ -132,7 +135,8 @@ export default function AsistenteLayout({ children }: { children: React.ReactNod
       <AsistenteFormContext.Provider
         value={{
           form, set, loadingSettings,
-          widgetForm, setWidgetForm, widgetConfig: widgetConfig ?? null, loadingWidget,
+          widgetForm, setWidgetForm, savedWidgetForm, setSavedWidgetForm,
+          widgetConfig: widgetConfig ?? null, loadingWidget,
           isDirty, saving, handleSave, handleDiscard, canUpdate,
         }}
       >

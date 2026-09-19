@@ -355,9 +355,16 @@ interface WidgetTabProps {
  onPreview: () => void;
  config?: WidgetConfig | null;
  setConfig?: React.Dispatch<React.SetStateAction<WidgetConfig | null>>;
+ /** Baseline persistido en servidor, compartido entre subpestañas junto con `config` (modo controlado). */
+ savedConfig?: WidgetConfig | null;
+ setSavedConfig?: React.Dispatch<React.SetStateAction<WidgetConfig | null>>;
 }
 
-export function WidgetTab({ subtab, onPreview, config: configProp, setConfig: setConfigProp }: WidgetTabProps) {
+export function WidgetTab({
+ subtab, onPreview,
+ config: configProp, setConfig: setConfigProp,
+ savedConfig: savedConfigProp, setSavedConfig: setSavedConfigProp,
+}: WidgetTabProps) {
  const { toast } = useToast();
  const can = usePermission();
  const canUpdate = can(PERM.BOT_SETTINGS_UPDATE);
@@ -376,9 +383,15 @@ export function WidgetTab({ subtab, onPreview, config: configProp, setConfig: se
  const loading = loadingWidget || loadingEmbed;
  const scriptTag = embedData?.script_tag ?? "";
 
+ // configProp/savedConfigProp vienen de un estado compartido (AsistenteFormContext) que
+ // persiste entre subpestañas. Solo se auto-siembra desde /widget/config cuando este
+ // componente administra su propio estado (modo no controlado) - en modo controlado el
+ // padre ya sembró ambos una sola vez, así que WidgetTab nunca pisa un borrador sin
+ // guardar cada vez que se remonta al navegar entre subpestañas.
+ const isControlled = configProp !== undefined;
  const seededRef = useRef(false);
  useEffect(() => {
-  if (!widgetData || seededRef.current) return;
+  if (isControlled || !widgetData || seededRef.current) return;
   seededRef.current = true;
   setConfig(widgetData);
   setSavedConfig(widgetData);
@@ -388,10 +401,24 @@ export function WidgetTab({ subtab, onPreview, config: configProp, setConfig: se
    (widgetData.proactive_message ?? "") !== "" ||
    (widgetData.suggestions ?? []).length > 0
   );
- }, [widgetData]);
+ }, [isControlled, widgetData]);
 
- const isDirty = config !== null && savedConfig !== null &&
-  JSON.stringify(config) !== JSON.stringify(savedConfig);
+ const effectiveSavedConfig = isControlled ? (savedConfigProp ?? null) : savedConfig;
+
+ // Captación abierta según el valor guardado, solo la primera vez que llega en modo controlado.
+ const captacionSeededRef = useRef(false);
+ useEffect(() => {
+  if (!isControlled || !effectiveSavedConfig || captacionSeededRef.current) return;
+  captacionSeededRef.current = true;
+  setCaptacionOpen(
+   (effectiveSavedConfig.launcher_label ?? "") !== "" ||
+   (effectiveSavedConfig.proactive_message ?? "") !== "" ||
+   (effectiveSavedConfig.suggestions ?? []).length > 0
+  );
+ }, [isControlled, effectiveSavedConfig]);
+
+ const isDirty = config !== null && effectiveSavedConfig !== null &&
+  JSON.stringify(config) !== JSON.stringify(effectiveSavedConfig);
 
  async function handleSave() {
   if (!config) return;
@@ -404,7 +431,7 @@ export function WidgetTab({ subtab, onPreview, config: configProp, setConfig: se
     invalidateApiCache("/widget/config");
     const { data } = await api.put<WidgetConfig>("/widget/config", config);
     setConfig(data);
-    setSavedConfig(data);
+    if (isControlled) setSavedConfigProp?.(data); else setSavedConfig(data);
     toast({ type: "success", message: "Configuración del widget guardada." });
    } catch (err) {
    toast({ type: "error", message: getErrorMessage(err, "No se pudo guardar la configuración del widget.") });
@@ -412,12 +439,12 @@ export function WidgetTab({ subtab, onPreview, config: configProp, setConfig: se
  }
 
  function handleDiscard() {
-  if (savedConfig) {
-   setConfig(savedConfig);
+  if (effectiveSavedConfig) {
+   setConfig(effectiveSavedConfig);
    setCaptacionOpen(
-    (savedConfig.launcher_label ?? "") !== "" ||
-    (savedConfig.proactive_message ?? "") !== "" ||
-    (savedConfig.suggestions ?? []).length > 0
+    (effectiveSavedConfig.launcher_label ?? "") !== "" ||
+    (effectiveSavedConfig.proactive_message ?? "") !== "" ||
+    (effectiveSavedConfig.suggestions ?? []).length > 0
    );
   }
  }

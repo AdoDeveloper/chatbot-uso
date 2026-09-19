@@ -235,7 +235,7 @@ export default function NotificacionesHistorialPage() {
         </TabsList>
 
         <TabsContent value="historial">
-          {unreadOwnCount > 0 && (
+          {unreadOwnCount > 0 && canUpdate && (
             <div className="flex justify-end mb-2">
               <Button variant="outline" size="sm" onClick={markAllTriggersRead} className="gap-1.5">
                 <Check className="w-3.5 h-3.5" /> Marcar todas ({unreadOwnCount})
@@ -299,7 +299,7 @@ export default function NotificacionesHistorialPage() {
                     <span className="text-muted-foreground whitespace-nowrap tabular-nums">{fmtDateTime(item.created_at)}</span>
                   </TableCell>
                   <TableCell>
-                    {item.own_log_id && !item.own_read_at && (
+                    {item.own_log_id && !item.own_read_at && canUpdate && (
                       <Button
                         variant="ghost"
                         size="icon"
@@ -343,6 +343,7 @@ export default function NotificacionesHistorialPage() {
                     <Select
                       value={draft.unit}
                       onChange={(e) => setDraft((p) => ({ ...p, unit: e.target.value as ReportSchedule["unit"] }))}
+                      disabled={!canUpdate}
                     >
                       {(Object.keys(UNIT_LABELS) as ReportSchedule["unit"][]).map((u) => (
                         <SelectOption key={u} value={u}>{UNIT_LABELS[u]}</SelectOption>
@@ -364,7 +365,8 @@ export default function NotificacionesHistorialPage() {
                               key={idx}
                               type="button"
                               onClick={() => toggleDay(idx)}
-                              className={`h-8 w-8 rounded-lg border text-13 font-medium transition-colors ${
+                              disabled={!canUpdate}
+                              className={`h-8 w-8 rounded-lg border text-13 font-medium transition-colors disabled:opacity-50 disabled:pointer-events-none ${
                                 active
                                   ? "bg-primary text-primary-foreground border-primary"
                                   : "bg-background border-border text-muted-foreground hover:bg-muted"
@@ -384,6 +386,7 @@ export default function NotificacionesHistorialPage() {
                       <Select
                         value={String(draft.day_of_month ?? 1)}
                         onChange={(e) => setDraft((p) => ({ ...p, day_of_month: Number(e.target.value) }))}
+                        disabled={!canUpdate}
                       >
                         {DAYS_OF_MONTH.map((d) => (
                           <SelectOption key={d} value={String(d)}>{d}</SelectOption>
@@ -399,6 +402,7 @@ export default function NotificacionesHistorialPage() {
                         <Select
                           value={String(draft.month ?? 1)}
                           onChange={(e) => setDraft((p) => ({ ...p, month: Number(e.target.value) }))}
+                          disabled={!canUpdate}
                         >
                           {MONTH_LABELS.map((m, i) => (
                             <SelectOption key={i + 1} value={String(i + 1)}>{m}</SelectOption>
@@ -410,6 +414,7 @@ export default function NotificacionesHistorialPage() {
                         <Select
                           value={String(draft.day_of_month ?? 1)}
                           onChange={(e) => setDraft((p) => ({ ...p, day_of_month: Number(e.target.value) }))}
+                          disabled={!canUpdate}
                         >
                           {DAYS_OF_MONTH.map((d) => (
                             <SelectOption key={d} value={String(d)}>{d}</SelectOption>
@@ -424,6 +429,7 @@ export default function NotificacionesHistorialPage() {
                     <Select
                       value={String(draft.hour)}
                       onChange={(e) => setDraft((p) => ({ ...p, hour: Number(e.target.value) }))}
+                      disabled={!canUpdate}
                     >
                       {HOURS.map((h) => (
                         <SelectOption key={h} value={String(h)}>{String(h).padStart(2, "0")}:00</SelectOption>
@@ -436,6 +442,7 @@ export default function NotificacionesHistorialPage() {
                     <Select
                       value={String(draft.minute)}
                       onChange={(e) => setDraft((p) => ({ ...p, minute: Number(e.target.value) }))}
+                      disabled={!canUpdate}
                     >
                       {MINUTES.map((m) => (
                         <SelectOption key={m} value={String(m)}>{String(m).padStart(2, "0")}</SelectOption>

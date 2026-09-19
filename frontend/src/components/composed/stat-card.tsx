@@ -12,6 +12,7 @@ interface StatCardProps {
   value: string | number
   description?: string
   delta?: number | null
+  deltaUnit?: string
   deltaLabel?: string
   icon?: React.ComponentType<{ className?: string }>
   valueIcon?: React.ComponentType<{ className?: string }>
@@ -37,6 +38,7 @@ function StatCard({
   value,
   description,
   delta,
+  deltaUnit = "%",
   deltaLabel,
   icon: Icon,
   valueIcon: ValueIcon,
@@ -94,7 +96,7 @@ function StatCard({
                 deltaClass
               )}>
                 <DeltaIcon className="h-3 w-3" />
-                {Math.abs(delta)}%
+                {Math.abs(delta)}{deltaUnit}
               </span>
             )}
           </div>

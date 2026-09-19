@@ -5,6 +5,8 @@ import { Wrench, Loader2, Trash2, BarChart2, Database, List, X } from "lucide-re
 import api from "@/lib/api";
 import { useApi, getErrorMessage, invalidateApiCache } from "@/hooks/use-api";
 import { useToast } from "@/components/ui/toast";
+import { usePermission } from "@/hooks/use-permission";
+import { PERM } from "@/lib/permissions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +41,8 @@ interface CacheConfigCardHandle {
 
 function CacheEntriesModal({ open, onClose, onChanged }: { open: boolean; onClose: () => void; onChanged: () => void }) {
   const { toast, confirm } = useToast();
+  const can = usePermission();
+  const canManage = can(PERM.SYSTEM_MANAGE);
   const { data, loading, refetch } = useApi<CacheEntryOut[]>(open ? "/cache/entries?page_size=100" : null);
   const entries = data ?? [];
   const [deletingKey, setDeletingKey] = useState<string | null>(null);
@@ -84,6 +88,7 @@ function CacheEntriesModal({ open, onClose, onChanged }: { open: boolean; onClos
             {entries.map((entry) => (
               <li key={entry.key} className="flex items-center gap-3 rounded-lg border px-3 py-2 bg-muted/30">
                 <p className="text-13 flex-1 min-w-0 truncate" title={entry.question}>{entry.question}</p>
+                {canManage && (
                 <Button
                   variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
                   onClick={() => handleDelete(entry)}
@@ -91,6 +96,7 @@ function CacheEntriesModal({ open, onClose, onChanged }: { open: boolean; onClos
                 >
                   {deletingKey === entry.key ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
                 </Button>
+                )}
               </li>
             ))}
           </ul>
@@ -102,6 +108,8 @@ function CacheEntriesModal({ open, onClose, onChanged }: { open: boolean; onClos
 
 const CacheConfigCard = forwardRef<CacheConfigCardHandle>(function CacheConfigCard(_props, ref) {
   const { toast } = useToast();
+  const can = usePermission();
+  const canManage = can(PERM.SYSTEM_MANAGE);
   const { data, loading, refetch } = useApi<CacheStatsOut>("/cache/stats");
   const [enabled, setEnabled] = useState(true);
   const [ttlHours, setTtlHours] = useState(12);
@@ -160,7 +168,7 @@ const CacheConfigCard = forwardRef<CacheConfigCardHandle>(function CacheConfigCa
             <List className="w-3.5 h-3.5" /> Ver entradas
           </Button>
         )}
-        <Switch checked={enabled} onCheckedChange={setEnabled} aria-label="Activar caché" />
+        <Switch checked={enabled} onCheckedChange={setEnabled} disabled={!canManage} aria-label="Activar caché" />
       </div>
 
       <CacheEntriesModal open={showEntries} onClose={() => setShowEntries(false)} onChanged={refetch} />
@@ -177,7 +185,7 @@ const CacheConfigCard = forwardRef<CacheConfigCardHandle>(function CacheConfigCa
             max={168}
             value={ttlHours}
             onChange={(e) => setTtlHours(Number(e.target.value))}
-            disabled={!enabled}
+            disabled={!enabled || !canManage}
           />
         </div>
         <div>
@@ -192,18 +200,20 @@ const CacheConfigCard = forwardRef<CacheConfigCardHandle>(function CacheConfigCa
             step={0.01}
             value={threshold}
             onChange={(e) => setThreshold(Number(e.target.value))}
-            disabled={!enabled}
+            disabled={!enabled || !canManage}
           />
         </div>
       </div>
 
-      <FloatingSaveBar dirty={dirty} saving={saving} onSave={save} />
+      {canManage && <FloatingSaveBar dirty={dirty} saving={saving} onSave={save} />}
     </Card>
   );
 });
 
 export default function EstadoPage() {
   const { confirm, toast } = useToast();
+  const can = usePermission();
+  const canManage = can(PERM.SYSTEM_MANAGE);
   const [syncing, setSyncing] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [purgingHealth, setPurgingHealth] = useState(false);
@@ -319,7 +329,7 @@ export default function EstadoPage() {
                 </p>
               </div>
             </div>
-            <Button size="sm" variant="outline" onClick={syncQdrant} disabled={syncing} className="gap-1.5 w-full">
+            <Button size="sm" variant="outline" onClick={syncQdrant} disabled={syncing || !canManage} className="gap-1.5 w-full">
               {syncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wrench className="w-3.5 h-3.5" />}
               Sincronizar ahora
             </Button>
@@ -338,7 +348,7 @@ export default function EstadoPage() {
                 </p>
               </div>
             </div>
-            <Button size="sm" variant="outline" onClick={clearCache} disabled={clearing} className="gap-1.5 w-full text-destructive">
+            <Button size="sm" variant="outline" onClick={clearCache} disabled={clearing || !canManage} className="gap-1.5 w-full text-destructive">
               {clearing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
               Limpiar caché
             </Button>
@@ -357,7 +367,7 @@ export default function EstadoPage() {
                 </p>
               </div>
             </div>
-            <Button size="sm" variant="outline" onClick={purgeHealthOutliers} disabled={purgingHealth} className="gap-1.5 w-full text-warning">
+            <Button size="sm" variant="outline" onClick={purgeHealthOutliers} disabled={purgingHealth || !canManage} className="gap-1.5 w-full text-warning">
               {purgingHealth ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <BarChart2 className="w-3.5 h-3.5" />}
               Limpiar P99
             </Button>
