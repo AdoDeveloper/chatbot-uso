@@ -90,8 +90,8 @@ const [loadingImpactId, setLoadingImpactId] = useState<string | null>(null);
 
 const guardrailsSchema = z.object({
   enabled: z.boolean(),
-  maxInputChars: z.number().min(100).max(10000),
-  maxOutputTokens: z.number().min(64).max(8192),
+  maxInputChars: z.number().min(1).max(50000),
+  maxOutputTokens: z.number().min(1).max(32000),
   piiEntities: z.array(z.string()),
 });
 
@@ -302,8 +302,8 @@ const KNOWN_PATTERN_CATEGORIES = [
                   </label>
                   <Input
                     type="number"
-                    min={100}
-                    max={10000}
+                    min={1}
+                    max={50000}
                     step={100}
                     value={watch("maxInputChars")}
                     onChange={(e) => setValue("maxInputChars", Number(e.target.value), { shouldDirty: true })}
@@ -316,8 +316,8 @@ const KNOWN_PATTERN_CATEGORIES = [
                   </label>
                   <Input
                     type="number"
-                    min={64}
-                    max={8192}
+                    min={1}
+                    max={32000}
                     step={64}
                     value={watch("maxOutputTokens")}
                     onChange={(e) => setValue("maxOutputTokens", Number(e.target.value), { shouldDirty: true })}

@@ -532,9 +532,9 @@ function UsuariosTab() {
                 </div>
               </TableCell>
               <TableCell className="hidden sm:table-cell">
-                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-semibold ${roleBadgeClass(u.role)}`}>
+                <Badge variant="outline" size="sm" className={`border-transparent ${roleBadgeClass(u.role)}`}>
                   {availableRoles.find((r) => r.name === u.role)?.display_name ?? u.role}
-                </span>
+                </Badge>
               </TableCell>
               <TableCell className="hidden sm:table-cell">
                 <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${u.is_active ? "text-success" : "text-muted-foreground"}`}>
@@ -591,14 +591,14 @@ function UsuariosTab() {
             <TableRow>
               <TableCell className="truncate max-w-40" title={inv.email}>{inv.email}</TableCell>
               <TableCell className="hidden sm:table-cell">
-                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-semibold ${roleBadgeClass(inv.role)}`}>
+                <Badge variant="outline" size="sm" className={`border-transparent ${roleBadgeClass(inv.role)}`}>
                   {availableRoles.find((r) => r.name === inv.role)?.display_name ?? inv.role}
-                </span>
+                </Badge>
               </TableCell>
               <TableCell className="hidden sm:table-cell">
-                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-semibold ${statusMeta.className}`}>
+                <Badge variant="outline" size="sm" className={`border-transparent ${statusMeta.className}`}>
                   {statusMeta.label}
-                </span>
+                </Badge>
               </TableCell>
               <TableCell className="hidden sm:table-cell text-xs text-muted-foreground">
                 {new Date(inv.expires_at).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })}

@@ -508,7 +508,8 @@ async def restore_snapshot(
                               "show_bot_icon", "suggestions", "proactive_message",
                               "max_chats_per_session", "max_chats_per_day",
                               "show_end_chat_button", "show_new_chat_button",
-                              "enable_csat", "csat_question", "launcher_label"):
+                              "enable_csat", "csat_question", "launcher_label",
+                              "enable_escalation", "enable_tts", "enable_accessibility"):
                     if field in wc_data:
                         setattr(wc, field, wc_data[field])
 

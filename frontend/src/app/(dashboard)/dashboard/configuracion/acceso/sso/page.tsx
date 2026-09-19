@@ -42,7 +42,7 @@ interface OAuthConfigOut {
 export default function SsoPage() {
   const can = usePermission();
   const { toast } = useToast();
-  const canManage = can(PERM.SYSTEM_MANAGE);
+  const canManage = can(PERM.SYSTEM_UPDATE);
 
   const [credEnabled, setCredEnabled] = useState(true);
   const [savingCred, setSavingCred] = useState(false);

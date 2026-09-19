@@ -386,9 +386,9 @@ export default function PublicacionesPage() {
               )}
             </div>
             {!loading && (
-              <span className={`text-3xs px-2 py-0.5 rounded-full font-medium border shrink-0 ${hasPendingSources ? "bg-warning/10 text-warning border-warning/30" : "bg-success/10 text-success border-success/30"}`}>
+              <Badge variant={hasPendingSources ? "warning" : "success"} size="xs" className="shrink-0">
                 {hasPendingSources ? `${pendingSources.length} pendiente${pendingSources.length > 1 ? "s" : ""}` : "Al día"}
-              </span>
+              </Badge>
             )}
           </div>
           {loading ? (

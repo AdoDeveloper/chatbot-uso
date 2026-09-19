@@ -864,12 +864,7 @@ function FeedbackPanel({ feedback, loading }: { feedback: AnalyticsFeedback | nu
          {s!.positive_rate.toFixed(1)}%
         </span>
        </div>
-       <div className="relative h-2 w-full rounded-full bg-muted overflow-hidden">
-        <div
-         className="absolute left-0 top-0 h-full rounded-full transition-all duration-700"
-         style={{ width: `${s!.positive_rate}%`, background: CHART_GREEN }}
-        />
-       </div>
+       <Progress value={s!.positive_rate} className="bg-muted" indicatorClassName="bg-brand-green" />
       </div>
 
       {/* Gráfico de tendencia */}
@@ -1059,12 +1054,7 @@ function CsatPanel({ csat, loading }: { csat: AnalyticsCsat | null; loading: boo
           <span className="flex items-center gap-0.5 text-2xs text-muted-foreground w-6 shrink-0">
            {n}<Star className="w-3 h-3 fill-current text-warning" />
           </span>
-          <div className="relative h-2 flex-1 rounded-full bg-muted overflow-hidden">
-           <div
-            className="absolute left-0 top-0 h-full rounded-full transition-all duration-700"
-            style={{ width: `${(count / maxBucket) * 100}%`, background: CHART_GOLD }}
-           />
-          </div>
+          <Progress value={count} max={maxBucket} className="flex-1 bg-muted" indicatorClassName="bg-warning" />
           <span className="text-2xs text-muted-foreground tabular-nums w-6 text-right shrink-0">{count}</span>
          </div>
         );

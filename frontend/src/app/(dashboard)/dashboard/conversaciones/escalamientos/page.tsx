@@ -143,6 +143,7 @@ function CaseCard({
   resolving,
   csatReasonLabels,
   canResolve,
+  showCheckbox,
 }: {
   conv: ChatConversationOut;
   selected: boolean;
@@ -150,6 +151,7 @@ function CaseCard({
   onResolve: (id: string) => void;
   resolving: boolean;
   csatReasonLabels: Record<string, string>;
+  showCheckbox: boolean;
   canResolve: boolean;
 }) {
   const badgeVariant = STATUS_BADGE_VARIANT[conv.status];
@@ -157,12 +159,14 @@ function CaseCard({
   return (
     <Card className={selected ? "border-primary/50 bg-primary/5" : undefined}>
       <div className="px-5 py-3 flex items-start gap-3 flex-wrap sm:flex-nowrap">
-        <input
-          type="checkbox"
-          checked={selected}
-          onChange={() => onToggleSelect(conv.id)}
-          className="mt-1 h-3.5 w-3.5 accent-primary shrink-0 cursor-pointer"
-        />
+        {showCheckbox && (
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={() => onToggleSelect(conv.id)}
+            className="mt-1 h-3.5 w-3.5 accent-primary shrink-0 cursor-pointer"
+          />
+        )}
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -497,7 +501,7 @@ export default function EscalamientosPage() {
           <EmptyState
             icon={CheckCircle2}
             title={`Sin casos en "${FILTER_LABELS[filter]}"`}
-            description="Cambia el filtro para ver otros casos"
+            description="Cambie el filtro para ver otros casos"
           />
         ) : (
           <div className="p-5 space-y-2">
@@ -511,6 +515,7 @@ export default function EscalamientosPage() {
                 csatReasonLabels={csatReasonLabels}
                 resolving={resolvingIds.has(conv.id)}
                 canResolve={canUpdate}
+                showCheckbox={filter === "escalated"}
               />
             ))}
           </div>

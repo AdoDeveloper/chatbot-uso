@@ -260,7 +260,7 @@ const ProviderPanel = forwardRef<ProviderPanelHandle, {
     <Switch checked={form.is_active} onCheckedChange={(v) => set("is_active", v)} />
    </div>
    <div className="pt-1">
-    <Button type="button" variant="outline" className="w-full gap-1.5" onClick={handleTest} disabled={testState === "testing" || !form.model_name}>
+    <Button type="button" variant="outline" className="w-full gap-1.5" onClick={handleTest} disabled={testState === "testing" || !form.model_name || !resolvedType.trim()}>
      {testState === "testing" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
      Probar
     </Button>
