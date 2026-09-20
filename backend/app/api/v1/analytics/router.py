@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from datetime import date, datetime, time, timedelta, timezone
-from typing import Literal
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import require_perm
@@ -249,16 +250,20 @@ async def cache_stats(
     return await svc.get_cache_stats(db, days=eff_days, source=source, until=until)
 
 
+class AnalyticsExportBody(BaseModel):
+    rows: list[dict[str, Any]] = []
+
+
 @router.post("/export")
 async def export_analytics(
-    body: dict,
+    body: AnalyticsExportBody,
     req: Request,
     format: str = Query("xlsx", pattern="^(xlsx|pdf)$"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_perm(P.ANALYTICS_READ)),
 ):
     from app.services.ingestion.export import excel_response, pdf_response
-    rows = body.get("rows", [])
+    rows = body.rows
     await audit_svc.log_action(
         db,
         action="analytics.export",
