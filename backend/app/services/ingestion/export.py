@@ -18,8 +18,14 @@ LOGO_FILE = Path(__file__).resolve().parents[3] / "static" / "assets" / "uso_log
 _FORMULA_CHARS = ("=", "+", "-", "@", "|", "%")
 
 def _safe_cell(v: Any) -> str:
-    """Prefija con apóstrofe valores que Excel interpretaría como fórmula."""
+    """Prefija con apóstrofe valores que Excel interpretaría como fórmula y
+    quita caracteres de control ilegales en XML (openpyxl los rechaza y
+    revienta la exportación completa si aparecen, ej. en mensajes de chat
+    con contenido binario/corrupto)."""
+    from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
+
     s = str(v) if v is not None else ""
+    s = ILLEGAL_CHARACTERS_RE.sub("", s)
     if s and s[0] in _FORMULA_CHARS:
         return "'" + s
     return s

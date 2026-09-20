@@ -57,6 +57,15 @@ class TestSafeCell:
     def test_empty_string_stays_empty(self):
         assert _safe_cell("") == ""
 
+    def test_strips_illegal_xml_control_characters(self):
+        # \x00-\x08, \x0b-\x0c, \x0e-\x1f son ilegales en XML/Excel y openpyxl
+        # los rechaza con IllegalCharacterError, reventando toda la exportación.
+        assert _safe_cell("hola\x00mundo\x1f!") == "holamundo!"
+
+    def test_keeps_legal_whitespace_control_characters(self):
+        # Tab, salto de línea y retorno de carro sí son válidos en XML.
+        assert _safe_cell("linea1\nlinea2\ttab") == "linea1\nlinea2\ttab"
+
 
 class TestCellValue:
     def test_bool_is_sanitized_as_string(self):
@@ -145,6 +154,16 @@ class TestBuildExcel:
         from openpyxl import load_workbook
         wb = load_workbook(io.BytesIO(data))
         assert len(wb.active.title) == 31
+
+    def test_cell_with_illegal_control_character_does_not_raise(self):
+        # Regresión: un mensaje de chat con un byte de control (\x0b) hacía
+        # que openpyxl lanzara IllegalCharacterError y tumbara todo el export.
+        rows = [{"Mensaje": "texto\x0bcon control"}]
+        data = build_excel(rows)
+        from openpyxl import load_workbook
+        wb = load_workbook(io.BytesIO(data))
+        ws = wb.active
+        assert ws.cell(row=7, column=1).value == "textocon control"
 
 
 # ---------------------------------------------------------------------------
