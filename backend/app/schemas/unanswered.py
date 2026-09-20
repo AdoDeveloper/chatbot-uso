@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.models.enums import UnansweredStatus
 
@@ -36,5 +36,5 @@ class UnansweredGroupList(BaseModel):
 
 
 class CreateFAQFromUnanswered(BaseModel):
-    answer: str
+    answer: str = Field(..., min_length=5)
     tags: list[str] = []
