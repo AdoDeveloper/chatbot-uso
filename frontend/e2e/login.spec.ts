@@ -85,7 +85,7 @@ test.describe("Login smoke", () => {
 test.describe("Login happy path", () => {
   test.skip(!E2E_USER || !E2E_PASS, "E2E_USER / E2E_PASS not set - skipping");
 
-  test("signs in and lands on the dashboard", async ({ page }) => {
+  test("signs in and lands on the dashboard, then signs out", async ({ page }) => {
     await page.goto("/login");
     await page.locator('input[type="email"]').fill(E2E_USER!);
     await page.locator('input#login-password').fill(E2E_PASS!);
@@ -99,6 +99,25 @@ test.describe("Login happy path", () => {
     // authenticated shell, not just parked on a redirect destination.
     // .first(): el saludo del dashboard también contiene ese texto.
     await expect(page.getByText("Chatbot USO").first()).toBeVisible();
+
+    // Cierre de sesión (POST /auth/logout) reutilizando esta MISMA sesión
+    // de login por UI, en vez de hacer un login nuevo dedicado - un login
+    // extra por UI en la misma corrida arriesga el rate-limit anti-fuerza-
+    // bruta de /auth/login (5/min, ver RATE_LIMIT_LOGIN_PER_MIN). Esta
+    // sesión no es el storageState compartido guardado en disco (ese lo
+    // crea global-setup.ts por separado), así que revocar su token aquí no
+    // afecta a ningún otro spec.
+    // Último botón del header: el menú de usuario (avatar), a la derecha de
+    // la campana de notificaciones. Sin aria-label propio, así que se ancla
+    // por posición - si el header gana un control nuevo a la derecha de
+    // este, revisar este selector.
+    await page.locator("header").getByRole("button").last().click();
+    const [logoutResp] = await Promise.all([
+      page.waitForResponse((r) => r.url().includes("/api/v1/auth/logout") && r.request().method() === "POST"),
+      page.getByRole("menuitem", { name: /cerrar sesión/i }).click(),
+    ]);
+    expect(logoutResp.status(), `unexpected /auth/logout status: ${logoutResp.status()}`).toBe(200);
+    await expect(page).toHaveURL(/\/login/, { timeout: 10_000 });
   });
 
   test("logged-in user can reach a deep route (admin tabs)", async ({ browser }) => {

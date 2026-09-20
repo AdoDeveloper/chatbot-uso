@@ -131,3 +131,48 @@ test.describe("Widget real - escalamiento con contacto", () => {
     expect(escalationTriggers.length).toBeGreaterThan(0);
   });
 });
+
+// ── CSAT y feedback del widget publico (POST /widget/public/csat,
+// PATCH /widget/public/messages/{id}/feedback) ─────────────────────────────
+// Mismo widget real de arriba, distinto flujo: valoracion al finalizar el
+// chat y feedback (pulgar arriba/abajo) sobre una respuesta del asistente.
+test.describe("Widget real - CSAT y feedback de mensajes", () => {
+  test("csat: finalizar chat, calificar y enviar llega al backend", async ({ page, request }) => {
+    test.setTimeout(60_000);
+    const authHeader = `Bearer ${(await page.context().cookies()).find((c) => c.name === "chatbot_access")?.value}`;
+    const widgetKey = await getWidgetKey(request, authHeader);
+
+    const messageInput = await loadWidgetPage(page, widgetKey);
+    await sendMessageAndWaitReply(messageInput, page, `Pregunta de prueba E2E ${Date.now()}`);
+
+    await page.getByRole("button", { name: /más opciones/i }).click();
+    await page.getByRole("menuitem", { name: /finalizar chat/i }).click();
+
+    const fiveStars = page.getByRole("button", { name: /^5 estrellas$/i });
+    await expect(fiveStars).toBeVisible({ timeout: 10_000 });
+    await fiveStars.click();
+
+    const [csatResp] = await Promise.all([
+      page.waitForResponse((r) => r.url().includes("/api/v1/widget/public/csat") && r.request().method() === "POST"),
+      page.getByRole("button", { name: /^finalizar$/i }).click(),
+    ]);
+    expect(csatResp.status(), `unexpected /widget/public/csat status: ${csatResp.status()}`).toBe(204);
+    await expect(page.getByText(/¡muchas gracias!/i)).toBeVisible({ timeout: 10_000 });
+  });
+
+  test("feedback: pulgar arriba en una respuesta llega al backend", async ({ page, request }) => {
+    test.setTimeout(60_000);
+    const authHeader = `Bearer ${(await page.context().cookies()).find((c) => c.name === "chatbot_access")?.value}`;
+    const widgetKey = await getWidgetKey(request, authHeader);
+
+    const messageInput = await loadWidgetPage(page, widgetKey);
+    await sendMessageAndWaitReply(messageInput, page, `Pregunta de prueba E2E feedback ${Date.now()}`);
+
+    const thumbsUp = page.getByRole("button", { name: /^útil$/i }).last();
+    const [feedbackResp] = await Promise.all([
+      page.waitForResponse((r) => /\/widget\/public\/messages\/[^/]+\/feedback$/.test(r.url()) && r.request().method() === "PATCH"),
+      thumbsUp.click(),
+    ]);
+    expect(feedbackResp.status(), `unexpected feedback status: ${feedbackResp.status()}`).toBe(204);
+  });
+});

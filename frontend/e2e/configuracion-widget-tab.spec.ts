@@ -95,7 +95,14 @@ test.describe("Configuracion > Asistente > Apariencia", () => {
     }
   });
 
-  test("motivos CSAT: crear, editar, activar/desactivar, reordenar y eliminar, restaurado", async ({ page }) => {
+  // "Reordenar" en el titulo es aspiracional, no lo que corre: el drag-and-
+  // drop de CsatReasonsManager es HTML5 nativo (no una libreria), y ni
+  // page.dragTo() ni disparar dragstart/dragover/drop manualmente via
+  // dispatchEvent logro que React confirmara el reorden de forma fiable en
+  // Chromium headless (limitacion conocida de Playwright con DnD nativo,
+  // no del componente) - se probo e intento cubrir por separado, sin
+  // exito, y se descarto en vez de dejar un test fragilmente skippeado.
+  test("motivos CSAT: crear, editar, activar/desactivar y eliminar, restaurado", async ({ page }) => {
     await page.goto("/dashboard/configuracion/asistente/apariencia");
     await expect(page.getByText(/controles de conversación/i)).toBeVisible({ timeout: 10_000 });
 
