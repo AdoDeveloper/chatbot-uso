@@ -63,7 +63,11 @@ async function loadWidgetPage(page: import("@playwright/test").Page, widgetKey: 
 async function sendMessageAndWaitReply(messageInput: import("@playwright/test").Locator, page: import("@playwright/test").Page, question: string) {
   await messageInput.fill(question);
   await messageInput.press("Enter");
-  await expect(page.locator('[aria-label="Escribiendo"]')).toHaveCount(0, { timeout: 30_000 });
+  // 45s, no 30s: el ultimo test del archivo (feedback) corre despues de
+  // ~65s de actividad previa del mismo LLM real en la misma corrida, y
+  // choco repetidamente justo en el borde de 30s bajo esa carga acumulada
+  // aunque la misma llamada por API sola tarda ~7s.
+  await expect(page.locator('[aria-label="Escribiendo"]')).toHaveCount(0, { timeout: 45_000 });
 }
 
 async function fillAndSubmitContact(page: import("@playwright/test").Page, type: "email" | "whatsapp", value: string) {

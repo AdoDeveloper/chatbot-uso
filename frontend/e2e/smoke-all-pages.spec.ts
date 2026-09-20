@@ -30,6 +30,7 @@ test.skip(!E2E_USER || !E2E_PASS, "E2E_USER / E2E_PASS not set - skipping");
 const DYNAMIC_HEIGHT_ROUTES = new Set([
   "/dashboard",
   "/dashboard/conversaciones/escalamientos",
+  "/dashboard/conversaciones/pendientes",
   "/dashboard/actividad/auditoria",
   "/dashboard/configuracion",
   "/dashboard/configuracion/asistente",
