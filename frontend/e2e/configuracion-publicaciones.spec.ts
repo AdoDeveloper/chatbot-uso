@@ -6,11 +6,12 @@ import os from "node:os";
 /**
  * Functional coverage for /dashboard/configuracion/publicaciones: saving a
  * manual restore point (non-destructive, always safe) and expanding a
- * version's diff, against the real backend. Deliberately does NOT click
- * "Publicar a producción" or "Restaurar" - those are the two highest-stakes
- * actions in the whole app (they change what real end users see in the
- * widget / roll back the live config) and running them unconditionally on
- * every test run would make this suite itself a production risk.
+ * version's diff, against the real backend.
+ *
+ * "Restaurar" (rollback) lives in its own file
+ * (configuracion-publicaciones-rollback.spec.ts) with a disposable-safe
+ * round-trip (snapshot the current state, roll back to it, net effect
+ * zero) since a real rollback overwrites live global_settings/widget_config.
  */
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;

@@ -8,9 +8,8 @@ import path from "node:path";
  * Qdrant" recovery action (safe/idempotent - only removes already-orphaned
  * chunks, does not touch valid data), all against the real backend.
  *
- * Deliberately skips "Limpiar caché completo" and "Limpiar P99" - both are
- * destructive/irreversible bulk-delete maintenance tools not meant to run
- * unconditionally on every suite execution.
+ * "Limpiar caché completo" and "Limpiar P99" live in their own file
+ * (configuracion-estado-mantenimiento.spec.ts) since both are destructive.
  */
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;
