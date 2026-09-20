@@ -23,9 +23,13 @@ test.describe("Columna de Acciones - visual regression", () => {
       // que se renderiza, sin depender del estado que dejen otros specs.
       let sourceName: string | null = null;
       if (name === "documentos") {
-        sourceName = `E2E Tabla Acciones ${Date.now()}`;
-        const filePath = path.join(os.tmpdir(), `e2e-tabla-acciones-${Date.now()}.txt`);
-        fs.writeFileSync(filePath, "Contenido de prueba E2E para verificar la columna de acciones.");
+        const stamp = Date.now();
+        sourceName = `E2E Tabla Acciones ${stamp}`;
+        const filePath = path.join(os.tmpdir(), `e2e-tabla-acciones-${stamp}.txt`);
+        // Contenido unico por corrida: si una corrida previa dejo un source
+        // huerfano (ej. por un fallo a mitad de test), el backend detecta
+        // duplicados por contenido y bloquea el guardado con contenido fijo.
+        fs.writeFileSync(filePath, `Contenido de prueba E2E ${stamp} para verificar la columna de acciones.`);
 
         await page.goto(route);
         // .first(): si la tabla está vacía, el EmptyState agrega su propio

@@ -61,8 +61,19 @@ test.describe("Conversaciones > Escalamientos", () => {
     await tagInput.fill(disposableTag);
     await page.getByRole("button", { name: /\+tag/i }).click();
     // El tag puede quedar visible en más de un lugar a la vez (fila + chip
-    // de filtro): basta con que al menos uno esté visible.
-    await expect(page.getByText(new RegExp(`#${disposableTag}`)).first()).toBeVisible({ timeout: 10_000 });
+    // de filtro): basta con que al menos uno esté visible. getByText incluye
+    // la <option> del <select> de filtro (matchea por texto pero es
+    // invisible por definición), así que se espera visibilidad sobre cada
+    // match hasta encontrar uno real en vez de fiarse de first().
+    const tagMatches = page.getByText(new RegExp(`#${disposableTag}`));
+    await expect(async () => {
+      const count = await tagMatches.count();
+      let anyVisible = false;
+      for (let i = 0; i < count; i++) {
+        if (await tagMatches.nth(i).isVisible()) { anyVisible = true; break; }
+      }
+      expect(anyVisible).toBe(true);
+    }).toPass({ timeout: 10_000 });
 
     // Re-selecciona: un bulk action exitoso limpia la selección.
     await firstCheckbox.check();

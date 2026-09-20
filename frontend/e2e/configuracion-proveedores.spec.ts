@@ -118,10 +118,14 @@ test.describe("Configuracion > Proveedores", () => {
     await dialog.getByLabel(/ocultar api key/i).click();
     await expect(keyInput).toHaveAttribute("type", "password");
 
+    // Modelo unico a este test: otros tests del mismo archivo usan
+    // "e2e-fake-model" y dejan filas reales en la tabla, lo que rompia la
+    // aserción de "no se creó nada" de abajo (matcheaba esas otras filas).
+    const cancelModelName = `e2e-cancel-probe-${Date.now()}`;
     // Endpoint custom falso: nunca contacta a un proveedor real, resuelve a un estado de fallo manejado.
     await dialog.locator("select").first().selectOption("__custom__");
     await dialog.getByPlaceholder(/together_ai/i).fill("e2e_probar_test");
-    await dialog.getByPlaceholder(/nombre-del-modelo/i).fill("e2e-fake-model");
+    await dialog.getByPlaceholder(/nombre-del-modelo/i).fill(cancelModelName);
     await dialog.getByPlaceholder("https://...").fill("https://example.invalid/v1");
     const probarBtn = dialog.getByRole("button", { name: /^probar$/i });
     await expect(probarBtn).toBeEnabled();
@@ -131,7 +135,7 @@ test.describe("Configuracion > Proveedores", () => {
 
     await dialog.getByRole("button", { name: /cancelar/i }).click();
     await expect(dialog).not.toBeVisible({ timeout: 5_000 });
-    await expect(page.locator("tr", { hasText: "e2e-fake-model" })).toHaveCount(0);
+    await expect(page.locator("tr", { hasText: cancelModelName })).toHaveCount(0);
   });
 
   test("mover proveedor en la cadena arriba/abajo y probar conexion rapida desde el menu", async ({ page }) => {
