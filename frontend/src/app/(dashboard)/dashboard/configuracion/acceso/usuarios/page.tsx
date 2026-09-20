@@ -8,7 +8,7 @@ import api from "@/lib/api";
 import type { User, Invitation, Role } from "@/types";
 import { useAuth } from "@/contexts/auth-context";
 import { useApi, getErrorMessage } from "@/hooks/use-api";
-import { timeAgo } from "@/lib/utils";
+import { timeAgo, copyToClipboard } from "@/lib/utils";
 import { usePermission } from "@/hooks/use-permission";
 import { PERM } from "@/lib/permissions";
 import { useToast } from "@/components/ui/toast";
@@ -226,9 +226,11 @@ function InvitePanel({ open, availableRoles, onClose, onCreated }: {
     }
   });
 
-  const handleCopy = () => {
+  const handleCopy = async () => {
     if (!generatedUrl) return;
-    navigator.clipboard.writeText(generatedUrl).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
+    if (!(await copyToClipboard(generatedUrl))) return;
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const roles = availableRoles;
@@ -318,11 +320,13 @@ function ResetPasswordResultModal({ result, onClose }: {
 }) {
   const { toast } = useToast();
 
-  const handleCopy = () => {
+  const handleCopy = async () => {
     if (!result) return;
-    navigator.clipboard.writeText(result.tempPassword).then(() =>
-      toast({ type: "success", message: "Contraseña copiada.", duration: 1500 })
-    );
+    if (!(await copyToClipboard(result.tempPassword))) {
+      toast({ type: "error", message: "No se pudo copiar la contraseña." });
+      return;
+    }
+    toast({ type: "success", message: "Contraseña copiada.", duration: 1500 });
   };
 
   return (
@@ -422,8 +426,12 @@ function UsuariosTab() {
     }
   };
 
-  const handleCopyInvite = (token: string) => {
-    navigator.clipboard.writeText(buildInviteUrl(token)).then(() => toast({ type: "success", message: "Enlace copiado.", duration: 1500 }));
+  const handleCopyInvite = async (token: string) => {
+    if (!(await copyToClipboard(buildInviteUrl(token)))) {
+      toast({ type: "error", message: "No se pudo copiar el enlace." });
+      return;
+    }
+    toast({ type: "success", message: "Enlace copiado.", duration: 1500 });
   };
 
   const refreshInvitations = () => {

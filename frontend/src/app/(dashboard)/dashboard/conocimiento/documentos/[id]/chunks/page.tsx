@@ -15,6 +15,7 @@ import {
 import { useApi, getErrorMessage } from "@/hooks/use-api";
 import { usePermission } from "@/hooks/use-permission";
 import { PERM } from "@/lib/permissions";
+import { copyToClipboard } from "@/lib/utils";
 import { useToast } from "@/components/ui/toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -89,12 +90,11 @@ export default function SourceChunksPage() {
  const [search, setSearch] = useState("");
 
  async function copyId(id: string) {
-  try {
-   await navigator.clipboard.writeText(id);
-   toast({ type: "success", message: "ID del chunk copiado." });
-  } catch (err) {
-   toast({ type: "error", message: getErrorMessage(err, "No se pudo copiar.") });
+  if (!(await copyToClipboard(id))) {
+   toast({ type: "error", message: "No se pudo copiar." });
+   return;
   }
+  toast({ type: "success", message: "ID del chunk copiado." });
  }
 
  const chunksQuery = useMemo(() => {

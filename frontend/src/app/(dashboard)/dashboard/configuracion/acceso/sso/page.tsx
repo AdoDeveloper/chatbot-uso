@@ -6,6 +6,7 @@ import { useApi, getErrorMessage, invalidateApiCache } from "@/hooks/use-api";
 import { usePermission } from "@/hooks/use-permission";
 import { PERM } from "@/lib/permissions";
 import { useToast } from "@/components/ui/toast";
+import { copyToClipboard } from "@/lib/utils";
 import { Lock, Copy, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -139,10 +140,13 @@ export default function SsoPage() {
     if (oauth) setAllowedDomains(oauth.allowed_domains.join(", "));
   }
 
-  function copyRedirectUri() {
+  async function copyRedirectUri() {
     if (typeof window === "undefined") return;
     const uri = `${window.location.origin}/api/auth/callback/microsoft`;
-    navigator.clipboard.writeText(uri);
+    if (!(await copyToClipboard(uri))) {
+      toast({ message: "No se pudo copiar la URL.", type: "error" });
+      return;
+    }
     toast({ message: "URL copiada al portapapeles.", type: "success" });
   }
 

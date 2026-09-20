@@ -10,6 +10,7 @@ import { useApi, getErrorMessage, invalidateApiCache } from "@/hooks/use-api";
 import { useToast } from "@/components/ui/toast";
 import { usePermission } from "@/hooks/use-permission";
 import { PERM } from "@/lib/permissions";
+import { copyToClipboard } from "@/lib/utils";
 import type { WidgetConfig } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -61,7 +62,7 @@ function WidgetApiKey({ config, onRegenerated, canUpdate }: {
  if (!config?.api_key) return null;
 
  async function handleCopy() {
-  await navigator.clipboard.writeText(config!.api_key);
+  await copyToClipboard(config!.api_key);
   setCopying(true);
   setTimeout(() => setCopying(false), 2000);
  }
@@ -609,7 +610,7 @@ export function WidgetTab({
        </div>
        <div className="grid grid-cols-1 sm:flex sm:justify-end gap-2">
         <Button variant="outline" size="sm" className="gap-1.5 h-8"
-         onClick={() => { navigator.clipboard.writeText(scriptTag); setCopied(true); setTimeout(() => setCopied(false), 2000); }}>
+         onClick={async () => { await copyToClipboard(scriptTag); setCopied(true); setTimeout(() => setCopied(false), 2000); }}>
          {copied ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}
          {copied ? "Copiado" : "Copiar"}
         </Button>

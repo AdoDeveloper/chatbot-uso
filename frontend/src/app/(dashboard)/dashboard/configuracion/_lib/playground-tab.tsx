@@ -14,6 +14,7 @@ import { useToast } from "@/components/ui/toast";
 import { SegmentedControl } from "@/components/composed/segmented-control";
 import { Badge } from "@/components/ui/badge";
 import { renderMarkdown } from "@/lib/render-markdown";
+import { copyToClipboard } from "@/lib/utils";
 import type { WidgetConfig } from "@/types";
 
 import { BASE_URL } from "@/lib/config";
@@ -23,6 +24,19 @@ function maybePortal(condition: boolean, node: React.ReactElement): React.ReactN
   if (!condition) return node;
   if (typeof document === "undefined") return node;
   return createPortal(node, document.body);
+}
+
+// crypto.randomUUID requiere un contexto seguro (HTTPS/localhost); en un
+// despliegue por HTTP plano (ej. staging interno) la propiedad no existe.
+function safeRandomId(): string {
+  try {
+    if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+    if (typeof crypto.getRandomValues === "function") {
+      const bytes = crypto.getRandomValues(new Uint8Array(16));
+      return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+    }
+  } catch { /* ignore */ }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 interface Message {
@@ -173,12 +187,9 @@ export function PlaygroundTab({
   const sessionIdRef = useRef<string>(
     (() => {
       try {
-        return (
-          sessionStorage.getItem("playground_session_id") ??
-          crypto.randomUUID()
-        );
+        return sessionStorage.getItem("playground_session_id") ?? safeRandomId();
       } catch {
-        return crypto.randomUUID();
+        return safeRandomId();
       }
     })(),
   );
@@ -382,7 +393,7 @@ export function PlaygroundTab({
     setCsatState("hidden");
     setCsatScore(0);
     setCsatReasons([]);
-    sessionIdRef.current = crypto.randomUUID();
+    sessionIdRef.current = safeRandomId();
     try {
       sessionStorage.removeItem(_PG_STORAGE_KEY);
       sessionStorage.setItem("playground_session_id", sessionIdRef.current);
@@ -404,7 +415,7 @@ export function PlaygroundTab({
     setEscalState("hidden");
     setEscalValue("");
     setEscalError("");
-    sessionIdRef.current = crypto.randomUUID();
+    sessionIdRef.current = safeRandomId();
     try {
       sessionStorage.removeItem(_PG_STORAGE_KEY);
       sessionStorage.setItem("playground_session_id", sessionIdRef.current);
@@ -423,33 +434,25 @@ export function PlaygroundTab({
   }
 
   async function copyMessage(msgId: string, content: string) {
-    try {
-      await navigator.clipboard.writeText(content);
+    if (!(await copyToClipboard(content))) return;
+    setMessages((prev) =>
+      prev.map((m) => (m.id === msgId ? { ...m, copied: true } : m)),
+    );
+    setTimeout(() => {
       setMessages((prev) =>
-        prev.map((m) => (m.id === msgId ? { ...m, copied: true } : m)),
+        prev.map((m) => (m.id === msgId ? { ...m, copied: false } : m)),
       );
-      setTimeout(() => {
-        setMessages((prev) =>
-          prev.map((m) => (m.id === msgId ? { ...m, copied: false } : m)),
-        );
-      }, 1500);
-    } catch {
-      /* clipboard blocked */
-    }
+    }, 1500);
   }
 
   /* Los mensajes del usuario no tienen `id` (solo lo trae el backend para los
      del asistente), asi que el estado "copiado" se marca por indice. */
   async function copyUserMessage(index: number, content: string) {
-    try {
-      await navigator.clipboard.writeText(content);
-      setMessages((prev) => prev.map((m, i) => (i === index ? { ...m, copied: true } : m)));
-      setTimeout(() => {
-        setMessages((prev) => prev.map((m, i) => (i === index ? { ...m, copied: false } : m)));
-      }, 1500);
-    } catch {
-      /* clipboard blocked */
-    }
+    if (!(await copyToClipboard(content))) return;
+    setMessages((prev) => prev.map((m, i) => (i === index ? { ...m, copied: true } : m)));
+    setTimeout(() => {
+      setMessages((prev) => prev.map((m, i) => (i === index ? { ...m, copied: false } : m)));
+    }, 1500);
   }
 
   async function handleFeedback(msgId: string, value: "positive" | "negative") {
