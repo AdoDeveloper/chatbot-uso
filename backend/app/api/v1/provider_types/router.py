@@ -82,7 +82,10 @@ async def delete_provider_type(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(_admin),
 ):
-    deleted = await svc.delete_type(db, catalog_id)
+    try:
+        deleted = await svc.delete_type(db, catalog_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
     if not deleted:
         raise NotFoundError("Tipo de proveedor no encontrado")
     await log_action(

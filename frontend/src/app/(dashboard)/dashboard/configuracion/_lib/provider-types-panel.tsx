@@ -215,7 +215,12 @@ export function ProviderTypesPanel({
       <TableBody>
        {catalogTypes.map((t) => (
         <TableRow key={t.id}>
-         <TableCell><code className="text-2xs">{t.type_key}</code></TableCell>
+         <TableCell>
+          <code className="text-2xs">{t.type_key}</code>
+          {t.is_builtin && (
+           <span className="ml-1.5 text-2xs text-muted-foreground">· sistema</span>
+          )}
+         </TableCell>
          <TableCell><p className="text-13 font-medium text-foreground">{t.display_name}</p></TableCell>
          <TableCell className="hidden md:table-cell">
           <p className="text-13 text-muted-foreground truncate max-w-64">{t.default_api_base ?? "-"}</p>
@@ -243,9 +248,11 @@ export function ProviderTypesPanel({
             <DropdownMenuItem onClick={() => { setEditing(t); setPanelOpen(true); }}>
              <Pencil className="w-3.5 h-3.5 mr-2" /> Editar
             </DropdownMenuItem>
+            {!t.is_builtin && (
             <DropdownMenuItem onClick={() => handleDelete(t)} disabled={!!deletingId} className="text-destructive focus:text-destructive focus:bg-destructive/10">
              <Trash2 className="w-3.5 h-3.5 mr-2" /> Eliminar
             </DropdownMenuItem>
+            )}
            </DropdownMenuContent>
           </DropdownMenu>
           )}

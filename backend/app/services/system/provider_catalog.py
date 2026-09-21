@@ -182,6 +182,8 @@ async def delete_type(db: AsyncSession, catalog_id: uuid.UUID) -> bool:
     row = await db.get(ProviderTypeCatalog, catalog_id)
     if not row:
         return False
+    if row.is_builtin:
+        raise ValueError(f"'{row.type_key}' es un tipo de proveedor del sistema y no puede eliminarse.")
     await db.delete(row)
     await db.commit()
     log.info("provider_type_catalog.deleted", id=str(catalog_id))
