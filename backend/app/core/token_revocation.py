@@ -4,7 +4,7 @@ Fail-open ante una caída de Redis - el corte de la DB siempre se aplica.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import structlog
 
@@ -52,5 +52,8 @@ def is_token_stale(payload: dict, tokens_valid_after: datetime | None) -> bool:
     issued = datetime.fromtimestamp(iat, tz=timezone.utc)
     if tokens_valid_after.tzinfo is None:
         tokens_valid_after = tokens_valid_after.replace(tzinfo=timezone.utc)
-    # Margen de 1s: un token emitido en el mismo segundo que el corte es válido.
-    return issued < tokens_valid_after.replace(microsecond=0)
+    # El iat de un JWT trunca a segundos enteros; tokens_valid_after guarda
+    # microsegundos. Un token reemitido en la misma request que fija el corte
+    # (ej. change-password) puede quedar 1s por debajo tras ese truncamiento
+    # aunque se haya generado después - se da 2s de margen para cubrirlo.
+    return issued < (tokens_valid_after - timedelta(seconds=2)).replace(microsecond=0)
