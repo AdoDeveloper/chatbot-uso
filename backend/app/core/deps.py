@@ -16,11 +16,16 @@ from app.services.users import service as user_service
 bearer = HTTPBearer(auto_error=False)
 
 
-async def get_current_user(
-    credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
-    db: AsyncSession = Depends(get_db),
-) -> User:
-    token = credentials.credentials if credentials else None
+async def resolve_user_from_access_token(token: str | None, db: AsyncSession) -> User:
+    """Valida un access JWT y devuelve el usuario, aplicando las mismas
+    verificaciones que get_current_user (firma, tipo, denylist de logout,
+    cuenta activa, invalidación por cambio de contraseña).
+
+    Extraído de get_current_user para que cualquier endpoint que necesite
+    decodificar el token a mano (en vez de vía Depends, ej. porque también
+    acepta una API key como autenticación alternativa) reutilice exactamente
+    esta lógica en vez de reimplementar una versión parcial.
+    """
     if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autenticado")
     try:
@@ -50,6 +55,14 @@ async def get_current_user(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Sesión expirada por cambio de credenciales")
 
     return user
+
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    token = credentials.credentials if credentials else None
+    return await resolve_user_from_access_token(token, db)
 
 
 def require_permission(module: str, action: str):

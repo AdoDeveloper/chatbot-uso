@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import time
 
-import jwt as pyjwt
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -11,13 +10,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.constants import PANEL_AUTHENTICATED_BROWSERS
-from app.core.deps import get_client_ip
+from app.core.deps import get_client_ip, resolve_user_from_access_token
 from app.core.versioning import _background_tasks
 from app.db import session as db_session
 from app.db.session import get_db
 from app.schemas.settings import NO_CONTEXT_MESSAGE
 from app.services.ai.llm_gateway import stream_chat
 from app.services.chat import pipeline
+from app.services.system.rbac import has_permission
 
 log = structlog.get_logger()
 
@@ -398,16 +398,25 @@ async def chat(
     el cliente debe mostrar un indicador de "escribiendo..." mientras espera."""
     is_authenticated_playground = False
     if (request.browser or "").lower() in PANEL_AUTHENTICATED_BROWSERS:
-        from app.core.security import decode_token
         auth_header = req.headers.get("Authorization", "")
         token = auth_header.removeprefix("Bearer ").strip()
-        payload = None
+        user = None
         if token:
             try:
-                payload = decode_token(token)
-            except pyjwt.PyJWTError:
-                payload = None
-        if not payload or payload.get("type") != "access":
+                # Misma validación que cualquier endpoint protegido (firma,
+                # tipo, denylist de logout, cuenta activa, invalidación por
+                # cambio de contraseña) - antes se decodificaba el JWT a mano
+                # aquí y esas cuatro verificaciones quedaban fuera, así que un
+                # token ya cerrado por logout seguía funcionando en el chat.
+                user = await resolve_user_from_access_token(token, db)
+            except HTTPException:
+                user = None
+        # El modo panel exige, además de un token válido, el mismo permiso
+        # que ya protege la página del previsualizador en el frontend
+        # (bot_settings.read) - si no lo tiene, se degrada al camino normal
+        # de widget-key en vez de rechazar, por si el cliente mandó
+        # browser=playground sin ser realmente el panel.
+        if not user or not await has_permission(db, user.role, "bot_settings", "read"):
             request.browser = None
             request.source_scope = None
         else:
