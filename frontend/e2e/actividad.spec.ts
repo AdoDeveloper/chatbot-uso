@@ -164,6 +164,11 @@ test.describe("Actividad > Inyecciones", () => {
 test.describe("Actividad > Seguridad", () => {
 
   test("desbloquear un usuario con limite activo (rate-limit de chat)", async ({ page, request, baseURL }) => {
+    // Timeout explicito: con proveedores LLM reales configurados, cada
+    // respuesta del chat tarda su tiempo real (10-20s) en vez de fallar
+    // rapido con 401 - la rafaga de abajo ya dispara en paralelo, pero el
+    // default de 30s de Playwright no alcanza a cubrir el resto del test.
+    test.setTimeout(90_000);
     const authHeader = `Bearer ${(await page.context().cookies()).find(c => c.name === "chatbot_access")?.value}`;
     const cfgRes = await request.get(`${BACKEND_URL}/api/v1/widget/config`, {
       headers: { Authorization: authHeader },
@@ -174,12 +179,18 @@ test.describe("Actividad > Seguridad", () => {
     }
     const sessionId = `e2e-ratelimit-${Date.now()}`;
     try {
-      for (let i = 0; i < 12; i++) {
-        await request.post(`${BACKEND_URL}/api/v1/widget/public/chat`, {
-          headers: { "X-Widget-Key": widgetKey! },
-          data: { question: `Rate limit test ${i}`, session_id: sessionId },
-        }).catch(() => {});
-      }
+      // Rafaga en paralelo (no secuencial): el rate-limit se dispara por
+      // cantidad de peticiones en la ventana, no por tiempo total, y en
+      // paralelo evita que la latencia real del LLM multiplique el tiempo
+      // total del test por 12.
+      await Promise.all(
+        Array.from({ length: 12 }, (_, i) =>
+          request.post(`${BACKEND_URL}/api/v1/widget/public/chat`, {
+            headers: { "X-Widget-Key": widgetKey! },
+            data: { question: `Rate limit test ${i}`, session_id: sessionId },
+          }).catch(() => {})
+        )
+      );
 
       await page.goto("/dashboard/actividad/seguridad");
       await expect(page.getByText(/usuarios con límite activo/i).first()).toBeVisible({ timeout: 10_000 });
