@@ -255,8 +255,6 @@ común: cada grupo vive en su propia carpeta bajo `backend/app/api/v1/`.
 | DELETE | `/providers/{id}` | Eliminar proveedor |
 | POST | `/providers/{id}/test` | Probar un proveedor existente |
 | POST | `/providers/test` | Probar una configuración no guardada |
-| GET | `/providers/{id}/models` | Modelos disponibles del proveedor |
-| POST | `/providers/models` | Consultar modelos por configuración |
 | POST | `/providers/reorder` | Reordenar la cadena de proveedores |
 
 ### Tipos de proveedor (`provider-types/`)

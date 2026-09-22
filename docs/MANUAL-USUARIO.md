@@ -268,7 +268,60 @@ canales a la vez (por ejemplo, correo + varios administradores en la app).
 
 ---
 
-## 9. Preguntas frecuentes del administrador
+## 9. Widget de chat público
+
+Esta sección describe lo que ve un **visitante del sitio institucional**, no
+el personal administrador. El widget es el chat embebido que se incrusta en
+páginas externas mediante el código de integración (Configuración →
+Asistente → Integración).
+
+### 9.1 Uso básico
+
+El widget aparece como una burbuja flotante en una esquina del sitio. Al
+hacer clic se abre la ventana de conversación, con el mensaje de bienvenida
+configurado y, si están activas, sugerencias rápidas de preguntas frecuentes.
+El visitante escribe su pregunta y el asistente responde con base en el
+contenido aprobado en la base de conocimiento.
+
+### 9.2 Controles sobre cada respuesta
+
+Al pasar el cursor sobre una respuesta del asistente aparecen tres controles:
+
+- **Escuchar en voz alta**: lee la respuesta usando el sintetizador de voz
+  del navegador.
+- **Copiar**: copia el texto de la respuesta al portapapeles.
+- **Valorar (útil / no útil)**: el visitante indica si la respuesta resolvió
+  su consulta. Esta valoración queda disponible para el equipo administrador
+  en Estadísticas → Retroalimentación.
+
+### 9.3 Accesibilidad
+
+Desde el menú de opciones del widget, el botón **Accesibilidad** abre un
+panel con dos ajustes que se recuerdan entre visitas (guardados en el
+navegador del visitante):
+
+- **Tamaño del texto**: pequeño, normal o grande.
+- **Alto contraste**: activa una paleta de colores de mayor contraste.
+
+### 9.4 Encuesta de satisfacción (CSAT)
+
+Al finalizar la conversación (menú de opciones → Finalizar chat), se invita
+al visitante a calificarla del 1 al 5, opcionalmente indicar un motivo y
+dejar un comentario. Estos datos alimentan el indicador de satisfacción en
+Estadísticas.
+
+### 9.5 Solicitar contacto humano (escalamiento)
+
+Cuando una regla de escalamiento se activa (por ejemplo, el visitante pide
+hablar con una persona, o el asistente detecta baja confianza en sus
+respuestas), el chat muestra una tarjeta ofreciendo derivar la conversación.
+Si el visitante acepta, puede dejar su correo o número de WhatsApp; el
+sistema notifica al personal administrador según las reglas configuradas en
+Configuración → Escalamiento.
+
+---
+
+## 10. Preguntas frecuentes del administrador
 
 **¿Por qué el chatbot dice que no tiene información?**
 Verifique que el documento esté **aprobado** (no solo subido) y que haya al

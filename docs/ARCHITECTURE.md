@@ -237,7 +237,7 @@ erDiagram
     USERS {
         uuid id PK
         string email UK
-        string role "rol dinámico (admin/editor/viewer/...)"
+        string role "admin/editor/viewer (roles fijos, sin ampliar)"
         bool is_active
         bool must_change_password
         timestamp last_login_at
@@ -381,7 +381,7 @@ chatbot-uso/
 | --- | --- |
 | Autenticación | JWT (access + refresh) con rotación de refresh y detección de reuso |
 | Invalidación de sesiones | Denylist de `jti` en Redis (logout) + `tokens_valid_after` por usuario (cambio de contraseña) |
-| Autorización | RBAC dinámico en BD: roles y permisos `(módulo, acción)` configurables desde el panel |
+| Autorización | RBAC con 3 roles fijos (admin/editor/viewer), definidos en código (`SYSTEM_ROLES`); permisos `(módulo, acción)` verificados contra BD en cada petición, sin UI para crear roles ni reasignar permisos |
 | Contraseñas | bcrypt |
 | Secretos en reposo | Cifrado Fernet (API keys de proveedores) con derivación PBKDF2-HMAC-SHA256 |
 | Anti–fuerza bruta | Rate limit por IP en endpoints de auth (Redis, con fallback en memoria) |
