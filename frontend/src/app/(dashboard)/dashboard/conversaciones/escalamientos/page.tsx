@@ -284,7 +284,11 @@ export default function EscalamientosPage() {
   const { data: knownTagsData, refetch: refetchTags } = useApi<ConversationTag[]>("/conversations/tags");
   const knownTags = knownTagsData ?? [];
 
-  const { data: metrics, loading: metricsLoading, error: metricsError, refetch: refetchMetrics } = useApi<EscalationMetrics>("/escalation/metrics?days=30");
+  const canEscalationMetrics = can(PERM.ESCALATION_READ);
+  const { data: metrics, loading: metricsLoading, error: metricsError, refetch: refetchMetrics } = useApi<EscalationMetrics>(
+    canEscalationMetrics ? "/escalation/metrics?days=30" : null,
+    [canEscalationMetrics],
+  );
 
   const { data: csatReasonLabelsData } = useApi<Record<string, string>>("/conversations/csat-reason-labels");
   const csatReasonLabels = csatReasonLabelsData ?? {};
@@ -436,7 +440,7 @@ export default function EscalamientosPage() {
 
       <ConversacionesTabs />
 
-      {!metricsError && <MetricsPanel metrics={metrics} loading={metricsLoading} />}
+      {canEscalationMetrics && !metricsError && <MetricsPanel metrics={metrics} loading={metricsLoading} />}
 
       <Card className="overflow-hidden">
         {/* Encabezado: contador + filtros */}

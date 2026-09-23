@@ -51,11 +51,12 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const can = usePermission();
   const isAdmin = can(PERM.SYSTEM_MANAGE);
+  const canKnowledge = can(PERM.KNOWLEDGE_READ);
 
  const { data: metrics, loading: loadingMetrics, error: metricsError } =
    useApi<AnalyticsDashboard>("/analytics/dashboard");
  const { data: sourcesData, loading: loadingSources, error: sourcesError } =
-   useApi<Source[]>("/sources");
+   useApi<Source[]>(canKnowledge ? "/sources" : null, [canKnowledge]);
  const { data: escalationsData, loading: loadingEscalations, error: escalationsError } =
    useApi<{ items: ChatConversationOut[] }>("/conversations?status=escalated&page_size=4");
  // Sección admin - solo se consulta con el permiso adecuado (path null la pospone)
@@ -239,8 +240,9 @@ export default function DashboardPage() {
    )}
 
    {/* Fila de contenido: fuentes + escalamientos pendientes */}
-   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+   <div className={`grid grid-cols-1 gap-4 mb-6 ${canKnowledge ? "md:grid-cols-2" : ""}`}>
     {/* Fuentes recientes */}
+    {canKnowledge && (
     <Card>
      <CardHeader className="flex-row items-center justify-between pb-4 border-b">
       <div>
@@ -301,6 +303,7 @@ export default function DashboardPage() {
       </div>
      )}
     </Card>
+    )}
 
     {/* Escalamientos pendientes */}
     <Card>
