@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import {
-  FileText, BookOpen, Loader2, FileSearch, Scissors, Eraser, Brain,
+  Loader2, FileSearch, Scissors, Eraser, Brain,
   CheckCheck, Ban, Clock, X,
 } from "lucide-react";
 import api from "@/lib/api";
@@ -10,10 +10,6 @@ import { invalidateApiCache } from "@/hooks/use-api";
 import type { Source } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-
-export const TYPE_ICON: Record<string, React.ElementType> = {
-  pdf: FileText, docx: FileText, txt: FileText, faq: BookOpen,
-};
 
 export const TYPE_LABEL: Record<string, string> = {
   pdf: "PDF", docx: "Word", txt: "TXT", faq: "FAQ",
@@ -117,11 +113,6 @@ export function TagInput({ value, onChange }: { value: string[]; onChange: (v: s
       </div>
     </div>
   );
-}
-
-export async function patchSourceTags(sourceId: string, tags: string[]) {
-  invalidateApiCache("/sources");
-  await api.patch(`/sources/${sourceId}`, { tags });
 }
 
 export async function patchSourceDetails(

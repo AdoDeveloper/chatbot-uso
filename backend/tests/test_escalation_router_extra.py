@@ -73,7 +73,7 @@ class TestEscalationTest:
         assert body["success"] is True
         assert "administradores" in body["message"]
         assert len(calls) == 1
-        assert calls[0]["conversation_id"] == "test-conversation"
+        assert calls[0]["conversation_id"] == ""
 
     async def test_test_escalation_editor_forbidden(self, client, editor_user, auth_headers):
         r = await client.post("/api/v1/escalation/test", headers=auth_headers(editor_user))

@@ -31,15 +31,6 @@ def _safe_cell(v: Any) -> str:
     return s
 
 
-def _cell_value(v: Any) -> Any:
-    """Números como números para que Excel pueda graficar; el resto se sanea."""
-    if isinstance(v, bool):
-        return _safe_cell(v)
-    if isinstance(v, (int, float)):
-        return v
-    return _safe_cell(v)
-
-
 def _num(v: Any) -> float | None:
     """Convierte valores de celda como "1,204" u "87%" a float para graficar."""
     if isinstance(v, (int, float)) and not isinstance(v, bool):

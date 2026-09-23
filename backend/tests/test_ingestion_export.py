@@ -20,7 +20,6 @@ import pytest
 
 from app.services.ingestion import export as export_mod
 from app.services.ingestion.export import (
-    _cell_value,
     _chart_drawing,
     _chart_series,
     _num,
@@ -40,7 +39,7 @@ def _pdf_text(data: bytes) -> str:
 
 
 # ---------------------------------------------------------------------------
-# _safe_cell / _cell_value / _num
+# _safe_cell / _num
 # ---------------------------------------------------------------------------
 
 class TestSafeCell:
@@ -65,19 +64,6 @@ class TestSafeCell:
     def test_keeps_legal_whitespace_control_characters(self):
         # Tab, salto de línea y retorno de carro sí son válidos en XML.
         assert _safe_cell("linea1\nlinea2\ttab") == "linea1\nlinea2\ttab"
-
-
-class TestCellValue:
-    def test_bool_is_sanitized_as_string(self):
-        assert _cell_value(True) == "True"
-        assert _cell_value(False) == "False"
-
-    def test_int_and_float_pass_through_as_numbers(self):
-        assert _cell_value(42) == 42
-        assert _cell_value(3.14) == 3.14
-
-    def test_string_is_sanitized(self):
-        assert _cell_value("=cmd") == "'=cmd"
 
 
 class TestNum:

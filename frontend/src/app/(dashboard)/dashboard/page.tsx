@@ -144,7 +144,7 @@ export default function DashboardPage() {
      <QuickAction href="/dashboard/conocimiento/documentos" icon={Upload} label="Subir fuente" hint="Añade a la base de conocimiento" />
      <QuickAction href="/dashboard/conversaciones" icon={MessageSquare} label="Conversaciones" hint="Revisar chats recientes" />
      <QuickAction href="/dashboard/conversaciones/escalamientos" icon={Inbox} label="Escalamientos" hint="Bandeja de casos por atender" />
-     <QuickAction href="/dashboard/configuracion/playground" icon={Play} label="Previsualizar" hint="Chat de prueba en vivo" />
+     <QuickAction href="/dashboard/configuracion/asistente/previsualizar" icon={Play} label="Previsualizar" hint="Chat de prueba en vivo" />
     </div>
    )}
 
@@ -496,7 +496,7 @@ function WorkflowCycle({
    label: "Pruebas",
    hintOk: "Servicio de IA activo",
    hintPending: "Sin servicio de IA activo",
-    href: "/dashboard/configuracion/playground",
+    href: "/dashboard/configuracion/asistente/previsualizar",
   },
  ];
 

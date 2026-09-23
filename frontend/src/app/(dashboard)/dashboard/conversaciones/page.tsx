@@ -332,7 +332,7 @@ export default function HistorialPage() {
         title="Aún no hay conversaciones"
         description="Cuando alguien interactúe con el chatbot las verá aquí. Pruebe el bot usted mismo para confirmar que funciona."
         action={
-         <Link href="/dashboard/configuracion/playground">
+         <Link href="/dashboard/configuracion/asistente/previsualizar">
           <Button size="sm" className="gap-1.5">
            <MessageSquare className="w-3.5 h-3.5" /> Probar el bot
           </Button>

@@ -97,7 +97,7 @@ async def test_escalation(
     administradores activos registrados en el sistema."""
     await svc.dispatch_escalation(
         db,
-        conversation_id="test-conversation",
+        conversation_id="",
         question="Esta es una prueba de escalamiento",
         reason="Prueba manual",
         is_test=True,

@@ -123,11 +123,6 @@ def paragraph(text: str) -> str:
     )
 
 
-def greeting(text: str = "") -> str:
-    # Sin saludo epistolar en mensajes automáticos.
-    return ""
-
-
 def detail_table(rows: dict[str, object], *, heading_text: str | None = None) -> str:
     """Lista de datos"""
     head = ""
@@ -219,21 +214,6 @@ def topic_list(topics: list[tuple[str, int]]) -> str:
         f"{rows}</table>"
     )
 
-
-def chip_list(items: list[str]) -> str:
-    """Lista de valores cortos como chips independientes, uno por línea -
-    en vez de una sola cadena separada por comas, que en un correo se ve
-    como texto corrido difícil de escanear cuando hay varios proveedores."""
-    if not items:
-        return ""
-    rows = "".join(
-        f'<tr><td style="padding:3px 0">'
-        f'<span class="bg-row t-main" style="display:inline-block;background:{ROW_BG};border:1px solid {BORDER_COLOR};'
-        f'border-radius:6px;padding:5px 12px;font-size:13px;color:{TEXT_COLOR};font-weight:600">{_html.escape(str(it))}</span>'
-        f"</td></tr>"
-        for it in items
-    )
-    return f'<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0">{rows}</table>'
 
 
 def quote_list(items: list[str]) -> str:

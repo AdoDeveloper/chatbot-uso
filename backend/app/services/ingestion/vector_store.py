@@ -192,20 +192,6 @@ async def set_source_active(source_id: str, value: bool) -> None:
     )
 
 
-async def count_chunks(source_id: str) -> int:
-    """Cuenta el total de chunks de una fuente en Qdrant."""
-    client = _get_client()
-    source_filter = Filter(
-        must=[FieldCondition(key="source_id", match=MatchValue(value=source_id))]
-    )
-    result = await client.count(
-        collection_name=COLLECTION,
-        count_filter=source_filter,
-        exact=True,
-    )
-    return result.count
-
-
 async def get_chunk(point_id: str) -> dict | None:
     """Retrieve a single chunk by its Qdrant point ID."""
     client = _get_client()

@@ -408,16 +408,6 @@ class TestProviderDownBody:
         assert "Tiempo transcurrido" in html
 
 
-class TestChipList:
-    def test_renders_each_item(self):
-        html = templates.chip_list(["Groq Produccion", "Mistral Free"])
-        assert "Groq Produccion" in html
-        assert "Mistral Free" in html
-
-    def test_empty_list_returns_empty_string(self):
-        assert templates.chip_list([]) == ""
-
-
 class TestTextBody:
     def test_renders_with_intro_and_action(self):
         text = service._text_body(NotificationEvent.doc_ready, {"document": "test.pdf"})

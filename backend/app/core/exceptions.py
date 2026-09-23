@@ -23,13 +23,5 @@ class NotFoundError(DomainError):
     status_code = status.HTTP_404_NOT_FOUND
 
 
-class ConflictError(DomainError):
-    status_code = status.HTTP_409_CONFLICT
-
-
 class ValidationError(DomainError):
     status_code = status.HTTP_422_UNPROCESSABLE_CONTENT
-
-
-class ForbiddenError(DomainError):
-    status_code = status.HTTP_403_FORBIDDEN

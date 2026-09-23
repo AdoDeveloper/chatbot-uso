@@ -2,7 +2,6 @@ import { test, expect } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 
-// Coverage for /dashboard/conocimiento/consulta (semantic search tester) and /dashboard/configuracion/playground (live chat preview), both running real queries against the real backend without persisting config.
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;
 
@@ -20,16 +19,15 @@ test.describe("Conocimiento > Consulta", () => {
     await page.getByPlaceholder(/requisitos de matrícula/i).fill("proceso de inscripcion");
     await page.locator("#main-content").getByRole("button", { name: /buscar/i }).click();
 
-    // Wait for actual result content, not a generic spinner check - a page-wide spinner sweep is prone to false negatives from unrelated transient UI state under concurrent E2E load.
     await expect(page.getByText(/fragmentos recuperados/i)).toBeVisible({ timeout: 30_000 });
     await page.screenshot({ path: path.join(SHOT_DIR, "01-consulta-resultado.png") });
   });
 });
 
-test.describe("Configuracion > Playground", () => {
+test.describe("Configuracion > Asistente > Previsualizar", () => {
   test("enviar un mensaje de prueba al chatbot", async ({ page, request, baseURL }) => {
     test.setTimeout(60_000);
-    await page.goto("/dashboard/configuracion/playground");
+    await page.goto("/dashboard/configuracion/asistente/previsualizar");
     await expect(page.getByPlaceholder(/escribe un mensaje/i)).toBeVisible({ timeout: 10_000 });
 
     await page.getByPlaceholder(/escribe un mensaje/i).fill("Hola, esto es un mensaje de prueba E2E.");

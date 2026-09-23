@@ -1,32 +1,12 @@
 import { test, expect } from "@playwright/test";
 
-/**
- * Full-system smoke: every real page under /dashboard, mapped directly from
- * the app router file tree (`find frontend/src/app/(dashboard)/dashboard -name
- * page.tsx`), not from the sidebar - the sidebar can hide routes that still
- * exist and are reachable by direct URL.
- *
- * For each route: response is not an error status, no uncaught console
- * errors, no infinite loading spinner left behind, and a visual baseline.
- * Deliberately does NOT exercise create/edit/delete flows per page - those
- * are covered by the dedicated specs (conversaciones, invitaciones,
- * tablas-acciones) and by the backend test suite. This just proves every
- * page loads and renders without breaking.
- */
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;
 
 test.use({ storageState: "e2e/.auth/admin.json" });
 test.skip(!E2E_USER || !E2E_PASS, "E2E_USER / E2E_PASS not set - skipping");
 
-// Estas rutas listan/grafican datos que otros specs crean/borran a lo largo
-// de la corrida (invitaciones, usuarios, notificaciones, conversaciones de
-// prueba de rate-limit, proveedores, versiones, log de auditoria) - su alto
-// de página varía según cuánto quede acumulado en ese momento y en qué orden
-// terminaron de correr los demás specs (confirmado en CI: la misma ruta dio
-// 2172px, 1348px y otras alturas en corridas consecutivas del mismo commit
-// sin cambios), así que una comparación de píxeles de página completa nunca
-// converge en un baseline estable.
+// Páginas cuyo alto depende de los datos que dejan otros specs: sin captura de referencia.
 const DYNAMIC_HEIGHT_ROUTES = new Set([
   "/dashboard",
   "/dashboard/conversaciones/escalamientos",
@@ -35,7 +15,6 @@ const DYNAMIC_HEIGHT_ROUTES = new Set([
   "/dashboard/configuracion",
   "/dashboard/configuracion/asistente",
   "/dashboard/configuracion/asistente/apariencia",
-  "/dashboard/configuracion/widget",
   "/dashboard/configuracion/notificaciones",
   "/dashboard/configuracion/acceso",
   "/dashboard/configuracion/acceso/sso",
@@ -70,7 +49,6 @@ const ROUTES = [
   "/dashboard/configuracion/asistente/integracion",
   "/dashboard/configuracion/asistente/limites",
   "/dashboard/configuracion/asistente/previsualizar",
-  "/dashboard/configuracion/cuotas",
   "/dashboard/configuracion/escalamiento",
   "/dashboard/configuracion/estado",
   "/dashboard/configuracion/estado/cuotas",
@@ -78,10 +56,8 @@ const ROUTES = [
   "/dashboard/configuracion/estado/cuotas/tendencia",
   "/dashboard/configuracion/filtros",
   "/dashboard/configuracion/notificaciones",
-  "/dashboard/configuracion/playground",
   "/dashboard/configuracion/proveedores",
   "/dashboard/configuracion/publicaciones",
-  "/dashboard/configuracion/widget",
   "/dashboard/configuracion/acceso",
   "/dashboard/configuracion/acceso/sso",
   "/dashboard/configuracion/acceso/usuarios",
@@ -97,8 +73,7 @@ for (const route of ROUTES) {
     const response = await page.goto(route);
     expect(response?.status(), `${route} returned an error status`).toBeLessThan(400);
 
-    // `networkidle` is unreliable here - Next.js keeps background link-prefetch traffic going, so it can resolve before the page's own fetches finish. Wait out spinners directly instead.
-    // /conocimiento/documentos legitimately keeps a spinning badge for rows still being processed by ingestion - real domain state, not a stuck loader, so it's excluded.
+    // Documentos muestra un indicador girando mientras una fuente se procesa.
     if (route !== "/dashboard/conocimiento/documentos") {
       const spinners = page.locator(".animate-spin");
       await expect(spinners, `${route} left a loading spinner visible after settling`).toHaveCount(0, { timeout: 20_000 });

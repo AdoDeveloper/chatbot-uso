@@ -190,24 +190,6 @@ class TestListAllChunks:
         assert [c["id"] for c in result] == ["id-2", "id-1"]
 
 
-class TestCountChunks:
-    async def test_returns_count_from_client(self, patch_client):
-        patch_client.count.return_value = SimpleNamespace(count=42)
-
-        result = await vs.count_chunks("src-1")
-
-        assert result == 42
-        kwargs = patch_client.count.call_args.kwargs
-        assert kwargs["collection_name"] == vs.COLLECTION
-        assert kwargs["exact"] is True
-
-    async def test_returns_zero_when_no_chunks(self, patch_client):
-        patch_client.count.return_value = SimpleNamespace(count=0)
-
-        result = await vs.count_chunks("src-empty")
-
-        assert result == 0
-
 
 class TestGetChunk:
     async def test_returns_none_when_not_found(self, patch_client):

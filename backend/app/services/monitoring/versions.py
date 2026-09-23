@@ -445,13 +445,6 @@ async def _prune_auto_snapshots(db: AsyncSession) -> int:
     return len(stale_ids)
 
 
-async def has_config_changed_since(db: AsyncSession, deployed_snapshot: dict) -> bool:
-    """Compara la configuración actual con un snapshot desplegado."""
-    current = await _collect_all(db)
-    diff = compute_diff(deployed_snapshot, current)
-    return any(changes for changes in diff.values())
-
-
 async def restore_snapshot(
     db: AsyncSession,
     *,
