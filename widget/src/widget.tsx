@@ -111,14 +111,23 @@ marked.use({
   },
 });
 
+function SuccessIcon({ small = false }: { small?: boolean }) {
+  return (
+    <span class={`success-icon${small ? " success-icon-sm" : ""}`} aria-hidden="true">
+      <svg viewBox="0 0 52 52">
+        <circle class="success-icon-circle" cx="26" cy="26" r="24" fill="none" />
+        <path class="success-icon-check" fill="none" d="M15 27l7 7 15-15" />
+      </svg>
+    </span>
+  );
+}
+
 function BotIcon({ size = 16, logoUrl }: { size?: number; logoUrl?: string | null }) {
   if (logoUrl) {
     return (
       <img
         src={logoUrl}
-        width={size}
-        height={size}
-        style={{ objectFit: "contain", borderRadius: "4px", display: "block" }}
+        style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%", display: "block" }}
         alt="Bot"
         aria-hidden="true"
       />
@@ -1178,7 +1187,7 @@ function ChatWidget({
               Reintentar
             </button>
           </div>
-        ) : (
+        ) : settings.enable_csat && csatState !== "hidden" ? null : (
           <>
             {/* Mensajes */}
             <div class="messages" role="log" aria-live="polite">
@@ -1333,7 +1342,8 @@ function ChatWidget({
                     )}
                     {escalState === "submitted" && (
                       <p class="escal-done">
-                        ✓ Listo. La universidad se pondrá en contacto con usted pronto.
+                        <SuccessIcon small />
+                        Listo. La universidad se pondrá en contacto con usted pronto.
                       </p>
                     )}
                     {escalState === "error" && (
@@ -1377,7 +1387,7 @@ function ChatWidget({
           </>
         )}
 
-        {/* CSAT: franja inferior en el lugar del input, con la conversación visible encima. */}
+        {/* CSAT: ocupa todo el cuerpo del chat, bajo el encabezado. */}
         {!offlineMode && settings.enable_csat && csatState !== "hidden" && (
           <div class="csat-dock">
             {csatState === "pending" && (
@@ -1434,12 +1444,7 @@ function ChatWidget({
             )}
             {csatState === "submitted" && (
               <div class="csat-thanks-wrap">
-                <div class="csat-thanks-icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="26" height="26">
-                    <circle cx="12" cy="12" r="10" />
-                    <polyline points="8 12.5 10.8 15.5 16 9" />
-                  </svg>
-                </div>
+                <SuccessIcon />
                 <div class="csat-thanks">¡Muchas gracias!</div>
                 <div class="csat-thanks-actions">
                   {settings.show_new_chat_button && messages.length > 1 && (

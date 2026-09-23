@@ -136,6 +136,18 @@ function saveA11yPrefs(prefs: A11yPrefs): void {
   try { window.localStorage.setItem(_PG_A11Y_STORAGE_KEY, JSON.stringify(prefs)); } catch { /* ignore */ }
 }
 
+// Mismo ícono animado que el widget público (clases en globals.css).
+function SuccessIcon({ small = false }: { small?: boolean }) {
+  return (
+    <span className={`success-icon${small ? " success-icon-sm" : ""}`} aria-hidden="true">
+      <svg viewBox="0 0 52 52">
+        <circle className="success-icon-circle" cx="26" cy="26" r="24" fill="none" />
+        <path className="success-icon-check" fill="none" d="M15 27l7 7 15-15" />
+      </svg>
+    </span>
+  );
+}
+
 function SourceCard({
   source, score, text, index,
 }: { source: string; score: number; text: string; index: number }) {
@@ -789,11 +801,11 @@ export function PlaygroundTab({
               >
                 {/* Encabezado del widget */}
                 <div
-                  className="flex items-center gap-2.5 px-3.5 py-2.5 shrink-0"
+                  className="flex items-center gap-2.5 px-3.5 py-3 shrink-0"
                   style={{ backgroundColor: primaryColor }}
                 >
                   {showBotIcon && (
-                    <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center shrink-0 overflow-hidden">
+                    <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shrink-0 overflow-hidden">
                       {logoUrl ? (
                         <img
                           src={logoUrl}
@@ -801,15 +813,15 @@ export function PlaygroundTab({
                           className="w-full h-full object-cover"
                         />
                       ) : (
-                        <Bot className="w-3.5 h-3.5 text-white" />
+                        <Bot className="w-[18px] h-[18px] text-white" />
                       )}
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-white truncate">
+                    <p className="text-sm font-semibold text-white truncate">
                       {chatbotName}
                     </p>
-                    <p className="text-3xs text-white/70">
+                    <p className="text-2xs text-white/75">
                       {offlineMode || networkDown ? "Sin conexión" : loading ? "Escribiendo…" : "En línea"}
                     </p>
                   </div>
@@ -820,7 +832,7 @@ export function PlaygroundTab({
                     <button
                       type="button"
                       onClick={() => setKebabOpen((v) => !v)}
-                      className="w-7 h-7 flex items-center justify-center rounded text-white hover:bg-white/10 transition-colors"
+                      className="w-9 h-9 flex items-center justify-center rounded-md text-white hover:bg-white/15 transition-colors"
                       aria-label="Más opciones"
                       aria-expanded={kebabOpen}
                       aria-haspopup="menu"
@@ -828,20 +840,20 @@ export function PlaygroundTab({
                       <List className="w-5 h-5" />
                     </button>
                     {kebabOpen && (
-                      <div role="menu" className="absolute right-0 top-7 z-10 min-w-[170px] bg-popover border border-border rounded-lg shadow-lg py-1 text-foreground">
+                      <div role="menu" className="absolute right-0 top-10 z-10 min-w-[190px] bg-popover border border-border rounded-xl shadow-lg p-1 text-foreground">
                         {showNewChatButton && messages.length > 0 && (
-                          <button type="button" role="menuitem" onClick={() => { resetConversation(); setKebabOpen(false); }} className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-muted-foreground/10 text-left">
-                            <RotateCcw className="w-3.5 h-3.5" /> Nueva conversación
+                          <button type="button" role="menuitem" onClick={() => { resetConversation(); setKebabOpen(false); }} className="w-full min-h-9 flex items-center gap-2.5 px-3 py-2 rounded-lg text-13 font-medium hover:bg-muted-foreground/10 text-left">
+                            <RotateCcw className="w-4 h-4 shrink-0" style={{ color: primaryColor }} /> Nueva conversación
                           </button>
                         )}
                         {enableAccessibility && (
-                          <button type="button" role="menuitem" aria-expanded={a11yOpen} onClick={() => { setA11yOpen((v) => !v); setKebabOpen(false); }} className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-muted-foreground/10 text-left">
-                            <Accessibility className="w-3.5 h-3.5" /> Accesibilidad
+                          <button type="button" role="menuitem" aria-expanded={a11yOpen} onClick={() => { setA11yOpen((v) => !v); setKebabOpen(false); }} className="w-full min-h-9 flex items-center gap-2.5 px-3 py-2 rounded-lg text-13 font-medium hover:bg-muted-foreground/10 text-left">
+                            <Accessibility className="w-4 h-4 shrink-0" style={{ color: primaryColor }} /> Accesibilidad
                           </button>
                         )}
                         {showEndChatButton && (
-                          <button type="button" role="menuitem" onClick={() => { endChat(); setKebabOpen(false); }} className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-muted-foreground/10 text-left text-destructive">
-                            <LogOut className="w-3.5 h-3.5" /> Finalizar chat
+                          <button type="button" role="menuitem" onClick={() => { endChat(); setKebabOpen(false); }} className="w-full min-h-9 flex items-center gap-2.5 px-3 py-2 rounded-lg text-13 font-medium hover:bg-destructive/10 text-left text-destructive">
+                            <LogOut className="w-4 h-4 shrink-0" /> Finalizar chat
                           </button>
                         )}
                       </div>
@@ -851,7 +863,7 @@ export function PlaygroundTab({
                   <button
                     type="button"
                     onClick={() => setWidgetOpen(false)}
-                    className="w-7 h-7 -ml-1.5 flex items-center justify-center rounded text-white hover:bg-white/10 transition-colors"
+                    className="w-9 h-9 -ml-1.5 flex items-center justify-center rounded-md text-white hover:bg-white/15 transition-colors"
                     title="Cerrar"
                     aria-label="Cerrar"
                   >
@@ -946,7 +958,7 @@ export function PlaygroundTab({
                 ) : (
                 <>
                 {/* Mensajes */}
-                <div ref={chatScrollRef} className="flex-1 overflow-y-auto bg-background p-3 space-y-2.5">
+                <div ref={chatScrollRef} className={`flex-1 overflow-y-auto bg-background p-3 space-y-2.5 ${enableCsat && csatState !== "hidden" ? "hidden" : ""}`}>
                   {/* Burbuja de bienvenida */}
                   <div className="flex items-end gap-1.5">
                     {showBotIcon && (
@@ -1263,7 +1275,7 @@ export function PlaygroundTab({
                           </form>
                         )}
                         {escalState === "submitted" && (
-                          <p className={highContrast ? "text-white font-medium" : "text-success font-medium"}>✓ Listo. La universidad se pondrá en contacto con usted pronto.</p>
+                          <p className={`flex items-center gap-2 font-medium ${highContrast ? "text-white" : "text-success"}`}><SuccessIcon small />Listo. La universidad se pondrá en contacto con usted pronto.</p>
                         )}
                       </div>
                     </div>
@@ -1272,7 +1284,8 @@ export function PlaygroundTab({
 
                 {/* CSAT - pantalla única: estrellas + motivos + comentario */}
                 {enableCsat && csatState === "pending" && (
-                  <div className={`border-t px-3 py-3 shrink-0 flex flex-col items-center gap-2 ${highContrast ? "bg-black border-white/40" : "border-border bg-muted/40"}`}>
+                  <div className={`flex-1 min-h-0 overflow-y-auto flex flex-col ${highContrast ? "bg-black" : "bg-muted/40"}`}>
+                  <div className="my-auto px-5 py-5 flex flex-col items-center gap-2.5">
                     <p className={`font-medium text-center ${msgScaleClass} ${highContrast ? "text-white" : "text-foreground"}`}>
                       {csatQuestion}
                     </p>
@@ -1346,25 +1359,34 @@ export function PlaygroundTab({
                       </button>
                     </div>
                   </div>
+                  </div>
                 )}
                 {enableCsat && csatState === "submitted" && (
-                  <div className={`border-t px-3 py-3 shrink-0 flex flex-col items-center gap-1.5 ${highContrast ? "bg-black border-white/40" : "border-border bg-muted/40"}`}>
-                    <div className="flex items-center justify-center w-10 h-10 rounded-full border-2 border-success text-success">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} width={22} height={22}>
-                        <circle cx="12" cy="12" r="10" />
-                        <polyline points="8 12.5 10.8 15.5 16 9" />
-                      </svg>
+                  <div className={`flex-1 min-h-0 overflow-y-auto flex flex-col ${highContrast ? "bg-black" : "bg-muted/40"}`}>
+                    <div className="my-auto px-5 py-5 flex flex-col items-center gap-2">
+                      <SuccessIcon />
+                      <p className={`text-[15px] font-semibold ${highContrast ? "text-white" : "text-foreground"}`}>
+                        ¡Muchas gracias!
+                      </p>
+                      <div className="flex items-center justify-center gap-2 mt-1 flex-wrap">
+                        {showNewChatButton && (
+                          <button
+                            type="button"
+                            onClick={resetConversation}
+                            className={`text-xs font-semibold px-3 py-1.5 rounded-md border ${highContrast ? "border-white/40 text-white hover:bg-white/10" : "border-border bg-background hover:bg-muted-foreground/10 text-foreground"}`}
+                          >
+                            Nueva conversación
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setWidgetOpen(false)}
+                          className={`text-xs font-semibold px-3 py-1.5 rounded-md border ${highContrast ? "border-white/40 text-white hover:bg-white/10" : "border-border bg-background hover:bg-muted-foreground/10 text-foreground"}`}
+                        >
+                          Cerrar
+                        </button>
+                      </div>
                     </div>
-                    <p className={`text-xs font-semibold ${highContrast ? "text-white" : "text-foreground"}`}>
-                      ¡Muchas gracias!
-                    </p>
-                    <button
-                      type="button"
-                      onClick={resetConversation}
-                      className={`text-2xs px-2.5 py-1 rounded border ${highContrast ? "border-white/40 text-white hover:bg-white/10" : "border-border hover:bg-muted-foreground/10 text-foreground"}`}
-                    >
-                      Nueva conversación
-                    </button>
                   </div>
                 )}
 
