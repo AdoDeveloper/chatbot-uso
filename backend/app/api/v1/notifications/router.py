@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.deps import require_perm
+from app.core.deps import get_current_user, require_perm
 from app.core.exceptions import NotFoundError
 from app.core.permissions import P
 from app.db.session import get_db
@@ -232,9 +232,13 @@ async def toggle_email_channel(
 async def notifications_inbox(
     limit: int = Query(20, ge=1, le=50),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_perm(P.NOTIFICATIONS_READ)),
+    current_user: User = Depends(get_current_user),
 ):
     """Últimas N notificaciones in-app de ESTE usuario + count de no leídas.
+
+    Bandeja personal: basta con estar autenticado (las notificaciones llegan a
+    todos los usuarios activos y _visible_events ya filtra por rol);
+    notifications.read es para administrar reglas e historial global.
     """
     visible = await _visible_events(db, current_user.role)
     result = await db.execute(
@@ -361,7 +365,7 @@ async def list_notifications(
 @router.post("/inbox/mark-all-read", response_model=MarkReadOut)
 async def mark_all_notifications_read(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_perm(P.NOTIFICATIONS_UPDATE)),
+    current_user: User = Depends(get_current_user),
 ):
     from datetime import datetime, timezone
 
@@ -384,7 +388,7 @@ async def mark_all_notifications_read(
 async def mark_notification_read(
     notification_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_perm(P.NOTIFICATIONS_UPDATE)),
+    current_user: User = Depends(get_current_user),
 ):
     from datetime import datetime, timezone
     result = await db.execute(

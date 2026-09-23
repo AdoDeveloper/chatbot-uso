@@ -154,6 +154,15 @@ class TestInbox:
         # Orden DESC por created_at - el más reciente primero
         assert body["items"][0]["id"] is not None
 
+    async def test_any_role_can_read_and_mark_own_inbox(self, client, make_user, auth_headers):
+        from app.models.enums import UserRole
+
+        viewer = await make_user(role=UserRole.viewer)
+        headers = auth_headers(viewer)
+        assert (await client.get("/api/v1/notifications/inbox", headers=headers)).status_code == 200
+        assert (await client.post("/api/v1/notifications/inbox/mark-all-read", headers=headers)).status_code == 200
+        assert (await client.get("/api/v1/notifications", headers=headers)).status_code == 403
+
     async def test_inbox_empty_when_no_logs(
         self, client, admin_user, auth_headers
     ):
@@ -178,13 +187,15 @@ class TestInbox:
         r = await client.get("/api/v1/notifications/inbox")
         assert r.status_code in (401, 403)
 
-    async def test_inbox_viewer_rejected(
-        self, client, viewer_user, auth_headers
+    async def test_inbox_viewer_sees_only_own_notifications(
+        self, client, viewer_user, auth_headers, seed_logs
     ):
         r = await client.get(
             "/api/v1/notifications/inbox", headers=auth_headers(viewer_user)
         )
-        assert r.status_code in (401, 403)
+        assert r.status_code == 200
+        assert r.json()["items"] == []
+        assert r.json()["unread_count"] == 0
 
     async def test_inbox_is_per_user_not_shared(
         self, client, admin_user, auth_headers, seed_logs, make_user
@@ -270,7 +281,7 @@ class TestMarkRead:
         assert r.status_code == 200
         assert r.json()["marked"] == 0
 
-    async def test_mark_read_viewer_rejected(
+    async def test_cannot_mark_another_users_notification(
         self, client, viewer_user, auth_headers, seed_logs
     ):
         unread = [log for log in seed_logs if log.read_at is None][0]
@@ -278,7 +289,7 @@ class TestMarkRead:
             f"/api/v1/notifications/inbox/{unread.id}/read",
             headers=auth_headers(viewer_user),
         )
-        assert r.status_code in (401, 403)
+        assert r.status_code == 404
 
 
 # ── __repr__ safety (no lazy-load tras commit) ─────────────────────────────

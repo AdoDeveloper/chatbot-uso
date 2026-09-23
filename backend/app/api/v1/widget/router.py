@@ -114,7 +114,7 @@ async def update_config(
 @router.get("/embed-code", response_model=EmbedCodeOut)
 async def embed_code(
     db: AsyncSession = Depends(get_db),
-    _: object = Depends(_admin),
+    _: object = Depends(_reader),
 ):
     cfg = await svc.get_or_create(db)
     await db.commit()

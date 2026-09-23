@@ -185,9 +185,14 @@ class TestEmbedCode:
         r = await client.get("/api/v1/widget/embed-code")
         assert r.status_code == 401
 
-    async def test_requires_admin_perm(self, client, viewer_user, auth_headers):
+    async def test_requires_read_perm(self, client, viewer_user, auth_headers):
         r = await client.get("/api/v1/widget/embed-code", headers=auth_headers(viewer_user))
         assert r.status_code == 403
+
+    async def test_editor_with_read_only_gets_embed_code(self, client, make_user, auth_headers):
+        editor = await make_user(role=UserRole.editor)
+        r = await client.get("/api/v1/widget/embed-code", headers=auth_headers(editor))
+        assert r.status_code == 200
 
     async def test_admin_gets_embed_code(self, client, admin_user, auth_headers):
         r = await client.get("/api/v1/widget/embed-code", headers=auth_headers(admin_user))
