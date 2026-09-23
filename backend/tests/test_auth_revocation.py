@@ -114,3 +114,19 @@ async def test_change_password_invalidates_prior_tokens(client, admin_user, auth
     assert resp.status_code == 200
     # El token emitido antes del cambio ahora es stale → 401
     assert (await client.get("/api/v1/auth/me", headers=old_headers)).status_code == 401
+    # El token reemitido en la misma respuesta debe seguir siendo válido.
+    new_headers = {"Authorization": f"Bearer {resp.json()['access_token']}"}
+    assert (await client.get("/api/v1/auth/me", headers=new_headers)).status_code == 200
+
+
+def test_revocation_cutoff_keeps_same_second_tokens_and_rejects_older():
+    from datetime import timedelta
+
+    from app.core.token_revocation import is_token_stale, revocation_cutoff
+
+    cutoff = revocation_cutoff()
+    assert cutoff.microsecond == 0
+    same_second = int(cutoff.timestamp())
+    assert is_token_stale({"iat": same_second}, cutoff) is False
+    assert is_token_stale({"iat": same_second + 1}, cutoff) is False
+    assert is_token_stale({"iat": int((cutoff - timedelta(seconds=1)).timestamp())}, cutoff) is True

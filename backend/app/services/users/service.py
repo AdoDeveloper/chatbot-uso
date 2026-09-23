@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import datetime
 import secrets
 import string
 import uuid
@@ -13,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import NotFoundError
 from app.core.security import hash_password, verify_password
+from app.core.token_revocation import revocation_cutoff
 from app.models.enums import UserRole
 from app.models.rbac import Role
 from app.models.user import User
@@ -173,7 +173,7 @@ async def reset_password(
     temp_password = _generate_temp_password()
     user.hashed_password = hash_password(temp_password)
     user.must_change_password = True
-    user.tokens_valid_after = datetime.datetime.now(datetime.timezone.utc)
+    user.tokens_valid_after = revocation_cutoff()
 
     await log_action(
         db, action="user.reset_password", resource_type="user",

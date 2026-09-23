@@ -14,7 +14,7 @@ from app.core.config import get_settings
 from app.core.deps import get_client_ip, get_current_user
 from app.core.rate_limit import RateLimitExceeded, check_rate_limit
 from app.core.security import decode_token, hash_password, verify_password
-from app.core.token_revocation import is_jti_revoked, is_token_stale, revoke_jti
+from app.core.token_revocation import is_jti_revoked, is_token_stale, revocation_cutoff, revoke_jti
 from app.db.session import get_db
 from app.models.chat_message import ChatMessage
 from app.models.enums import ReviewStatus
@@ -311,7 +311,7 @@ async def change_password(
 
     current_user.hashed_password = hash_password(body.new_password)
     current_user.must_change_password = False
-    current_user.tokens_valid_after = datetime.datetime.now(datetime.timezone.utc)
+    current_user.tokens_valid_after = revocation_cutoff()
     await log_action(
         db, action="auth.change_password", resource_type="user",
         actor_id=current_user.id, resource_id=str(current_user.id),
