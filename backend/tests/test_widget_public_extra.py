@@ -129,6 +129,54 @@ class TestPublicEscalationContact:
         assert len(stub_dispatch_escalation) == 1
         assert stub_dispatch_escalation[0]["conversation_id"] == ""
 
+    @pytest.mark.parametrize("contact_type,value", [
+        ("email", "no-es-un-correo"),
+        ("email", "a@b"),
+        ("whatsapp", "123"),
+        ("whatsapp", "llamame por favor"),
+    ])
+    async def test_invalid_contact_is_rejected_without_notifying(
+        self, client, widget_config, stub_dispatch_escalation, contact_type, value
+    ):
+        r = await client.post(
+            "/api/v1/widget/public/escalation/contact",
+            json={"contact_type": contact_type, "contact_value": value},
+            headers={"X-Widget-Key": widget_config.api_key},
+        )
+        assert r.status_code == 422
+        assert stub_dispatch_escalation == []
+
+    async def test_repeated_requests_from_same_ip_are_throttled(
+        self, client, widget_config, stub_dispatch_escalation
+    ):
+        from app.api.v1.widget.router import _CONTACT_MAX_PER_IP
+        codes = []
+        for i in range(_CONTACT_MAX_PER_IP + 2):
+            r = await client.post(
+                "/api/v1/widget/public/escalation/contact",
+                json={"contact_type": "email", "contact_value": f"spam{i}@x.com"},
+                headers={"X-Widget-Key": widget_config.api_key},
+            )
+            codes.append(r.status_code)
+        assert codes[:_CONTACT_MAX_PER_IP] == [204] * _CONTACT_MAX_PER_IP
+        assert codes[_CONTACT_MAX_PER_IP:] == [429, 429]
+        assert len(stub_dispatch_escalation) == _CONTACT_MAX_PER_IP
+
+    async def test_same_conversation_is_throttled_across_ips(
+        self, client, widget_config, make_conversation, stub_dispatch_escalation
+    ):
+        from app.api.v1.widget.router import _CONTACT_MAX_PER_CONVERSATION
+        conv = await make_conversation()
+        codes = []
+        for i in range(_CONTACT_MAX_PER_CONVERSATION + 1):
+            r = await client.post(
+                "/api/v1/widget/public/escalation/contact",
+                json={"conversation_id": str(conv.id), "contact_type": "email", "contact_value": "a@b.com"},
+                headers={"X-Widget-Key": widget_config.api_key, "X-Real-IP": f"10.0.0.{i + 1}"},
+            )
+            codes.append(r.status_code)
+        assert codes == [204] * _CONTACT_MAX_PER_CONVERSATION + [429]
+
 
 class TestPublicFeedback:
     async def test_feedback_on_existing_message(self, client, widget_config, db_session, make_conversation):

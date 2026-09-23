@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import uuid
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_client_ip, require_perm
 from app.core.permissions import P
+from app.core.rate_limit import RateLimitExceeded, check_rate_limit
 from app.core.widget_auth import require_widget_key, verify_widget_access
 from app.db.session import get_db
 from app.models.enums import MessageFeedback
@@ -48,10 +50,31 @@ class _PublicCsatBody(BaseModel):
         return out
 
 
+_CONTACT_EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]{2,}$")
+_CONTACT_PHONE_RE = re.compile(r"^\+?\d{8,15}$")
+
+# Cada solicitud notifica por correo a todos los administradores y la API key
+# del widget es pública, así que sin tope basta un script para inundarlos.
+_CONTACT_MAX_PER_IP = 5
+_CONTACT_MAX_PER_CONVERSATION = 3
+_CONTACT_WINDOW_SECONDS = 3600
+
+
 class _PublicEscalationContactBody(BaseModel):
     conversation_id: uuid.UUID | None = None
     contact_type: str = Field(..., pattern="^(email|whatsapp)$")
     contact_value: str = Field(..., min_length=1, max_length=200)
+
+    @model_validator(mode="after")
+    def _validate_contact(self) -> "_PublicEscalationContactBody":
+        value = self.contact_value.strip()
+        if self.contact_type == "email":
+            if not _CONTACT_EMAIL_RE.match(value):
+                raise ValueError("Correo electrónico inválido")
+        elif not _CONTACT_PHONE_RE.match(re.sub(r"[\s\-()]", "", value)):
+            raise ValueError("Número de WhatsApp inválido (8 a 15 dígitos)")
+        self.contact_value = value
+        return self
 
 
 class _PublicFeedbackBody(BaseModel):
@@ -254,6 +277,7 @@ async def public_feedback(
 @router.post("/public/escalation/contact", status_code=204)
 async def public_escalation_contact(
     body: _PublicEscalationContactBody,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     widget: WidgetConfig = Depends(verify_widget_access),
 ):
@@ -262,6 +286,22 @@ async def public_escalation_contact(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Escalamiento a un humano no habilitado para este widget.",
+        )
+    try:
+        await check_rate_limit(
+            "widget:escalation_contact:ip", get_client_ip(request),
+            max_requests=_CONTACT_MAX_PER_IP, window_seconds=_CONTACT_WINDOW_SECONDS,
+        )
+        if body.conversation_id:
+            await check_rate_limit(
+                "widget:escalation_contact:conv", str(body.conversation_id),
+                max_requests=_CONTACT_MAX_PER_CONVERSATION, window_seconds=_CONTACT_WINDOW_SECONDS,
+            )
+    except RateLimitExceeded as exc:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Ya recibimos su solicitud de contacto. Inténtelo de nuevo más tarde.",
+            headers={"Retry-After": str(exc.retry_after)},
         )
     await svc.handle_escalation_consent(
         db,
