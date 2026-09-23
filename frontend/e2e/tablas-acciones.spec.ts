@@ -52,12 +52,21 @@ test.describe("Columna de Acciones - visual regression", () => {
       const lastColumnCells = page.locator("table tbody tr td:last-child");
       await expect(lastColumnCells.first()).toBeVisible();
 
-      // "documentos" quedó justo sobre el 2% (0.03) en CI con contenido
-      // idéntico - jitter de renderizado de fuentes en una tabla pequeña
-      // pesa proporcionalmente más que en tablas grandes.
-      await expect(table).toHaveScreenshot(`acciones-${name}.png`, {
-        maxDiffPixelRatio: name === "documentos" ? 0.05 : 0.02,
+      // Verificación directa del desbordamiento en vez de una captura de toda
+      // la tabla: la captura cambiaba con cada alta o baja de filas reales.
+      const overflow = await page.evaluate(() => {
+        const tableBox = document.querySelector("table")!.getBoundingClientRect();
+        const problems: string[] = [];
+        document.querySelectorAll<HTMLElement>("table tbody tr td:last-child").forEach((cell, i) => {
+          if (cell.scrollWidth > cell.clientWidth + 1) problems.push(`fila ${i}: contenido desbordado`);
+          cell.querySelectorAll("button, a").forEach((el) => {
+            const r = el.getBoundingClientRect();
+            if (r.right > tableBox.right + 1 || r.left < tableBox.left - 1) problems.push(`fila ${i}: acción fuera de la tabla`);
+          });
+        });
+        return problems;
       });
+      expect(overflow).toEqual([]);
 
       if (sourceName) {
         const row = page.locator("tr", { hasText: sourceName });
