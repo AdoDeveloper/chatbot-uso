@@ -1360,7 +1360,7 @@ export const STYLES = `
   .panel-open {
     transform: scale(1) translateY(0);
   }
-  .proactive-bubble { display: none; }
+  .proactive-bubble { max-width: calc(100vw - 2rem); }
 
   .bubble-wrap-panel-open { display: none; }
 }
