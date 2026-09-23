@@ -1178,82 +1178,6 @@ function ChatWidget({
               Reintentar
             </button>
           </div>
-        ) : settings.enable_csat && csatState !== "hidden" ? (
-          <div class="csat-fullscreen">
-            {csatState === "pending" && (
-              <div class="csat-panel" role="group" aria-label="Valoración de la conversación">
-                <p class="csat-question">{settings.csat_question}</p>
-                <div class="csat-stars">
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <button
-                      key={n}
-                      class={`csat-star ${n <= (csatScore ?? 0) ? "csat-star-filled" : ""}`}
-                      onClick={() => handleCsatStarClick(n)}
-                      aria-label={`${n} estrella${n !== 1 ? "s" : ""}`}
-                      title={["", "Muy malo", "Malo", "Regular", "Bueno", "Excelente"][n]}
-                    >★</button>
-                  ))}
-                </div>
-                <div class="csat-star-labels">
-                  <span>Muy disconforme</span>
-                  <span>Muy conforme</span>
-                </div>
-                {Object.keys(settings.csat_reasons).length > 0 && (
-                  <div class="csat-reasons" role="group" aria-label="Motivo de la calificación">
-                    {Object.entries(settings.csat_reasons).map(([key, label]) => (
-                      <label key={key} class={`csat-reason-item ${csatReasons.includes(key) ? "csat-reason-item-checked" : ""}`}>
-                        <input
-                          type="checkbox"
-                          checked={csatReasons.includes(key)}
-                          onChange={() => setCsatReasons((prev) =>
-                            prev.includes(key) ? prev.filter((r) => r !== key) : [...prev, key]
-                          )}
-                        />
-                        {label}
-                      </label>
-                    ))}
-                  </div>
-                )}
-                <textarea
-                  class="csat-comment"
-                  placeholder="Cuéntenos su experiencia (opcional)…"
-                  maxLength={300}
-                  value={csatComment}
-                  onInput={(e) => setCsatComment((e.target as HTMLTextAreaElement).value)}
-                  rows={2}
-                />
-                <div class="csat-actions">
-                  <button class="csat-skip" onClick={() => setCsatState("submitted")}>Omitir</button>
-                  <button
-                    class="csat-submit-btn"
-                    onClick={handleCsatSubmit}
-                    disabled={!csatScore}
-                  >Finalizar</button>
-                </div>
-              </div>
-            )}
-            {csatState === "submitted" && (
-              <div class="csat-thanks-wrap">
-                <div class="csat-thanks-icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="26" height="26">
-                    <circle cx="12" cy="12" r="10" />
-                    <polyline points="8 12.5 10.8 15.5 16 9" />
-                  </svg>
-                </div>
-                <div class="csat-thanks">¡Muchas gracias!</div>
-                <div class="csat-thanks-actions">
-                  {settings.show_new_chat_button && messages.length > 1 && (
-                    <button class="csat-thanks-btn" onClick={handleClearConversation}>
-                      Nueva conversación
-                    </button>
-                  )}
-                  <button class="csat-thanks-btn" onClick={handleMinimize}>
-                    Cerrar
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
         ) : (
           <>
             {/* Mensajes */}
@@ -1451,6 +1375,85 @@ function ChatWidget({
             )}
 
           </>
+        )}
+
+        {/* CSAT: franja inferior en el lugar del input, con la conversación visible encima. */}
+        {!offlineMode && settings.enable_csat && csatState !== "hidden" && (
+          <div class="csat-dock">
+            {csatState === "pending" && (
+              <div class="csat-panel" role="group" aria-label="Valoración de la conversación">
+                <p class="csat-question">{settings.csat_question}</p>
+                <div class="csat-stars">
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <button
+                      key={n}
+                      class={`csat-star ${n <= (csatScore ?? 0) ? "csat-star-filled" : ""}`}
+                      onClick={() => handleCsatStarClick(n)}
+                      aria-label={`${n} estrella${n !== 1 ? "s" : ""}`}
+                      title={["", "Muy malo", "Malo", "Regular", "Bueno", "Excelente"][n]}
+                    >{n <= (csatScore ?? 0) ? "★" : "☆"}</button>
+                  ))}
+                </div>
+                <div class="csat-star-labels">
+                  <span>Muy disconforme</span>
+                  <span>Muy conforme</span>
+                </div>
+                {Object.keys(settings.csat_reasons).length > 0 && (
+                  <div class="csat-reasons" role="group" aria-label="Motivo de la calificación">
+                    {Object.entries(settings.csat_reasons).map(([key, label]) => (
+                      <label key={key} class={`csat-reason-item ${csatReasons.includes(key) ? "csat-reason-item-checked" : ""}`}>
+                        <input
+                          type="checkbox"
+                          checked={csatReasons.includes(key)}
+                          onChange={() => setCsatReasons((prev) =>
+                            prev.includes(key) ? prev.filter((r) => r !== key) : [...prev, key]
+                          )}
+                        />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                )}
+                <textarea
+                  class="csat-comment"
+                  placeholder="Cuéntenos su experiencia, es opcional…"
+                  maxLength={300}
+                  value={csatComment}
+                  onInput={(e) => setCsatComment((e.target as HTMLTextAreaElement).value)}
+                  rows={2}
+                />
+                <div class="csat-actions">
+                  <button class="csat-skip" onClick={() => setCsatState("submitted")}>Omitir</button>
+                  <button
+                    class="csat-submit-btn"
+                    onClick={handleCsatSubmit}
+                    disabled={!csatScore}
+                  >Finalizar</button>
+                </div>
+              </div>
+            )}
+            {csatState === "submitted" && (
+              <div class="csat-thanks-wrap">
+                <div class="csat-thanks-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="26" height="26">
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="8 12.5 10.8 15.5 16 9" />
+                  </svg>
+                </div>
+                <div class="csat-thanks">¡Muchas gracias!</div>
+                <div class="csat-thanks-actions">
+                  {settings.show_new_chat_button && messages.length > 1 && (
+                    <button class="csat-thanks-btn" onClick={handleClearConversation}>
+                      Nueva conversación
+                    </button>
+                  )}
+                  <button class="csat-thanks-btn" onClick={handleMinimize}>
+                    Cerrar
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         )}
 
         {/* Input - oculto durante CSAT: el usuario está calificando/cerrando

@@ -56,11 +56,13 @@ export const STYLES = `
   position: absolute;
   bottom: calc(100% + 12px);
   right: 0;
-  width: 380px;
+  width: 400px;
 
   max-width: calc(100vw - 3rem);
   max-width: calc(100dvw - 3rem);
-  height: 520px;
+  height: min(704px, calc(100vh - 120px));
+  height: min(704px, calc(100dvh - 120px));
+  min-height: 250px;
   background: #fff;
   border-radius: 16px;
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.08);
@@ -189,7 +191,21 @@ export const STYLES = `
 
 .msg-row-assistant {
   align-self: flex-start;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 8px;
+  align-items: end;
 }
+
+/* El avatar se alinea con el borde inferior de la burbuja, no con la fila de
+   acciones que va debajo: el contenido del mensaje pasa a ser parte de la
+   grilla de la fila sin cambiar el DOM. */
+.msg-row-assistant > .msg-assistant:not(.escal-card) { display: contents; }
+.msg-row-assistant > .msg-avatar { grid-column: 1; grid-row: 1; margin: 0 0 2px; }
+.msg-row-assistant > .msg-assistant > *,
+.msg-row-assistant > .escal-card { grid-column: 2; justify-self: start; max-width: 100%; }
+.msg-row-assistant > .msg-assistant > :first-child,
+.msg-row-assistant > .escal-card { grid-row: 1; }
 
 @keyframes msg-in {
   from { opacity: 0; transform: translateY(6px); }
@@ -475,7 +491,7 @@ export const STYLES = `
 
 .input {
   flex: 1;
-  border: 1.5px solid #e5e7eb;
+  border: 1.5px solid transparent;
   border-radius: 22px;
   padding: 10px 16px;
   font-size: 14px;
@@ -485,8 +501,8 @@ export const STYLES = `
   outline: none;
   max-height: 120px;
   overflow-y: auto;
-  background: #fff;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  background: #f3f4f6;
+  transition: border-color 0.15s;
   color: #1a1a1a;
 
   scrollbar-width: none;
@@ -498,7 +514,6 @@ export const STYLES = `
 
 .input:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 15%, transparent);
 }
 
 .input::placeholder { color: #9ca3af; }
@@ -560,7 +575,7 @@ export const STYLES = `
 }
 
 @media (hover: hover) {
-  .msg-assistant:hover .msg-actions,
+  .msg-row-assistant:hover .msg-actions,
   .msg-user-col:hover .msg-actions-user {
     opacity: 1;
   }
@@ -684,12 +699,19 @@ export const STYLES = `
   to   { transform: scale(1);   opacity: 1; }
 }
 
+/* La etiqueta va al lado del botón (en la misma fila) y el mensaje proactivo
+   encima, igual que en la vista previa del panel. */
 .launcher-label-wrap {
+  position: absolute;
+  bottom: 10px;
+  right: 64px;
   display: flex;
   align-items: center;
   cursor: pointer;
   animation: proactive-in 0.35s ease 0.6s both;
 }
+.root[data-position$="-left"] .launcher-label-wrap { right: auto; left: 64px; }
+.root[data-position^="top-"] .launcher-label-wrap { bottom: auto; top: 10px; }
 
 .launcher-label-text {
   background: #fff;
@@ -713,7 +735,7 @@ export const STYLES = `
 
 .kebab-menu {
   position: absolute;
-  top: calc(100% + 10px);
+  top: calc(100% + 4px);
   right: 0;
   background: #fff;
   border: 1px solid #e5e7eb;
@@ -727,19 +749,6 @@ export const STYLES = `
   animation: kebab-in 0.16s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.kebab-menu::before {
-  content: "";
-  position: absolute;
-  top: -5px;
-  right: 14px;
-  width: 10px;
-  height: 10px;
-  background: #fff;
-  border-left: 1px solid #e5e7eb;
-  border-top: 1px solid #e5e7eb;
-  transform: rotate(45deg);
-  border-radius: 2px 0 0 0;
-}
 
 @keyframes kebab-in {
   from { opacity: 0; transform: translateY(-6px) scale(0.97); }
@@ -863,20 +872,20 @@ export const STYLES = `
 }
 
 .proactive-bubble {
-  position: absolute;
-  bottom: 8px;
-  right: 72px;
   max-width: 240px;
   background: #fff;
   color: #111827;
   padding: 10px 14px;
-  border-radius: 16px 16px 4px 16px;
+  border-radius: 16px;
   box-shadow: 0 4px 16px rgba(0,0,0,0.12);
   font-size: 13px;
   line-height: 1.45;
   cursor: pointer;
   animation: proactive-in 0.4s ease 1.2s both;
 }
+
+/* En las esquinas inferiores .root usa column-reverse: sin esto quedaría debajo del botón. */
+.root[data-position^="bottom-"] .proactive-bubble { order: 1; }
 
 .proactive-bubble:hover {
   background: #f9fafb;
@@ -891,23 +900,20 @@ export const STYLES = `
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-.csat-fullscreen {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+.csat-dock {
+  flex-shrink: 0;
+  max-height: 75%;
   overflow-y: auto;
+  border-top: 1px solid #e5e7eb;
+  background: #f9fafb;
 }
 
 .csat-panel {
-  padding: 20px 20px 16px;
+  padding: 12px 12px 14px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  background: #fafafa;
-  border-radius: 12px;
-  margin: 12px;
+  gap: 8px;
 }
 
 .csat-question {
@@ -929,7 +935,7 @@ export const STYLES = `
   background: none;
   border: none;
   font-size: 26px;
-  color: #d1d5db;
+  color: #ca8a04;
   cursor: pointer;
   padding: 0 2px;
   line-height: 1;
@@ -1052,7 +1058,6 @@ export const STYLES = `
   padding: 9px 6px;
   min-height: 40px;
   font-family: inherit;
-  text-decoration: underline;
   transition: color 0.12s;
 }
 
@@ -1082,14 +1087,11 @@ export const STYLES = `
 }
 
 .csat-thanks-wrap {
-  background: #f0fdf4;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  padding: 14px;
-  border-radius: 12px;
-  margin: 0 12px;
+  padding: 12px;
 }
 
 .csat-thanks-icon {
@@ -1105,7 +1107,7 @@ export const STYLES = `
 
 .csat-thanks {
   font-size: 13px;
-  color: #15803d;
+  color: #111827;
   font-weight: 600;
   text-align: center;
 }
@@ -1121,9 +1123,9 @@ export const STYLES = `
 
 .csat-thanks-btn {
   background: #fff;
-  border: 1px solid #bbf7d0;
-  color: #15803d;
-  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  color: #111827;
+  border-radius: 6px;
   padding: 6px 12px;
   font-size: 12px;
   font-weight: 600;
@@ -1133,8 +1135,7 @@ export const STYLES = `
 }
 
 .csat-thanks-btn:hover {
-  background: #dcfce7;
-  border-color: #86efac;
+  background: #f3f4f6;
 }
 
 .escal-card {
@@ -1191,7 +1192,7 @@ export const STYLES = `
   flex: 1;
   text-align: center;
   background: transparent;
-  color: #6b7280;
+  color: #374151;
   border: 1px solid #d1d5db;
   border-radius: 999px;
   padding: 10px 12px;
@@ -1209,7 +1210,8 @@ export const STYLES = `
 
 .escal-type-row {
   display: flex;
-  gap: 14px;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .escal-radio-label {
@@ -1363,13 +1365,6 @@ export const STYLES = `
   .bubble-wrap-panel-open { display: none; }
 }
 
-@media (max-height: 600px) and (min-width: 481px) {
-  .panel {
-    height: min(520px, calc(100vh - 90px));
-    height: min(520px, calc(100dvh - 90px));
-  }
-}
-
 .panel[data-text-scale="sm"] .md,
 .panel[data-text-scale="sm"] .user-text { font-size: 12.5px; }
 .panel[data-text-scale="lg"] .md { font-size: 16.5px; line-height: 1.75; }
@@ -1473,7 +1468,6 @@ export const STYLES = `
 }
 
 .panel[data-contrast="high"] .kebab-menu { border: 2px solid #000; }
-.panel[data-contrast="high"] .kebab-menu::before { border-color: #000; }
 .panel[data-contrast="high"] .kebab-item { color: #000; }
 .panel[data-contrast="high"] .kebab-item svg { color: #000; }
 .panel[data-contrast="high"] .header-status { color: #fff; }
