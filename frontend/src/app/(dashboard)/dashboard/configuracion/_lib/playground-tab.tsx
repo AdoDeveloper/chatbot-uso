@@ -795,8 +795,8 @@ export function PlaygroundTab({
               <div
                 className={
                   isMobilePreview
-                    ? "fixed inset-0 z-100 overflow-hidden flex flex-col bg-background"
-                    : "rounded-none md:rounded-2xl overflow-hidden flex flex-col shadow-2xl border-0 md:border border-border bg-background flex-1 w-full md:w-[340px] md:flex-none md:max-w-[calc(100vw-3rem)] md:h-[440px] md:max-h-[calc(100%-1rem)]"
+                    ? "fixed inset-0 z-100 overflow-hidden flex flex-col bg-card"
+                    : "rounded-none md:rounded-2xl overflow-hidden flex flex-col shadow-2xl border-0 md:border border-border bg-card flex-1 w-full md:w-[340px] md:flex-none md:max-w-[calc(100vw-3rem)] md:h-[440px] md:max-h-[calc(100%-1rem)]"
                 }
               >
                 {/* Encabezado del widget */}
@@ -958,7 +958,7 @@ export function PlaygroundTab({
                 ) : (
                 <>
                 {/* Mensajes */}
-                <div ref={chatScrollRef} className={`flex-1 overflow-y-auto bg-background p-3 space-y-2.5 ${enableCsat && csatState !== "hidden" ? "hidden" : ""}`}>
+                <div ref={chatScrollRef} className={`flex-1 overflow-y-auto bg-card p-3 space-y-2.5 ${enableCsat && csatState !== "hidden" ? "hidden" : ""}`}>
                   {/* Burbuja de bienvenida */}
                   <div className="flex items-end gap-1.5">
                     {showBotIcon && (
@@ -1213,14 +1213,14 @@ export function PlaygroundTab({
                           ? "bg-black text-white border-white/40"
                           : escalState === "submitted"
                             ? "bg-brand-green/10 border-brand-green/30 text-foreground"
-                            : "bg-background border-border text-foreground"
+                            : "bg-card border-border text-foreground"
                       }`}>
                         {escalState === "prompt" && (
                           <>
                             <p className="font-medium">¿Desea que la universidad se ponga en contacto con usted?</p>
                             <div className="flex gap-1.5">
                               <button type="button" onClick={() => setEscalState("form")} className="flex-1 py-1.5 rounded-full text-white text-2xs font-medium" style={{ backgroundColor: primaryColor }}>Sí</button>
-                              <button type="button" onClick={() => setEscalState("continue")} className={`flex-1 py-1.5 rounded-full border text-2xs font-medium ${highContrast ? "border-white/40 hover:bg-white/10" : "border-border bg-background hover:bg-muted-foreground/10"}`}>No</button>
+                              <button type="button" onClick={() => setEscalState("continue")} className={`flex-1 py-1.5 rounded-full border text-2xs font-medium ${highContrast ? "border-white/40 hover:bg-white/10" : "border-border bg-card hover:bg-muted-foreground/10"}`}>No</button>
                             </div>
                           </>
                         )}
@@ -1229,7 +1229,7 @@ export function PlaygroundTab({
                             <p className="font-medium">¿Desea continuar con el asistente virtual?</p>
                             <div className="flex gap-1.5">
                               <button type="button" onClick={() => setEscalState("hidden")} className="flex-1 py-1.5 rounded-full text-white text-2xs font-medium" style={{ backgroundColor: primaryColor }}>Sí, continuar</button>
-                              <button type="button" onClick={() => { setEscalState("hidden"); if (enableCsat) setCsatState("pending"); }} className={`flex-1 py-1.5 rounded-full border text-2xs font-medium ${highContrast ? "border-white/40 hover:bg-white/10" : "border-border bg-background hover:bg-muted-foreground/10"}`}>No, finalizar</button>
+                              <button type="button" onClick={() => { setEscalState("hidden"); if (enableCsat) setCsatState("pending"); }} className={`flex-1 py-1.5 rounded-full border text-2xs font-medium ${highContrast ? "border-white/40 hover:bg-white/10" : "border-border bg-card hover:bg-muted-foreground/10"}`}>No, finalizar</button>
                             </div>
                           </>
                         )}
@@ -1253,7 +1253,7 @@ export function PlaygroundTab({
                               id="pg-escal-input"
                               type={escalType === "email" ? "email" : "tel"}
                               inputMode={escalType === "email" ? "email" : "tel"}
-                              className={`w-full h-8 rounded-lg px-2.5 text-xs outline-none border ${highContrast ? "bg-black text-white placeholder:text-white/50" : "bg-background placeholder:text-muted-foreground/70"} ${escalError ? "border-destructive" : highContrast ? "border-white/40" : "border-border"}`}
+                              className={`w-full h-8 rounded-lg px-2.5 text-xs outline-none border ${highContrast ? "bg-black text-white placeholder:text-white/50" : "bg-card placeholder:text-muted-foreground/70"} ${escalError ? "border-destructive" : highContrast ? "border-white/40" : "border-border"}`}
                               placeholder={escalType === "email" ? "tucorreo@ejemplo.com" : "+503 7777 7777"}
                               value={escalValue}
                               onChange={(e) => { setEscalValue(e.target.value); if (escalError) setEscalError(""); }}
@@ -1284,7 +1284,7 @@ export function PlaygroundTab({
 
                 {/* CSAT - pantalla única: estrellas + motivos + comentario */}
                 {enableCsat && csatState === "pending" && (
-                  <div className={`flex-1 min-h-0 overflow-y-auto flex flex-col ${highContrast ? "bg-black" : "bg-muted/40"}`}>
+                  <div className={`flex-1 min-h-0 overflow-y-auto flex flex-col ${highContrast ? "bg-black" : "bg-card"}`}>
                   <div className="my-auto px-5 py-5 flex flex-col items-center gap-2.5">
                     <p className={`font-medium text-center ${msgScaleClass} ${highContrast ? "text-white" : "text-foreground"}`}>
                       {csatQuestion}
@@ -1316,7 +1316,7 @@ export function PlaygroundTab({
                                 ? ""
                                 : highContrast
                                   ? "border-white/40 bg-black text-white hover:border-white/60"
-                                  : "border-border bg-background hover:border-muted-foreground/40"
+                                  : "border-border bg-card hover:border-muted-foreground/40"
                             }`}
                             style={csatReasons.includes(key) ? {
                               borderColor: primaryColor,
@@ -1338,7 +1338,7 @@ export function PlaygroundTab({
                       </div>
                     )}
                     <textarea
-                      className={`w-full rounded-lg px-2.5 py-2 text-xs outline-none border resize-none mt-1 focus:border-(--csat-focus-color) ${highContrast ? "bg-black text-white border-white/40 placeholder:text-white/50" : "bg-background border-border placeholder:text-muted-foreground"}`}
+                      className={`w-full rounded-lg px-2.5 py-2 text-xs outline-none border resize-none mt-1 focus:border-(--csat-focus-color) ${highContrast ? "bg-black text-white border-white/40 placeholder:text-white/50" : "bg-card border-border placeholder:text-muted-foreground"}`}
                       placeholder="Cuéntenos su experiencia, es opcional…"
                       maxLength={300}
                       rows={2}
@@ -1362,7 +1362,7 @@ export function PlaygroundTab({
                   </div>
                 )}
                 {enableCsat && csatState === "submitted" && (
-                  <div className={`flex-1 min-h-0 overflow-y-auto flex flex-col ${highContrast ? "bg-black" : "bg-muted/40"}`}>
+                  <div className={`flex-1 min-h-0 overflow-y-auto flex flex-col ${highContrast ? "bg-black" : "bg-card"}`}>
                     <div className="my-auto px-5 py-5 flex flex-col items-center gap-2">
                       <SuccessIcon />
                       <p className={`text-[15px] font-semibold ${highContrast ? "text-white" : "text-foreground"}`}>
@@ -1373,7 +1373,7 @@ export function PlaygroundTab({
                           <button
                             type="button"
                             onClick={resetConversation}
-                            className={`text-xs font-semibold px-3 py-1.5 rounded-md border ${highContrast ? "border-white/40 text-white hover:bg-white/10" : "border-border bg-background hover:bg-muted-foreground/10 text-foreground"}`}
+                            className={`text-xs font-semibold px-3 py-1.5 rounded-md border ${highContrast ? "border-white/40 text-white hover:bg-white/10" : "border-border bg-card hover:bg-muted-foreground/10 text-foreground"}`}
                           >
                             Nueva conversación
                           </button>
@@ -1381,7 +1381,7 @@ export function PlaygroundTab({
                         <button
                           type="button"
                           onClick={() => setWidgetOpen(false)}
-                          className={`text-xs font-semibold px-3 py-1.5 rounded-md border ${highContrast ? "border-white/40 text-white hover:bg-white/10" : "border-border bg-background hover:bg-muted-foreground/10 text-foreground"}`}
+                          className={`text-xs font-semibold px-3 py-1.5 rounded-md border ${highContrast ? "border-white/40 text-white hover:bg-white/10" : "border-border bg-card hover:bg-muted-foreground/10 text-foreground"}`}
                         >
                           Cerrar
                         </button>
@@ -1392,12 +1392,12 @@ export function PlaygroundTab({
 
                 {/* Sugerencias rápidas */}
                 {showSuggestions && csatState === "hidden" && escalState === "hidden" && (
-                  <div className="border-t border-border bg-background px-2.5 pt-2 pb-1.5 shrink-0 flex flex-wrap gap-1">
+                  <div className="border-t border-border bg-card px-2.5 pt-2 pb-1.5 shrink-0 flex flex-wrap gap-1">
                     {suggestions.slice(0, 3).map((s, i) => (
                       <button
                         key={i}
                         onClick={() => handleSend(s)}
-                        className="text-3xs px-2.5 py-1 rounded-full border border-border bg-background hover:bg-muted transition-colors text-foreground"
+                        className="text-3xs px-2.5 py-1 rounded-full border border-border bg-card hover:bg-muted transition-colors text-foreground"
                       >
                         {s}
                       </button>
@@ -1406,7 +1406,7 @@ export function PlaygroundTab({
                 )}
 
                 {csatState === "hidden" && (
-                  <div className={`bg-background px-2.5 py-2.5 shrink-0 ${showSuggestions ? "" : "border-t border-border"}`}>
+                  <div className={`bg-card px-2.5 py-2.5 shrink-0${showSuggestions ? "" : "border-t border-border"}`}>
                     <div className="flex gap-1.5 items-center">
                       <input
                         className="flex-1 h-9 bg-muted rounded-full px-4 text-xs outline-none border border-transparent focus:border-primary placeholder:text-muted-foreground transition-colors"

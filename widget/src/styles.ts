@@ -924,7 +924,7 @@ export const STYLES = `
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  background: #f9fafb;
+  background: #fff;
 }
 
 /* margin:auto centra verticalmente sin cortar el contenido cuando no cabe. */
@@ -1126,7 +1126,6 @@ export const STYLES = `
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: #dcfce7;
   flex-shrink: 0;
   animation: success-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
