@@ -1,7 +1,4 @@
-"""
-Semantic cache for chat responses using Redis + embedding similarity.
-Falls back gracefully if Redis is unavailable - cache miss, not error.
-"""
+"""Semantic cache for chat responses using Redis + embedding similarity."""
 from __future__ import annotations
 
 import hashlib
@@ -24,19 +21,7 @@ _GENERATION_KEY = "semcache:generation"
 
 
 async def get_cache_generation() -> int:
-    """Contador global, incrementado en cada invalidate_by_source().
-
-    Usado para cerrar una race TOCTOU: retrieve_context() lee los chunks al
-    inicio del turno, pero store_cache() escribe la respuesta recién al
-    terminar el streaming del LLM (varios segundos después). Si un admin
-    edita/descarta el chunk usado en ese intervalo, invalidate_by_source()
-    limpia el caché - pero store_cache() lo volvía a poblar de todas formas
-    con la respuesta ya generada (basada en el texto viejo), revirtiendo la
-    invalidación y sirviendo información obsoleta hasta el próximo edit o
-    el TTL de 12h. Comparando la generación capturada al leer el contexto
-    contra la generación actual al escribir, una escritura "vencida" por una
-    invalidación intermedia se descarta en vez de re-cachearse.
-    """
+    """Contador global, incrementado en cada invalidate_by_source()."""
     try:
         redis = get_redis()
         val = await redis.get(_GENERATION_KEY)
@@ -79,10 +64,7 @@ async def get_cached_response(
     use_draft: bool = False,
     threshold: float | None = None,
 ) -> dict[str, Any] | None:
-    """
-    Check semantic cache for a similar question.
-    Returns {"sources": [...], "content": "..."} or None on miss.
-    """
+    """Check semantic cache for a similar question."""
     try:
         redis = get_redis()
         query_emb = (await embed_texts_async([question], prefix="query: "))[0]["dense"]
@@ -143,14 +125,7 @@ async def store_cached_response(
     use_draft: bool = False,
     min_generation: int | None = None,
 ) -> None:
-    """Guarda una respuesta en el caché semántico.
-
-    `min_generation`: generación de caché capturada (get_cache_generation())
-    al momento de leer el contexto, ANTES de generar la respuesta con el
-    LLM. Si al momento de escribir la generación actual ya avanzó (una
-    edición/descarte de fuente invalidó el caché mientras el LLM generaba),
-    la escritura se descarta - ver docstring de get_cache_generation().
-    """
+    """Guarda una respuesta en el caché semántico."""
     try:
         if min_generation is not None:
             current_gen = await get_cache_generation()
@@ -241,13 +216,7 @@ async def list_entries(limit: int = 20) -> list[dict]:
 
 
 async def delete_entry(key: str) -> bool:
-    """Borra una entrada del caché semántico.
-
-    La clave llega desde el path del endpoint, así que se exige el prefijo del
-    caché: el mismo Redis aloja los locks de ingesta, los contadores de rate
-    limit y los cooldowns de alertas, y borrar cualquiera de ellos tendría
-    efectos muy distintos a "limpiar una respuesta guardada".
-    """
+    """Borra una entrada del caché semántico."""
     if not key.startswith(CACHE_PREFIX):
         return False
     try:

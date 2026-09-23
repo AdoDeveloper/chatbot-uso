@@ -61,7 +61,6 @@ SAFETY_MARGIN_TOKENS = 1_024
 MAX_CONTEXT_FRACTION = 0.6  # tope de la ventana dedicado al contexto recuperado
 
 
-
 # Caracteres por token (medido: ratio 3.95-4.52, media 4.36); 4.0 deja margen conservador.
 CHARS_PER_TOKEN = 4.0
 
@@ -96,11 +95,7 @@ def truncate_context_chunks(
     history: list[dict] | None = None,
     reserve_output_tokens: int = 0,
 ) -> tuple[list[dict], dict]:
-    """Recorta chunks por score hasta que quepan en la ventana de contexto.
-
-    Nunca lanza ni devuelve vacío si había chunks: al menos se conserva el de
-    mayor score. Devuelve (chunks_keep, info).
-    """
+    """Recorta chunks por score hasta que quepan en la ventana de contexto."""
     info: dict = {"truncated": False, "kept": len(chunks), "dropped": 0}
     if not chunks:
         return chunks, info

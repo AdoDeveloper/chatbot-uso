@@ -1,10 +1,4 @@
-"""Cobertura de los triggers de escalación no_answer y negative_feedback.
-
-Verifica que pipeline.detect_escalation() calcule y pase al motor de reglas
-valores reales de no_answer_seconds y feedback_negative_ratio, para que las
-reglas de esos dos tipos puedan dispararse según la configuración y el
-comportamiento real del chatbot.
-"""
+"""Cobertura de los triggers de escalación no_answer y negative_feedback."""
 from __future__ import annotations
 
 import itertools
@@ -19,7 +13,6 @@ from app.models.enums import MessageFeedback, MessageRole
 from app.models.escalation_rule import EscalationRule
 from app.services.chat.pipeline import _feedback_negative_ratio, _recent_assistant_rag_scores, detect_escalation
 
-# Timestamp creciente explícito: varios mensajes insertados en el mismo instante de reloj de MySQL no tendrían desempate estable en el ORDER BY created_at.
 _next_ts = itertools.count()
 
 
@@ -133,9 +126,6 @@ async def test_no_answer_rule_does_not_trigger_when_fast(db_session):
 
 @pytest.mark.asyncio
 async def test_recent_assistant_rag_scores_reads_real_history_chronologically(db_session):
-    """confidence_below evalúa "N respuestas consecutivas": los scores se leen
-    del historial real de la conversación en orden cronológico, no de los N
-    chunks de la respuesta actual (que es una señal distinta)."""
     conv = await _make_conversation(db_session)
     await _add_assistant_message_with_score(db_session, conv.id, 0.01)
     await _add_assistant_message_with_score(db_session, conv.id, 0.02)
@@ -189,13 +179,6 @@ async def test_confidence_below_rule_does_not_trigger_on_greetings_without_sourc
 
 @pytest.mark.asyncio
 async def test_detect_escalation_fails_safe_and_logs_degraded(db_session, monkeypatch):
-    """Si evaluate_rule lanza (p.ej. trigger_config corrupto guardado por un
-    admin), detect_escalation debía devolver False sin propagar la excepción
-    - eso ya funcionaba. Lo que faltaba: el log de este camino era idéntico
-    al de "ninguna regla se disparó" (mismo mensaje, sin marca distintiva),
-    así que un fallo sistemático de evaluación era indistinguible de que
-    simplemente no hubiera nada que escalar. degraded=True lo hace visible,
-    igual que llm.grade_failed_open."""
     from app.services.chat import pipeline as pipeline_mod
 
     conv = await _make_conversation(db_session)
@@ -233,8 +216,6 @@ async def test_detect_escalation_fails_safe_and_logs_degraded(db_session, monkey
 
 @pytest.mark.asyncio
 async def test_confidence_below_rule_triggers_on_real_consecutive_turns(db_session):
-    """El propio turno actual (persistido por persist_turn antes de llamar a
-    detect_escalation) ya cuenta como el N-ésimo de la secuencia."""
     conv = await _make_conversation(db_session)
     await _add_assistant_message_with_score(db_session, conv.id, 0.01)
     await _add_assistant_message_with_score(db_session, conv.id, 0.015)  # turno "actual"

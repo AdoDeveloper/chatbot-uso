@@ -1,11 +1,4 @@
-"""Tests unitarios para app/services/system/scheduler.py.
-
-Cubre la lógica de cada job (health snapshot, digest diario, warm-up de
-embeddings, auto-resolución de conversaciones inactivas) mockeando Redis,
-la sesión de BD y los servicios externos que cada loop invoca. No se
-ejercita el scheduling real (asyncio.sleep se mockea o se corta con
-CancelledError tras una iteración).
-"""
+"""Tests unitarios para app/services/system/scheduler.py."""
 from __future__ import annotations
 
 import asyncio
@@ -326,10 +319,6 @@ class TestDigestLoop:
         assert kwargs["payload"] == stats
 
     async def test_does_not_send_when_schedule_does_not_match(self):
-        # Cuando _cumple_agenda es False, el loop hace `await
-        # asyncio.sleep(3600)` antes del `continue`, evitando un busy-loop.
-        # Cortamos el loop igual que en los demás tests: _sleep_raises_after
-        # levanta _StopLoop en la primera llamada a sleep.
         calls = [0]
         fake_db = AsyncMock()
         fake_db.__aenter__.return_value = fake_db

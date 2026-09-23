@@ -22,14 +22,6 @@ interface ParamFieldProps {
   htmlFor?: string;
 }
 
-/**
- * Wrapper estándar para inputs de configuración/formularios.
- * Garantiza que cada parámetro editable de la app tenga: label + badge de valor
- * opcional + HelpTip opcional + texto de ayuda opcional + error inline.
- *
- * Se usa en todo lugar donde se edite configuración, para que el usuario
- * nunca enfrente un input sin saber qué hace.
- */
 export function ParamField({
   label,
   hint,

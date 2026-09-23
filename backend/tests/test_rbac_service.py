@@ -1,12 +1,4 @@
-"""Tests unitarios directos para app.services.system.rbac.
-
-conftest._seed_rbac_for_tests siembra MODULES_SEED/SYSTEM_ROLES con ORM puro
-ANTES de cada test (fixture db_engine, autouse vía db_session), así que la BD
-ya llega con RBAC poblado - seed_rbac() aquí siempre corre en modo idempotente
-(counts en 0), nunca desde una tabla vacía. Los tests de creación usan un
-helper que vacía esas tablas primero para poder verificar el camino de
-creación real; los demás dependen del seed ya aplicado por el fixture.
-"""
+"""Tests unitarios directos para app.services.system.rbac."""
 from __future__ import annotations
 
 import uuid
@@ -24,8 +16,6 @@ pytestmark = pytest.mark.asyncio
 
 
 async def _clear_rbac_tables(db_session) -> None:
-    """Vacía lo que _seed_rbac_for_tests ya sembró, para probar seed_rbac()
-    desde una tabla vacía en vez de su camino idempotente (counts en 0)."""
     await db_session.execute(RolePermission.__table__.delete())
     await db_session.execute(Role.__table__.delete())
     await db_session.execute(Permission.__table__.delete())

@@ -1,10 +1,3 @@
-"""must_change_password solo se aplicaba en el frontend (redirect tras leer
-el flag del login): un cliente HTTP directo con una contraseña temporal
-podía usar el access token para llamar cualquier endpoint protegido sin
-jamás cambiarla. require_permission ahora bloquea con 403 mientras el flag
-siga activo; /auth/me y /auth/change-password siguen accesibles porque el
-usuario necesita poder leer su estado y cambiar la contraseña.
-"""
 from __future__ import annotations
 
 import pytest

@@ -2,7 +2,6 @@ import { test, expect } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 
-// Coverage for the Apariencia/Integración/Límites subtabs of /dashboard/configuracion/asistente (WidgetTab). Deliberately never clicks "Regenerar" on the widget API key - it would break every widget currently deployed with the old key.
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;
 
@@ -95,13 +94,6 @@ test.describe("Configuracion > Asistente > Apariencia", () => {
     }
   });
 
-  // "Reordenar" en el titulo es aspiracional, no lo que corre: el drag-and-
-  // drop de CsatReasonsManager es HTML5 nativo (no una libreria), y ni
-  // page.dragTo() ni disparar dragstart/dragover/drop manualmente via
-  // dispatchEvent logro que React confirmara el reorden de forma fiable en
-  // Chromium headless (limitacion conocida de Playwright con DnD nativo,
-  // no del componente) - se probo e intento cubrir por separado, sin
-  // exito, y se descarto en vez de dejar un test fragilmente skippeado.
   test("motivos CSAT: crear, editar, activar/desactivar y eliminar, restaurado", async ({ page }) => {
     await page.goto("/dashboard/configuracion/asistente/apariencia");
     await expect(page.getByText(/controles de conversación/i)).toBeVisible({ timeout: 10_000 });
@@ -125,9 +117,6 @@ test.describe("Configuracion > Asistente > Apariencia", () => {
     await editInput.blur();
     await expect(page.getByText(editedLabel)).toBeVisible({ timeout: 10_000 });
 
-    // Locator acotado a la fila real (div.rounded-lg con label+switch como
-    // hijos directos) - "div" a secas matchea cualquier ancestro con ese
-    // texto y .last() termina agarrando el switch de otro motivo.
     const reasonSwitch = page.locator("div.rounded-lg", { hasText: editedLabel }).locator('[role="switch"]');
     await expect(reasonSwitch).toHaveAttribute("aria-checked", "true", { timeout: 5_000 });
     await reasonSwitch.click();

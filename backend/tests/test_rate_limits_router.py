@@ -1,10 +1,4 @@
-"""Tests para app/api/v1/system/rate_limits/router.py - no tenía ningún test.
-
-Cubre config (get/patch), listado de IPs limitadas, reset de IP y el reporte
-de uso (usage). Usa el Redis fake (fakeredis) inyectado por el fixture
-`client` para poblar contadores reales vía app.core.rate_limit, sin mockear
-los endpoints. RBAC real vía require_perm: viewer sin permiso recibe 403 real.
-"""
+"""Tests para app/api/v1/system/rate_limits/router.py - no tenía ningún test."""
 from __future__ import annotations
 
 import pytest

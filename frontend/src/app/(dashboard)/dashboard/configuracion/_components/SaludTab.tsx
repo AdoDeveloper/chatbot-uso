@@ -49,7 +49,6 @@ const REFRESH_OPTIONS = [
 
 
 export interface SaludTabHandle {
-  /** Toma una nueva muestra de salud y la registra en el historial, luego refresca todo. */
   check: () => Promise<void>;
   /** Solo recarga los datos ya existentes, sin registrar una muestra nueva. */
   refetchAll: () => Promise<void>;
@@ -190,9 +189,6 @@ export const SaludTab = forwardRef<SaludTabHandle>(function SaludTab(_props, ref
         </div>
       </div>
 
-      {/* Services table - ahora con uptime y P50/P95/P99. El selector de
-          rango de fechas vive aquí porque afecta tanto esta tabla (uptime/
-          P50-P95-P99) como la de incidentes debajo. */}
       <Card className="overflow-hidden">
         <div className="px-5 py-3 border-b border-border">
           <PeriodFilter

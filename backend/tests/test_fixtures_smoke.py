@@ -1,9 +1,4 @@
-"""Sanity check that the test infrastructure (DB, client, auth) wires up.
-
-If any of these fail, every higher-level integration test will too - keeping
-this file tiny means the failure points right at the fixture, not the code
-under test.
-"""
+"""Sanity check that the test infrastructure (DB, client, auth) wires up."""
 from __future__ import annotations
 
 

@@ -1,9 +1,4 @@
-"""
-PDF parser - extracts text prioritizing layout-aware extraction over plain text.
-
-Strategy: pymupdf4llm.markdown FIRST (layout-aware, multi-column, tables),
-          pymupdf4llm.markdown + force_ocr SECOND (scanned PDFs).
-"""
+"""PDF parser - extracts text prioritizing layout-aware extraction over plain text."""
 from __future__ import annotations
 
 import asyncio
@@ -14,11 +9,7 @@ log = structlog.get_logger()
 
 
 async def parse_pdf(file_path: str) -> str:
-    """
-    Extrae texto de un PDF con pymupdf4llm (layout-aware).
-    Estrategia 1: markdown sin forzar OCR (para PDFs digitales con texto limpio).
-    Estrategia 2: markdown con OCR forzado (para PDFs escaneados).
-    """
+    """Extrae texto de un PDF con pymupdf4llm (layout-aware)."""
     loop = asyncio.get_running_loop()
     import pymupdf4llm
 

@@ -46,13 +46,7 @@ _HEADING_STYLES: dict[str, str] = {
 
 
 async def parse_docx(file_path: str) -> str:
-    """
-    Extrae texto de un archivo DOCX preservando estructura:
-    - Headings  → ## / ### / ####  (para que _detect_sections los reconozca)
-    - Párrafos completamente en negrita → **texto** (títulos de sección sin estilo)
-    - Listas auto-numeradas de Word  → - ítem  (con sangría por nivel)
-    - Tablas → representación Markdown
-    """
+    """Extrae texto de un archivo DOCX preservando estructura."""
     try:
         from docx import Document
         from docx.oxml.ns import qn

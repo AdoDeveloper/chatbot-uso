@@ -33,10 +33,7 @@ class UsersSummary(BaseModel):
 
 
 class PasswordResetResponse(BaseModel):
-    """La contraseña temporal se devuelve una sola vez en esta respuesta -
-    no se persiste en texto plano ni se puede recuperar después. El admin
-    debe comunicarla al usuario por un canal seguro; must_change_password
-    fuerza que la reemplace en su próximo login."""
+    """La contraseña temporal se devuelve una sola vez en esta respuesta."""
     temp_password: str
     user: UserResponse
 
@@ -62,8 +59,7 @@ async def users_summary(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_perm(P.USERS_READ)),
 ):
-    """Conteos agregados del equipo completo, independientes de la paginación
-    de GET /users - mismo patrón que /security/summary."""
+    """Conteos agregados del equipo completo, independientes de la paginación de GET /users."""
     total_members = await db.scalar(select(func.count()).select_from(User)) or 0
     active = await db.scalar(select(func.count()).where(User.is_active.is_(True))) or 0
     no_access_yet = await db.scalar(

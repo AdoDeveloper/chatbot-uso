@@ -44,12 +44,7 @@ async def _get_setting(db: AsyncSession, key: str) -> str | None:
 
 
 async def _enforce_auth_rate_limit(request: Request, scope: str, max_per_min: int) -> None:
-    """Limita intentos por IP en endpoints de autenticación (anti fuerza bruta).
-
-    Primero intenta Redis. Si Redis no está disponible, activa el contador en
-    memoria como fallback secundario para mantener protección básica contra
-    fuerza bruta incluso cuando Redis cae.
-    """
+    """Limita intentos por IP en endpoints de autenticación (anti fuerza bruta)."""
     client_ip = get_client_ip(request)
     try:
         await check_rate_limit(f"auth:{scope}", client_ip, max_requests=max_per_min, window_seconds=60)
@@ -78,12 +73,7 @@ class AuthProviders(BaseModel):
 
 @router.get("/providers", response_model=AuthProviders)
 async def get_providers(db: AsyncSession = Depends(get_db)):
-    """Endpoint público (sin auth) que indica qué métodos de login están activos.
-
-    El frontend lo consume en /login para renderizar condicionalmente el
-    formulario de credenciales y/o el botón de Microsoft SSO. Credenciales
-    de Microsoft vienen del .env; el toggle activo/inactivo vive en la DB.
-    """
+    """Endpoint público (sin auth) que indica qué métodos de login están activos."""
     credentials_raw = await _get_setting(db, "auth_credentials_enabled")
     credentials_enabled = bool(credentials_raw) if credentials_raw is not None else True
 
@@ -115,12 +105,7 @@ async def microsoft_callback(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    """Recibe el authorization code de Microsoft, lo intercambia por tokens,
-    obtiene el email del id_token y devuelve un par JWT propio del sistema.
-
-    NO crea usuarios nuevos: el acceso vía SSO requiere que la cuenta ya
-    exista (creada por el flujo normal de invitación).
-    """
+    """Recibe el authorization code de Microsoft."""
     from app.services.auth import sso as sso_service
 
     await _enforce_auth_rate_limit(request, "sso", get_settings().RATE_LIMIT_LOGIN_PER_MIN)
@@ -131,11 +116,7 @@ async def microsoft_callback(
 
 @router.post("/login", response_model=TokenResponse)
 async def login(body: LoginRequest, request: Request, db: AsyncSession = Depends(get_db)):
-    """Autentica al usuario y emite par access/refresh JWT.
-
-    Cada intento (exitoso o no) queda registrado en audit_log para detección de
-    fuerza bruta. Cuentas deshabilitadas reciben 403 distintivo del 401 normal.
-    """
+    """Autentica al usuario y emite par access/refresh JWT."""
     await _enforce_auth_rate_limit(request, "login", get_settings().RATE_LIMIT_LOGIN_PER_MIN)
 
     # Aplica el setting credentials_enabled - rechaza a nivel de backend
@@ -192,10 +173,7 @@ async def login(body: LoginRequest, request: Request, db: AsyncSession = Depends
 
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh(body: RefreshRequest, request: Request, db: AsyncSession = Depends(get_db)):
-    """Rota un refresh token válido por un par nuevo de access/refresh.
-
-    Usado por el interceptor de axios al detectar un 401 en una llamada normal.
-    """
+    """Rota un refresh token válido por un par nuevo de access/refresh."""
     await _enforce_auth_rate_limit(request, "refresh", get_settings().RATE_LIMIT_REFRESH_PER_MIN)
 
     refresh_token = body.refresh_token
@@ -262,11 +240,7 @@ async def logout(
     body: LogoutRequest | None = None,
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
 ):
-    """Revoca el access token actual y el refresh token.
-
-    Ambos jti se añaden a la denylist en Redis hasta su expiración natural.
-    No falla si no hay token: cerrar sesión siempre debe "tener éxito".
-    """
+    """Revoca el access token actual y el refresh token."""
     access_token = credentials.credentials if credentials else None
     if access_token:
         try:
@@ -319,15 +293,9 @@ async def change_password(
     )
     await db.commit()
 
-    # tokens_valid_after invalida cualquier token emitido antes de este
-    # commit, incluido el access token con el que se acaba de autenticar
-    # esta misma petición - sin reemitir, la siguiente llamada del cliente
-    # (GET /auth/me) recibe 401 y la sesión se cierra sola justo después de
-    # cambiar la contraseña.
     return _token_response(
         current_user, *await rbac_service.issue_user_tokens(db, current_user)
     )
-
 
 
 class OnboardingStatus(BaseModel):
@@ -397,12 +365,7 @@ async def onboarding_dismiss(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ) -> OperationStatus:
-    """Marca el wizard como dismissed para este usuario.
-
-    El frontend deja de mostrarlo aunque el sistema no esté completamente
-    operativo. Útil cuando el admin ya conoce el flujo y quiere ir directo al
-    panel.
-    """
+    """Marca el wizard como dismissed para este usuario."""
     current_user.onboarding_dismissed = True
     await db.commit()
     return OperationStatus()

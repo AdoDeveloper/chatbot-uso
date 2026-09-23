@@ -1121,9 +1121,6 @@ function ChatWidget({
             {/* Tamaño de texto */}
             <div class="a11y-row">
               <span class="a11y-label">Tamaño del texto</span>
-              {/* radiogroup/radio + aria-checked, no aria-pressed: es una
-                  selección única entre opciones excluyentes, no un botón de
-                  encendido/apagado (WAI-ARIA APG, patrón Radio Group). */}
               <div class="a11y-scale" role="radiogroup" aria-label="Tamaño del texto">
                 {(["sm", "md", "lg"] as TextScale[]).map((s, i) => (
                   <button
@@ -1387,7 +1384,6 @@ function ChatWidget({
           </>
         )}
 
-        {/* CSAT: ocupa todo el cuerpo del chat, bajo el encabezado. */}
         {!offlineMode && settings.enable_csat && csatState !== "hidden" && (
           <div class="csat-dock">
             {csatState === "pending" && (

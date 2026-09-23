@@ -62,9 +62,7 @@ def _percentile(data: list[float], p: float) -> float:
 
 
 def sql_date_format(db: AsyncSession, col, fmt: str):
-    """Expresión de formato de fecha portable, agrupando por el DÍA LOCAL
-    (América/El Salvador, UTC-6) en vez del día UTC crudo.
-    """
+    """Expresión de formato de fecha portable, agrupando por el DÍA LOCAL."""
     from app.core.timezone import UTC_OFFSET_HOURS
     if db.bind is not None and db.bind.dialect.name == "sqlite":
         local_col = func.datetime(col, f"{UTC_OFFSET_HOURS:+d} hours")
@@ -128,9 +126,6 @@ async def get_dashboard(db: AsyncSession, source: str = "production") -> Analyti
         if queries_yesterday else None
     )
 
-    # resolution_rate: preguntas sin responder resueltas / total de la semana,
-    # misma entidad en numerador y denominador (igual patrón que get_topics).
-    # Antes restaba UnansweredQuestion de ChatConversation, entidades distintas.
     total_questions_q = await db.execute(
         select(func.count(UnansweredQuestion.id))
         .join(ChatConversation, UnansweredQuestion.conversation_id == ChatConversation.id, isouter=True)
@@ -223,9 +218,6 @@ async def get_dashboard(db: AsyncSession, source: str = "production") -> Analyti
     _prev_avg, prev_latency_sample_size = lat_prev_q.one()
     prev_latency = float(_prev_avg or 0) / 1000
     latency_delta = round(avg_latency - prev_latency, 2)
-    # Con muestras chicas (tipico en trafico bajo) un solo mensaje lento puede
-    # mover el promedio semanas enteras - se marca cuando cualquiera de los dos
-    # periodos tiene pocos datos, para que el frontend no lo lea como tendencia real.
     latency_delta_reliable = latency_sample_size >= 5 and prev_latency_sample_size >= 5
 
     src_q = await db.execute(
@@ -311,13 +303,7 @@ async def get_topics(
 async def get_heatmap(
     db: AsyncSession, window: str = "week", source: str = "production",
 ) -> AnalyticsHeatmap:
-    """Mapa de calor de actividad, en 4 granularidades temporales.
-
-    - day:   24 buckets por hora cubriendo las últimas 24 h
-    - week:  grid de 7 × 24 agregando los últimos 30 días (default)
-    - month: 30 buckets diarios (últimos 30 días)
-    - year:  365 buckets diarios (últimos 365 días)
-    """
+    """Mapa de calor de actividad, en 4 granularidades temporales."""
     now = datetime.now(timezone.utc)
     _source_where = _source_sql_where(source)
 
@@ -653,8 +639,7 @@ async def get_source_quality(
 async def get_response_quality(
     db: AsyncSession, days: int = 30, until: datetime | None = None,
 ) -> AnalyticsResponseQuality:
-    """Promedios de las métricas de calidad RAG (context relevance, faithfulness,
-    answer relevance) evaluadas async por evaluate_response_quality."""
+    """Promedios de las métricas de calidad RAG."""
     _until = until or datetime.now(timezone.utc)
     since = _until - timedelta(days=days)
     q = await db.execute(
@@ -783,9 +768,6 @@ async def get_period_comparison(
             return None
         return round((a - b) / b * 100, 2)
 
-    # Con pocas muestras (tipico en trafico bajo) un solo mensaje lento puede
-    # mover el promedio/P95 entero - se oculta el delta cuando cualquiera de
-    # los dos periodos tiene menos de 5 mensajes, para no leerlo como tendencia real.
     latency_reliable = current.avg_latency_sample_size >= 5 and previous.avg_latency_sample_size >= 5
 
     deltas: dict[str, float | None] = {
@@ -814,13 +796,7 @@ def _classify_channel(origin_url: str | None, browser: str | None) -> str:
 async def get_channels(
     db: AsyncSession, days: int = 7, until: datetime | None = None, source: str = "production",
 ) -> AnalyticsChannels:
-    """Desglosa el tráfico por canal de entrada: widget, api, playground.
-
-    Con source='production' (default) se excluye el tráfico de playground vía
-    _source_filter, igual que el resto de endpoints de analytics - así "playground"
-    solo aparece como categoría propia cuando se consulta explícitamente
-    source='playground'.
-    """
+    """Desglosa el tráfico por canal de entrada: widget, api, playground."""
     _until = until or datetime.now(timezone.utc)
     since = _until - timedelta(days=days)
     result = await db.execute(
@@ -853,12 +829,7 @@ async def get_cache_stats(
     db: AsyncSession, days: int = 7, source: str = "production",
     until: datetime | None = None,
 ) -> CacheStats:
-    """Cuenta hits/misses de cache semántica desde `chat_messages.rag_route`.
-
-    Convenios actuales:
-    - rag_route == 'cache' → hit (valor exacto que fija chat/router.py)
-    - cualquier otro valor de rag_route → miss
-    """
+    """Cuenta hits/misses de cache semántica desde `chat_messages.rag_route`."""
     _until = until or datetime.now(timezone.utc)
     since = _until - timedelta(days=days)
 
@@ -1004,8 +975,7 @@ async def get_csat(
     db: AsyncSession, *, days: int = 30, source: str = "production",
     until: datetime | None = None,
 ) -> AnalyticsCsat:
-    """Valoraciones CSAT (estrellas 1-5) de cualquier conversación cerrada
-    con encuesta respondida, sin limitarse a las que fueron escaladas."""
+    """Valoraciones CSAT (estrellas 1-5) de cualquier conversación cerrada con encuesta respondida."""
     from app.services.widget import csat_reasons as csat_reasons_svc
 
     _until = until or datetime.now(timezone.utc)
@@ -1035,9 +1005,6 @@ async def get_csat(
         total += cnt
         score_sum += score * cnt
     avg_score = round(score_sum / total, 2) if total else None
-    # % de conversaciones con score 4-5 ("satisfecho"), la definición de CSAT
-    # más comparable con benchmarks externos de industria (Zendesk, HubSpot),
-    # a diferencia del promedio 1-5 que no es directamente comparable con un %.
     satisfied = distribution["4"] + distribution["5"]
     satisfied_rate = round(satisfied / total * 100, 1) if total else None
 

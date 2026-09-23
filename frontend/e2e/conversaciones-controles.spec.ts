@@ -1,7 +1,6 @@
 import { test, expect } from "@playwright/test";
 import path from "node:path";
 
-// Control-level coverage for /dashboard/conversaciones beyond conversaciones.spec.ts: search, date range, status chips, export, feedback buttons, sources disclosure, and delete - run against a real, disposable conversation created via the widget chat endpoint so the delete test never touches a real end-user's conversation.
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;
 
@@ -51,7 +50,6 @@ test.describe("Conversaciones > controles de lista y detalle", () => {
     await page.getByRole("menuitem", { name: /excel/i }).click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toBeTruthy();
-    // Button disables itself while the request is in flight - wait for it to re-enable before the second click, or it can land while still disabled.
     await expect(exportBtn).toBeEnabled({ timeout: 10_000 });
 
     await exportBtn.click();

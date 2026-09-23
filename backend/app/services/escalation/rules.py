@@ -70,8 +70,7 @@ async def delete_rule(db: AsyncSession, *, rule_id: uuid.UUID) -> None:
 
 
 async def ping_smtp(db: AsyncSession, *, current_user: User) -> ChannelPingResult:
-    """Envía un email de prueba al usuario que lo solicita para verificar que
-    SMTP está configurado y que los escalamientos llegarán correctamente."""
+    """Envía un email de prueba al usuario que lo solicita para verificar que SMTP está configurado y que los escalamientos llegarán correctamente."""
     ok = False
     ping_error: str | None = None
     latency_ms: int | None = None

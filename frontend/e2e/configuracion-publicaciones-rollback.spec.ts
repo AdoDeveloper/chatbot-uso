@@ -1,20 +1,5 @@
 import { test, expect } from "@playwright/test";
 
-/**
- * Coverage for POST /versions/{id}/rollback ("Restaurar"), deliberately
- * excluded from configuracion-publicaciones.spec.ts as production-risk: a
- * real rollback overwrites the live global_settings/widget_config, so
- * running it against an arbitrary old version on every CI run could revert
- * whatever config is actually in use on this environment.
- *
- * Disposable-safe approach: capture a manual snapshot of the CURRENT state
- * (POST /versions), which flips is_active to that new snapshot and makes
- * the row that was active right before it show the "Restaurar" button.
- * Rolling back to THAT previous row re-activates the exact same config that
- * was live before this test ran - the net effect on the system is zero,
- * but the real rollback code path (backend restore_snapshot + the UI modal)
- * runs end-to-end.
- */
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;
 
@@ -29,11 +14,6 @@ test.describe("Configuracion > Publicaciones > Restaurar", () => {
 
     await page.getByRole("button", { name: /ver todo el historial/i }).click();
 
-    // La fila activa antes de crear el snapshot es la que debe quedar con
-    // "Restaurar" visible justo despues (capture_snapshot desactiva todas
-    // las anteriores). Se identifica por version_number desde la respuesta
-    // de creacion, no por DOM matching (las Card anidadas hacian que
-    // hasText/has sobre <div> genericos matchearan decenas de ancestros).
     await page.getByRole("button", { name: /guardar punto de restauración/i }).click();
     const snapshotDialog = page.getByRole("dialog");
     await snapshotDialog.getByPlaceholder(/antes de cambiar el prompt/i).fill(`E2E rollback probe ${Date.now()}`);
@@ -46,9 +26,6 @@ test.describe("Configuracion > Publicaciones > Restaurar", () => {
     const newVersion: { version_number: number } = await versionsResp.json();
     const previousVersionNumber = newVersion.version_number - 1;
 
-    // La tarjeta de version es <Card> (renderiza con clase "overflow-hidden");
-    // se ancla en el texto exacto "vN" (regex con anclas) para no matchear
-    // "vN0"/"vN1", etc.
     const targetRow = page.locator("div.overflow-hidden", {
       has: page.getByText(new RegExp(`^v${previousVersionNumber}$`)),
     }).first();
@@ -65,10 +42,6 @@ test.describe("Configuracion > Publicaciones > Restaurar", () => {
     expect(rollbackResp.status(), `unexpected rollback status: ${rollbackResp.status()}`).toBe(200);
     await expect(rollbackDialog).not.toBeVisible({ timeout: 15_000 });
 
-    // El rollback crea una nueva entrada de historial (trigger_source=
-    // "rollback", no reactiva el numero de version original in-place - asi
-    // que el "Último registro" pasa a ser esta nueva entrada), y su resumen
-    // confirma que restauro exactamente la version objetivo.
     const newestRow = page.locator("div.overflow-hidden", {
       has: page.getByText(/último registro/i),
     }).first();

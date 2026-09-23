@@ -258,11 +258,6 @@ export default function HistorialPage() {
    />
    <ConversacionesTabs />
 
-   {/* Responsive: en mobile, lista y detalle nunca se apilan en el mismo
-       scroll - al seleccionar una conversación la lista se oculta y el
-       detalle ocupa toda la altura con botón volver, igual que en desktop
-       pero como panel único en vez de split view. dvh en vez de vh: en
-       móviles evita que la barra de navegador oculte contenido. */}
    <div className="flex flex-col lg:flex-row gap-4 h-[calc(100dvh-16rem)] min-h-100">
     {/* Lista de conversaciones */}
     <Card className={`w-full lg:max-w-md lg:shrink-0 overflow-hidden flex-col ${selected ? "hidden lg:flex" : "flex"}`}>

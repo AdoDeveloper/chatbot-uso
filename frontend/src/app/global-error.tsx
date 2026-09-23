@@ -1,6 +1,5 @@
 "use client";
 
-// Fallback si el layout raíz falla: reemplaza todo el documento, por eso incluye <html>/<body> propios sin depender de providers ni estilos del layout.
 
 export default function GlobalError({
   error: _error,

@@ -1,10 +1,4 @@
-"""Tests para app/api/v1/system/cache/router.py - no tenía ningún test.
-
-Cubre stats, listado de entradas, borrado (total y por key) y actualización
-de config del caché semántico. Usa el Redis fake (fakeredis) inyectado por
-el fixture `client` para poblar entradas reales vía app.services.ai.semantic_cache,
-sin mockear los endpoints.
-"""
+"""Tests para app/api/v1/system/cache/router.py - no tenía ningún test."""
 from __future__ import annotations
 
 import json
@@ -26,13 +20,6 @@ async def viewer_user(make_user):
 
 @pytest.fixture(autouse=True)
 def _patch_cache_svc_redis(client, monkeypatch):
-    """El fixture `client` mockea `app.core.redis.get_redis` con un FakeRedis,
-    pero app/services/ai/semantic_cache.py hace `from app.core.redis import
-    get_redis` (import directo) - ese binding ya quedó resuelto al importar
-    el módulo, así que el monkeypatch de conftest no lo alcanza. Reapuntamos
-    `cache_svc.get_redis` al mismo `get_redis` (ya parcheado) para que el
-    router de cache y este helper de seed usen la misma instancia FakeRedis.
-    """
     from app.core import redis as redis_mod
     from app.services.ai import semantic_cache as cache_svc
 

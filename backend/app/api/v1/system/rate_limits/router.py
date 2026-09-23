@@ -115,9 +115,6 @@ async def unblock_ip(
     return OperationStatus()
 
 
-
-
-
 class UsagePoint(BaseModel):
     bucket: str         # ISO timestamp del inicio de la hora
     requests: int
@@ -141,12 +138,7 @@ async def usage_report(
     db: AsyncSession = Depends(get_db),
     _=Depends(_reader),
 ):
-    """Tendencia de tráfico vs límite configurado.
-
-    `requests` se calcula desde `chat_messages.created_at` con role=user.
-    `throttles` desde `rate_limit_events`.
-    Ventana: [since, until] derivada de `date_from`/`date_to`, o de `hours` si no se pasan.
-    """
+    """Tendencia de tráfico vs límite configurado."""
     from app.models.chat_message import ChatMessage
     from app.models.enums import MessageRole
     from app.services.monitoring.analytics import sql_date_format

@@ -1,7 +1,4 @@
-"""
-Multi-dimensional rate limiting using Redis sliding windows.
-Falls open if Redis is down. All limits configurable via Settings.
-"""
+"""Multi-dimensional rate limiting using Redis sliding windows."""
 from __future__ import annotations
 
 import asyncio
@@ -31,12 +28,7 @@ async def check_rate_limit(
     max_requests: int,
     window_seconds: int,
 ) -> bool:
-    """
-    Check and increment a sliding window counter.
-    Returns True if within limit, raises RateLimitExceeded if over.
-    Falls open (returns True) if Redis is unavailable - callers that need
-    a hard guarantee under Redis failure should check `redis_available` separately.
-    """
+    """Check and increment a sliding window counter."""
     global _LOCAL_FALLBACK_WARNED
     try:
         redis = redis_mod.get_redis()
@@ -101,11 +93,7 @@ async def _local_rate_limit(
 
 
 async def check_chat_limits(client_ip: str, limits: dict, *, session_id: str | None = None) -> None:
-    """Check all chat rate limit dimensions. Raises RateLimitExceeded on breach.
-
-    Si se pasa `session_id`, se aplica también un límite por sesión.
-    No toca el pipeline RAG: es solo el guardia previo del endpoint de chat.
-    """
+    """Check all chat rate limit dimensions."""
     await check_rate_limit(
         "chat:min", client_ip,
         max_requests=limits.get("per_min", 10),
@@ -153,11 +141,7 @@ async def get_throttled_ips(
     limit_per_min: int | None = None,
     limit_per_hour: int | None = None,
 ) -> list[dict]:
-    """Escanea Redis en busca de IPs cerca o por encima de los rate limits.
-
-    Forma de la clave: `rl:chat:<window_label>:<ip>:<window_seconds>`
-    Acepta los límites efectivos del panel; si no se pasan usa los defaults.
-    """
+    """Escanea Redis en busca de IPs cerca o por encima de los rate limits."""
     from app.services.system.settings import RUNTIME_DEFAULTS
     limit_per_min = limit_per_min or RUNTIME_DEFAULTS["rate_limit_chat_per_min"]
     limit_per_hour = limit_per_hour or RUNTIME_DEFAULTS["rate_limit_chat_per_hour"]
@@ -174,9 +158,6 @@ async def get_throttled_ips(
             cursor, keys = await redis.scan(cursor, match=pattern, count=200)
             for key in keys:
                 parts = key.split(":")
-                # rl:chat:<label>:<ip>:<window_seconds>
-                # Las direcciones IPv6 contienen ":", así que ip = todo entre el
-                # índice 3 y el último segmento (la ventana numérica).
                 if len(parts) < 5:
                     continue
                 # "chat:session" identifica sesiones, no IPs - excluir de este reporte.
@@ -211,13 +192,7 @@ async def get_throttled_ips(
 
 
 async def reset_ip(ip: str) -> None:
-    """Elimina las claves de rate limit de una IP específica.
-
-    No se puede usar el glob `rl:*:{ip}:*` porque las direcciones IPv6 contienen
-    ':' y romperían el patrón. En su lugar escaneamos todas las claves `rl:*` y
-    extraemos el identificador igual que hace `get_throttled_ips`
-    (clave = `rl:<prefix...>:<identifier>:<window>`), comparándolo con `ip`.
-    """
+    """Elimina las claves de rate limit de una IP específica."""
     try:
         redis = redis_mod.get_redis()
         cursor = 0
@@ -228,7 +203,6 @@ async def reset_ip(ip: str) -> None:
                 parts = key.split(":")
                 if len(parts) < 5:
                     continue
-                # identifier = todo entre el índice 3 y el último segmento (window)
                 identifier = ":".join(parts[3:-1])
                 if identifier == ip:
                     keys_to_delete.append(key)

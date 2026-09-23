@@ -1,10 +1,4 @@
-"""Tests de caracterización para app/api/v1/guardrails/router.py.
-
-test_guardrails.py cubre el motor de guardrails (validate_input) como
-función pura, pero ningún endpoint HTTP de este router - en particular
-el CRUD de patrones custom (_load_custom_list/_save_custom_list) no
-tenía ninguna prueba. Se fijan aquí antes de mover ese CRUD a servicio.
-"""
+"""Tests de caracterización para app/api/v1/guardrails/router.py."""
 from __future__ import annotations
 
 import pytest

@@ -1,9 +1,4 @@
-"""Tests de caracterización para app/api/v1/maintenance/router.py.
-
-Ningún archivo de test cubría sync_qdrant ni purge_health_outliers antes
-de esto. Se fijan aquí antes de mover sync_qdrant a servicio. Qdrant se
-sustituye por un stub - no hay Qdrant real en el entorno de test.
-"""
+"""Tests de caracterización para app/api/v1/maintenance/router.py."""
 from __future__ import annotations
 
 import uuid
@@ -23,8 +18,6 @@ async def viewer_user(make_user):
 
 @pytest.fixture
 def patch_qdrant_scroll_and_delete(monkeypatch):
-    """Stub del cliente Qdrant usado por sync_qdrant: scroll devuelve puntos
-    fijos (uno válido, uno huérfano), count/delete registran llamadas."""
     import app.services.ingestion.qdrant_sync as qdrant_sync_svc
 
     calls = {"deleted_filter": None, "count_called": False}

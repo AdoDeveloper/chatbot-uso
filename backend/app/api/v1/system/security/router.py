@@ -1,15 +1,4 @@
-"""
-Security observability endpoints.
-
-Aggregates security-relevant events from the audit log and Redis rate-limiting
-so the admin can answer:
-  - ¿Cuántos intentos de inyección bloqueó el sistema esta semana?
-  - ¿Qué IP tiene más intentos de login fallidos?
-  - ¿Cuál es el patrón de inyección más frecuente?
-  - ¿Qué IPs están siendo throttled ahora?
-
-Everything is read-only; actions (unblock IP, ignore pattern) live elsewhere.
-"""
+"""Security observability endpoints."""
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -31,7 +20,6 @@ from app.services.ai.guardrails import get_injection_pattern_defs
 log = structlog.get_logger()
 router = APIRouter(prefix="/security", tags=["system:security"])
 _audit_read = require_perm(P.AUDIT_READ)
-
 
 
 class SecuritySummary(BaseModel):
@@ -70,16 +58,10 @@ class InjectionSample(BaseModel):
     created_at: datetime
 
 
-
 def _period_bounds(
     days: int, date_from: datetime | None = None, date_to: datetime | None = None
 ) -> tuple[datetime, datetime, datetime, datetime]:
-    """Devuelve (since, until, prev_since, prev_until) para comparaciones.
-
-    Si se pasa `date_from`, la ventana es [since, until] y el período previo
-    tiene la misma duración inmediatamente anterior. Si no, se deriva de `days`
-    como una ventana relativa terminando ahora.
-    """
+    """Devuelve (since, until, prev_since, prev_until) para comparaciones."""
     custom_since, custom_until = since_until(date_from, date_to)
     if custom_since is not None:
         since, until = custom_since, custom_until
@@ -99,7 +81,6 @@ async def _count(db: AsyncSession, action: str, since: datetime, until: datetime
     if until:
         stmt = stmt.where(AuditLog.created_at < until)
     return (await db.execute(stmt)).scalar_one() or 0
-
 
 
 @router.get("/summary", response_model=SecuritySummary)
@@ -154,7 +135,6 @@ async def security_summary(
     )
 
 
-
 @router.get("/login-failures", response_model=list[FailedLoginGroup])
 async def login_failures(
     days: int = Query(7, ge=1, le=90),
@@ -190,7 +170,6 @@ async def login_failures(
         )
         for r in result.all()
     ]
-
 
 
 @router.get("/injections/by-category", response_model=list[InjectionByCategory])
@@ -239,7 +218,6 @@ async def injections_by_category(
         key=lambda x: x.count,
         reverse=True,
     )
-
 
 
 @router.get("/injections/samples", response_model=list[InjectionSample])

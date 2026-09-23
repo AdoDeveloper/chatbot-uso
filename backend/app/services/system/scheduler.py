@@ -43,16 +43,7 @@ def AsyncSessionLocal(*args, **kwargs):
 
 
 async def _acquire_once(key: str, ttl: int) -> bool:
-    """Mutex distribuido basado en BD (sin Redis).
-
-    Guarda en `global_settings` una fila con el `key` dado y un `expires_at`.
-    Solo un worker puede adquirirlo a la vez gracias a `SELECT ... FOR UPDATE`
-    (pessimistic row lock) a nivel de base de datos. El lock se libera solo
-    cuando expira `expires_at` (no hay DELETE explícito).
-
-    Devuelve True si este worker adquirió el lock (debe correr el job);
-    False si otro worker ya lo tiene o si la BD falla.
-    """
+    """Mutex distribuido basado en BD (sin Redis)."""
     try:
         async with AsyncSessionLocal() as db:
             await _probe_connection(db)
@@ -67,9 +58,6 @@ async def _acquire_once(key: str, ttl: int) -> bool:
                     )
                 ).scalar_one_or_none()
             except Exception:
-                # Dialectos sin soporte de FOR UPDATE (p. ej. SQLite en dev):
-                # reintenta sin el lock de fila. La carrera es rara y el peor
-                # caso es un envío duplicado ocasional, no un correo perdido.
                 row = (
                     await db.execute(
                         select(GlobalSetting).where(GlobalSetting.key == key)
@@ -115,14 +103,7 @@ async def _acquire_once(key: str, ttl: int) -> bool:
 
 
 async def _purge_expired_locks() -> int:
-    """Borra las filas de lock `scheduler:*` cuyo `expires_at` ya pasó.
-
-    La clave de cada lock lleva un bucket temporal (`scheduler:health:<n>`),
-    así que cada ciclo crea una fila nueva que nunca se reutiliza. Sin esta
-    purga `global_settings` crece de forma indefinida (~450 filas al día con
-    los intervalos actuales), mezclando locks efímeros con la configuración
-    real del sistema.
-    """
+    """Borra las filas de lock `scheduler:*` cuyo `expires_at` ya pasó."""
     cutoff = datetime.now(timezone.utc) - timedelta(hours=_LOCK_RETENTION_HOURS)
     cutoff_iso = cutoff.isoformat()
     try:
@@ -148,12 +129,7 @@ async def _purge_expired_locks() -> int:
 
 
 async def _purge_old_health_snapshots() -> int:
-    """Borra los snapshots de salud anteriores al margen de retención.
-
-    Se toma un snapshot por servicio cada `_HEALTH_INTERVAL`. La ventana máxima
-    consultable desde la API es de 720 horas (30 días), así que lo anterior a
-    `_SNAPSHOT_RETENTION_DAYS` ya no es alcanzable desde el panel.
-    """
+    """Borra los snapshots de salud anteriores al margen de retención."""
     from app.models.health_snapshot import HealthSnapshot
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=_SNAPSHOT_RETENTION_DAYS)
@@ -170,9 +146,7 @@ async def _purge_old_health_snapshots() -> int:
 
 
 async def _warmup_loop() -> None:
-    """Ejecuta un embedding de prueba cada _WARMUP_INTERVAL segundos para mantener
-    activo el thread pool de inferencia de ONNX Runtime.
-    """
+    """Ejecuta un embedding de prueba cada _WARMUP_INTERVAL segundos para mantener activo el thread pool de inferencia de ONNX Runtime."""
     await asyncio.sleep(30)
     log.info("scheduler.warmup_loop_started", interval=_WARMUP_INTERVAL)
     while True:
@@ -186,12 +160,7 @@ async def _warmup_loop() -> None:
 
 
 async def _health_loop() -> None:
-    """Toma un snapshot de salud y ejecuta chequeos de alertas cada _HEALTH_INTERVAL segundos.
-
-    Usa un mutex en BD (FOR UPDATE) para que solo una instancia del backend
-    por ventana de 5 minutos ejecute el snapshot, evitando snapshots y
-    notificaciones duplicadas si llega a correr más de una a la vez.
-    """
+    """Toma un snapshot de salud y ejecuta chequeos de alertas cada _HEALTH_INTERVAL segundos."""
     log.info("scheduler.health_loop_started", interval=_HEALTH_INTERVAL)
     while True:
         try:
@@ -204,9 +173,6 @@ async def _health_loop() -> None:
                     await collect_snapshot(db)
                     await run_all_checks(db)
                 log.debug("scheduler.health_snapshot_recorded")
-                # En régimen estacionario cada ciclo purga unas pocas filas, así
-                # que solo se registra en info una limpieza grande; el resto va
-                # a debug para no llenar el journal cada 5 minutos.
                 purged = await _purge_expired_locks()
                 if purged:
                     _log = log.info if purged >= _PURGE_LOG_THRESHOLD else log.debug
@@ -292,9 +258,7 @@ async def _stale_conversations_loop() -> None:
 
 
 async def _qdrant_sync_loop() -> None:
-    """Purga periódicamente vectores huérfanos en Qdrant (source_id sin
-    fuente activa en MySQL).
-    """
+    """Purga periódicamente vectores huérfanos en Qdrant (source_id sin fuente activa en MySQL)."""
     log.info("scheduler.qdrant_sync_loop_started", interval=_QDRANT_SYNC_INTERVAL)
     while True:
         try:
@@ -314,7 +278,7 @@ async def _qdrant_sync_loop() -> None:
 
 
 def start() -> None:
-    """Inicia el monitor de salud, el digest diario, el warm-up de embeddings, el barrido de conversaciones inactivas y el barrido de huérfanos de Qdrant como tareas asyncio en segundo plano."""
+    """Inicia el monitor de salud."""
     global _health_task, _digest_task, _warmup_task, _stale_conv_task, _qdrant_sync_task
     if _health_task is None or _health_task.done():
         _health_task = asyncio.create_task(_health_loop())

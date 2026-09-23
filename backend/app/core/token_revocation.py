@@ -1,7 +1,4 @@
-"""
-Revocación de JWT: denylist por jti (Redis) + corte tokens_valid_after por usuario (DB).
-Fail-open ante una caída de Redis - el corte de la DB siempre se aplica.
-"""
+"""Revocación de JWT: denylist por jti (Redis) + corte tokens_valid_after por usuario (DB)."""
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -43,13 +40,7 @@ async def is_jti_revoked(jti: str | None) -> bool:
 
 
 def revocation_cutoff() -> datetime:
-    """Valor para tokens_valid_after: ahora, truncado al segundo.
-
-    El iat de un JWT está en segundos enteros. Guardar el corte ya truncado
-    evita que una columna DATETIME sin fracciones lo redondee hacia arriba
-    (MySQL redondea, no trunca) y deje caduco el token reemitido en la misma
-    petición que fija el corte.
-    """
+    """Valor para tokens_valid_after: ahora, truncado al segundo."""
     return datetime.now(timezone.utc).replace(microsecond=0)
 
 

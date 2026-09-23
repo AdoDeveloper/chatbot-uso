@@ -2,22 +2,6 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-/* ─────────────────────────────────────────────────────────────
- * DESIGN TOKENS - single source of truth
- *
- * Foundation: Navy/Royal/Dodger family (institutional brand) +
- * neutral grayscale. Tuned for WCAG AA on every text/icon pair.
- *
- * Density target: AdminLTE-style - compacta pero respirable.
- * Tables 36px, body 13.5px, headings -0.015em letter-spacing.
- *
- * Contrast verified pairs (against #FFFFFF and #F8FAFC):
- *   foreground   #111827  16.10 / 14.96   AAA
- *   muted-fg     #4B5563   7.59 /  7.05   AAA
- *   primary      #1E40AF   8.59 /  7.97   AAA
- *   destructive  #B91C1C   7.18 /  6.66   AAA
- *   ring         #2563EB   5.17 /  4.80   AA  (interactive only)
- * ───────────────────────────────────────────────────────────── */
 
 @theme inline {
   /* Surface & content */
@@ -117,17 +101,6 @@
   --color-env-qa:   #D97706;
   --color-env-prod: #16A34A;
 
-  /* ── Escala tipográfica del panel ──
-   * Formaliza los tamaños que el dashboard ya usaba como valores mágicos
-   * (text-[10px]/[11px]/[13px]/[15px]) como escalones nombrados, para que el
-   * código use el sistema y no píxeles sueltos. No cambia ningún tamaño: son
-   * los mismos px, ahora con nombre. Escala densa propia de un panel de datos.
-   *   text-3xs  10px · badges, contadores, metadatos mínimos
-   *   text-2xs  11px · etiquetas de columna, ayudas, pills
-   *   text-xs   12px · (Tailwind) secundario general
-   *   text-13   13px · cuerpo denso de tablas y filas
-   *   text-sm   14px · (Tailwind) cuerpo estándar
-   *   text-15   15px · texto ligeramente destacado */
   --text-3xs: 10px;
   --text-3xs--line-height: 1.4;
   --text-2xs: 11px;
@@ -165,16 +138,10 @@
   --accent: #F1F5F9;
   --accent-foreground: #111827;
 
-  /* Status colors - all AA+ on white, and (destructive/success/warning/info)
-     also AA+ as text-on-tint (text-X on bg-X/N badges, used throughout the
-     panel - the original values only cleared the white-background bar). */
   --destructive: #B91C1C;
   --destructive-foreground: #FFFFFF;
   --success: #14742F;
   --success-foreground: #FFFFFF;
-  /* Darkened from the original #CA8A04 (2.7:1 on its own light tint) so
-     text-warning stays WCAG AA on both solid fills (with white text on top)
-     and the bg-warning/N tint badges used throughout the panel. */
   --warning: #854D0E;
   --warning-foreground: #FFFFFF;
   --info: #1D4ED8;
@@ -219,14 +186,6 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
-    /* NO fijar overflow-x aquí: cualquier valor de overflow distinto de
-     * "visible" en html/body (incluso solo en un eje) convierte a ese
-     * elemento en su propio contenedor de scroll/recorte en vez de dejar
-     * que el viewport real lo maneje. Eso rompe `position: sticky` de
-     * descendientes (el header del dashboard dejaba de quedarse fijo) y
-     * recorta popovers/tooltips posicionados contra el viewport (se
-     * cortaban en vez de mostrarse completos). El desborde horizontal
-     * accidental se contiene en el wrapper del dashboard, no aquí. */
   }
   body {
     @apply bg-background text-foreground;
@@ -261,9 +220,6 @@
     border-radius: 4px;
   }
 
-  /* En touch (sin hover real), muchos navegadores móviles marcan el botón
-   * como focus-visible tras el tap y el anillo queda pegado hasta el
-   * siguiente toque en otro lugar. Se desactiva el anillo en ese entorno. */
   @media (hover: none) and (pointer: coarse) {
     :focus-visible {
       outline: none;
@@ -276,9 +232,6 @@
     }
   }
 
-  /* Cursor pointer en interactivos - Tailwind v4 cambió el default a `default`,
-   * lo restauramos para que UX sea consistente con expectativa del usuario.
-   * Excluye estados disabled/aria-disabled. */
   button:not(:disabled):not([aria-disabled="true"]),
   [role="button"]:not([aria-disabled="true"]),
   [role="tab"]:not([aria-disabled="true"]),

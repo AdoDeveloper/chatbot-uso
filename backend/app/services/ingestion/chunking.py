@@ -1,20 +1,4 @@
-"""
-Context-aware chunking with Parent-Child retrieval.
-
-Strategy: section detection → child chunks (256 tokens ≈ 1024 chars) for
-precise embedding retrieval → parent chunks (1000 tokens ≈ 4000 chars) for
-rich LLM context.
-
-Why Parent-Child:
-  - Child chunks are small enough for embedding models (e5-large 512 token limit)
-    to produce focused semantic representations.
-  - Parent chunks give the LLM enough surrounding context to generate
-    coherent, complete answers.
-  - At retrieval time: embed & search children, but return the parent to the LLM.
-
-Public API:
-  chunk_text(text, source_id, source_name) -> list[dict]
-"""
+"""Context-aware chunking with Parent-Child retrieval."""
 from __future__ import annotations
 
 import re
@@ -125,11 +109,7 @@ def chunk_text(
     child_size: int = DEFAULT_CHILD_CHUNK_SIZE,
     child_overlap: int = DEFAULT_CHILD_CHUNK_OVERLAP,
 ) -> list[dict]:
-    """
-    Divide el texto en chunks Parent-Child listos para indexar.
-
-    Los parámetros de tamaño son configurables desde GlobalSetting.
-    """
+    """Divide el texto en chunks Parent-Child listos para indexar."""
     if not text or not text.strip():
         return []
 

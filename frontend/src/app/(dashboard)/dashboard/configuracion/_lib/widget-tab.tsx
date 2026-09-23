@@ -384,11 +384,6 @@ export function WidgetTab({
  const loading = loadingWidget || loadingEmbed;
  const scriptTag = embedData?.script_tag ?? "";
 
- // configProp/savedConfigProp vienen de un estado compartido (AsistenteFormContext) que
- // persiste entre subpestañas. Solo se auto-siembra desde /widget/config cuando este
- // componente administra su propio estado (modo no controlado) - en modo controlado el
- // padre ya sembró ambos una sola vez, así que WidgetTab nunca pisa un borrador sin
- // guardar cada vez que se remonta al navegar entre subpestañas.
  const isControlled = configProp !== undefined;
  const seededRef = useRef(false);
  useEffect(() => {

@@ -123,11 +123,7 @@ async def test_query(
     db: AsyncSession = Depends(get_db),
     _=Depends(require_perm(P.KNOWLEDGE_READ)),
 ):
-    """Recupera los fragmentos de una consulta y los evalúa igual que el chat.
-
-    Sin la evaluación, la prueba mostraría fragmentos que el asistente
-    descarta antes de responder.
-    """
+    """Recupera los fragmentos de una consulta y los evalúa igual que el chat."""
     start = time.monotonic()
 
     embeddings = await embed_texts_async([body.query], prefix="query: ")
@@ -153,9 +149,6 @@ async def test_query(
 
     chunks = [
         ChunkTestResult(
-            # Texto completo: la pantalla sirve para revisar qué recibe el
-            # asistente, y un fragmento cortado no permite juzgar si el
-            # troceado dejó la información utilizable.
             text=r.get("text") or "",
             source_name=r.get("source_name", ""),
             source_id=r.get("source_id"),

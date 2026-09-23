@@ -1,15 +1,4 @@
-"""Tests de app/services/ai/semantic_cache.py - lógica real de matching.
-
-test_semantic_cache_generation.py cubre el guard TOCTOU de generación, pero
-usa embeddings idénticos entre store y get (mock constante) - nunca ejercita
-la comparación de similitud coseno en sí, el filtro de scope por source_ids
-(aislamiento draft/prod), ni el corte SCAN_BATCH_HARD_LIMIT. Un cálculo roto
-en cualquiera de esas rutas serviría una respuesta incorrecta o filtraría una
-respuesta de borrador a producción sin que ningún test lo detectara.
-
-Mismo patrón de fakeredis por test que test_semantic_cache_generation.py
-(get_redis está cacheado con @lru_cache y ligado al primer event loop).
-"""
+"""Tests de app/services/ai/semantic_cache.py - lógica real de matching."""
 from __future__ import annotations
 
 import pytest
@@ -102,9 +91,6 @@ class TestGetCachedResponseMatching:
 
 class TestGetCachedResponseSourceScope:
     async def test_different_source_ids_scope_is_isolated(self, monkeypatch):
-        """Una entrada cacheada con un scope de fuentes distinto no debe
-        considerarse hit aunque el embedding sea idéntico - evita que una
-        respuesta generada con un subconjunto de fuentes se sirva para otro."""
         monkeypatch.setattr(cache_svc, "embed_texts_async", _embed_fixed([1.0, 0.0]))
         await cache_svc.store_cached_response(
             "pregunta", ["source-a"], [], "respuesta con source-a",
@@ -139,9 +125,6 @@ class TestGetCachedResponseSourceScope:
 
 class TestGetCachedResponseDraftProdIsolation:
     async def test_draft_and_prod_scopes_do_not_cross_match(self, monkeypatch):
-        """use_draft=True escribe/lee bajo un prefijo de key distinto a prod
-        (ver _cache_key) - una respuesta de borrador no debe filtrarse a
-        producción ni viceversa."""
         monkeypatch.setattr(cache_svc, "embed_texts_async", _embed_fixed([1.0, 0.0]))
         await cache_svc.store_cached_response(
             "pregunta", None, [], "respuesta de borrador", use_draft=True,
@@ -157,8 +140,6 @@ class TestGetCachedResponseDraftProdIsolation:
 
 class TestGetCachedResponseErrorHandling:
     async def test_redis_failure_returns_none_not_exception(self, monkeypatch):
-        """Falla graceful documentada en el docstring del módulo: un error de
-        Redis (ej. desconexión) debe degradar a cache miss, nunca propagar."""
         async def _boom(texts, prefix=""):
             raise ConnectionError("redis unreachable")
         monkeypatch.setattr(cache_svc, "embed_texts_async", _boom)

@@ -1,9 +1,4 @@
-"""Tests para app/api/v1/security/router.py - no tenía ningún test.
-
-login_failures e injections_by_category usan SQL específico de MySQL
-(func.json_unquote, ->>'$.path') sin equivalente en SQLite - por eso el CI
-ahora corre contra un servicio MySQL real en vez de SQLite in-memory.
-"""
+"""Tests para app/api/v1/security/router.py - no tenía ningún test."""
 from __future__ import annotations
 
 import uuid

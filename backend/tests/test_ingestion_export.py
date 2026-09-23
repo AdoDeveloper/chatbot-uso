@@ -1,17 +1,4 @@
-"""Tests unitarios directos para app/services/ingestion/export.py.
-
-Se llama a las funciones puras (build_excel, build_pdf, build_pdf_report y
-helpers internos de gráficas) directamente, sin pasar por ningún endpoint,
-y se verifica el contenido real generado (con openpyxl para xlsx, y
-parseo básico de estructura para PDF).
-
-Foco de cobertura pedido:
-- export.py líneas 320-384 (_chart_drawing: pie/bar/line, casos sin datos
-  suficientes, muchas categorías) y 291-301 (_chart_series con
-  {"label", "value"}).
-- También se cubren ramas de build_excel/build_pdf/build_pdf_report con
-  filas vacías, formulas peligrosas en celdas, y portada con/sin logo.
-"""
+"""Tests unitarios directos para app/services/ingestion/export.py."""
 from __future__ import annotations
 
 import io
@@ -38,10 +25,6 @@ def _pdf_text(data: bytes) -> str:
     return "\n".join(page.get_text() for page in doc)
 
 
-# ---------------------------------------------------------------------------
-# _safe_cell / _num
-# ---------------------------------------------------------------------------
-
 class TestSafeCell:
     def test_prefixes_formula_chars(self):
         for prefix in ("=", "+", "-", "@", "|", "%"):
@@ -57,8 +40,6 @@ class TestSafeCell:
         assert _safe_cell("") == ""
 
     def test_strips_illegal_xml_control_characters(self):
-        # \x00-\x08, \x0b-\x0c, \x0e-\x1f son ilegales en XML/Excel y openpyxl
-        # los rechaza con IllegalCharacterError, reventando toda la exportación.
         assert _safe_cell("hola\x00mundo\x1f!") == "holamundo!"
 
     def test_keeps_legal_whitespace_control_characters(self):
@@ -84,10 +65,6 @@ class TestNum:
         assert _num("no-es-numero") is None
         assert _num(None) is None
 
-
-# ---------------------------------------------------------------------------
-# build_excel
-# ---------------------------------------------------------------------------
 
 class TestBuildExcel:
     def test_empty_rows_keeps_full_letterhead(self):
@@ -142,8 +119,6 @@ class TestBuildExcel:
         assert len(wb.active.title) == 31
 
     def test_cell_with_illegal_control_character_does_not_raise(self):
-        # Regresión: un mensaje de chat con un byte de control (\x0b) hacía
-        # que openpyxl lanzara IllegalCharacterError y tumbara todo el export.
         rows = [{"Mensaje": "texto\x0bcon control"}]
         data = build_excel(rows)
         from openpyxl import load_workbook
@@ -151,10 +126,6 @@ class TestBuildExcel:
         ws = wb.active
         assert ws.cell(row=7, column=1).value == "textocon control"
 
-
-# ---------------------------------------------------------------------------
-# build_pdf
-# ---------------------------------------------------------------------------
 
 class TestBuildPdf:
     def test_empty_rows_produces_valid_pdf_bytes(self):
@@ -180,10 +151,6 @@ class TestBuildPdf:
         data = build_pdf([{}, {}], title="Todo vacio")
         assert data[:4] == b"%PDF"
 
-
-# ---------------------------------------------------------------------------
-# _chart_series - foco en líneas 291-301 y 279-289
-# ---------------------------------------------------------------------------
 
 class TestChartSeries:
     def test_columns_mode_extracts_first_row_values(self):
@@ -232,10 +199,6 @@ class TestChartSeries:
         assert _chart_series(rows, spec) is None
 
 
-# ---------------------------------------------------------------------------
-# _chart_drawing - foco principal: líneas 320-384
-# ---------------------------------------------------------------------------
-
 class TestChartDrawing:
     def test_insufficient_data_returns_none_single_point(self):
         rows = [{"Tema": "A", "Consultas": 10}]
@@ -273,7 +236,6 @@ class TestChartDrawing:
         assert any(isinstance(c, VerticalBarChart) for c in d.contents)
 
     def test_line_chart_is_added_to_drawing(self):
-        # Misma regresión que el bar chart (ver test anterior).
         rows = [{"Dia": f"D{i}", "Valor": i} for i in range(1, 6)]
         spec = {"type": "line", "label": "Dia", "value": "Valor"}
         d = _chart_drawing(rows, spec, avail_width=400)
@@ -296,10 +258,6 @@ class TestChartDrawing:
         from reportlab.graphics.charts.barcharts import VerticalBarChart
         assert any(isinstance(c, VerticalBarChart) for c in d.contents)
 
-
-# ---------------------------------------------------------------------------
-# build_pdf_report - foco 291-301/320-384 integrados + 412-413, 502-504
-# ---------------------------------------------------------------------------
 
 class TestBuildPdfReport:
     def test_report_with_table_section_only(self):
@@ -400,10 +358,6 @@ class TestBuildPdfReport:
         data = build_pdf_report(sections, title="Sin logo")
         assert data[:4] == b"%PDF"
 
-
-# ---------------------------------------------------------------------------
-# Response wrappers (streaming) - sanity de integración liviana
-# ---------------------------------------------------------------------------
 
 class TestResponseWrappers:
     def test_excel_response_has_correct_media_type_and_filename(self):

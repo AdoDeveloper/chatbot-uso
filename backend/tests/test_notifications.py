@@ -1,12 +1,4 @@
-"""Integration tests for notifications API.
-
-Cubre:
-  - Update de regla (regression del DetachedInstanceError tras commit)
-  - Inbox endpoint con unread_count
-  - Mark single as read
-  - Mark all as read
-  - __repr__ seguro del NotificationLog (no lazy-load tras commit)
-"""
+"""Integration tests for notifications API."""
 from __future__ import annotations
 
 import uuid
@@ -48,12 +40,7 @@ async def seed_rule(db_session):
 
 @pytest.fixture
 async def seed_logs(db_session, admin_user):
-    """Inserta 3 notification logs para admin_user: 2 no leídas, 1 leída.
-
-    El inbox es individual (user_id) desde que se agregó fan-out por
-    destinatario, así que las filas deben pertenecer a quien las consulta
-    en el test.
-    """
+    """Inserta 3 notification logs para admin_user: 2 no leídas, 1 leída."""
     logs = [
         NotificationLog(
             id=uuid.uuid4(),
@@ -93,7 +80,6 @@ async def seed_logs(db_session, admin_user):
         db_session.add(log)
     await db_session.commit()
     return logs
-
 
 
 class TestUpdateRule:
@@ -200,8 +186,6 @@ class TestInbox:
     async def test_inbox_is_per_user_not_shared(
         self, client, admin_user, auth_headers, seed_logs, make_user
     ):
-        """Las notificaciones de admin_user no deben aparecer en el inbox de
-        otro admin: el buzón es individual, no un estado global por rol."""
         other_admin = await make_user(role=UserRole.admin)
         r = await client.get(
             "/api/v1/notifications/inbox", headers=auth_headers(other_admin)
@@ -297,9 +281,6 @@ class TestMarkRead:
 
 class TestSafeRepr:
     async def test_notification_log_repr_doesnt_lazy_load(self, db_session):
-        """Si el __repr__ accediera a self.event/self.channel después de
-        commit con expire_on_commit=True, dispararía un refresh que falla
-        en instancias detached (lo que pasaba en el handler del error)."""
         log = NotificationLog(
             id=uuid.uuid4(),
             event="doc_ready",

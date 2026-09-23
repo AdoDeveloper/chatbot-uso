@@ -1,11 +1,3 @@
-"""Tests para app/services/ai/embedding.py - sin cobertura propia hasta ahora,
-solo se ejercía indirectamente vía mocks en los módulos que lo consumen.
-
-Los tests rápidos mockean _get_dense_model/_get_sparse_model (nunca cargan
-fastembed real). El test de integración, marcado @pytest.mark.slow, carga el
-modelo ONNX real una sola vez para verificar que sigue produciendo embeddings
-coherentes - se excluye de las corridas normales con `pytest -m "not slow"`.
-"""
 from __future__ import annotations
 
 import asyncio
@@ -83,9 +75,6 @@ class TestOnnxProviders:
 
 class TestEmbedTexts:
     def test_empty_list_returns_empty_without_loading_models(self, monkeypatch):
-        """Una lista vacía no debe intentar calcular dense_dim sobre un
-        resultado inexistente, ni cargar los modelos ONNX para un input que
-        de todas formas no produce nada."""
         def _fail_if_called():
             raise AssertionError("no debería cargar el modelo dense para una lista vacía")
 
@@ -130,8 +119,6 @@ class TestEmbedTextsAsync:
         assert result[0]["dense"] == [0.1, 0.2, 0.3]
 
     async def test_serializes_concurrent_calls_through_the_semaphore(self, fake_models):
-        """_ONNX_SEM(1) garantiza una sola inferencia ONNX a la vez: dos
-        llamadas concurrentes no deben solaparse en el tiempo."""
         dense, _ = fake_models
         active = 0
         max_concurrent = 0
@@ -156,10 +143,7 @@ class TestEmbedTextsAsync:
 
 @pytest.mark.slow
 class TestEmbedTextsRealModel:
-    """Carga el modelo ONNX real (multilingual-e5-large + Qdrant/bm25).
-    No se mockea nada aquí a propósito: es la única verificación de que el
-    modelo real sigue disponible y produce embeddings con sentido semántico.
-    """
+    """Carga el modelo ONNX real (multilingual-e5-large + Qdrant/bm25)."""
 
     async def test_real_embedding_has_the_expected_dense_dimension(self):
         result = await embedding.embed_texts_async(["hola, ¿cómo estás?"], prefix="query: ")

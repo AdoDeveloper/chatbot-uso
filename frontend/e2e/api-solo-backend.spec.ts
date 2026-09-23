@@ -1,14 +1,5 @@
 import { test, expect } from "@playwright/test";
 
-/**
- * Coverage for backend endpoints with no reachable frontend trigger, so a
- * UI-driven spec is impossible: alerts/run (no "evaluar ahora" button
- * anywhere in the dashboard), integrations/smtp/test (distinct from
- * escalation's own smtp-ping, which IS covered via the UI), and the
- * singular conversation tags endpoint (only bulk-tag from triage has a
- * button; PUT .../tags on one conversation is never called from the app).
- * Exercised directly against the backend, same pattern as actividad.spec.ts.
- */
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;
 

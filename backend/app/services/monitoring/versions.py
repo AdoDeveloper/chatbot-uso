@@ -1,8 +1,4 @@
-"""
-Whole-system versioning service.
-Captures full chatbot state as JSONB snapshots (append-only).
-Supports diff, change summaries, and rollback.
-"""
+"""Whole-system versioning service."""
 from __future__ import annotations
 
 import uuid
@@ -22,14 +18,8 @@ log = structlog.get_logger()
 
 SCHEMA_VERSION = 2
 
-# Los locks del scheduler viven en global_settings con una clave que lleva un
-# bucket temporal, así que aparecen y desaparecen solos: si entran al snapshot
-# ensucian cada diff de configuración con entradas que nadie modificó.
 _EPHEMERAL_KEY_PREFIX = "scheduler:"
 
-# Claves de global_settings que definen el comportamiento del asistente. El
-# resto de la tabla (rate limits, caché, agenda de reportes, OAuth) es
-# operativo y no se versiona.
 _ASSISTANT_SETTING_KEYS = frozenset({
     "system_prompt",
     "greeting_response",
@@ -152,12 +142,7 @@ async def _collect_widget(db: AsyncSession) -> dict:
 
 
 async def _collect_all(db: AsyncSession) -> dict:
-    """Snapshot de la configuración del asistente.
-
-    Se limita a lo que define cómo responde el chatbot. Quedan fuera los
-    documentos y las FAQ (el rollback nunca los revirtió: solo avisaba) y las
-    reglas de escalamiento y notificación, que son operativas.
-    """
+    """Snapshot de la configuración del asistente."""
     return {
         "schema_version": SCHEMA_VERSION,
         "sections": {
@@ -291,11 +276,7 @@ async def _next_version(db: AsyncSession) -> int:
 
 
 async def _get_active_version(db: AsyncSession) -> ConfigVersion | None:
-    """Versión activa más reciente.
-
-    Se ordena de forma explícita: sin ORDER BY, un `limit(1)` devuelve una fila
-    arbitraria si por cualquier motivo hay más de una marcada como activa.
-    """
+    """Versión activa más reciente."""
     result = await db.execute(
         select(ConfigVersion)
         .where(ConfigVersion.is_active.is_(True))
@@ -361,9 +342,6 @@ async def capture_snapshot(
     force: bool = False,
 ) -> ConfigVersion | None:
     async with _VersioningLock() as acquired:
-        # Sin el lock, dos capturas concurrentes leen el mismo número de
-        # versión y desactivan cada una a un padre distinto: quedan dos
-        # versiones con el mismo number y ambas activas.
         if not acquired:
             log.warning("versioning.skipped_no_lock", trigger_source=trigger_source)
             return None
@@ -421,15 +399,7 @@ MAX_AUTO_SNAPSHOTS = 50
 
 
 async def _prune_auto_snapshots(db: AsyncSession) -> int:
-    """Elimina los snapshots automáticos más antiguos que excedan el límite.
-
-    No se excluyen las versiones referenciadas como padre: como cada versión
-    apunta a la anterior, esa condición bloqueaba la cadena entera y la poda
-    no borraba nada. La FK es ON DELETE SET NULL, así que los hijos quedan sin
-    padre en vez de con una referencia rota, y el diff cae al comportamiento
-    que ya usa para las versiones sin padre: comparar contra la anterior por
-    número de versión.
-    """
+    """Elimina los snapshots automáticos más antiguos que excedan el límite."""
     candidates = list(await db.scalars(
         select(ConfigVersion.id)
         .where(ConfigVersion.trigger_source != "deploy")

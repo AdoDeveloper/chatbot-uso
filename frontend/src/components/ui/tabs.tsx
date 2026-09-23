@@ -3,13 +3,6 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
 
-/* ── Tabs ── navegación por secciones, patrón `underline`.
- *
- * Bajo peso visual, escalable, jerárquicamente neutro - el patrón dominante en
- * dashboards modernos (Vercel, GitHub, Stripe, Linear).
- *
- * Para toggles mutuamente excluyentes (ambiente, rango de fecha) o filtros de
- * lista, usar `SegmentedControl`, no este componente. */
 
 /* ── Context ── */
 interface TabsContextValue {

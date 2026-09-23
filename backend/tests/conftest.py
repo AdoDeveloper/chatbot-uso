@@ -8,9 +8,6 @@ import pytest
 import pytest_asyncio
 
 os.environ["SECRET_KEY"] = "test-secret-key-for-unit-tests-only-please"
-# DATABASE_URL/REDIS_URL reales los inyecta el entorno (CI vía env: en
-# test.yml, o exportados a mano en local) - estos son solo el fallback para
-# una BD de test local sin contraseña, ver docs/INSTALLATION.md.
 os.environ.setdefault(
     "DATABASE_URL",
     "mysql+aiomysql://chatbot:chatbot@localhost:3306/chatbot_test_ci",
@@ -41,7 +38,6 @@ def settings_env(monkeypatch):
     yield
     get_settings.cache_clear()
     invalidate_runtime_overrides()
-
 
 
 async def _seed_rbac_for_tests(session) -> None:
@@ -88,8 +84,6 @@ async def _seed_rbac_for_tests(session) -> None:
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
 async def db_engine():
-    """El mismo engine que usa la app (app.db.session.engine), con las tablas
-    creadas UNA sola vez por archivo de test."""
     from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
     from sqlalchemy.pool import NullPool
     from sqlalchemy import event
@@ -156,13 +150,9 @@ async def db_session(db_engine) -> AsyncGenerator:
             await outer_txn.rollback()
 
 
-
 @pytest_asyncio.fixture(loop_scope="module")
 async def client(db_session, monkeypatch):
-    """
-    httpx AsyncClient bound to the FastAPI app, with DB + Redis dependencies
-    overridden. Use for endpoint integration tests.
-    """
+    """httpx AsyncClient bound to the FastAPI app, with DB + Redis dependencies overridden."""
     import fakeredis.aioredis
     from httpx import AsyncClient, ASGITransport
 
@@ -189,7 +179,6 @@ async def client(db_session, monkeypatch):
 
     app.dependency_overrides.clear()
     await fake.aclose()
-
 
 
 @pytest_asyncio.fixture(loop_scope="module")

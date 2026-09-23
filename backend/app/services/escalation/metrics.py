@@ -19,18 +19,7 @@ _ESCALATION_STATES = (
 async def get_metrics(
     db: AsyncSession, *, days: int = 30, until: datetime | None = None,
 ) -> dict:
-    """KPIs globales del módulo de escalaciones para los últimos N días.
-
-    Retorna:
-    - total: cuántas conversaciones fueron escaladas en el periodo
-    - by_status: desglose por estado actual
-    - by_trigger: desglose por tipo de trigger
-    - avg_resolution_seconds: tiempo promedio de resolución (solo cerradas)
-    - resolution_rate: resueltas / (resueltas + aún en estado "escalated"),
-      excluyendo cualquier escalada que un admin haya devuelto a "active"
-      manualmente (no cuenta como resuelta ni como pendiente)
-    - csat_avg: promedio de CSAT entre los que tienen score
-    """
+    """KPIs globales del módulo de escalaciones para los últimos N días."""
     _until = until or datetime.now(timezone.utc)
     since = _until - timedelta(days=max(1, days))
 

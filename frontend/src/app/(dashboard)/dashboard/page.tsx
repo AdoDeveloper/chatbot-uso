@@ -149,7 +149,6 @@ export default function DashboardPage() {
    )}
 
 
-
    {/* Fila de snapshot de seguridad + salud */}
    {can(PERM.SYSTEM_MANAGE) && (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">

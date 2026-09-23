@@ -19,13 +19,6 @@ const chartConfig = {
   count: { label: "Consultas", color: "#0F2F6E" },
 } satisfies ChartConfig;
 
-/**
- * Gráficos de barras para los 4 modos de ventana. Se evita el heatmap de
- * cuadros de color (estilo GitHub) porque en móvil las celdas se vuelven
- * ilegibles (demasiado pequeñas, sin espacio para 24 columnas); las barras
- * muestran el mismo dato, consistentes con el resto de Estadísticas y
- * legibles en cualquier ancho.
- */
 export function ActivityChart({ cells, window = "week", rangeEnd }: ActivityChartProps) {
   if (window === "day") return <DayBars cells={cells} />;
   if (window === "week") return <WeekBars cells={cells} />;
@@ -64,9 +57,6 @@ function DayBars({ cells }: { cells: HeatmapCell[] }) {
 }
 
 function WeekBars({ cells }: { cells: HeatmapCell[] }) {
-  // Colapsa la matriz día×hora sumando las 24 horas de cada día: pierde el
-  // detalle de hora del día pero conserva el insight principal (qué día de
-  // la semana concentra más actividad).
   const data = useMemo(() => {
     const byDay = new Map<number, number>();
     cells.forEach((c) => {

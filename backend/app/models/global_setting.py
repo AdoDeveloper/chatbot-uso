@@ -11,11 +11,7 @@ from app.db.session import Base
 
 
 class GlobalSetting(Base):
-    """
-    Almacén key-value para configuración del chatbot.
-    Claves predefinidas: system_prompt, top_k, score_threshold, temperature,
-    max_tokens, use_corrective_rag.
-    """
+    """Almacén key-value para configuración del chatbot."""
     __tablename__ = "global_settings"
 
     key: Mapped[str] = mapped_column(String(100), primary_key=True)

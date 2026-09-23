@@ -96,11 +96,7 @@ async def seed_first_admin(db: AsyncSession) -> None:
 
 
 async def seed_defaults(db: AsyncSession) -> None:
-    """Crea registros por defecto para widget, notificaciones y escalamiento.
-
-    Idempotente: puede llamarse en cada arranque del servidor sin efectos
-    secundarios si los registros ya existen.
-    """
+    """Crea registros por defecto para widget, notificaciones y escalamiento."""
     await _db_lock(db, _DEFAULTS_LOCK_NAME)
     try:
         wc_count = await db.scalar(select(func.count()).select_from(WidgetConfig))

@@ -23,9 +23,7 @@ _EMBED_BATCH = 16
 
 
 class _SourceDeletedDuringIngestion(Exception):
-    """Señal interna: el source fue borrado (soft-delete) mientras se
-    ingería en background. No es un error real, se captura aparte para no
-    marcar status=error ni reinsertar vectores para un source ya borrado."""
+    """Señal interna: el source fue borrado (soft-delete) mientras se ingería en background."""
 
 
 async def _set_stage(db: AsyncSession, source: Source, stage: str) -> None:
@@ -36,11 +34,7 @@ async def _set_stage(db: AsyncSession, source: Source, stage: str) -> None:
 
 
 async def _abort_if_deleted(db: AsyncSession, source_pk) -> None:
-    """Releída best-effort de `deleted_at` para detectar si delete_source()
-    corrió en paralelo (la ingesta es una tarea de background sin forma de
-    cancelarse desde afuera). Sin esto, una ingesta que sigue viva tras el
-    soft-delete reinserta vectores en Qdrant para un source ya "borrado",
-    invisibles en la UI pero vivos en el índice indefinidamente."""
+    """Releída best-effort de `deleted_at` para detectar si delete_source() corrió en paralelo."""
     result = await db.execute(select(Source.deleted_at).where(Source.id == source_pk))
     deleted_at = result.scalar_one_or_none()
     if deleted_at is not None:
@@ -48,10 +42,7 @@ async def _abort_if_deleted(db: AsyncSession, source_pk) -> None:
 
 
 async def ingest(db: AsyncSession, source: Source) -> None:
-    """
-    Pipeline completo:  parse → chunk → embed → upsert Qdrant → update DB
-    Actualiza source.status y source.chunk_count en la DB.
-    """
+    """Pipeline completo:  parse → chunk → embed → upsert Qdrant → update DB Actualiza source.status y source.chunk_count en la DB."""
     source_id = str(source.id)
     log.info("ingestion.start", source_id=source_id, type=source.type, name=source.name)
 

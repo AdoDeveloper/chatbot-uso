@@ -191,9 +191,6 @@ async def channels(
     db: AsyncSession = Depends(get_db),
     _: object = Depends(require_perm(P.ANALYTICS_READ)),
 ):
-    # Con source="production" (default) se excluye playground vía _source_filter,
-    # igual que el resto de endpoints - "Previsualizar" solo aparece como
-    # categoría propia si se consulta explícitamente source="playground".
     eff_days, until = _effective_range(days, date_from, date_to)
     return await svc.get_channels(db, days=eff_days, until=until, source=source)
 

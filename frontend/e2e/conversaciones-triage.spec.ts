@@ -2,16 +2,6 @@ import { test, expect } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 
-/**
- * Functional coverage for /dashboard/conversaciones/escalamientos and
- * /dashboard/conversaciones/pendientes. Both pages act on real domain data
- * (escalated conversations, unanswered questions) that this suite doesn't
- * fabricate - creating a fake escalation would require driving a full real
- * chat conversation through the widget first. Each write action is
- * exercised only when matching data already exists in the environment
- * (mirrors the established skip pattern in conversaciones.spec.ts /
- * invitaciones.spec.ts); otherwise the test documents the empty state.
- */
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;
 
@@ -60,11 +50,6 @@ test.describe("Conversaciones > Escalamientos", () => {
     const disposableTag = `e2e-bulk-${Date.now()}`;
     await tagInput.fill(disposableTag);
     await page.getByRole("button", { name: /\+tag/i }).click();
-    // El tag puede quedar visible en más de un lugar a la vez (fila + chip
-    // de filtro): basta con que al menos uno esté visible. getByText incluye
-    // la <option> del <select> de filtro (matchea por texto pero es
-    // invisible por definición), así que se espera visibilidad sobre cada
-    // match hasta encontrar uno real en vez de fiarse de first().
     const tagMatches = page.getByText(new RegExp(`#${disposableTag}`));
     await expect(async () => {
       const count = await tagMatches.count();
@@ -94,9 +79,6 @@ test.describe("Conversaciones > Escalamientos", () => {
     await expect(page.getByRole("heading", { name: /escalamientos|conversaciones/i }).first()).toBeVisible({ timeout: 10_000 });
     await page.screenshot({ path: path.join(SHOT_DIR, "01-escalamientos.png") });
 
-    // Don't gate on the skeleton's absence - right after goto() the fetch
-    // may not have started yet, so a "skeleton count 0" check can resolve
-    // trivially true before data has loaded. Poll for the actual button.
     const resolveButton = page.getByRole("button", { name: /^marcar resuelto$/i }).first();
     const hasEscalated = await resolveButton
       .waitFor({ state: "visible", timeout: 15_000 })
@@ -177,7 +159,6 @@ test.describe("Conversaciones > Pendientes", () => {
     await dialog.locator("textarea").fill("Respuesta de prueba E2E generada desde una pregunta pendiente.");
     await page.screenshot({ path: path.join(SHOT_DIR, "05-crear-faq-formulario.png") });
 
-    // Captura la respuesta real (POST .../create-faq -> {faq_id}) en vez de adivinar la fuente creada: la pregunta actuada puede ser cualquiera de la lista.
     const [createResponse] = await Promise.all([
       page.waitForResponse((r) => /\/unanswered\/.+\/create-faq$/.test(r.url()) && r.request().method() === "POST"),
       dialog.getByRole("button", { name: /crear faq/i }).click(),
@@ -187,7 +168,6 @@ test.describe("Conversaciones > Pendientes", () => {
 
     const faqId = (await createResponse.json().catch(() => null))?.faq_id;
     if (faqId) {
-      // El Source creado junto al FAQEntry no expone su id directamente; se resuelve como la fuente FAQ más reciente (seguro porque este test la acaba de crear).
       const authHeader = `Bearer ${(await page.context().cookies()).find(c => c.name === "chatbot_access")?.value}`;
       const srcRes = await request.get(`${baseURL}/api/v1/sources?page_size=5`, {
         headers: { Authorization: authHeader },

@@ -1,11 +1,4 @@
-"""Tests unitarios puros para app/services/ingestion/parsing/.
-
-Ningún test previo ejercitaba estos parsers directamente (docx.py tenía
-~8% de cobertura) - todos los tests de ingestion pasan por el endpoint HTTP
-completo, que mockea el parsing. Estos tests llaman las funciones de parsing
-directamente con archivos reales (generados con python-docx / pandas) y no
-requieren client/db_session ni MySQL.
-"""
+"""Tests unitarios puros para app/services/ingestion/parsing/."""
 from __future__ import annotations
 
 import pytest
@@ -20,11 +13,6 @@ from app.models.enums import SourceType
 # ── docx.py ──────────────────────────────────────────────────────────────
 
 def _add_numbered_paragraph(doc, text: str, ilvl: int = 0) -> None:
-    """python-docx no agrega w:numPr real solo con style='List Bullet'
-    (el estilo por sí solo no basta - Word decide "es lista" por la
-    presencia de w:numPr en w:pPr). Lo inyectamos a mano para simular
-    una lista auto-numerada real de Word, que es lo que _detect_sections
-    / parse_docx buscan."""
     from docx.oxml.ns import qn
     from docx.oxml import OxmlElement
 
@@ -154,10 +142,6 @@ class TestParseDocx:
         doc = Document()
         para = doc.add_paragraph("Encabezado en español")
         para.style = doc.styles["Heading 1"]
-        # Renombrar el estilo asignado para simular variante localizada
-        # (python-docx no permite crear estilos "Título 1" fácilmente sin
-        # una plantilla localizada, así que verificamos vía el diccionario
-        # _HEADING_STYLES directamente en un test aparte)
         doc.save(path)
 
         text = await parse_docx(path)
@@ -187,10 +171,6 @@ class TestParseDocx:
 
 
 class TestZipBombProtection:
-    """python-docx descomprime el ZIP interno sin validar el ratio de
-    expansión - un DOCX construido con XML muy repetitivo puede expandirse
-    órdenes de magnitud más que su tamaño en disco. _check_zip_bomb valida
-    esto antes de invocar Document()."""
 
     async def test_normal_docx_passes(self, tmp_path):
         path = str(tmp_path / "doc.docx")
@@ -205,9 +185,6 @@ class TestZipBombProtection:
         from app.services.ingestion.parsing.docx import _check_zip_bomb
 
         path = str(tmp_path / "bomb.docx")
-        # Un solo miembro con contenido extremadamente repetitivo comprime a
-        # una fracción mínima de su tamaño real - simula el patrón de una
-        # zip bomb sin necesitar gigabytes reales en disco de test.
         payload = b"A" * (50 * 1024 * 1024)  # 50MB de un solo byte repetido
         with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
             zf.writestr("word/document.xml", payload)
@@ -221,10 +198,6 @@ class TestZipBombProtection:
         from app.services.ingestion.parsing.docx import _check_zip_bomb
 
         path = str(tmp_path / "normal.docx")
-        # os.urandom no comprime bien (alta entropía, como el contenido real
-        # de un DOCX con texto variado + metadata XML) - a diferencia de un
-        # payload repetitivo, que comprime órdenes de magnitud mejor y por
-        # eso no sirve como "caso normal" para este test.
         payload = os.urandom(200 * 1024)
         with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as zf:
             zf.writestr("word/document.xml", payload)
@@ -267,11 +240,6 @@ class TestParseTxt:
             await parse_txt(str(path))
 
     async def test_binary_content_raises_instead_of_silently_parsing_garbage(self, tmp_path):
-        """latin-1 decodifica CUALQUIER byte sin UnicodeDecodeError (mapea
-        1:1 byte->codepoint), así que antes de esta validación un archivo
-        binario renombrado a .txt (p. ej. un .docx real) 'parseaba' sin
-        error como mojibake ilegible - producía chunks y embeddings de
-        basura que quedaban status=ready sin ninguna alerta de calidad."""
         path = tmp_path / "file.txt"
         # Bytes de control aleatorios, no texto real en ningún encoding.
         path.write_bytes(bytes(range(0, 40)) * 50)
@@ -283,18 +251,6 @@ class TestParseTxt:
 # ── pdf.py ───────────────────────────────────────────────────────────────
 
 class TestParsePdf:
-    """pdf.py fue reescrito (commit 4014b6f) para usar pymupdf4llm.to_markdown
-    en dos intentos (force_text=True, luego force_text=False para OCR) en
-    vez de las funciones _extract_pymupdf/_extract_ocr que estos tests
-    mockeaban antes - quedaron probando una API que ya no existe
-    (ImportError en collection). Reescritos contra la implementación real.
-
-    pdf.py hace `import pymupdf4llm` DENTRO de parse_pdf() (no a nivel de
-    módulo), así que el mock debe aplicarse sobre el paquete real
-    (pymupdf4llm.to_markdown) vía monkeypatch - parchear un atributo en
-    pdf_mod no tendría efecto porque el nombre no existe ahí hasta que la
-    función corre, y el import local siempre trae el real.
-    """
 
     async def test_uses_force_text_result_when_present(self, monkeypatch):
         import pymupdf4llm

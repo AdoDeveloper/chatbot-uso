@@ -28,11 +28,7 @@ def render_email(
     severity: str = "neutral",
     eyebrow: str | None = None,
 ) -> str:
-    """Envuelve `content` en la estructura institucional limpia.
-
-    El encabezado muestra el título de la notificación; el nombre de la
-    institución se ubica como rótulo superior discreto.
-    """
+    """Envuelve `content` en la estructura institucional limpia."""
     pre = (
         f'<div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all">'
         f"{_html.escape(preheader)}</div>"
@@ -168,8 +164,7 @@ def muted_note(text: str) -> str:
 
 
 def stat_grid(stats: list[tuple[object, str]]) -> str:
-    """Cifras destacadas en una rejilla de 2 columnas (se ve bien en móvil y
-    escritorio sin media queries: 2x2 con cuatro métricas)."""
+    """Cifras destacadas en una rejilla de 2 columnas."""
     rows_html = ""
     for i in range(0, len(stats), 2):
         pair = stats[i:i + 2]
@@ -213,7 +208,6 @@ def topic_list(topics: list[tuple[str, int]]) -> str:
         f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px">'
         f"{rows}</table>"
     )
-
 
 
 def quote_list(items: list[str]) -> str:

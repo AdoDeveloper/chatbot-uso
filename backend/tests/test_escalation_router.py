@@ -1,10 +1,4 @@
-"""Tests de caracterización para app/api/v1/escalation/router.py.
-
-ping_smtp y test_rule no estaban cubiertos por ningún otro archivo de
-test (test_escalation_triggers.py prueba el motor de reglas puro, no
-estos endpoints HTTP). Se fijan aquí antes de mover ping_smtp a
-servicio, para confirmar que la migración no cambia comportamiento.
-"""
+"""Tests de caracterización para app/api/v1/escalation/router.py."""
 from __future__ import annotations
 
 import uuid

@@ -16,10 +16,6 @@ from app.schemas.provider_type_catalog import (
 
 log = structlog.get_logger()
 
-# lepton y anyscale quedan fuera a propósito: descontinuados (lepton desde
-# 20/05/2025, adyacente a la adquisición por NVIDIA; anyscale perdió el
-# acceso multi-tenant en agosto de 2024) - no tiene sentido sembrarlos como
-# opción elegible en el panel.
 _BUILTIN_CATALOG: list[dict] = [
     {"type_key": "openai", "display_name": "OpenAI", "default_api_base": "https://api.openai.com/v1"},
     {"type_key": "groq", "display_name": "Groq", "default_api_base": "https://api.groq.com/openai/v1"},
@@ -79,11 +75,7 @@ _BUILTIN_CATALOG: list[dict] = [
 
 
 async def seed_provider_catalog(db: AsyncSession) -> None:
-    """Siembra/actualiza los tipos de proveedor conocidos al arrancar.
-
-    Idempotente (upsert por type_key): no duplica filas ni pisa un type_key
-    que el admin haya renombrado a mano.
-    """
+    """Siembra/actualiza los tipos de proveedor conocidos al arrancar."""
     existing = (await db.execute(select(ProviderTypeCatalog))).scalars().all()
     by_key = {row.type_key: row for row in existing}
 

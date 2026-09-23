@@ -3,14 +3,6 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 
-/**
- * Additional functional coverage for /dashboard/conocimiento/documentos not
- * already covered by conocimiento-documentos.spec.ts: the row-level "Vista
- * previa" modal (content + quality stats), the inline tag editor modal
- * launched from the row, and the full reject -> "Reemplazar archivo" ->
- * re-review lifecycle (previously out of scope because it required a
- * rejected source, which this test now creates disposably).
- */
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;
 
@@ -77,10 +69,6 @@ test.describe("Conocimiento > Documentos > controles avanzados de fila", () => {
     const name = `E2E Tags Source ${Date.now()}`;
     const row = await uploadDisposableSource(page, name, "Contenido de prueba E2E para el editor de etiquetas inline.");
 
-    // Las etiquetas se editan dentro del modal general "Editar documento"
-    // (botón "Editar" en la fila), no en un dialogo dedicado - el input de
-    // etiqueta tiene su propio botón "+ Agregar" para añadirla a la lista
-    // local, que solo se persiste al pulsar "Guardar" del modal.
     await row.getByRole("button", { name: /^editar$/i }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByRole("heading", { name: /editar documento/i })).toBeVisible({ timeout: 5_000 });
@@ -159,7 +147,6 @@ test.describe("Conocimiento > Documentos > controles avanzados de fila", () => {
     await expect(replaceDialog2).not.toBeVisible({ timeout: 40_000 });
     fs.unlinkSync(newFilePath);
 
-    // Tras un reemplazo exitoso, tanto el badge de estado como el de revisión pueden leer "Pendiente" a la vez; match por cualquiera evita ambigüedad de strict-mode.
     await expect(row.getByText(/pendiente/i).first()).toBeVisible({ timeout: 20_000 });
     await page.screenshot({ path: path.join(SHOT_DIR, "05-fuente-reemplazada.png") });
 

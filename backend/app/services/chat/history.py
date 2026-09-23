@@ -21,8 +21,7 @@ def _conv_lock_key(session_id: str) -> str:
 
 
 async def acquire_session_lock(session_id: str, *, timeout: float = 5.0) -> bool:
-    """Serializa la persistencia de turnos concurrentes con el mismo session_id
-    para evitar conversaciones duplicadas. Fail-open si Redis no está."""
+    """Serializa la persistencia de turnos concurrentes con el mismo session_id para evitar conversaciones duplicadas."""
     import asyncio
 
     from app.core.redis import get_redis

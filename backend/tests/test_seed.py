@@ -14,8 +14,6 @@ pytestmark = pytest.mark.asyncio
 
 
 async def test_seed_first_admin_creates_admin_from_settings(db_session, monkeypatch):
-    """Contra una BD limpia, seed_first_admin crea el admin con el email/rol
-    definidos en settings y lo marca para forzar cambio de contraseña."""
     from app.core.config import get_settings
 
     monkeypatch.setenv("FIRST_ADMIN_EMAIL", "root@example.com")
@@ -36,8 +34,7 @@ async def test_seed_first_admin_creates_admin_from_settings(db_session, monkeypa
 
 
 async def test_seed_first_admin_is_idempotent(db_session, monkeypatch):
-    """Correrlo dos veces no crea un segundo admin ni falla: la segunda
-    llamada ve count > 0 y retorna temprano."""
+    """Correrlo dos veces no crea un segundo admin ni falla: la segunda llamada ve count > 0 y retorna temprano."""
     from app.core.config import get_settings
 
     monkeypatch.setenv("FIRST_ADMIN_EMAIL", "root@example.com")
@@ -54,8 +51,6 @@ async def test_seed_first_admin_is_idempotent(db_session, monkeypatch):
 
 
 async def test_seed_first_admin_skips_when_users_exist(db_session, make_user, monkeypatch):
-    """Si ya hay usuarios (de cualquier origen), no crea al admin de settings,
-    incluso si FIRST_ADMIN_EMAIL apunta a otro correo."""
     from app.core.config import get_settings
 
     await make_user(email="existing@example.com", role=UserRole.viewer)
@@ -77,8 +72,7 @@ async def test_seed_first_admin_skips_when_users_exist(db_session, make_user, mo
 
 
 async def test_seed_first_admin_requires_email_configured(db_session, monkeypatch):
-    """Sin FIRST_ADMIN_EMAIL no debe crear un admin con placeholder silencioso;
-    se espera un error explícito."""
+    """Sin FIRST_ADMIN_EMAIL no debe crear un admin con placeholder silencioso; se espera un error explícito."""
     from app.core.config import get_settings
 
     monkeypatch.setenv("FIRST_ADMIN_EMAIL", "")
@@ -112,8 +106,6 @@ async def test_seed_first_admin_requires_password_configured(db_session, monkeyp
 
 
 async def test_seed_defaults_runs_clean(db_session):
-    """seed_defaults corre sin error contra una BD limpia y crea widget config,
-    reglas de notificación por cada evento/canal, y reglas de escalamiento."""
     await seed.seed_defaults(db_session)
 
     wc_count = await db_session.scalar(select(func.count()).select_from(WidgetConfig))
@@ -145,8 +137,7 @@ async def test_seed_defaults_runs_clean(db_session):
 
 
 async def test_seed_defaults_is_idempotent(db_session):
-    """Correr seed_defaults dos veces no duplica widget config, reglas de
-    notificación ni reglas de escalamiento."""
+    """Correr seed_defaults dos veces no duplica widget config, reglas de notificación ni reglas de escalamiento."""
     await seed.seed_defaults(db_session)
     await seed.seed_defaults(db_session)
 

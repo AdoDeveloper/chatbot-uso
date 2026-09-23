@@ -2,18 +2,6 @@ import { test, expect } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 
-/**
- * Functional coverage for /dashboard/configuracion/acceso/sso: editing and
- * saving the allowed-domains field, against the real backend. Deliberately
- * does NOT toggle "Activar Microsoft SSO" - it can lock the whole team out
- * of the dashboard if flipped without password login active as a fallback.
- *
- * "Inicio de sesión con contraseña" lives in its own file
- * (configuracion-acceso-auth-methods.spec.ts): it toggles+restores via
- * direct API calls with a `finally`, and skips itself unless Microsoft SSO
- * is already active/configured in this environment (a real fallback login
- * path, checked before ever touching the toggle).
- */
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;
 

@@ -1,8 +1,4 @@
-"""Tests unitarios directos para app/services/chat/history.py.
-
-Usan db_session (MySQL real vía fixture) para sembrar datos y llaman las
-funciones del servicio directamente, verificando el estado resultante en BD.
-"""
+"""Tests unitarios directos para app/services/chat/history.py."""
 from __future__ import annotations
 
 import uuid
@@ -139,7 +135,6 @@ async def test_get_or_create_conversation_does_not_reopen_outside_window(db_sess
     conv = await history.get_or_create_conversation(
         db_session, session_id=resolved_session_id
     )
-    # get_or_create_conversation expira los objetos de la sesión (rollback/commit interno); con MySQL el recargado implícito revienta con MissingGreenlet, así que se refresca explícitamente.
     await db_session.refresh(conv)
     conv_id = conv.id
     conv_status = conv.status
@@ -205,9 +200,6 @@ async def test_add_message_persists_and_updates_last_message_at(db_session):
     ).scalar_one()
     assert row.content == "Hola, necesito ayuda"
 
-    # add_message actualiza last_message_at con un UPDATE de Core (no ORM), así
-    # que el objeto `conv` ya cargado en el identity map de la sesión no se
-    # entera solo - hay que refrescarlo explícitamente antes de comparar.
     await db_session.refresh(conv)
     assert conv.last_message_at > old_last_message_at
 
@@ -522,10 +514,6 @@ async def test_auto_resolve_stale_conversations_ignores_non_active(db_session, m
 
 
 async def test_acquire_and_release_session_lock_roundtrip(monkeypatch):
-    # acquire/release_session_lock hacen `from app.core.redis import get_redis`
-    # dentro de la propia función (import perezoso), así que hay que parchear
-    # el binding en su módulo origen - la fixture `client` no aplica aquí
-    # porque este test no pasa por el override de FastAPI.
     import fakeredis.aioredis
     import app.core.redis as redis_mod
     fake = fakeredis.aioredis.FakeRedis(decode_responses=True)
@@ -564,10 +552,6 @@ async def test_release_session_lock_swallows_redis_error(monkeypatch):
 async def test_get_or_create_conversation_finds_existing_when_lock_not_acquired(
     db_session, monkeypatch,
 ):
-    """Si el lock no se adquiere (contención o Redis caído), get_or_create_conversation
-    debe re-chequear si ya existe una conversación activa antes de crear una
-    nueva - sin esto, dos requests concurrentes que ambas fallan el lock
-    crean cada una su propia conversación, partiendo el historial en dos."""
     session_id = f"race-{uuid.uuid4().hex[:8]}"
 
     existing = ChatConversation(session_id=session_id, status=ConversationStatus.active)

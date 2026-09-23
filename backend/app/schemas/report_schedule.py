@@ -13,13 +13,7 @@ DEFAULT_REPORT_SCHEDULE: dict = {
 
 
 class ReportSchedule(BaseModel):
-    """Cadencia del reporte de preguntas sin responder (unanswered_digest).
-
-    `hour`/`minute` se interpretan en la zona de El Salvador (UTC-6). El
-    scheduler los convierte a UTC al momento de disparar. `days_of_week` usa
-    0=Lun … 6=Dom (solo para `unit="weekly"`). `day_of_month` para
-    monthly/yearly; `month` solo para yearly.
-    """
+    """Cadencia del reporte de preguntas sin responder (unanswered_digest)."""
 
     unit: str = Field("daily")
     hour: int = Field(8, ge=0, le=23)

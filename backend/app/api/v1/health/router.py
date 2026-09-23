@@ -44,21 +44,13 @@ class ReadinessResponse(BaseModel):
 
 @router.get("/live", response_model=LivenessResponse)
 async def liveness() -> LivenessResponse:
-    """Liveness probe - responde 200 si el proceso está vivo, sin tocar dependencias.
-
-    Apto para Kubernetes liveness probe o para uptimers que solo quieren saber
-    si el contenedor responde.
-    """
+    """Liveness probe - responde 200 si el proceso está vivo, sin tocar dependencias."""
     return LivenessResponse()
 
 
 @router.get("/ready", response_model=ReadinessResponse)
 async def readiness(response: Response) -> ReadinessResponse:
-    """Readiness probe - verifica BD + Redis + Qdrant.
-
-    Retorna 200 si todas las dependencias responden, 503 si alguna falla.
-    Pensado para UptimeRobot / Healthchecks.io / Kubernetes readiness probe.
-    """
+    """Readiness probe - verifica BD + Redis + Qdrant."""
     checks: dict[str, str] = {}
     all_ok = True
 
@@ -208,17 +200,12 @@ async def health_detailed(_: object = Depends(_system_read)):
     )
 
 
-
 @router.post("/snapshot", response_model=HealthSnapshotResult)
 async def take_snapshot(
     db: AsyncSession = Depends(get_db),
     _=Depends(_system_read),
 ):
-    """Recolecta una muestra inmediata de todos los servicios y la persiste.
-
-    Pensado para llamarse periódicamente (cron, background task externo, o
-    auto-refresh del UI). Retorna el resultado de los checks.
-    """
+    """Recolecta una muestra inmediata de todos los servicios y la persiste."""
     return await health_history.collect_snapshot(db)
 
 

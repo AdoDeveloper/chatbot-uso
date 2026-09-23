@@ -48,9 +48,6 @@ class TestRedisFallback:
         assert await check_rate_limit("test:dim3", "9.9.9.9", max_requests=5, window_seconds=60) is True
 
     async def test_local_fallback_still_enforces_a_limit(self, monkeypatch):
-        """El fallback local no debe ser ilimitado: permisivo (1.3x) pero
-        con techo real, para no dejar el endpoint público completamente
-        abierto mientras Redis está caído."""
         monkeypatch.setattr(rl_mod.redis_mod, "get_redis", lambda: _BrokenRedis())
         # limit=1 * 1.3 factor → techo real de 1 request (int(1.3) == 1)
         await check_rate_limit("test:dim4", "9.9.9.10", max_requests=1, window_seconds=60)
@@ -75,7 +72,6 @@ class TestRedisFallback:
         await check_rate_limit("test:dim5", "9.9.9.11", max_requests=5, window_seconds=60)
         assert rl_mod._LOCAL_FALLBACK_WARNED is False
 
-        # 2ª caída: debe volver a loguear (antes del fix quedaba en silencio porque el flag seguía en True desde la 1ª vez).
         monkeypatch.setattr(rl_mod.redis_mod, "get_redis", lambda: _BrokenRedis())
         await check_rate_limit("test:dim5", "9.9.9.11", max_requests=5, window_seconds=60)
         assert warnings.count("ratelimit.local_fallback_active") == 2

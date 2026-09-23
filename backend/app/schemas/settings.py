@@ -2,10 +2,6 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-# Fuente única del prompt: lo usan el valor por defecto de la configuración y
-# el respaldo del gateway cuando la base de datos no trae uno. Nombrar aquí el
-# material recuperado ("CONTEXTO") hacía que el asistente lo repitiera al
-# usuario, que no sabe qué es; el marcador {context} lo sustituye el gateway.
 DEFAULT_SYSTEM_PROMPT = (
     "Eres el asistente virtual de la Universidad de Sonsonate. Ayudas a "
     "estudiantes y aspirantes con trámites, requisitos y procesos académicos.\n\n"
@@ -33,10 +29,6 @@ DEFAULT_SYSTEM_PROMPT = (
     "Información disponible:\n{context}"
 )
 
-# Se responde con esto cuando el filtro de relevancia descarta todo lo
-# recuperado, sin llegar a consultar al modelo. Dice lo mismo que el prompt
-# indica al asistente en ese caso, para que la respuesta no cambie de tono
-# según quién la produzca.
 NO_CONTEXT_MESSAGE = (
     "Solo puedo ayudarte con temas de la Universidad de Sonsonate, como "
     "inscripciones, graduación o trámites académicos. Si tu consulta es sobre "

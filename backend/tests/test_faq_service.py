@@ -55,7 +55,6 @@ class TestUpdateFaqReEmbedFailure:
 
         assert updated.question == "pregunta editada"
 
-        # El texto se actualiza en MySQL, pero la Source debe quedar marcada como error, no como si el reindexado hubiera tenido éxito silenciosamente.
         src = await db_session.get(Source, faq_entry.source_id)
         assert src.status == SourceStatus.error
         assert src.error_message

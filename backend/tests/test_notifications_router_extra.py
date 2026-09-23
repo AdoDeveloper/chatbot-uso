@@ -1,15 +1,3 @@
-"""Tests para endpoints de app/api/v1/notifications/router.py sin cobertura
-en test_notifications.py (que ya cubre update de regla, inbox, mark-read y
-__repr__ seguro).
-
-Cubre:
-  - GET /notifications/rules (listado)
-  - GET /notifications/rules/email/status (agregado email_enabled)
-  - GET/PUT /notifications/report-schedule
-  - PUT /notifications/rules/email/toggle (toggle masivo del canal email)
-  - GET /notifications (historial paginado)
-  - Enmascarado de target (email/teléfono) en items del historial
-"""
 from __future__ import annotations
 
 import uuid
@@ -131,9 +119,6 @@ class TestListRules:
         assert r.status_code == 200, r.text
         body = r.json()
         assert len(body) == 3
-        # ORDER BY event, channel: MySQL ordena el ENUM nativo por posición de
-        # declaración (ver NotificationEvent en app/models/enums.py), no
-        # alfabéticamente - doc_ready antes que doc_error, luego escalation.
         assert [item["event"] for item in body] == [
             "doc_ready", "doc_error", "escalation",
         ]
@@ -439,8 +424,6 @@ class TestListNotifications:
     async def test_groups_multi_channel_trigger_into_one_row(
         self, client, db_session, admin_user, auth_headers
     ):
-        """Un mismo trigger_id entregado por correo y a 3 admins in_app
-        aparece como una fila con 2 canales, no 4 filas crudas."""
         trigger_id = uuid.uuid4()
         db_session.add(NotificationLog(
             id=uuid.uuid4(), trigger_id=trigger_id,

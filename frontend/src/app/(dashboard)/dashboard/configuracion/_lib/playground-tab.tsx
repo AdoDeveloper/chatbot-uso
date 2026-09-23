@@ -225,9 +225,6 @@ export function PlaygroundTab({
     model?: string;
     latency?: number;
   } | null>(null);
-  // El modo se persiste junto a la conversación: session_id pertenece a un
-  // modo concreto, y retomarlo desde el otro anexaría los mensajes nuevos con
-  // el browser equivocado.
   const [mode, setMode] = useState<PlaygroundMode>(() => {
     try {
       const stored = sessionStorage.getItem(_PG_MODE_STORAGE_KEY);
@@ -512,8 +509,6 @@ export function PlaygroundTab({
     setOfflineMode(false);
     setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
 
-    // Instancia local a esta invocación: distingue "me abortaron por ya no
-    // ser la request vigente" (ignorar) de "fallo de red real" (mostrar error).
     const controller = new AbortController();
     abortRef.current?.abort();
     abortRef.current = controller;
@@ -532,9 +527,6 @@ export function PlaygroundTab({
       question: q,
       session_id: sessionIdRef.current,
       messages: history.length > 0 ? history : undefined,
-      // En modo "deployed" el turno usa la config y las fuentes publicadas
-      // (lo mismo que ve un usuario real), así que debe contar en las
-      // estadísticas de producción: "playground" queda excluido de ellas.
       browser: mode === "deployed" ? "preview-production" : "playground",
       ...(mode === "deployed" ? { source_scope: "production" } : {}),
     });
@@ -695,23 +687,10 @@ export function PlaygroundTab({
         </div>
       </div>
 
-      {/* ── Main two-column layout ──
-          Altura acotada también en mobile (no solo md:) para que el chat
-          tenga scroll interno en vez de crecer y empujar el resto de la
-          página. En mobile usa una fracción del viewport; desde md: la
-          ventana flotante de tamaño fijo.
-          dvh en vez de vh: vh mide el viewport de layout completo (fijo),
-          dvh se ajusta al viewport visual real - con vh, al abrir el
-          teclado el chat quedaba parcialmente tapado (el input inaccesible)
-          porque 82vh seguía calculando sobre la altura sin teclado. */}
       <div
         className="flex flex-col md:flex-row rounded-xl border border-border overflow-hidden h-[82vh] h-[82dvh] md:h-[580px]"
       >
         {/* ── Left: page simulation ── */}
-        {/* En mobile no hay espacio real para simular una página de fondo:
-            el chat ocuparía casi todo el ancho igual, dejando el "browser
-            chrome" y el skeleton fantasma como una tira inútil detrás. Se
-            oculta bajo md: y el chat pasa a ocupar el panel completo. */}
         <div className="flex-1 relative overflow-hidden bg-slate-100 dark:bg-slate-800/60 flex flex-col min-h-0">
           {/* Chrome del navegador */}
           <div className="hidden md:flex bg-white dark:bg-slate-900 border-b border-border/50 px-3 py-2 items-center gap-2 shrink-0">
@@ -765,9 +744,6 @@ export function PlaygroundTab({
           {/* ── Widget: pantalla completa en mobile, flotante desde md: en la
               esquina configurada. ── */}
           <div className={`flex-1 min-h-0 flex flex-col items-center justify-center md:justify-start md:absolute md:inset-auto md:flex-none gap-2.5 ${widgetCornerClass}`}>
-            {/* En mobile, con el chat cerrado, se muestra un estado vacío
-                claro en vez de dejar solo el fondo gris con un botón
-                flotando sin contexto. */}
             {!widgetOpen && (
               <div className="md:hidden flex flex-col items-center gap-2.5 px-6 text-center">
                 <MessageSquare className="w-9 h-9 text-muted-foreground/30" />
@@ -776,20 +752,12 @@ export function PlaygroundTab({
                 </p>
               </div>
             )}
-            {/* Mensaje proactivo (solo cuando el widget está cerrado). El simulador
-                emula un sitio web real (siempre claro), por eso se fijan
-                colores explícitos en vez de usar variantes dark: del panel. */}
             {!widgetOpen && proactiveMessage && (
               <div className="bg-white text-slate-800 border border-slate-200 rounded-2xl shadow-lg px-3 py-2 text-xs max-w-[70vw] md:max-w-[200px] text-center md:text-left">
                 {proactiveMessage}
               </div>
             )}
 
-            {/* Chat panel - overlay fijo de pantalla completa real en
-                mobile (portal a document.body, fuera de la card acotada a
-                82dvh: si quedaba dentro del flujo normal, el input se
-                perdía al crecer la conversación), ventana flotante de
-                tamaño fijo desde md: (simula el widget embebido). */}
             {widgetOpen && maybePortal(
               isMobilePreview,
               <div
@@ -930,8 +898,6 @@ export function PlaygroundTab({
                   </div>
                 )}
 
-                {/* Un fallo de red o backend reemplaza todo el cuerpo del chat
-                    (mensajes, CSAT, sugerencias) por este panel. */}
                 {offlineMode ? (
                   <div className="flex-1 flex flex-col items-center justify-center gap-2 px-6 py-8 text-center">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} width={36} height={36} className="text-muted-foreground/40">
@@ -1438,9 +1404,6 @@ export function PlaygroundTab({
               </div>
             )}
 
-            {/* Fila del launcher: label + botón. Oculto en mobile cuando el
-                chat ya está abierto (ahí el botón "minimizar" vive dentro
-                del propio header del chat, ver arriba). */}
             <div className={`items-center gap-2 self-center md:self-auto ${widgetOpen ? "hidden md:flex" : "flex"}`}>
               {!widgetOpen && launcherLabel && (
                 <div className="bg-white text-slate-800 border border-slate-200 rounded-full shadow-md px-3 py-1.5 text-xs font-medium max-w-[60vw] md:max-w-[200px] truncate">

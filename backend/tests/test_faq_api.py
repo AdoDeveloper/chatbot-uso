@@ -1,8 +1,4 @@
-"""Integration tests for the FAQ API.
-
-Exercises the full HTTP → router → service → DB pipeline against an in-memory
-SQLite database. Each test gets a fresh DB and a fresh authenticated user.
-"""
+"""Integration tests for the FAQ API."""
 from __future__ import annotations
 
 import pytest

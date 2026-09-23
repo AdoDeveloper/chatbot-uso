@@ -51,11 +51,7 @@ async def list_sources(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_perm(P.KNOWLEDGE_READ)),
 ):
-    """Lista todas las fuentes activas (no soft-deleted), ordenadas por más reciente.
-
-    Eager-loads las relaciones `created_by` y `reviewed_by` para que el shape de la
-    respuesta incluya nombres en lugar de UUIDs sueltos.
-    """
+    """Lista todas las fuentes activas (no soft-deleted), ordenadas por más reciente."""
     result = await db.execute(
         select(Source)
         .where(Source.deleted_at.is_(None))
@@ -173,9 +169,7 @@ async def replace_source_file(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_perm(P.KNOWLEDGE_UPDATE)),
 ):
-    """Reemplaza el archivo de una fuente existente (ej. tras un rechazo) y
-    dispara una nueva ingestión. Distinto de /ingest, que reprocesa el mismo
-    archivo sin cambios."""
+    """Reemplaza el archivo de una fuente existente."""
     source = await sources_svc.replace_source_file(
         db, source_id=source_id, req=req, background_tasks=background_tasks,
         file=file, current_user=current_user,
@@ -196,11 +190,7 @@ async def approve_source(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_perm(P.KNOWLEDGE_MANAGE)),
 ):
-    """Marca la fuente como aprobada - el chatbot puede usarla en sus respuestas.
-
-    Si la fuente venía de un estado `rechazada` se limpia `rejection_reason`.
-    Cada aprobación queda registrada en audit_log con la acción `source.approve`.
-    """
+    """Marca la fuente como aprobada - el chatbot puede usarla en sus respuestas."""
     source = await sources_svc.get_or_404(db, source_id, load_user=True)
     source.review_status = ReviewStatus.aprobada
     source.reviewed_at = datetime.now(timezone.utc)
@@ -233,11 +223,7 @@ async def reject_source(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_perm(P.KNOWLEDGE_MANAGE)),
 ):
-    """Marca la fuente como rechazada con un motivo escrito (truncado a 500 chars).
-
-    El chatbot deja de consultar la fuente inmediatamente. La razón queda visible
-    en la UI para que el editor que subió la fuente pueda corregirla y re-subirla.
-    """
+    """Marca la fuente como rechazada con un motivo escrito (truncado a 500 chars)."""
     source = await sources_svc.get_or_404(db, source_id, load_user=True)
     source.review_status = ReviewStatus.rechazada
     source.reviewed_at = datetime.now(timezone.utc)
@@ -393,10 +379,7 @@ async def preview_source(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_perm(P.KNOWLEDGE_READ)),
 ):
-    """Devuelve un extracto del contenido sin re-ejecutar ingestión.
-
-    Lee el archivo desde disco (si aún existe) y extrae texto plano.
-    """
+    """Devuelve un extracto del contenido sin re-ejecutar ingestión."""
     source = await sources_svc.get_or_404(db, source_id)
     preview_text = ""
     truncated = False

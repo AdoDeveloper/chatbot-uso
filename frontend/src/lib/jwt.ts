@@ -7,12 +7,6 @@ export interface JwtPayload {
   permissions?: string[];
 }
 
-/**
- * Decodifica la parte payload de un JWT (base64url) SIN verificar la firma.
- * La firma la valida el backend; aquí solo leemos el claim `permissions` para
- * resolver la visibilidad de la navegación en el cliente. Si el token es
- * inválido o no tiene payload, devolvemos null.
- */
 export function decodeJwt(token: string | null | undefined): JwtPayload | null {
   if (!token) return null;
   const part = token.split(".")[1];

@@ -1,8 +1,4 @@
-"""Tests del wizard de bienvenida.
-
-Cubre la lógica del endpoint `/auth/onboarding-status` que decide en qué paso
-está cada admin y el endpoint `/auth/onboarding-dismiss` que permite saltarlo.
-"""
+"""Tests del wizard de bienvenida."""
 from __future__ import annotations
 
 import uuid
@@ -132,7 +128,6 @@ class TestOnboardingStatus:
     async def test_step_5_when_no_messages(
         self, client, db_session, admin_user, auth_headers
     ):
-        """Todo listo excepto la primera pregunta: paso 5 = probar el bot."""
         await _create_provider(db_session, is_active=True)
         await _create_source(db_session, review_status=ReviewStatus.aprobada)
         r = await client.get(
@@ -174,8 +169,6 @@ class TestOnboardingDismiss:
     async def test_dismiss_persists_in_status(
         self, client, admin_user, auth_headers
     ):
-        """Tras dismiss, /onboarding-status retorna dismissed: true (aunque
-        step siga siendo 1, el frontend usa esto para no mostrar el wizard)."""
         await client.post(
             "/api/v1/auth/onboarding-dismiss",
             headers=auth_headers(admin_user),

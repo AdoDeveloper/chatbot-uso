@@ -3,14 +3,6 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 
-/**
- * Functional coverage for /dashboard/conocimiento/documentos: both tabs.
- *
- * Fuentes: upload a small real .txt source, add a tag, reingest it, then
- * delete it (full lifecycle, real backend ingestion pipeline).
- *
- * FAQ: create/edit/delete an FAQ entry.
- */
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;
 
@@ -26,7 +18,6 @@ function escapeRegExp(s: string): string {
 
 test.describe("Conocimiento > Documentos > Fuentes", () => {
   test("subir, etiquetar, reingestar y eliminar una fuente", async ({ page }) => {
-    // Compite por el mismo pipeline de ingestión con conocimiento-chunks.spec.ts bajo workers:2; el timeout explícito debe superar el budget del .toPass() de abajo.
     test.setTimeout(300_000);
     const uniqueId = Date.now();
     const sourceName = `E2E Source ${uniqueId}`;
@@ -54,7 +45,6 @@ test.describe("Conocimiento > Documentos > Fuentes", () => {
 
     // Solo espera el badge de estado "Listo", no el de revisión (ese queda "Pendiente" legítimamente hasta que un admin aprueba).
     await expect(row.getByText("Listo", { exact: true })).toBeVisible({ timeout: 60_000 });
-    // El backend puede tardar unos segundos en liberar el lock de Redis tras marcar "Listo"; reingestar antes puede pegarle a "already_running" como no-op silencioso.
     await page.waitForTimeout(8_000);
     await page.screenshot({ path: path.join(SHOT_DIR, "02-fuente-procesada.png") });
 

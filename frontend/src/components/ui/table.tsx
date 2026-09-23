@@ -4,7 +4,6 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 import { ScrollShadow } from "@/components/composed/scroll-shadow"
 
-// `min-w-full` deja que la tabla crezca y active el scroll horizontal del ScrollShadow; las columnas ocultas en mobile no fuerzan ese scroll.
 function Table({ className, ...props }: React.HTMLAttributes<HTMLTableElement>) {
   return (
     <ScrollShadow className="w-full">
@@ -42,11 +41,6 @@ function TableHead({ className, sticky, ...props }: React.ThHTMLAttributes<HTMLT
       data-slot="table-head"
       className={cn(
         "h-9 px-3 text-left align-middle text-2xs font-semibold uppercase tracking-wider text-muted-foreground bg-muted [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
-        // w-px + whitespace-nowrap: en table-layout auto esto no fuerza 1px
-        // real, sino que reduce la columna al mínimo que su contenido más
-        // ancho requiera (título "Acciones" vs. los botones de cada fila) -
-        // se ajusta por tabla en vez de reservar un ancho fijo igual para
-        // una sola acción que para varias.
         sticky && "sticky right-0 z-10 w-px whitespace-nowrap border-l border-border/60 shadow-[-4px_0_6px_-4px_rgb(0_0_0/0.12)]",
         className
       )}

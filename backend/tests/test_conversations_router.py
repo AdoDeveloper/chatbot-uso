@@ -1,10 +1,4 @@
-"""Tests para app/api/v1/conversations/router.py.
-
-Cubre get_conversation, update status, CSAT, feedback de mensajes, tags, y
-bulk_action (que resuelve con un solo SELECT ... IN() en vez de N
-SELECTs) - este archivo fija el contrato para que una futura regresión de
-performance o de lógica no pase desapercibida.
-"""
+"""Tests para app/api/v1/conversations/router.py."""
 from __future__ import annotations
 
 import uuid
@@ -365,9 +359,6 @@ class TestListKnownTags:
 
 
 class TestDeleteConversation:
-    """DELETE /conversations/{id} - permiso conversations.delete, agregado
-    tras la auditoría que encontró el permiso sembrado en el catálogo de
-    roles sin ningún endpoint que lo usara."""
 
     async def test_requires_auth(self, client):
         r = await client.delete(f"/api/v1/conversations/{uuid.uuid4()}")

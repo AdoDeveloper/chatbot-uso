@@ -1,10 +1,4 @@
-"""Tests para app/api/v1/providers/router.py - no tenía ningún test.
-
-Los endpoints /test y /{id}/test llaman a proveedores LLM externos
-reales (llm_gateway.test_connection) - se mockean con monkeypatch para no
-hacer llamadas HTTP de verdad ni depender de que un proveedor externo esté
-disponible.
-"""
+"""Tests para app/api/v1/providers/router.py - no tenía ningún test."""
 from __future__ import annotations
 
 import uuid

@@ -118,11 +118,7 @@ async def test_saved_provider(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(_admin),
 ):
-    """Prueba la conexión de un proveedor ya guardado (usa la API key almacenada).
-
-    Persiste el resultado en `llm_providers.last_test_*` para mostrar el estado
-    en la UI sin re-pingear cada vez que se carga la página.
-    """
+    """Prueba la conexión de un proveedor ya guardado (usa la API key almacenada)."""
     row = await settings_service.get_provider_with_key(db, provider_id)
     if not row:
         raise NotFoundError("Proveedor no encontrado")

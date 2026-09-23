@@ -60,11 +60,7 @@ async def purge_health_outliers(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(_admin),
 ) -> PurgeHealthResult:
-    """Elimina snapshots de salud con latencias anómalas (> 2 s).
-
-    Útil cuando el historial acumula mediciones del arranque inicial o de
-    momentos de caída severa que distorsionan los percentiles P95/P99.
-    """
+    """Elimina snapshots de salud con latencias anómalas (> 2 s)."""
     threshold = 2_000
     result = await db.execute(
         delete(HealthSnapshot).where(HealthSnapshot.latency_ms > threshold)

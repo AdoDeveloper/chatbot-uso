@@ -20,10 +20,7 @@ from app.db.session import Base
 
 
 class ProviderTypeCatalog(Base):
-    """Catálogo editable de tipos de proveedor LLM conocidos (URL base +
-    headers por defecto). Reemplaza el dict hardcodeado que antes vivía en
-    llm_gateway.py - un LLMProvider sin api_base propio resuelve contra
-    esta tabla en tiempo de petición (mismo patrón que api_base hoy)."""
+    """Catálogo editable de tipos de proveedor LLM conocidos (URL base + headers por defecto)."""
 
     __tablename__ = "provider_type_catalog"
     __table_args__ = (UniqueConstraint("type_key", name="uq_provider_type_catalog_type_key"),)
@@ -40,9 +37,6 @@ class ProviderTypeCatalog(Base):
     # Sembrado vs. creado por el admin - solo cosmético, no bloquea edición/borrado.
     is_builtin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="0")
 
-    # Si este tipo de proveedor exige API key para autenticarse (la mayoría
-    # de APIs cloud) o no (servidores propios como Ollama/LM Studio/vLLM,
-    # que normalmente no piden credenciales).
     requires_api_key: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, server_default="1")
 
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)

@@ -105,11 +105,7 @@ async def upsert_chunks(
     chunks: list[dict],
     embeddings: list[dict],
 ) -> int:
-    """
-    Inserta/actualiza puntos en Qdrant.
-    chunks: salida de chunking.chunk_text
-    embeddings: salida de embedding.embed_texts (misma longitud)
-    """
+    """Inserta/actualiza puntos en Qdrant."""
     client = _get_client()
     points = []
     for chunk, emb in zip(chunks, embeddings):
@@ -152,11 +148,7 @@ ALL_CHUNKS_CAP = 2000
 
 
 async def list_all_chunks(source_id: str) -> list[dict]:
-    """Trae todos los chunks de una fuente en una sola llamada, ordenados por chunk_index.
-
-    Se usa para calcular la paginación numérica page/page_size/total en el
-    servidor sin depender del cursor de scroll opaco y solo-adelante de Qdrant.
-    """
+    """Trae todos los chunks de una fuente en una sola llamada, ordenados por chunk_index."""
     client = _get_client()
     source_filter = Filter(
         must=[FieldCondition(key="source_id", match=MatchValue(value=source_id))]
@@ -175,12 +167,7 @@ async def list_all_chunks(source_id: str) -> list[dict]:
 
 
 async def set_source_active(source_id: str, value: bool) -> None:
-    """Marca is_active=value en todos los puntos de una fuente (FAQ).
-
-    Usado por faq.update_faq() para propagar el toggle "Activo/Inactivo" del
-    panel a Qdrant sin necesidad de re-embeber: sin esto, hybrid_search()
-    sigue devolviendo (y el bot sigue citando) una FAQ marcada inactiva.
-    """
+    """Marca is_active=value en todos los puntos de una fuente (FAQ)."""
     client = _get_client()
     source_filter = Filter(
         must=[FieldCondition(key="source_id", match=MatchValue(value=source_id))]
@@ -203,11 +190,6 @@ async def get_chunk(point_id: str) -> dict | None:
             with_vectors=False,
         )
     except UnexpectedResponse as exc:
-        # Qdrant exige que el id sea UUID o entero; con cualquier otro
-        # formato responde 400 y el cliente lo propaga como excepción en
-        # vez de una lista vacía - sin este catch, un point_id mal formado
-        # (ej. "1" a secas, o cualquier string no-UUID) tumbaba el endpoint
-        # con un 500 genérico en vez de un 404 limpio.
         log.warning("qdrant.get_chunk_invalid_id", point_id=point_id, error=str(exc))
         return None
     if not points:
@@ -263,14 +245,7 @@ async def hybrid_search(
     score_threshold: float = 0.0,
     balance_sources: bool = False,
 ) -> list[dict]:
-    """
-    Búsqueda híbrida (RRF sobre dense + sparse).
-
-    Si balance_sources=True y no hay filtro explícito de fuentes, crea prefetches
-    independientes por fuente con su propio filtro y Weighted RRF, asignando
-    mayor peso a fuentes minoritarias según su cantidad de chunks.
-    (requiere Qdrant v1.17+ para RrfQuery).
-    """
+    """Búsqueda híbrida (RRF sobre dense + sparse)."""
     from qdrant_client.models import Fusion, FusionQuery, Prefetch
 
     client = _get_client()

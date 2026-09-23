@@ -24,8 +24,6 @@ class TestInputValidation:
 
 
 class TestCaracteresSospechosos:
-    """El historial que el widget reenvía vuelve a pasar por validate_input, así
-    que un falso positivo aquí borra del contexto las respuestas del asistente."""
 
     def test_espacio_estrecho_no_marca_el_mensaje(self):
         # Los modelos lo emiten al formatear rangos: "9.0 – 9.5", "CUM ≥ 9.0".
@@ -99,11 +97,7 @@ class TestApplyOutputGuardrails:
         assert apply_output_guardrails(normal) == normal
 
     def test_pii_in_llm_output_is_redacted(self):
-        """El contexto recuperado (documentos indexados) nunca pasa por
-        validate_input - solo `question` lo hace. Si el LLM cita
-        textualmente un DUI presente en un documento fuente, debe
-        redactarse igual que si lo hubiera escrito el usuario. scan_output
-        estaba importado en pipeline.py pero nunca invocado (dead code)."""
+        """El contexto recuperado (documentos indexados) nunca pasa por validate_input - solo `question` lo hace."""
         from app.services.chat.pipeline import apply_output_guardrails
 
         leaked_pii = "Según el registro, el estudiante con DUI 12345678-9 está matriculado."
@@ -119,9 +113,6 @@ class TestApplyOutputGuardrails:
 
 
 class TestApplyOutputGuardrailsContextAllowList:
-    """Un correo/teléfono institucional que el admin indexó a propósito en un
-    documento (para que el bot lo comparta) no debe redactarse solo porque
-    el LLM lo repitió textualmente en la respuesta."""
 
     def test_email_present_in_context_is_not_redacted(self):
         from app.services.chat.pipeline import apply_output_guardrails
@@ -148,8 +139,6 @@ class TestApplyOutputGuardrailsContextAllowList:
         assert "otro-correo@ejemplo.com" not in result
 
     def test_dui_in_context_is_still_redacted(self):
-        """DUI, tarjeta e IBAN no entran al allow_list aunque estén en el
-        contexto: son datos de una persona, no contacto institucional."""
         from app.services.chat.pipeline import apply_output_guardrails
 
         context = [{"text": "El estudiante con DUI 12345678-9 está matriculado."}]
@@ -166,18 +155,12 @@ class TestApplyOutputGuardrailsContextAllowList:
 
 
 class TestRedactPiiConfigurableEntities:
-    """pii_entities era configurable desde el panel (PATCH /guardrails/config)
-    y GET /config lo reflejaba, pero redact_pii nunca lo leía - usaba una
-    lista hardcodeada fija. Ahora acepta `entities` desde el caller."""
 
     def test_default_entities_redacts_email(self):
         result = redact_pii("mi correo es juan@example.com")
         assert "juan@example.com" not in result
 
     def test_empty_entities_list_still_redacts_sv_recognizers(self):
-        """Los reconocedores SV_* (DUI/NIT/NRC/teléfono) son cumplimiento
-        normativo, no un toggle del admin - deben aplicarse siempre aunque
-        el admin desactive todas las entidades genéricas."""
         result = redact_pii("mi DUI es 12345678-9", entities=[])
         assert "12345678-9" not in result
 
@@ -195,11 +178,6 @@ class TestRedactPiiConfigurableEntities:
 
 
 class TestSvPhoneFalsePositives:
-    """El patrón SV_PHONE matcheaba una subcadena de 8 dígitos empezando en
-    2/6/7 dentro de CUALQUIER número largo, sin exigir un límite de palabra
-    al inicio - un timestamp de 13 dígitos usado como texto de prueba se
-    redactó como si fuera un teléfono real, rompiendo la búsqueda por texto
-    exacto de esa conversación en el panel."""
 
     def test_real_phone_still_detected(self):
         result = redact_pii("Llámame al 71234567")
@@ -210,8 +188,6 @@ class TestSvPhoneFalsePositives:
         assert "7123-4567" not in result
 
     def test_long_numeric_id_is_not_redacted(self):
-        """Un ID/timestamp largo que por casualidad contiene una subcadena
-        de 8 dígitos empezando en 2/6/7 no debe tratarse como teléfono."""
         text = "El código de referencia es 1788223266862"
         result = redact_pii(text)
         assert result == text

@@ -1,11 +1,4 @@
-"""Tests de revocación de JWT y guardas anti-escalada.
-
-Cubre las correcciones de seguridad:
-  - C-1: update_user no permite auto-promoción de rol ni auto-desactivación,
-    ni que un no-admin modifique a un admin.
-  - C-2: logout revoca el token (denylist), refresh rota e invalida el anterior,
-    y change_password invalida todas las sesiones previas (tokens_valid_after).
-"""
+"""Tests de revocación de JWT y guardas anti-escalada."""
 from __future__ import annotations
 
 
@@ -17,7 +10,6 @@ from app.models.enums import UserRole
 @pytest.fixture
 async def admin_user(make_user):
     return await make_user(role=UserRole.admin, email="admin@example.com")
-
 
 
 async def test_user_cannot_promote_own_role(client, admin_user, auth_headers):
@@ -77,7 +69,6 @@ async def test_admin_can_update_other_user(client, admin_user, make_user, auth_h
     )
     assert resp.status_code == 200
     assert resp.json()["full_name"] == "Nombre Nuevo"
-
 
 
 async def test_logout_revokes_access_token(client, admin_user, auth_headers):

@@ -1,6 +1,5 @@
 import { test, expect } from "@playwright/test";
 
-// Coverage for /dashboard/conversaciones: assistant replies render as sanitized markdown, and the delete-conversation action is a labeled, always-visible button.
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;
 
@@ -10,7 +9,6 @@ test.skip(!E2E_USER || !E2E_PASS, "E2E_USER / E2E_PASS not set - skipping");
 test.describe("Conversaciones", () => {
   test("assistant messages render markdown, not raw syntax", async ({ page }) => {
     await page.goto("/dashboard/conversaciones");
-    // Don't gate on the skeleton's absence - right after goto() it may not be attached yet, so a "count 0" check resolves trivially true before data loads. Poll for the list item instead.
     const firstItem = page.locator('button[aria-pressed]').first();
     const hasConversations = await firstItem
       .waitFor({ state: "visible", timeout: 15_000 })
@@ -31,7 +29,6 @@ test.describe("Conversaciones", () => {
 
   test("delete conversation action is a visible labeled button", async ({ page }) => {
     await page.goto("/dashboard/conversaciones");
-    // Don't gate on the skeleton's absence - right after goto() it may not be attached yet, so a "count 0" check resolves trivially true before data loads. Poll for the list item instead.
     const firstItem = page.locator('button[aria-pressed]').first();
     const hasConversations = await firstItem
       .waitFor({ state: "visible", timeout: 15_000 })

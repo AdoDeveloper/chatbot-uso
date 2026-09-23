@@ -32,7 +32,6 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 // tokens: el access token nuevo trae permisos frescos, así que re-decodificamos.
 export const TOKENS_REFRESHED_EVENT = "auth:tokens-refreshed";
 
-// Permisos desde el claim `permissions` del JWT, incrustado por el backend en todo login/refresh/SSO.
 function permsFromToken(): Set<string> | null {
   const payload = decodeJwt(tokenStore.getAccess());
   const p = payload?.permissions;
@@ -58,10 +57,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (data.must_change_password && !currentPath.startsWith("/cambiar-contrasena")) {
         router.push("/cambiar-contrasena");
       } else if (!data.must_change_password && currentPath.startsWith("/cambiar-contrasena")) {
-        // Navegación completa, no router.push: mismo motivo que login() -
-        // change-password acaba de rotar tokens_valid_after y las cookies,
-        // y una soft-navigation puede dejar al middleware viendo el estado
-        // viejo (página en blanco hasta refrescar manualmente).
         window.location.href = "/dashboard";
       }
     } catch (err: unknown) {
@@ -106,10 +101,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(data.user);
     const next = permsFromToken();
     setPermissions((prev) => next ?? prev);
-    // Navegación completa (no router.push): el middleware server-side a veces
-    // no ve la cookie recién seteada por JS en una soft-navigation, dejando
-    // la página en blanco hasta refrescar manualmente. window.location.href
-    // fuerza un request nuevo que sí incluye la cookie fresca.
     window.location.href = data.user.must_change_password ? "/cambiar-contrasena" : "/dashboard";
   }, []);
 

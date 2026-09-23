@@ -1,14 +1,4 @@
-"""Tests unitarios directos para app/services/ingestion/source_quality.py.
-
-Siembra datos reales (Source, ChatConversation, ChatMessage) via db_session
-y llama quality_report/find_duplicate/classify_error/file_hash directamente,
-verificando el resultado exacto.
-
-test_sources_router_extra.py::TestQualityReport ya cubre el endpoint
-/quality de forma superficial (solo checa que "total_chunks" esté en la
-respuesta). Aquí se prueba el servicio en profundidad: hits_7d, last_used_at,
-manejo de sources_json con distintas formas, y el bloque 76-122 completo.
-"""
+"""Tests unitarios directos para app/services/ingestion/source_quality.py."""
 from __future__ import annotations
 
 import uuid
@@ -82,10 +72,6 @@ async def _make_message(db_session, conv, *, sources_json, created_at=None) -> C
     return msg
 
 
-# ---------------------------------------------------------------------------
-# file_hash
-# ---------------------------------------------------------------------------
-
 class TestFileHash:
     def test_returns_sha256_hex(self):
         import hashlib
@@ -98,10 +84,6 @@ class TestFileHash:
     def test_empty_content_matches_known_sha256(self):
         assert file_hash(b"") == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 
-
-# ---------------------------------------------------------------------------
-# classify_error
-# ---------------------------------------------------------------------------
 
 class TestClassifyError:
     def test_none_message_returns_all_none(self):
@@ -158,10 +140,6 @@ class TestClassifyError:
         assert friendly == "El PDF está protegido con contraseña."
 
 
-# ---------------------------------------------------------------------------
-# find_duplicate
-# ---------------------------------------------------------------------------
-
 class TestFindDuplicate:
     async def test_finds_source_with_matching_hash(self, db_session):
         s = _make_source(content_hash="abc123")
@@ -192,10 +170,6 @@ class TestFindDuplicate:
         found = await find_duplicate(db_session, "deleted789")
         assert found is None
 
-
-# ---------------------------------------------------------------------------
-# quality_report - foco principal: bloque 76-122
-# ---------------------------------------------------------------------------
 
 class TestQualityReport:
     async def test_source_not_found_returns_error_dict(self, db_session):

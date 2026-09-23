@@ -1,11 +1,5 @@
 import { test, expect } from "@playwright/test";
 
-/**
- * Coverage for the main /dashboard landing page's interactive elements
- * (KPI cards, workflow links, quick actions) - complements
- * smoke-all-pages.spec.ts, which only checks that the page loads without
- * errors.
- */
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;
 
@@ -23,7 +17,7 @@ test.describe("Dashboard inicio", () => {
     await expect(page.getByText(/latencia promedio/i)).toBeVisible();
   });
 
-  test("workflow cycle links to documentos and playground", async ({ page }) => {
+  test("workflow cycle links to documentos and previsualizar", async ({ page }) => {
     await page.goto("/dashboard");
 
     await page.getByRole("link", { name: /documentos/i }).first().click();
@@ -31,7 +25,7 @@ test.describe("Dashboard inicio", () => {
 
     await page.goto("/dashboard");
     await page.getByRole("link", { name: /pruebas/i }).first().click();
-    await expect(page).toHaveURL(/\/dashboard\/configuracion\/playground/);
+    await expect(page).toHaveURL(/\/dashboard\/configuracion\/asistente\/previsualizar/);
   });
 
   test("quick actions navigate to their targets", async ({ page }) => {
@@ -50,7 +44,7 @@ test.describe("Dashboard inicio", () => {
 
     await page.goto("/dashboard");
     await page.getByRole("link", { name: /previsualizar/i }).click();
-    await expect(page).toHaveURL(/\/dashboard\/configuracion\/playground/);
+    await expect(page).toHaveURL(/\/dashboard\/configuracion\/asistente\/previsualizar/);
   });
 
   test("security and health snapshots link to their detail pages", async ({ page }) => {
@@ -96,9 +90,6 @@ test.describe("Dashboard inicio", () => {
   });
 });
 
-// ── OnboardingWizard ─────────────────────────────────────────────────────
-// Staging only: desactiva temporalmente los proveedores activos vía API
-// para forzar step != "done", y los restaura en un `finally`.
 test.describe("Dashboard inicio - OnboardingWizard", () => {
   test("wizard renders, dismiss and refresh both work", async ({ page }) => {
     test.setTimeout(60_000);

@@ -2,15 +2,6 @@ import { test, expect } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 
-/**
- * Functional coverage for /dashboard/configuracion/estado: health snapshot
- * refresh, rate-limit config save (restored after), and the "Sincronizar
- * Qdrant" recovery action (safe/idempotent - only removes already-orphaned
- * chunks, does not touch valid data), all against the real backend.
- *
- * "Limpiar caché completo" and "Limpiar P99" live in their own file
- * (configuracion-estado-mantenimiento.spec.ts) since both are destructive.
- */
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;
 

@@ -97,11 +97,7 @@ async def upload_source(
     db: AsyncSession, *, req: Request, background_tasks: BackgroundTasks,
     file: UploadFile, name: str, description: str, tags: str, current_user: User,
 ) -> Source:
-    """Sube un archivo (PDF/DOCX/TXT) y dispara la ingestión en background.
-
-    El status comienza como `pending` y avanza a `processing` → `ready`/`error`
-    conforme el job de fondo (chunking + embedding + upsert Qdrant) progresa.
-    """
+    """Sube un archivo (PDF/DOCX/TXT) y dispara la ingestión en background."""
     source_type = detect_type(file.filename or "", file.content_type or "")
     source_name = name.strip() or Path(file.filename or "archivo").stem
 
@@ -190,9 +186,7 @@ async def replace_source_file(
     db: AsyncSession, *, source_id: uuid.UUID, req: Request,
     background_tasks: BackgroundTasks, file: UploadFile, current_user: User,
 ) -> Source:
-    """Reemplaza el archivo físico de una fuente existente (ej. tras un
-    rechazo por contenido incorrecto) y dispara una nueva ingestión.
-    """
+    """Reemplaza el archivo físico de una fuente existente."""
     source = await get_or_404(db, source_id)
     if source.status == SourceStatus.processing:
         raise HTTPException(
@@ -432,14 +426,7 @@ async def bulk_reingest_sources(
 
 
 async def _acquire_ingestion_lock(source_id: uuid.UUID) -> bool | None:
-    """Lock por source para evitar ingestas concurrentes (doble click, reingest
-    + edit simultáneo) que dejarían vectores huérfanos o chunk_count incorrecto.
-
-    Devuelve:
-      True  → lock adquirido, proceder.
-      False → otra ingesta ya corre para este source, NO proceder.
-      None  → Redis no disponible; proceder igualmente (no bloquear ingesta).
-    """
+    """Lock por source para evitar ingestas concurrentes."""
     from app.core import redis as _redis_mod
     try:
         ok = await _redis_mod.get_redis().set(
@@ -478,7 +465,6 @@ async def run_ingestion(source_id: uuid.UUID) -> None:
                     await ingestion.ingest(db, source)
             except Exception as exc:
                 _log.error("ingestion.background_failed", source_id=str(source_id), error=str(exc))
-                # Marca la fuente como error para que el UI muestre el fallo en vez de quedarse colgado.
                 try:
                     # La sesión viene de una excepción: sin rollback previo la
                     # escritura falla y la fuente queda en `processing` para siempre.

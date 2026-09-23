@@ -1,9 +1,4 @@
-"""Tests de app/services/ai/context_budget.py - recorte de contexto por presupuesto.
-
-Sin cobertura previa pese a ser lógica que evita 413 Payload Too Large del
-proveedor LLM: si el chunk de mayor score por sí solo excede el presupuesto
-disponible, debía truncarse su propio texto en vez de enviarse íntegro.
-"""
+"""Tests de app/services/ai/context_budget.py - recorte de contexto por presupuesto."""
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -27,14 +22,11 @@ def _provider(*, model_name: str = "", provider_type: str = "", context_limit=No
 
 class TestGetContextWindow:
     def test_explicit_context_limit_wins_over_everything(self):
-        # context_limit no es un campo real de LLMProvider, pero get_context_window ya lo respeta si algún caller lo pasa - contrato forward-compatible.
         p = _provider(model_name="gpt-4o", provider_type="openai", context_limit=999_999)
         assert get_context_window(p) == 999_999
 
     def test_more_specific_model_override_wins_over_generic_prefix(self):
-        """gpt-4.1-nano y gpt-4.1-mini deben matchear antes que gpt-4.1
-        genérico; gpt-4o-mini antes que gpt-4o. El orden de inserción del
-        dict importa porque get_context_window usa `needle in model_name`."""
+        """gpt-4.1-nano y gpt-4.1-mini deben matchear antes que gpt-4.1 genérico; gpt-4o-mini antes que gpt-4o."""
         assert get_context_window(_provider(model_name="gpt-4.1-nano-2026")) == 1_000_000
         assert get_context_window(_provider(model_name="gpt-4.1-2026-05-01")) == 1_000_000
         assert get_context_window(_provider(model_name="gpt-4o-mini")) == 128_000

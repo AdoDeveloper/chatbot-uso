@@ -23,16 +23,7 @@ _GREETING_MAX_LEN = 80  # cota dura de longitud antes de tokenizar
 
 
 def _is_greeting_only(q: str) -> bool:
-    """True si la pregunta completa es, en esencia, solo saludo/cortesía.
-
-    Reemplaza al patrón regex `^(?:(?:ALT)\\s*[,.!?]*\\s*)+$` que sufría
-    backtracking catastrófico (ReDoS) con entradas tipo "hola " * N: un
-    grupo repetido `(...)+ ` cuyo contenido interno también acepta longitud
-    cero es la combinación clásica que dispara ese comportamiento. Aquí no
-    hay ningún cuantificador de repetición sobre un grupo con alternativas
-    - solo tokenización por espacios/puntuación (str.split, O(n)) y
-    comparación greedy de tuplas de palabras contra un set fijo.
-    """
+    """True si la pregunta completa es, en esencia, solo saludo/cortesía."""
     if len(q) > _GREETING_MAX_LEN:
         return False
     words = [
@@ -91,8 +82,6 @@ def classify_query(question: str) -> str:
 
 
 def get_greeting_response(custom: str | None = None) -> str:
-    """Devuelve el saludo de respuesta. Recurre al valor por defecto si el
-    admin no configuró uno personalizado en ChatbotSettings.
-    """
+    """Devuelve el saludo de respuesta."""
     custom = (custom or "").strip()
     return custom if custom else _GREETING_RESPONSE

@@ -324,7 +324,6 @@ export default function EscalamientosPage() {
     if (loadError) toast({ type: "error", message: "Error al cargar los escalamientos." });
   }, [loadError, toast]);
 
-  // Limpia la selección al cambiar de filtro: evita bulk actions sobre IDs ya no visibles.
   useEffect(() => {
     setSelectedIds(new Set());
   }, [filter, tagFilter, dateFrom, dateTo]);

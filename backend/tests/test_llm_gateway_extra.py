@@ -1,14 +1,3 @@
-"""Tests de la lógica de orquestación del LLM Gateway que NO es específica de
-un adaptador: circuit breaker, retries, selección/fallback entre proveedores
-en la cadena, test_connection, grade_documents, rewrite_query
-y el helper _clean_rewrite.
-
-test_llm_adapters.py ya cubre el parsing SSE/JSON de cada adaptador - este
-archivo cubre el código que decide QUÉ adaptador usar, CUÁNDO reintentar,
-CUÁNDO saltar a otro proveedor de la cadena, y qué mensaje de error final
-llega al usuario cuando todo falla. Es exactamente el código que puede fallar
-silenciosamente en producción si el fallback nunca se dispara.
-"""
 from __future__ import annotations
 
 import time
@@ -206,8 +195,6 @@ class TestAzureOpenAIAdapterUrls:
 
 
 class TestStreamChatOrchestration:
-    """El corazón del fallback: stream_chat() de alto nivel que recorre la
-    cadena de proveedores y decide cuándo pasar al siguiente."""
 
     async def test_raises_if_chain_is_empty(self):
         with pytest.raises(RuntimeError, match="No hay proveedores"):
@@ -260,9 +247,6 @@ class TestStreamChatOrchestration:
             system_prompt="Prompt custom con {context}",
         ):
             pass
-        # El canario de seguridad (check_system_prompt_leak) se añade a
-        # CUALQUIER system prompt, incluido el configurable del panel - sin
-        # eso, un prompt custom nunca podría delatar su propia fuga.
         system_msg = captured["messages"][0]["content"]
         assert system_msg.startswith("Prompt custom con d")
         assert "[[CANARY_TOKEN_2024]]" in system_msg
@@ -362,14 +346,6 @@ class TestStreamChatOrchestration:
         assert second_call_happened["v"] is False
 
     async def test_falls_back_when_primary_has_invalid_config(self, monkeypatch):
-        """_get_adapter() puede lanzar ANTES de que exista un adapter con el
-        que llamar stream_chat (p. ej. Anthropic/Gemini/Cohere/Azure/Bedrock
-        sin API key configurada) - a diferencia de los demás tests de esta
-        clase, que mockean adapter.stream_chat, aquí el fallo ocurre en la
-        selección del adapter en sí. Cubre el fix que movió _get_adapter()
-        dentro del try/except del bucle de fallback: antes esa excepción se
-        propagaba fuera de stream_chat() sin registrar el fallo en el circuit
-        breaker y sin probar el resto de la cadena."""
         # provider_type "anthropic" exige api_key en _get_adapter(); se pasa
         # api_key=None para forzar el RuntimeError de configuración inválida.
         p1 = _make_provider(name="SinApiKey", provider_type="anthropic")
@@ -386,8 +362,6 @@ class TestStreamChatOrchestration:
             )
         ]
         assert chunks == ["resultado"]
-        # El proveedor mal configurado debe quedar registrado como fallo en
-        # el circuit breaker, igual que un fallo de red normal.
         assert len(gw._breaker._failures.get(str(p1.id), [])) == 1
 
     async def test_all_providers_fail_raises_generic_unavailable_error(self, monkeypatch):
@@ -483,11 +457,6 @@ class TestTestConnection:
         assert result["error"] is not None
 
     async def test_missing_api_key_for_cloud_provider_reports_failure(self):
-        """Regresión: test_connection() de alto nivel (llm_gateway.py) envuelve
-        _get_adapter() en try/except para que un proveedor cloud sin api_key
-        devuelva el mismo shape de error {"success": False, "error": ...} que
-        LLMAdapter.test_connection(), en vez de propagar un RuntimeError sin
-        capturar (antes rompía con 500 el endpoint /providers/test)."""
         result = await gw.test_connection("anthropic", "claude-3", api_key=None, api_base=None)
         assert result["success"] is False
         assert result["latency_ms"] is None
@@ -512,10 +481,6 @@ class TestGradeDocuments:
         assert result == [True, False, True]
 
     async def test_never_forces_reasoning_effort_explicitly(self, monkeypatch):
-        """grade_documents ya no decide reasoning_effort por provider_type:
-        deja el parámetro en None y es OpenAICompatAdapter.complete() quien
-        detecta dinámicamente (vía metadata de /models) si corresponde
-        enviar algo. Válido para cualquier provider_type, no solo groq."""
         for provider_type in ("groq", "openai", "openrouter"):
             provider = _make_provider(provider_type=provider_type)
             captured = {}
@@ -529,10 +494,6 @@ class TestGradeDocuments:
             assert captured["reasoning_effort"] is None
 
     async def test_retries_once_then_fails_open_on_persistent_short_array(self, monkeypatch):
-        """Un array corto no dice nada de los documentos que faltan, así que
-        no se puede rellenar con False sin penalizar documentos nunca
-        evaluados. Se reintenta una vez; si sigue corto, se abre igual que
-        el resto de fallos de la función (all-True), no se cierra."""
         provider = _make_provider()
         llamadas = []
 
@@ -547,9 +508,6 @@ class TestGradeDocuments:
         assert len(llamadas) == 2
 
     async def test_short_array_recovers_on_retry(self, monkeypatch):
-        """Si el reintento sí trae el array completo, se usa ese juicio real
-        en vez de degradar - el primer intento corto no debe desperdiciarse
-        forzando un fail-open innecesario."""
         provider = _make_provider()
         respuestas = iter([
             '{"grades": [false]}',
@@ -614,10 +572,6 @@ class TestGradeDocuments:
 
 
 class TestOpenAICompatAdapterCompleteReasoningEffort:
-    """Payload HTTP real armado por OpenAICompatAdapter.complete() - a
-    diferencia de TestGradeDocuments (que mockea complete() entero), esto
-    verifica que el kwarg reasoning_effort efectivamente llegue al JSON
-    enviado al proveedor, no solo que la firma lo acepte."""
 
     async def test_reasoning_effort_included_in_payload_when_set(self, monkeypatch):
         captured = {}

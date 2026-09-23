@@ -1,12 +1,3 @@
-"""Tests para app/api/v1/auth/router.py: providers, login, me,
-change-password, refresh y logout en su flujo normal.
-
-test_auth_revocation.py ya cubre la invalidación de tokens (rotación,
-cambio de contraseña, logout); este archivo cubre el resto del contrato del
-endpoint que no tenía ningún test: credenciales inválidas, cuenta
-desactivada, login deshabilitado por config, y los casos de error de
-/refresh (token ausente/inválido/de tipo incorrecto).
-"""
 from __future__ import annotations
 
 import pytest
@@ -126,7 +117,6 @@ class TestChangePassword:
         )
         assert r.status_code == 200
 
-        # La contraseña vieja ya no debe funcionar (tokens_valid_after avanzó)
         login = await client.post(
             "/api/v1/auth/login",
             json={"email": admin_user.email, "password": "NuevaClave123!"},

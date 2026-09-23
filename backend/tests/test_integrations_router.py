@@ -1,10 +1,4 @@
-"""Tests para app/api/v1/integrations/router.py.
-
-El router expone la configuracion de SMTP y OAuth, de modo que las pruebas
-fijan dos garantias: que las respuestas describen el estado con banderas y
-nunca devuelven la contrasena ni el secreto, y que solo escribe quien tiene
-permiso de actualizacion.
-"""
+"""Tests para app/api/v1/integrations/router.py."""
 from __future__ import annotations
 
 import pytest

@@ -39,8 +39,7 @@ class ChatRequest(BaseModel):
     source_scope: str | None = None
 
 class ChatResponse(BaseModel):
-    """Respuesta completa del chat - sin streaming: el cliente muestra un
-    indicador de "escribiendo..." mientras espera esta respuesta única."""
+    """Respuesta completa del chat."""
     type: str = "message"  # "message" | "error"
     message: str | None = None  # solo en type == "error"
     sources: list[dict] = []
@@ -67,9 +66,7 @@ async def _persist_and_respond(
     response_kwargs: dict,
     context_relevance_ratio: float | None = None,
 ) -> ChatResponse:
-    """Persiste el turno (nueva sesión de BD, ver comentario en persist_turn
-    sobre por qué "fresh") y arma el ChatResponse final.
-    """
+    """Persiste el turno en una sesión de BD nueva y arma el ChatResponse."""
     async with db_session.AsyncSessionLocal() as fresh_db:
         message_id, conversation_id, escalation_prompt = await pipeline.persist_turn(
             fresh_db,
@@ -118,9 +115,6 @@ async def _run_chat_inner(
     settings,
     t_start: float,
 ) -> ChatResponse:
-    # True para el borrador Y para el modo "Producción" del previsualizador
-    # (ambos vienen del panel autenticado). use_draft abajo distingue entre
-    # los dos: is_playground por sí solo no dice si el turno usa borrador.
     is_playground = (request.browser or "").lower() in PANEL_AUTHENTICATED_BROWSERS
     use_draft = is_playground and (request.source_scope != "production")
     cfg = await pipeline.load_chat_config(db, use_draft)
@@ -241,9 +235,6 @@ async def _run_chat_inner(
     context_chunks, context_relevance_ratio = rag_result
 
     if not context_chunks:
-        # El grading de relevancia (grade_documents) descartó todos los chunks
-        # recuperados: sin este corte, el LLM generador recibía context_chunks=[]
-        # y dependía solo del system_prompt para no inventar una respuesta.
         no_context_latency_ms = int((time.monotonic() - t_start) * 1000)
         return await _persist_and_respond(
             request,
@@ -355,11 +346,6 @@ async def _run_chat_inner(
             rag_route=_detected_route,
         )
 
-        # is_playground es True también para preview-production (modo
-        # "Producción" del previsualizador): esa respuesta usa el mismo
-        # contexto y config que vería un usuario real, así que su calidad sí
-        # se evalúa. use_draft es el que distingue el borrador, que se omite
-        # a propósito para no generar costo de LLM juez en cada tecla de prueba.
         if assistant_message_id and not use_draft:
             task = asyncio.create_task(pipeline.evaluate_response_quality(
                 assistant_message_id, request.question, final_text, llm_chunks,
@@ -394,8 +380,7 @@ async def chat(
     req: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    """Endpoint del chatbot. Responde con el mensaje completo (sin streaming);
-    el cliente debe mostrar un indicador de "escribiendo..." mientras espera."""
+    """Endpoint del chatbot."""
     is_authenticated_playground = False
     if (request.browser or "").lower() in PANEL_AUTHENTICATED_BROWSERS:
         auth_header = req.headers.get("Authorization", "")
@@ -403,19 +388,9 @@ async def chat(
         user = None
         if token:
             try:
-                # Misma validación que cualquier endpoint protegido (firma,
-                # tipo, denylist de logout, cuenta activa, invalidación por
-                # cambio de contraseña) - antes se decodificaba el JWT a mano
-                # aquí y esas cuatro verificaciones quedaban fuera, así que un
-                # token ya cerrado por logout seguía funcionando en el chat.
                 user = await resolve_user_from_access_token(token, db)
             except HTTPException:
                 user = None
-        # El modo panel exige, además de un token válido, el mismo permiso
-        # que ya protege la página del previsualizador en el frontend
-        # (bot_settings.read) - si no lo tiene, se degrada al camino normal
-        # de widget-key en vez de rechazar, por si el cliente mandó
-        # browser=playground sin ser realmente el panel.
         if not user or not await has_permission(db, user.role, "bot_settings", "read"):
             request.browser = None
             request.source_scope = None

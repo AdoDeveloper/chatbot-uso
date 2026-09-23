@@ -1,13 +1,4 @@
-"""Tests unitarios directos de app/services/monitoring/analytics.py.
-
-Los tests de router (test_analytics_router_extra.py, test_analytics_timeline.py)
-ya cubren la capa HTTP (auth, shape de respuesta, parseo de query params) para
-la mayoría de endpoints via smoke tests parametrizados. Este archivo llama las
-funciones del servicio directamente con `db_session`, sembrando datos reales,
-para ejercitar las ramas internas de agregación que esos smoke tests no
-disparan: casos sin datos, ceros, redondeo, clasificación de canal, feedback
-positivo/negativo, calidad de fuentes, comparación de períodos, etc.
-"""
+"""Tests unitarios directos de app/services/monitoring/analytics.py."""
 from __future__ import annotations
 
 import uuid
@@ -108,9 +99,6 @@ class TestGetCacheStats:
         assert result.days == 7
 
     async def test_hits_and_misses_computed(self, db_session):
-        """rag_route se fija a "cache" (valor exacto, sin sufijo) en
-        chat/router.py cuando la respuesta sale del caché semántico;
-        cualquier otro valor no nulo (factual, greeting) es un miss."""
         conv = _conv()
         db_session.add(conv)
         await db_session.flush()
@@ -139,8 +127,6 @@ class TestGetCacheStats:
         assert result.hit_rate == 0.0
 
     async def test_value_with_cache_prefix_but_not_exact_is_a_miss(self, db_session):
-        """El match es por igualdad exacta con "cache", no por prefijo: un
-        valor que solo empiece con "cache" no debe contar como hit."""
         conv = _conv()
         db_session.add(conv)
         await db_session.flush()
@@ -368,9 +354,6 @@ class TestSnapshotForRangeAndPeriodComparison:
         assert snap.avg_latency_ms == 2000.0
 
     async def test_period_comparison_deltas_with_previous_zero(self, db_session):
-        """When the previous period has zero baseline, _delta returns None
-        (indefinido/"nuevo") instead of dividing by zero or reporting a
-        misleading 0.0 ("sin cambio")."""
         conv = _conv(started_at=NOW)
         db_session.add(conv)
         await db_session.flush()
@@ -430,9 +413,6 @@ class TestSnapshotForRangeAndPeriodComparison:
         )
 
     async def test_latency_deltas_none_with_small_sample(self, db_session):
-        """Con menos de 5 mensajes en cualquiera de los dos períodos, un solo
-        outlier puede mover el promedio/P95 entero - los deltas de latencia
-        deben ser None, no un número que se lea como tendencia real."""
         conv = _conv(started_at=NOW)
         db_session.add(conv)
         await db_session.flush()
@@ -679,9 +659,6 @@ class TestGetDashboard:
         )
 
     async def test_queries_delta_is_none_when_no_queries_yesterday(self, db_session):
-        """Sin consultas ayer, el delta debe ser indefinido (None), no 0%
-        (falso 'sin cambio') ni un porcentaje inflado por sustituir el
-        denominador 0 por 1."""
         conv = _conv(started_at=NOW)
         db_session.add(conv)
         await db_session.flush()
@@ -694,9 +671,6 @@ class TestGetDashboard:
         assert result.queries_today_delta is None
 
     async def test_resolution_rate_uses_unanswered_questions_ratio(self, db_session):
-        """resolution_rate = preguntas sin responder resueltas / total de la
-        semana (misma entidad en numerador y denominador), no una resta entre
-        ChatConversation y UnansweredQuestion."""
         conv = _conv(started_at=NOW)
         db_session.add(conv)
         await db_session.flush()
@@ -716,15 +690,11 @@ class TestGetDashboard:
         assert result.resolution_rate == 50.0
 
     async def test_resolution_rate_is_100_when_no_unanswered_questions(self, db_session):
-        """Sin preguntas sin responder en la semana, no hay nada que resolver:
-        100%, no 0% ni una división por cero."""
+        """Sin preguntas sin responder en la semana, no hay nada que resolver: 100%, no 0% ni una división por cero."""
         result = await svc.get_dashboard(db_session)
         assert result.resolution_rate == 100.0
 
     async def test_latency_delta_is_none_with_small_sample(self, db_session):
-        """Con pocos mensajes (< 5) en el período actual o el anterior, un solo
-        mensaje lento puede mover el promedio entero - el delta debe ser None
-        en vez de un número que se lea como tendencia real de rendimiento."""
         conv = _conv(started_at=NOW)
         db_session.add(conv)
         await db_session.flush()

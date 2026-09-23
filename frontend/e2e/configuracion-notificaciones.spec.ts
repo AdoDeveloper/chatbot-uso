@@ -2,13 +2,6 @@ import { test, expect } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 
-/**
- * Functional coverage for /dashboard/configuracion/notificaciones: the
- * report schedule save flow (Programación tab) and the global email toggle
- * (Eventos tab), against the real backend. The email toggle test restores
- * its original state at the end so it doesn't permanently change delivery
- * behavior for the environment.
- */
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;
 
@@ -25,7 +18,6 @@ test.describe("Configuracion > Notificaciones", () => {
     await expect(page.getByRole("columnheader", { name: /evento/i })).toBeVisible({ timeout: 10_000 });
     await expect(page.getByRole("columnheader", { name: /canales/i })).toBeVisible();
 
-    // Each row groups one trigger (not one raw NotificationLog row), so "Canales" shows badges like "Correo"/"En la app" instead of a single target.
     const firstRow = page.locator("tbody tr").first();
     if (await firstRow.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await expect(firstRow.getByText(/correo|en la app/i).first()).toBeVisible();
@@ -67,7 +59,6 @@ test.describe("Configuracion > Notificaciones", () => {
     const freqSelect = page.locator("select").first();
     const originalFreq = await freqSelect.inputValue();
 
-    // Weekly reveals day-of-week toggles; toggled on and back off in place, independent of whichever frequency is actually saved at the end of the test.
     await freqSelect.selectOption("weekly");
     await expect(page.getByText(/días de la semana/i)).toBeVisible({ timeout: 5_000 });
     const dayButtons = page.locator("button.h-8.w-8");

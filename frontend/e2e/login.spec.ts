@@ -1,20 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
 
-/**
- * Smoke E2E for the login flow.
- *
- * Unauth paths run unconditionally:
- *   1. /              → redirects to /login
- *   2. /login         → renders, accepts input, calls the API on submit
- *   3. /dashboard/*   → unauth users get bounced to /login
- *
- * The "happy path" sign-in test runs only when E2E_USER + E2E_PASS are set.
- * In CI, set these to a seeded test account; locally, export them in your
- * shell to validate the full pipeline against your dev DB.
- *
- *   E2E_USER=admin@example.com E2E_PASS='secret' npm run test:e2e
- */
 const E2E_USER = process.env.E2E_USER;
 
 // Si global-setup.ts tuvo que rotar la contraseña (admin recién sembrado con
@@ -53,9 +39,6 @@ test.describe("Login smoke", () => {
     await page.locator('input#login-password').fill("wrong-password");
     await page.locator('button[type="submit"]').click();
 
-    // Wait briefly for the request to roundtrip and assert we did not navigate
-    // away from /login. Don't assert exact error copy so the test stays
-    // resilient to wording changes.
     await page.waitForTimeout(800);
     await expect(page).toHaveURL(/\/login/);
   });
@@ -95,22 +78,8 @@ test.describe("Login happy path", () => {
     // the auth context takes a tick to populate cookies + bootstrap user.
     await expect(page).toHaveURL(/\/dashboard/, { timeout: 10_000 });
 
-    // "Chatbot USO" brand text in the sidebar confirms we're inside the
-    // authenticated shell, not just parked on a redirect destination.
-    // .first(): el saludo del dashboard también contiene ese texto.
     await expect(page.getByText("Chatbot USO").first()).toBeVisible();
 
-    // Cierre de sesión (POST /auth/logout) reutilizando esta MISMA sesión
-    // de login por UI, en vez de hacer un login nuevo dedicado - un login
-    // extra por UI en la misma corrida arriesga el rate-limit anti-fuerza-
-    // bruta de /auth/login (5/min, ver RATE_LIMIT_LOGIN_PER_MIN). Esta
-    // sesión no es el storageState compartido guardado en disco (ese lo
-    // crea global-setup.ts por separado), así que revocar su token aquí no
-    // afecta a ningún otro spec.
-    // Último botón del header: el menú de usuario (avatar), a la derecha de
-    // la campana de notificaciones. Sin aria-label propio, así que se ancla
-    // por posición - si el header gana un control nuevo a la derecha de
-    // este, revisar este selector.
     await page.locator("header").getByRole("button").last().click();
     const [logoutResp] = await Promise.all([
       page.waitForResponse((r) => r.url().includes("/api/v1/auth/logout") && r.request().method() === "POST"),
@@ -121,9 +90,6 @@ test.describe("Login happy path", () => {
   });
 
   test("logged-in user can reach a deep route (admin tabs)", async ({ browser }) => {
-    // Reuses the session saved by global-setup instead of logging in again -
-    // repeated UI logins in the same run trip the backend's anti-brute-force
-    // rate limit on /auth/login.
     const context = await browser.newContext({ storageState: "e2e/.auth/admin.json" });
     const page = await context.newPage();
 
@@ -149,9 +115,6 @@ test.describe("Notifications bell", () => {
     await expect(bell).toBeVisible();
     await bell.click();
 
-    // Dropdown should show the inbox header. Don't assert specific items -
-    // the test DB may have zero notifications, in which case we get the
-    // empty state.
     await expect(page.getByText(/Sin notificaciones|Marcar todas|Ver historial/i)).toBeVisible();
   });
 });

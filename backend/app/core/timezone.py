@@ -1,10 +1,4 @@
-"""Zona horaria fija del proyecto: El Salvador (UTC-6, sin horario de verano).
-
-El sistema guarda todos los timestamps en UTC en la base de datos (esto no
-cambia), pero la *interpretación* de horarios configurados por el usuario
-(por ej. la hora del reporte diario) y la *visualización* se hacen en la
-zona de El Salvador, que es donde opera el negocio.
-"""
+"""Zona horaria fija del proyecto: El Salvador (UTC-6, sin horario de verano)."""
 from __future__ import annotations
 
 from datetime import datetime, timezone

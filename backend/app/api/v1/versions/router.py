@@ -42,10 +42,6 @@ class VersionDetailOut(VersionOut):
 
 class VersionCreate(BaseModel):
     description: str = ""
-    # Guardado manual explícito: el usuario pidió un punto de restauración a
-    # propósito, tiene sentido crearlo aunque no haya diff nuevo desde la
-    # última versión (ej. el auto-snapshot del middleware ya capturó el
-    # mismo cambio segundos antes).
     force: bool = False
 
 
@@ -62,12 +58,7 @@ class RollbackResult(BaseModel):
 
 
 class VersionDiff(BaseModel):
-    """Diferencias entre la versión solicitada y su padre.
-
-    `sections` es un mapping `{seccion: [cambios...]}` agrupado por sección
-    de configuración (proveedores, prompts, guardrails, etc.). El shape
-    exacto lo decide el servicio `system_version_service.compute_diff`.
-    """
+    """Diferencias entre la versión solicitada y su padre."""
     version_number: int
     change_summary: str | None = None
     sections: dict[str, list[dict]]

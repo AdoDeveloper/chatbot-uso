@@ -1,20 +1,4 @@
-"""Tests adicionales para app/api/v1/system/guardrails/router.py.
-
-test_guardrails_router.py ya cubre el CRUD de patrones custom (list/create/
-update/delete/impact) contra usuarios admin. Este archivo cierra huecos que
-quedaban sin cubrir:
-
-- RBAC real: viewer (sin system.read/system.manage) recibe 403 en todos los
-  endpoints, tanto de lectura (require_perm(SYSTEM_READ)) como de escritura
-  (require_perm(SYSTEM_MANAGE)).
-- PATCH /config: no tenía ninguna prueba (ni el 200 ni el whitelisting de
-  claves - que una clave no permitida no se persista).
-- GET /injection-log: solo estaba cubierto el caso vacío; faltaba con
-  entradas reales y respetando `page_size`.
-- POST /test: solo estaba cubierto el caso "passed=True" con texto benigno;
-  faltaba el caso de detección real de inyección (passed=False y campos
-  matched_* poblados).
-"""
+"""Tests adicionales para app/api/v1/system/guardrails/router.py."""
 from __future__ import annotations
 
 import uuid

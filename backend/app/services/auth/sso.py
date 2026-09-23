@@ -33,9 +33,7 @@ def _token_response(user, access: str, refresh: str) -> TokenResponse:
 async def handle_microsoft_callback(
     db: AsyncSession, *, request: Request, code: str, redirect_uri: str,
 ) -> TokenResponse:
-    """Recibe el authorization code de Microsoft, lo intercambia por tokens,
-    obtiene el email del id_token y devuelve un par JWT propio del sistema.
-    """
+    """Recibe el authorization code de Microsoft."""
     # Credenciales vienen del .env; is_active y allowed_domains de la DB
     settings = get_settings()
     client_id = settings.MICROSOFT_CLIENT_ID

@@ -1,12 +1,4 @@
-"""Initial schema
-
-Migración única consolidada para MySQL 8.0.
-Tipos utilizados:
-  - UUID  → sa.Uuid(native_uuid=False)  → CHAR(36)
-  - JSONB → sa.JSON                     → JSON (nativo MySQL 8.0)
-  - ARRAY → sa.Text                     → TEXT (JSONList serializa como JSON string)
-  - ENUM  → sa.Enum(*values)            → ENUM nativo MySQL
-"""
+"""Initial schema Migración única consolidada para MySQL 8.0."""
 from typing import Sequence, Union
 
 import sqlalchemy as sa  # type: ignore[import-not-found]
@@ -51,12 +43,7 @@ def _e(name: str) -> sa.Enum:
 
 
 def _ct(name: str, *cols, **kw) -> None:
-    """CREATE TABLE seguro para MySQL: salta si la tabla ya existe.
-
-    MySQL DDL es no-transaccional; una migración fallida puede dejar
-    tablas parcialmente creadas. Este helper evita OperationalError 1050
-    al reintentar sin borrar el volumen.
-    """
+    """CREATE TABLE seguro para MySQL: salta si la tabla ya existe."""
     if sa_inspect(op.get_bind()).has_table(name):
         return
     op.create_table(name, *cols, **kw)
@@ -221,9 +208,6 @@ def upgrade() -> None:
         sa.Column("last_test_error",       sa.Text,        nullable=True),
     )
 
-    # provider_type_catalog - no FK dependencies. Catálogo editable de tipos
-    # de proveedor conocidos (URL base + headers por defecto), reemplaza el
-    # dict hardcodeado que antes vivía en llm_gateway.py.
     _ct(
         "provider_type_catalog",
         sa.Column("id",                    sa.Uuid(native_uuid=False), primary_key=True),
@@ -393,10 +377,6 @@ def upgrade() -> None:
     )
     _ci("ix_notification_rules_event", "notification_rules", ["event"])
 
-    # notification_logs - FK a users nullable: las notificaciones in-app se
-    # escriben una fila por destinatario (user_id); las de canal email o los
-    # eventos de sistema sin destinatario individual (p. ej. antes del fan-out)
-    # dejan user_id NULL.
     _ct(
         "notification_logs",
         sa.Column("id",            sa.Uuid(native_uuid=False), primary_key=True),

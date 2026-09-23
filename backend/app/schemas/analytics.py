@@ -121,7 +121,7 @@ TimelineEventType = Literal[
 
 
 class TimelineEvent(BaseModel):
-    id: str                          # id único por origen (ej. audit:xxx, escalation:xxx)
+    id: str
     type: TimelineEventType
     title: str                       # "Fuente aprobada: admisiones-2026"
     detail: str | None = None        # contexto adicional opcional

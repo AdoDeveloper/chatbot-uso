@@ -1,11 +1,4 @@
-"""Tests para app/api/v1/invitations/router.py.
-
-Cubre el flujo completo: listar/crear/revocar invitaciones (admin), y el
-flujo público de aceptación (get_invitation_info + accept_invitation).
-Fijan el contrato de dos comportamientos sensibles a regresión:
-last_login_at debe actualizarse al aceptar, y la URL de invitación debe
-derivarse de FRONTEND_URL.
-"""
+"""Tests para app/api/v1/invitations/router.py."""
 from __future__ import annotations
 
 import uuid
@@ -122,12 +115,7 @@ class TestCreateInvitation:
         assert r.json()["role"] == "admin"
 
     async def test_non_admin_actor_cannot_invite_as_admin(self, make_user, db_session):
-        """Misma guarda anti-escalada que update_user (service.py:98-99):
-        solo un admin puede otorgar el rol admin. Se prueba a nivel de
-        servicio porque el vector real (rol dinámico con users.manage sin
-        ser admin) requiere infraestructura RBAC que actualmente no tiene
-        endpoint de creación - la guarda debe existir de todos modos, no
-        depender de que ese endpoint nunca se construya."""
+        """Misma guarda anti-escalada que update_user (service.py:98-99): solo un admin puede otorgar el rol admin."""
         from fastapi import HTTPException
         from app.models.enums import UserRole
         from app.services.users import invitation as invitation_service
@@ -161,10 +149,7 @@ class TestRevokeInvitation:
 
 
 class TestDeleteInvitation:
-    """Borrado físico (DELETE .../permanent) - distinto de TestRevokeInvitation
-    (soft-delete vía DELETE .../{id}). Restringido a invitaciones ya no
-    usables para no borrar por error un enlace que un usuario real todavía
-    podría estar por usar."""
+    """Borrado físico (DELETE .../permanent) - distinto de TestRevokeInvitation (soft-delete vía DELETE .../{id})."""
 
     async def test_requires_perm(self, client, viewer_user, auth_headers, db_session):
         inv = await _make_invitation(db_session, active=False)

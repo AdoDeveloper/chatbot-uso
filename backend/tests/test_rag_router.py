@@ -1,12 +1,4 @@
-"""Tests del Adaptive RAG Router.
-
-Valida que `classify_query` decide la ruta correcta para cada tipo de consulta:
-  - greeting → respuesta directa sin retrieval
-  - factual  → retrieval simple
-  - complex  → CRAG (expand + grade + rewrite)
-
-Estos tests son puros (no tocan BD/Redis/Qdrant) - corren en milisegundos.
-"""
+"""Tests del Adaptive RAG Router."""
 from __future__ import annotations
 
 import pytest
@@ -41,8 +33,6 @@ class TestGreetingDetection:
         "cómo estás",
         "qué tal",
         "¿qué tal?",
-        # Saludos encadenados - antes del fix, solo una alternativa cubría
-        # todo el mensaje y "hola buenos días" caía a la ruta factual.
         "hola buenos días",
         "hola, buenos días",
         "hola buenas tardes",
@@ -70,8 +60,7 @@ class TestFactualRoute:
         "documentos para inscribirse",
     ])
     def test_short_factual_queries_get_factual_route(self, query: str):
-        """Consultas cortas, sin keywords de comparación, sin múltiples
-        preguntas: usan la ruta factual (más barata)."""
+        """Consultas cortas, sin keywords de comparación, sin múltiples preguntas: usan la ruta factual (más barata)."""
         assert classify_query(query) == QueryRoute.FACTUAL
 
 

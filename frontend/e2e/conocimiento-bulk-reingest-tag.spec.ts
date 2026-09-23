@@ -3,14 +3,6 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 
-/**
- * Functional coverage for the bulk "Reingestar" and "+Tag"/"−Tag" actions
- * on /dashboard/conocimiento/documentos (POST /sources/bulk/reingest and
- * POST /sources/bulk/tag), the sources-page counterparts of the already-
- * covered bulk-delete (conocimiento-bulk-delete.spec.ts). Uploads two
- * disposable sources, only ever acts on sources this test itself created,
- * and deletes them at the end via the same bulk-delete flow.
- */
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;
 
@@ -45,9 +37,6 @@ test("reingestar y etiquetar varias fuentes en lote", async ({ page }) => {
   }
   await expect(page.getByText(/2 seleccionadas/i)).toBeVisible({ timeout: 5_000 });
 
-  // Reingestar: ambas fuentes recien subidas quedan "pendiente_revision"
-  // (no aprobadas), asi que corre sin dialogo de confirmacion adicional
-  // (ese solo aparece si alguna seleccionada ya esta aprobada y en uso).
   const [reingestResp] = await Promise.all([
     page.waitForResponse((r) => r.url().includes("/api/v1/sources/bulk/reingest") && r.request().method() === "POST"),
     page.getByRole("button", { name: /^reingestar$/i }).click(),

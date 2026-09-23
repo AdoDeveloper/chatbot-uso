@@ -31,10 +31,7 @@ router = APIRouter(tags=["invitations"])
 
 
 def _build_response(inv) -> InvitationResponse:
-    """El panel muestra `invite_url` como enlace de respaldo para compartir a
-    mano, así que debe apuntar a la página de aceptación del frontend, la
-    misma que va en el correo. La ruta equivalente de la API devuelve JSON.
-    """
+    """El panel muestra `invite_url` como enlace de respaldo para compartir a mano."""
     data = InvitationResponse.model_validate(inv)
     frontend = get_settings().FRONTEND_URL.rstrip("/")
     data.invite_url = f"{frontend}/invite/{inv.token}"
@@ -154,12 +151,7 @@ async def get_invitation_info(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    """Devuelve los datos públicos del token para mostrar en el formulario de registro.
-
-    El token tiene entropía suficiente (secrets.token_urlsafe(48)) para que
-    la fuerza bruta sea impráctica de por sí, pero se agrega rate limit como
-    defensa en profundidad - el mismo patrón que ya protege accept_invitation.
-    """
+    """Devuelve los datos públicos del token para mostrar en el formulario de registro."""
     client_ip = get_client_ip(request)
     try:
         await check_rate_limit("invite:info", client_ip, max_requests=20, window_seconds=60)

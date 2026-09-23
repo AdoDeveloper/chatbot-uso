@@ -133,11 +133,7 @@ async def update_faq(
 
 
 async def _re_embed_faq(entry: FAQEntry) -> bool:
-    """Reindexar una FAQ en Qdrant tras editar su texto.
-
-    Devuelve False si falla, en vez de solo loguear: sin eso, la FAQ quedaría
-    "editada" en MySQL pero sin vector en Qdrant, y el bot no podría
-    responder esa pregunta sin ningún error visible en el panel."""
+    """Reindexar una FAQ en Qdrant tras editar su texto."""
     full_text = f"P: {entry.question}\nR: {entry.answer}"
     source_id = str(entry.source_id)
     try:

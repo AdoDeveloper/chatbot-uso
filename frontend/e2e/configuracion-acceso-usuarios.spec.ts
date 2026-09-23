@@ -2,7 +2,6 @@ import { test, expect } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 
-// Coverage for /dashboard/configuracion/acceso/usuarios beyond invitaciones.spec.ts: full invitation lifecycle against the real backend using a disposable @invalid address, plus editing the logged-in admin's own display name (the only user edit safe to run unconditionally). Never touches "Resetear contraseña" or "Eliminar" on a real user account.
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;
 
@@ -157,10 +156,6 @@ test.describe("Configuracion > Acceso > Usuarios", () => {
     const row = page.locator("tr", { hasText: email });
     await expect(row).toBeVisible({ timeout: 10_000 });
 
-    // Directo al backend (127.0.0.1:8000), no via el rewrite de Next: el
-    // rewrite del server.js standalone produce un 500 genérico y sostenido
-    // en llamadas API directas de Playwright (no del navegador) - causa no
-    // confirmada, pero pegarle directo al backend lo evita por completo.
     const authHeader = `Bearer ${(await page.context().cookies()).find((c) => c.name === "chatbot_access")?.value}`;
     let invite: { email: string; token: string; id: string } | undefined;
     await expect(async () => {

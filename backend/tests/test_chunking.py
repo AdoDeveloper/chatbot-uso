@@ -1,10 +1,4 @@
-"""Tests del chunking Parent-Child.
-
-El chunker es el componente que decide cómo se trocea un documento antes de
-embedirse en Qdrant. Errores aquí degradan toda la calidad del RAG. Estos
-tests cubren los casos críticos: secciones cortas, secciones largas con
-sub-chunks, contexto preservado, dedup, casos edge.
-"""
+"""Tests del chunking Parent-Child."""
 from __future__ import annotations
 
 import pytest
@@ -45,8 +39,7 @@ class TestShortDocument:
 
 
 class TestLongDocument:
-    """Documentos largos (> child_size) se dividen en parents y cada parent en
-    múltiples children. Cada child apunta a su parent_id."""
+    """Documentos largos (> child_size) se dividen en parents y cada parent en múltiples children."""
 
     @pytest.fixture
     def long_text(self) -> str:
@@ -69,16 +62,13 @@ class TestLongDocument:
         assert indices == list(range(len(chunks)))
 
     def test_children_share_parent_id(self, long_text):
-        """Children del mismo bloque parent comparten parent_id (Parent-Child retrieval
-        funciona porque podemos deduplicar por parent_id)."""
         chunks = chunk_text(long_text, SOURCE_ID, SOURCE_NAME, child_size=500, parent_size=1500)
         parent_ids = {c["parent_id"] for c in chunks}
         # Hay menos parents que children (ese es el punto del modelo Parent-Child)
         assert len(parent_ids) < len(chunks)
 
     def test_parent_text_is_richer_than_child(self, long_text):
-        """parent_text debe tener más contexto que el child individual (mismo prefijo
-        pero cuerpo más largo)."""
+        """parent_text debe tener más contexto que el child individual (mismo prefijo pero cuerpo más largo)."""
         chunks = chunk_text(long_text, SOURCE_ID, SOURCE_NAME, child_size=500, parent_size=1500)
         # Para el primer chunk, parent_text >= text (es child o parent completo)
         c = chunks[0]

@@ -1,12 +1,4 @@
-"""Tests unitarios directos para app/services/ingestion/vector_store.py.
-
-Este módulo encapsula operaciones contra Qdrant. No hay Qdrant real en el
-entorno de test: se sustituye app.services.ingestion.vector_store._get_client
-por un stub/AsyncMock que imita la interfaz de AsyncQdrantClient usada por
-cada función. No duplica los casos ya cubiertos indirectamente por
-test_chunks_router.py (que ejercía get_chunk/list_all_chunks/upsert_chunks
-vía monkeypatch de esas mismas funciones, sin pasar por _get_client).
-"""
+"""Tests unitarios directos para app/services/ingestion/vector_store.py."""
 from __future__ import annotations
 
 import uuid
@@ -190,7 +182,6 @@ class TestListAllChunks:
         assert [c["id"] for c in result] == ["id-2", "id-1"]
 
 
-
 class TestGetChunk:
     async def test_returns_none_when_not_found(self, patch_client):
         patch_client.retrieve.return_value = []
@@ -212,11 +203,6 @@ class TestGetChunk:
         assert kwargs["with_vectors"] is False
 
     async def test_returns_none_on_invalid_point_id_instead_of_500(self, patch_client):
-        """Qdrant exige que el id sea UUID o entero; con cualquier otro
-        formato (ej. "1" a secas, o cualquier string no-UUID) responde 400 y
-        el cliente lo propaga como UnexpectedResponse en vez de una lista
-        vacía. Antes de este fix, eso tumbaba el endpoint con un 500
-        genérico en vez de un 404 limpio."""
         from qdrant_client.http.exceptions import UnexpectedResponse
 
         patch_client.retrieve.side_effect = UnexpectedResponse(

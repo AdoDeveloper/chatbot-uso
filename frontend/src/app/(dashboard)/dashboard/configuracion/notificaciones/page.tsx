@@ -155,9 +155,6 @@ export default function NotificacionesHistorialPage() {
   const [savedDraft, setSavedDraft] = useState<ReportSchedule | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // Toggle global de correos: refleja si AL MENOS una regla email está
-  // habilitada. Activarlo habilita el canal email para todos los eventos;
-  // desactivarlo lo apaga para todos (el canal in-app queda intacto).
   const { data: rulesData, loading: loadingRules } = useApi<{ email_enabled: boolean; smtp_configured: boolean }>(
     "/notifications/rules/email/status",
   );

@@ -1,12 +1,4 @@
-"""Tests HTTP para app/api/v1/access/users/router.py::reset_user_password.
-
-El resto del router (list/get/update/delete) no tenía tests HTTP tampoco,
-pero el foco aquí es el endpoint nuevo POST /users/{id}/reset-password: la
-lógica de negocio ya está cubierta en test_users_service.py, este archivo
-verifica el contrato HTTP real (RBAC vía require_perm, status codes, shape
-de la respuesta), que es justamente la capa que test_users_service.py no
-puede probar al llamar el servicio directo.
-"""
+"""Tests HTTP para app/api/v1/access/users/router.py::reset_user_password."""
 from __future__ import annotations
 
 import pytest

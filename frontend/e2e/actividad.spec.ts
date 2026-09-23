@@ -2,15 +2,6 @@ import { test, expect } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 
-/**
- * Functional coverage for /dashboard/actividad and its three tabs
- * (auditoria, inyecciones, seguridad). Auditoria's export is exercised
- * unconditionally (safe, non-destructive). Seguridad's "Liberar"/
- * "Desbloquear" actions each trip their own real rate-limit condition
- * (real failed logins / real chat throttling against the public widget
- * endpoint) immediately before checking, since both are transient
- * Redis-backed state with short TTLs that can't reliably be waited on.
- */
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;
 
@@ -20,12 +11,6 @@ test.skip(!E2E_USER || !E2E_PASS, "E2E_USER / E2E_PASS not set - skipping");
 const SHOT_DIR = path.join("e2e", ".report-screenshots", "actividad");
 fs.mkdirSync(SHOT_DIR, { recursive: true });
 
-// Directo al backend (127.0.0.1:8000), no via el rewrite de Next: el
-// rewrite del server.js standalone devuelve 500 sostenido para
-// /api/v1/auth/login y /api/v1/widget/* en llamadas API directas de
-// Playwright (no del navegador) - confirmado con logs de diagnostico,
-// causa no confirmada del lado del rewrite. Pegarle directo al backend
-// lo evita por completo.
 const BACKEND_URL = "http://127.0.0.1:8000";
 
 async function cleanupRateLimitConversations(
@@ -164,10 +149,6 @@ test.describe("Actividad > Inyecciones", () => {
 test.describe("Actividad > Seguridad", () => {
 
   test("desbloquear un usuario con limite activo (rate-limit de chat)", async ({ page, request, baseURL }) => {
-    // Timeout explicito: con proveedores LLM reales configurados, cada
-    // respuesta del chat tarda su tiempo real (10-20s) en vez de fallar
-    // rapido con 401 - la rafaga de abajo ya dispara en paralelo, pero el
-    // default de 30s de Playwright no alcanza a cubrir el resto del test.
     test.setTimeout(90_000);
     const authHeader = `Bearer ${(await page.context().cookies()).find(c => c.name === "chatbot_access")?.value}`;
     const cfgRes = await request.get(`${BACKEND_URL}/api/v1/widget/config`, {
@@ -179,10 +160,6 @@ test.describe("Actividad > Seguridad", () => {
     }
     const sessionId = `e2e-ratelimit-${Date.now()}`;
     try {
-      // Rafaga en paralelo (no secuencial): el rate-limit se dispara por
-      // cantidad de peticiones en la ventana, no por tiempo total, y en
-      // paralelo evita que la latencia real del LLM multiplique el tiempo
-      // total del test por 12.
       await Promise.all(
         Array.from({ length: 12 }, (_, i) =>
           request.post(`${BACKEND_URL}/api/v1/widget/public/chat`, {
@@ -240,10 +217,6 @@ test.describe("Actividad > Seguridad", () => {
       const liberarButton = page.getByRole("button", { name: /^liberar$/i }).first();
       let found = false;
       for (let attempt = 1; attempt <= 4 && !found; attempt++) {
-        // Ráfaga justo antes de leer la página en vez de esperar+navegar en
-        // serie: la ventana de 60s de Redis empieza a contar recién con la
-        // primera petición, así que minimizar el tiempo entre la ráfaga y la
-        // lectura es lo que más ayuda bajo contención real de CI.
         await fireThrottleBurst(attempt === 1 ? sessionId : `${sessionId}-retry${attempt}`);
         if (attempt === 1) {
           await page.goto("/dashboard/actividad/seguridad", { timeout: 30_000 });
@@ -266,9 +239,6 @@ test.describe("Actividad > Seguridad", () => {
     const consoleErrors: string[] = [];
     await page.goto("/dashboard/actividad/seguridad");
     page.on("pageerror", (e) => consoleErrors.push(String(e)));
-    // .first(): "Intentos fallidos" (título de la StatCard) y "Sin intentos
-    // fallidos" (empty-state cuando no hay registros) matchean ambos este
-    // regex - cualquiera de los dos confirma que la sección cargó.
     await expect(page.getByText(/intentos fallidos/i).first()).toBeVisible({ timeout: 10_000 });
 
     const dateInputs = page.locator('input[type="date"]');

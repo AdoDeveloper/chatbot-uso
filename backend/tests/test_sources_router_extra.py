@@ -1,18 +1,4 @@
-"""Tests de caracterización adicionales para app/api/v1/sources/router.py.
-
-test_sources_api.py y test_chunks_api.py cubren list_sources,
-approve_source, reject_source, get_source (parcial), delete_source
-(solo permisos) y bulk_tag. Los siguientes endpoints NO tenían ningún
-test antes de esto: upload_source, bulk_upload_sources, update_source,
-reingest_source, delete_source (caso de éxito real), bulk_delete,
-bulk_reingest, preview_source, quality_report_endpoint.
-
-upload_source dispara la ingestión real en background (background_tasks),
-pero la respuesta HTTP se devuelve antes de que corra; el parseo de un
-PDF "falso" simplemente falla dentro del job de background y marca la
-fuente como error - sin bloquear ni afectar el status code de la
-petición. Por eso estos tests no necesitan mockear Qdrant/embeddings.
-"""
+"""Tests de caracterización adicionales para app/api/v1/sources/router.py."""
 from __future__ import annotations
 
 import io
@@ -31,9 +17,6 @@ async def viewer_user(make_user):
 
 
 def _fake_pdf_bytes(marker: str = "x") -> bytes:
-    # No es un PDF válido - el parseo real fallará en background (esperado,
-    # no lo estamos probando aquí), pero el content-type/extension bastan
-    # para pasar la detección de tipo y el flujo de subida.
     return f"%PDF-1.4 fake content {marker}".encode()
 
 
@@ -74,9 +57,6 @@ class TestUploadSource:
         body = r.json()
         assert body["name"] == "Mi documento"
         assert body["type"] == "pdf"
-        # El status puede ya haber avanzado a error si el background task
-        # corrió sincrónicamente antes de leer la respuesta; lo importante
-        # es que la creación en sí fue aceptada.
         assert body["status"] in ("pending", "processing", "error")
 
     async def test_upload_unsupported_type_returns_415(self, client, admin_user, auth_headers):
@@ -195,7 +175,6 @@ class TestDeleteSourceSuccess:
         await db_session.refresh(seeded_source)
         assert seeded_source.deleted_at is not None
 
-        # Ya no debe aparecer en el listado activo.
         r2 = await client.get("/api/v1/sources", headers=auth_headers(admin_user))
         ids = [s["id"] for s in r2.json()]
         assert str(seeded_source.id) not in ids

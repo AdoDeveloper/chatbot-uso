@@ -48,18 +48,11 @@ export default function CambiarContrasenaPage() {
   const onSubmit = async (data: FormData) => {
     setServerError("");
     try {
-      // change-password rota tokens_valid_after, lo que invalida de inmediato
-      // el access token con el que se autenticó esta misma petición - por eso
-      // el endpoint responde con un par de tokens nuevo (igual que login),
-      // que hay que guardar antes de seguir usando la sesión.
       const { data: tokens } = await api.post<TokenResponse>("/auth/change-password", {
         current_password: data.current_password,
         new_password: data.new_password,
       });
       tokenStore.set(tokens.access_token, tokens.refresh_token);
-      // Navegación completa, no refreshUser()+router.push: mismo motivo que
-      // login() - una soft-navigation puede no ver a tiempo la cookie/token
-      // recién rotados.
       window.location.href = "/dashboard";
     } catch (err: unknown) {
       setServerError(getErrorMessage(err, "No se pudo cambiar la contraseña. Intente de nuevo."));

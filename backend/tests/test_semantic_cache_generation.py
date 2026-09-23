@@ -12,7 +12,6 @@ def _fake_redis(monkeypatch):
 
     fake = fakeredis.aioredis.FakeRedis(decode_responses=True)
     monkeypatch.setattr(redis_mod, "get_redis", lambda: fake)
-    # semantic_cache.py hace `from app.core.redis import get_redis` (import directo) - ese binding ya quedó resuelto, así que el monkeypatch de arriba no lo alcanza por sí solo.
     monkeypatch.setattr(cache_svc, "get_redis", lambda: fake)
     return fake
 
@@ -71,8 +70,6 @@ class TestStoreCachedResponseGenerationGuard:
         assert result["content"] == "respuesta correcta"
 
     async def test_store_without_min_generation_always_succeeds(self, monkeypatch):
-        """Compatibilidad hacia atrás: sin min_generation (llamadas que no
-        pasan por el pipeline de chat), el comportamiento no cambia."""
         async def _fake_embed(texts, prefix=""):
             return [{"dense": [0.2] * 8} for _ in texts]
 
@@ -90,9 +87,6 @@ class TestStoreCachedResponseGenerationGuard:
 
 
 class TestStoreCachedResponseAtomicTTL:
-    """hset + expire eran dos round-trips de red separados: si el proceso
-    moría entre ambos, la clave quedaba persistida sin TTL (crecimiento
-    indefinido del caché). Ahora van en un pipeline."""
 
     async def test_stored_key_always_has_ttl(self, monkeypatch, _fake_redis):
         async def _fake_embed(texts, prefix=""):

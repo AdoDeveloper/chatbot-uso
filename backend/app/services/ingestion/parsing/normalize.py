@@ -35,13 +35,7 @@ def _es_fila_de_tabla(linea: str) -> bool:
 
 
 def normalizar_texto(texto: str) -> str:
-    """Limpia artefactos de extracción preservando la estructura del documento.
-
-    Quita caracteres de control e invisibles, unifica espacios y guiones
-    tipográficos, junta palabras partidas por guion al final de línea y
-    elimina separadores y pies de página. Respeta las tablas Markdown, cuyo
-    espaciado interno delimita las columnas.
-    """
+    """Limpia artefactos de extracción preservando la estructura del documento."""
     if not texto:
         return ""
 

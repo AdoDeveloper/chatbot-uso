@@ -112,9 +112,6 @@ function SheetContent({
       state.dragging = true
     }
     const delta = axis === "x" ? dx : dy
-    // Solo se sigue el dedo en la dirección que cierra el sheet; en la
-    // dirección contraria no se mueve (no "sobre-abre" más allá de su
-    // posición final).
     const closing = delta * sign > 0
     setDragOffset(closing ? delta : 0)
   }

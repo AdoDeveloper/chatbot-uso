@@ -118,11 +118,7 @@ def _read_resource_utilization() -> tuple[float | None, float | None, float | No
 
 
 async def collect_snapshot(db: AsyncSession) -> dict:
-    """Ejecuta todos los checks y persiste una fila por servicio.
-
-    Tras persistir, dispara el chequeo proactivo de `service_down` para emitir
-    notificaciones si una racha de fallos lo amerita.
-    """
+    """Ejecuta todos los checks y persiste una fila por servicio."""
     cpu, mem, disk = _read_resource_utilization()
     results: dict[str, dict] = {}
     for name, fn in _CHECKS.items():
@@ -182,10 +178,7 @@ async def get_history(db: AsyncSession, *, service: str | None = None, hours: in
 async def get_uptime_summary(
     db: AsyncSession, *, hours: int = 24, since: datetime | None = None, until: datetime | None = None
 ) -> list[dict]:
-    """Por cada servicio: % uptime + P50 + P95 + P99 + última latencia.
-
-    Ventana: [since, until]. Si no se pasan, se deriva de `hours` (últimas N horas hasta ahora).
-    """
+    """Por cada servicio: % uptime + P50 + P95 + P99 + última latencia."""
     if since is None:
         since = datetime.now(timezone.utc) - timedelta(hours=hours)
     if until is None:
@@ -254,10 +247,7 @@ async def get_uptime_summary(
 async def get_incidents(
     db: AsyncSession, *, hours: int = 168, since: datetime | None = None, until: datetime | None = None
 ) -> list[dict]:
-    """Deriva incidentes por servicio: tramos contiguos con `is_ok=False`.
-
-    Ventana: [since, until]. Si no se pasan, se deriva de `hours` (default 7 días hasta ahora).
-    """
+    """Deriva incidentes por servicio: tramos contiguos con `is_ok=False`."""
     if since is None:
         since = datetime.now(timezone.utc) - timedelta(hours=hours)
     if until is None:

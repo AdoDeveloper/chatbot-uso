@@ -1,8 +1,4 @@
-"""Helpers de calidad para Sources.
-
-Funciones puras que viven separadas del pipeline de ingesta para que la UI
-admin pueda inspeccionar/explicar el estado de cualquier fuente sin reejecutar.
-"""
+"""Helpers de calidad para Sources."""
 from __future__ import annotations
 
 import hashlib
@@ -15,7 +11,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 def file_hash(content: bytes) -> str:
     """SHA-256 hex del archivo. Usado para detectar uploads duplicados."""
     return hashlib.sha256(content).hexdigest()
-
 
 
 _ERROR_PATTERNS: list[tuple[str, str, str, str]] = [
@@ -40,11 +35,7 @@ _ERROR_PATTERNS: list[tuple[str, str, str, str]] = [
 
 
 def classify_error(message: str | None) -> tuple[str | None, str | None, str | None]:
-    """Dado un mensaje de error crudo, retorna (code, friendly_message, hint).
-
-    Si no hay patrón, devuelve (None, message, None) - la UI mostrará el
-    mensaje crudo, pero al menos no lanza "error" sin más.
-    """
+    """Dado un mensaje de error crudo, retorna (code, friendly_message, hint)."""
     if not message:
         return None, None, None
     low = message.lower()
@@ -54,17 +45,8 @@ def classify_error(message: str | None) -> tuple[str | None, str | None, str | N
     return None, message, None
 
 
-
 async def quality_report(db: AsyncSession, source_id) -> dict:
-    """Resumen de calidad de chunks: cobertura, longitud promedio, warnings.
-
-    Datos:
-    - total_chunks
-    - avg_chars: promedio de longitud por chunk
-    - short_chunks: <100 chars
-    - long_chunks: >2000 chars
-    - last_used_at: última vez que un chunk fue recuperado (chat_messages.sources_json)
-    """
+    """Resumen de calidad de chunks: cobertura, longitud promedio, warnings."""
     from app.models.chat_message import ChatMessage
     from app.models.source import Source
 

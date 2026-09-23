@@ -1,10 +1,4 @@
-"""Tests para app/api/v1/access/rbac/router.py.
-
-`my-permissions` alimenta al panel para decidir que acciones muestra, asi que
-las pruebas fijan la separacion entre roles: un viewer no debe recibir
-permisos de escritura, y el listado de roles queda reservado a quien puede
-leer configuracion del sistema.
-"""
+"""Tests para app/api/v1/access/rbac/router.py."""
 from __future__ import annotations
 
 import pytest

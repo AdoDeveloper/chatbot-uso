@@ -1,23 +1,4 @@
-"""Tests de caracterización para microsoft_callback en app/api/v1/auth/router.py.
-
-Este endpoint no tenía NINGÚN test antes de esto (verificado por grep en
-todo tests/) a pesar de ser el flujo con mayor blast radius del sistema
-(login SSO: intercambio de código, verificación JWKS, provisión de
-usuario). Se fija exhaustivamente aquí antes de considerar cualquier
-extracción a servicio.
-
-El intercambio de código por tokens con Microsoft (httpx) se sustituye
-por un stub. La verificación del id_token NO mockea jwt.decode: firma un
-id_token real con una clave RSA de test y solo reemplaza PyJWKClient
-para que devuelva la clave pública correspondiente - así jwt.decode()
-real (el mismo módulo que usa core/security.py para los JWT propios del
-sistema) sigue haciendo la verificación de firma de verdad, sin arriesgar
-que un mock global rompa la emisión de tokens tras un login exitoso.
-
-Todas las ramas de error devuelven el mismo 401 genérico ("Credenciales
-incorrectas") por diseño anti-enumeración; se distinguen por el `reason`
-que queda en el audit log (no verificado aquí, solo el status code).
-"""
+"""Tests de caracterización para microsoft_callback en app/api/v1/auth/router.py."""
 from __future__ import annotations
 
 import pytest
@@ -46,13 +27,6 @@ def sso_env(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def reset_local_rate_limit_fallback():
-    """Red de seguridad para el fallback en memoria de app.core.rate_limit
-    (_LOCAL_LIMITS, dict a nivel de módulo que persistiría entre tests si
-    Redis no estuviera disponible). El camino normal ya no depende de esto:
-    rate_limit.py usa `redis_mod.get_redis()` (import del módulo, no del
-    símbolo), por lo que el `monkeypatch.setattr(redis_mod, "get_redis", ...)`
-    de conftest.py sí lo intercepta, y cada test recibe un FakeRedis nuevo
-    vía el fixture `client` - el rate limit se resetea solo entre tests."""
     from app.core.rate_limit import _LOCAL_LIMITS
     _LOCAL_LIMITS.clear()
     yield
@@ -73,16 +47,12 @@ def _new_rsa_key():
 
 @pytest.fixture(scope="module")
 def rsa_keypair():
-    """Clave RSA de test usada para firmar id_tokens "legítimos" en los
-    tests. Ver docstring del módulo: no se mockea jwt.decode global."""
+    """Clave RSA de test usada para firmar id_tokens "legítimos" en los tests."""
     return _new_rsa_key()
 
 
 @pytest.fixture(scope="module")
 def other_rsa_keypair():
-    """Segunda clave, distinta de rsa_keypair - usada para simular un
-    id_token con firma inválida (PyJWKClient devuelve la pública de
-    rsa_keypair, pero el token viene firmado con esta otra)."""
     return _new_rsa_key()
 
 
@@ -100,9 +70,6 @@ def _sign_id_token(claims: dict, private_key, audience="test-client-id") -> str:
 
 @pytest.fixture
 def patch_jwks_verify(monkeypatch, rsa_keypair):
-    """PyJWKClient.get_signing_key_from_jwt siempre devuelve la clave
-    pública de rsa_keypair - jwt.decode() real verifica la firma de verdad
-    contra esa clave. Ningún golpe de red al JWKS real de Microsoft."""
     import jwt as jwt_module
 
     class _FakeSigningKey:
@@ -122,19 +89,6 @@ def patch_jwks_verify(monkeypatch, rsa_keypair):
 
 @pytest.fixture
 def patch_ms_token_exchange(monkeypatch, rsa_keypair):
-    """Mockea el httpx.AsyncClient usado DENTRO de microsoft_callback para
-    simular el intercambio de código por tokens con Microsoft, devolviendo
-    un id_token real firmado con rsa_keypair.
-
-    Importante: NO se puede monkeypatchear httpx.AsyncClient.post a nivel
-    de clase - el propio test client (fixture `client` en conftest.py)
-    también es un httpx.AsyncClient (con ASGITransport), así que un patch
-    de clase intercepta la petición del test contra el servidor de
-    pruebas, no solo la llamada real a Microsoft. En su lugar se reemplaza
-    el atributo `AsyncClient` visto desde `app.services.auth.sso.httpx`
-    (el módulo httpx importado ahí), dejando intacto el httpx usado por
-    conftest.py para construir el test client.
-    """
     import app.services.auth.sso as sso_service
 
     default_claims = {"email": "usuario@empresa.com", "preferred_username": "usuario@empresa.com"}

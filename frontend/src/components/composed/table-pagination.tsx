@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, MoreHorizontal } from "lucide-react";
 import { Select, SelectOption } from "@/components/ui/select";
 
-// Umbral propio (no el de useIsMobile): por debajo de este ancho, la fila de botones de paginación puede exceder el espacio de una card angosta.
 const NARROW_BREAKPOINT = 480;
 
 function useIsNarrow() {
@@ -19,7 +18,6 @@ function useIsNarrow() {
   return narrow;
 }
 
-/** Opciones estándar del selector de tamaño de página, iguales en todo el panel. */
 export const PAGE_SIZE_OPTIONS = [10, 20, 30] as const;
 
 interface TablePaginationProps {
@@ -57,11 +55,6 @@ function buildPageList(current: number, total: number, siblings: number): (numbe
   return out;
 }
 
-/**
- * Pie de tabla estándar (formato datatable) para todo el panel: a la
- * izquierda "Mostrando N de Total", a la derecha
- * << < [1][2][3] > >>.
- */
 export function TablePagination({
   total, page, pageSize, shown, onPageChange, onPageSizeChange, className,
 }: TablePaginationProps) {
@@ -71,10 +64,6 @@ export function TablePagination({
   if (total <= pageSize && !onPageSizeChange) return null;
 
   const shownCount = shown ?? Math.min(pageSize, total - (page - 1) * pageSize);
-  // En pantallas angostas se omiten los siblings y los saltos a primera/
-  // última página - sin eso, la fila de botones (cada uno en su propio
-  // recuadro) puede ser más ancha que la card y el último botón queda
-  // cortado fuera de la pantalla.
   const pageList = buildPageList(page, totalPages, narrow ? 0 : SIBLINGS);
 
   const navBtn = "w-7 h-7 flex items-center justify-center rounded-md border border-border bg-card text-muted-foreground shadow-xs transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary disabled:opacity-30 disabled:pointer-events-none disabled:hover:border-border disabled:hover:bg-card";

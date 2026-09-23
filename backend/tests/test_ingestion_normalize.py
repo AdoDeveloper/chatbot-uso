@@ -1,11 +1,4 @@
-"""Tests de la normalización del texto extraído.
-
-Todo lo que sale de un parser pasa por aquí antes de trocearse y vectorizarse,
-así que un artefacto que sobreviva degrada la búsqueda: un espacio duro en
-"Artículo 1" impide que coincida con la consulta del usuario. Estos tests
-cubren los artefactos reales de PDF y DOCX, y que la estructura que sí aporta
-significado (tablas, encabezados, párrafos) no se pierda.
-"""
+"""Tests de la normalización del texto extraído."""
 from __future__ import annotations
 
 from app.services.ingestion.parsing.normalize import normalizar_texto
@@ -54,8 +47,7 @@ class TestTablas:
         assert normalizar_texto(tabla) == tabla
 
     def test_alineacion_interna_de_tabla_no_se_colapsa(self):
-        """El espaciado dentro de una fila delimita columnas: colapsarlo
-        rompería la lectura de la tabla."""
+        """El espaciado dentro de una fila delimita columnas: colapsarlo rompería la lectura de la tabla."""
         tabla = "| CUM   | Modalidad |\n|-------|-----------|\n| 8.0   | Pasantía  |"
         assert normalizar_texto(tabla) == tabla
 

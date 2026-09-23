@@ -18,10 +18,7 @@ LOGO_FILE = Path(__file__).resolve().parents[3] / "static" / "assets" / "uso_log
 _FORMULA_CHARS = ("=", "+", "-", "@", "|", "%")
 
 def _safe_cell(v: Any) -> str:
-    """Prefija con apóstrofe valores que Excel interpretaría como fórmula y
-    quita caracteres de control ilegales en XML (openpyxl los rechaza y
-    revienta la exportación completa si aparecen, ej. en mensajes de chat
-    con contenido binario/corrupto)."""
+    """Prefija con apóstrofe valores que Excel interpretaría como fórmula y quita caracteres de control ilegales."""
     from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
 
     s = str(v) if v is not None else ""
@@ -129,10 +126,8 @@ def excel_response(
     )
 
 
-
 def _draw_header_footer(canvas, doc, *, title: str) -> None:
-    """Dibuja el membrete institucional (logo + nombre) arriba y el pie con
-    numeración de páginas abajo. Se invoca en cada página del PDF."""
+    """Dibuja el membrete institucional (logo + nombre) arriba y el pie con numeración de páginas abajo."""
     from reportlab.lib import colors
     from reportlab.lib.units import cm
 
@@ -300,12 +295,7 @@ def pdf_response(
 
 
 def _chart_series(rows: list[dict], spec: dict) -> tuple[list[str], list[float]] | None:
-    """Extrae (etiquetas, valores) según el spec de gráfica.
-
-    Dos modos:
-      {"label": "Tema", "value": "Consultas"}          → una fila por punto
-      {"columns": ["Positivas", "Negativas"]}           → columnas de la primera fila
-    """
+    """Extrae (etiquetas, valores) según el spec de gráfica."""
     if spec.get("columns"):
         if not rows:
             return None
@@ -332,11 +322,7 @@ def _chart_series(rows: list[dict], spec: dict) -> tuple[list[str], list[float]]
 
 
 def _chart_drawing(rows: list[dict], spec: dict, avail_width: float):
-    """Construye una gráfica (Drawing de reportlab) desde las filas de la sección.
-
-    spec: {"type": "line"|"bar"|"pie", ...claves de _chart_series}
-    Devuelve None si no hay datos numéricos suficientes.
-    """
+    """Construye una gráfica (Drawing de reportlab) desde las filas de la sección."""
     from reportlab.graphics.charts.barcharts import VerticalBarChart
     from reportlab.graphics.charts.linecharts import HorizontalLineChart
     from reportlab.graphics.charts.piecharts import Pie
@@ -463,13 +449,7 @@ def build_pdf_report(
     title: str = "Reporte",
     subtitle: str | None = None,
 ) -> bytes:
-    """Genera un PDF con portada, secciones de texto, tablas y gráficas.
-
-    Cada sección admite:
-      {"title", "rows"}            → tabla
-      {"title", "text"}            → párrafo narrativo (p. ej. resumen ejecutivo)
-      {"title", "rows", "chart"}   → gráfica sobre las filas + tabla debajo
-    """
+    """Genera un PDF con portada, secciones de texto, tablas y gráficas."""
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4, landscape
     from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet

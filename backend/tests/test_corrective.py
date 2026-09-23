@@ -1,8 +1,4 @@
-"""Tests unitarios para app/services/rag/corrective.py.
-
-Ejercita la lógica del LangGraph CRAG (expand → retrieve → grade → rewrite)
-y las funciones auxiliares mockeando dependencias externas (embedding, Qdrant, LLM).
-"""
+"""Tests unitarios para app/services/rag/corrective.py."""
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -86,8 +82,6 @@ class TestGrade:
         assert [d["id"] for d in result["relevant_docs"]] == ["chunk-1", "chunk-3", "chunk-4"]
 
     async def test_completes_context_when_grader_approves_too_few(self):
-        """Un solo fragmento deja al generador sin apoyo suficiente, así que se
-        completa con los mejores del recuperador hasta el mínimo."""
         docs = [SAMPLE_DOC, {"id": "chunk-2"}, {"id": "chunk-3"}]
         state = _make_state(documents=docs)
         with patch(
@@ -99,8 +93,6 @@ class TestGrade:
         assert result["relevant_docs"][0]["id"] == "chunk-1"
 
     async def test_keeps_context_empty_when_nothing_is_relevant(self):
-        """Sin ningún fragmento aprobado la pregunta queda fuera del corpus:
-        completar solo daría al generador material ajeno."""
         docs = [SAMPLE_DOC, {"id": "chunk-2"}, {"id": "chunk-3"}]
         state = _make_state(documents=docs)
         with patch(
@@ -159,8 +151,7 @@ class TestMaybeFlagUnanswered:
             await _maybe_flag_unanswered("¿test?")
 
     async def test_schedules_topic_classification_when_provider_given(self):
-        """Con provider, debe programar una tarea de clasificación en
-        background sin esperarla (fire-and-forget)."""
+        """Con provider, debe programar una tarea de clasificación en background sin esperarla (fire-and-forget)."""
         import asyncio
 
         with patch("app.db.session.AsyncSessionLocal") as mock_local, \
@@ -272,7 +263,6 @@ class TestRunSimpleRag:
         assert ratio == 1.0
 
     async def test_without_provider_skips_grading(self):
-        """provider=None (default) - comportamiento histórico sin costo LLM."""
         docs = [{"id": "chunk-1"}, {"id": "chunk-2"}]
         with (
             patch("app.services.rag.corrective.embed_texts_async", AsyncMock(return_value=[SAMPLE_EMB])),
@@ -285,9 +275,6 @@ class TestRunSimpleRag:
         assert ratio == 1.0
 
     async def test_with_provider_filters_by_grade(self):
-        """provider pasado - el filtro de relevancia (mismo grade_documents que
-        corrective RAG) descarta los chunks marcados como no relevantes, sin
-        pasar por el ciclo expand/rewrite del grafo completo."""
         docs = [{"id": "chunk-%d" % i} for i in range(1, 5)]
         with (
             patch("app.services.rag.corrective.embed_texts_async", AsyncMock(return_value=[SAMPLE_EMB])),
@@ -302,8 +289,6 @@ class TestRunSimpleRag:
         assert ratio == 3 / 4
 
     async def test_ratio_reflects_the_grader_not_the_completed_context(self):
-        """El ratio mide el juicio del filtro: si midiera lo enviado tras
-        completar, la métrica ocultaría que el evaluador aprobó poco."""
         docs = [{"id": "chunk-%d" % i} for i in range(1, 5)]
         with (
             patch("app.services.rag.corrective.embed_texts_async", AsyncMock(return_value=[SAMPLE_EMB])),
@@ -391,10 +376,6 @@ class TestRunAdaptiveRag:
         assert ratio == 1.0
 
     async def test_factual_route_with_corrective_enabled_passes_provider_for_grading(self):
-        """Regresión: preguntas factual con use_corrective_rag=True (default)
-        deben pasar provider/api_key a run_simple_rag para activar el filtro
-        de relevancia - sin esto, un retrieval con contexto ruidoso podía
-        pasar chunks irrelevantes al LLM de generación sin verificar."""
         with (
             patch("app.services.rag.router.classify_query", return_value=QueryRoute.FACTUAL),
             patch("app.services.rag.corrective.run_simple_rag", AsyncMock(return_value=([SAMPLE_DOC], 1.0))) as mock_simple,
@@ -410,8 +391,6 @@ class TestRunAdaptiveRag:
         assert kwargs["api_key"] == "real-key"
 
     async def test_factual_route_with_corrective_disabled_skips_grading(self):
-        """Si el admin desactivó corrective RAG por completo, factual no debe
-        pagar el costo de grading tampoco - respeta la config existente."""
         with (
             patch("app.services.rag.router.classify_query", return_value=QueryRoute.FACTUAL),
             patch("app.services.rag.corrective.run_simple_rag", AsyncMock(return_value=([SAMPLE_DOC], 1.0))) as mock_simple,

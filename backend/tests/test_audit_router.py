@@ -1,10 +1,4 @@
-"""Tests para app/api/v1/audit/router.py.
-
-Cubre el listado con sus filtros y orden, el detalle, la lista de actores y
-la exportacion. La exportacion recibe atencion especial: sus filtros deben
-coincidir con los del listado, porque un archivo que no corresponde a lo
-consultado invalida el registro como evidencia.
-"""
+"""Tests para app/api/v1/audit/router.py."""
 from __future__ import annotations
 
 import uuid
@@ -198,11 +192,7 @@ class TestExportLogs:
     async def test_export_accepts_the_same_filters_as_the_listing(
         self, client, admin_user, auth_headers, campo
     ):
-        """Los filtros del listado deben existir tambien en la exportacion.
-
-        Si uno falta, FastAPI lo descarta en silencio y el archivo generado
-        no corresponde a lo que el panel muestra.
-        """
+        """Los filtros del listado deben existir tambien en la exportacion."""
         valores = {
             "resource_type": "source",
             "actor_id": str(admin_user.id),

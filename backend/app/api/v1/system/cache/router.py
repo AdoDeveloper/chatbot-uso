@@ -67,7 +67,6 @@ async def clear_cache(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(_admin),
 ) -> DeletedCount:
-    """Vacía todo el caché semántico. Devuelve el número de entradas borradas."""
     deleted = await cache_svc.clear_all()
     await audit_svc.log_action(
         db,

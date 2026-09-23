@@ -14,11 +14,7 @@ from app.models.enums import EscalationEventType
 
 
 class EscalationEvent(Base):
-    """Registro de auditoría del ciclo de vida de una conversación escalada.
-
-    Cada fila registra una transición (escalado, resuelto, etc.).
-    Consultar esta tabla da la línea de tiempo completa de un caso.
-    """
+    """Registro de auditoría del ciclo de vida de una conversación escalada."""
 
     __tablename__ = "escalation_events"
 

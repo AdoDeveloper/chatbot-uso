@@ -2,7 +2,6 @@ import { test, expect } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 
-// Coverage for /dashboard/configuracion/asistente: settings export, the Prompt tab save flow, a widget appearance toggle, and CSAT reason CRUD. Never touches "Regenerar clave del widget" - it would break every widget embed currently deployed with the old key.
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;
 

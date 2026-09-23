@@ -1,9 +1,4 @@
-"""Tests para app/api/v1/versions/router.py.
-
-Cubre listado paginado, creación de snapshot manual (incl. 409 sin cambios),
-detalle, diff contra la versión padre y rollback (incl. 404), con verificación
-de RBAC (bot_settings.read / bot_settings.update) en cada endpoint.
-"""
+"""Tests para app/api/v1/versions/router.py."""
 from __future__ import annotations
 
 import uuid

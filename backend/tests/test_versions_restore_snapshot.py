@@ -1,16 +1,4 @@
-"""Tests de app/services/monitoring/versions.py::restore_snapshot - ramas sin cubrir.
-
-test_versions_router.py::TestRollback solo ejercita el camino feliz vía HTTP
-(un solo GlobalSetting, esquema v2 actual). Esta es la ruta de recuperación
-ante desastres del sistema: un rollback corrupto o parcial (reactivar un
-proveedor LLM sin API key, restaurar un secreto enmascarado como el string
-literal "[CONFIGURED]", o no revertir el snapshot v1 legado) no se detectaría
-sin tests directos de cada rama.
-
-Se llama a restore_snapshot() directo (no vía HTTP) para poder construir
-snapshots sintéticos con las formas exactas de cada rama, incluyendo casos
-que capture_snapshot() normal no produciría fácilmente (ej. v1 legacy).
-"""
+"""Tests de app/services/monitoring/versions.py::restore_snapshot - ramas sin cubrir."""
 from __future__ import annotations
 
 import uuid
@@ -49,9 +37,6 @@ async def _make_version(db_session, snapshot: dict, *, schema_version: int = SCH
 
 class TestRestoreSnapshotV1Legacy:
     async def test_v1_snapshot_restores_flat_settings_with_warning(self, db_session, admin_user):
-        """Snapshots viejos (schema_version != SCHEMA_VERSION actual, formato
-        plano key-value sin 'sections') deben restaurarse igual, con aviso
-        explícito de que solo se restauró configuración básica."""
         v1_snapshot = {"schema_version": 1, "greeting_response": "Bot Legado", "max_input_chars": 500}
         target = await _make_version(db_session, v1_snapshot, schema_version=1)
 
@@ -66,8 +51,6 @@ class TestRestoreSnapshotV1Legacy:
 
 class TestEphemeralLocksExcludedFromSnapshots:
     async def test_capture_ignores_scheduler_locks(self, db_session):
-        """Los locks del scheduler viven en global_settings pero no son
-        configuración: si entran al snapshot ensucian todos los diffs."""
         from app.services.monitoring.versions import _collect_global_settings
 
         db_session.add(GlobalSetting(
@@ -83,8 +66,6 @@ class TestEphemeralLocksExcludedFromSnapshots:
         assert collected["temperature"] == 0.4
 
     async def test_restore_ignores_locks_from_old_snapshots(self, db_session, admin_user):
-        """Snapshots anteriores al fix guardaron miles de locks: restaurarlos
-        no debe recrearlos en global_settings."""
         lock_key = f"scheduler:health:{uuid.uuid4().hex[:8]}"
         snapshot = {
             "schema_version": SCHEMA_VERSION,
@@ -107,10 +88,7 @@ class TestEphemeralLocksExcludedFromSnapshots:
 
 class TestPruneAutoSnapshots:
     async def test_prunes_chained_versions_and_orphans_children(self, db_session):
-        """Cada versión apunta a la anterior como padre. Excluir de la poda a
-        las referenciadas como padre bloqueaba la cadena entera y no se
-        borraba nada; los hijos deben quedar sin padre, no con una referencia
-        rota."""
+        """Cada versión apunta a la anterior como padre."""
         from app.services.monitoring.versions import MAX_AUTO_SNAPSHOTS, _prune_auto_snapshots
 
         total = MAX_AUTO_SNAPSHOTS + 5
@@ -138,10 +116,6 @@ class TestPruneAutoSnapshots:
 
         assert removed > 0, "la poda debe borrar aunque las versiones formen una cadena"
 
-        # El ON DELETE SET NULL lo aplica MySQL, no la sesión: con
-        # expire_on_commit=False los objetos del identity map conservan el
-        # parent_version_id viejo y el SELECT los devuelve cacheados. Hay que
-        # expirar para leer el estado real de la base.
         db_session.expire_all()
 
         # Las mas antiguas se fueron; ninguna quedó apuntando a una borrada.
@@ -163,9 +137,6 @@ async def _fetch_all(db_session, ids: list[uuid.UUID]) -> list[ConfigVersion]:
 
 class TestRestoreSnapshotSecretMasking:
     async def test_masked_secret_value_is_not_overwritten(self, db_session, admin_user):
-        """El snapshot nunca contiene el secreto real, solo el string literal
-        '[CONFIGURED]' - restaurarlo tal cual escribiría ese texto como si
-        fuera la clave real, dejando el sistema roto silenciosamente."""
         db_session.add(GlobalSetting(key="smtp_password", value="real-secret-value"))
         await db_session.commit()
 
@@ -234,8 +205,6 @@ class TestRestoreSnapshotWidgetConfig:
 
 class TestRestoreSnapshotLLMProviders:
     async def test_provider_absent_from_snapshot_is_deactivated(self, db_session, admin_user):
-        """Un proveedor que se agregó DESPUÉS del snapshot elegido no debe
-        quedar activo tras el rollback - se desactiva y pierde prioridad."""
         provider = LLMProvider(
             id=uuid.uuid4(), name="Proveedor Nuevo", provider_type="openai",
             model_name="gpt-4", is_active=True, priority=1,
@@ -256,10 +225,6 @@ class TestRestoreSnapshotLLMProviders:
     async def test_provider_in_snapshot_but_missing_from_db_is_recreated_inactive_with_warning(
         self, db_session, admin_user,
     ):
-        """Un proveedor que estaba en el snapshot pero fue borrado de la BD
-        se recrea SIN api_key (nunca se captura) - debe quedar inactivo y
-        el warning debe decírselo al admin explícitamente, no fallar silente
-        con una clave vacía funcionando a medias."""
         missing_id = str(uuid.uuid4())
         snapshot = {
             "schema_version": SCHEMA_VERSION,
@@ -341,9 +306,6 @@ class TestRestoreSnapshotNotificationRules:
 
 class TestRestoreSnapshotNotRevertedWarnings:
     async def test_warns_about_escalation_rules_sources_and_faq_not_reverted(self, db_session, admin_user):
-        """Estas secciones se capturan en snapshots pero deliberadamente no
-        se revierten (borrar fuentes/FAQ productivas en un rollback sería
-        destructivo) - el admin debe ser avisado, no dejado sin explicación."""
         snapshot = {
             "schema_version": SCHEMA_VERSION,
             "sections": {

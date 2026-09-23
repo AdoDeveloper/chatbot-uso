@@ -25,11 +25,6 @@ export interface UseApiResult<T> {
   setData: React.Dispatch<React.SetStateAction<T | null>>;
 }
 
-/**
- * Caché en memoria por path para no re-fetchear en cada montaje de vista.
- * Al volver a una vista, los datos aparecen al instante (desde caché) y se
- * revalidan en background. TTL corto: los datos siguen siendo frescos.
- */
 const CACHE_TTL_MS = 30_000;
 const _cache = new Map<string, { data: unknown; ts: number }>();
 
@@ -47,10 +42,6 @@ function _cacheSet(path: string, data: unknown): void {
   _cache.set(path, { data, ts: Date.now() });
 }
 
-/**
- * Invalida la entrada de caché de useApi para una ruta. Llámalo tras PUT/POST/DELETE
- * para que la próxima vez que se monte un useApi(path) haga un fetch real.
- */
 export function invalidateApiCache(path: string): void {
   _cache.delete(path);
 }
@@ -59,19 +50,6 @@ export function clearApiCache(): void {
   _cache.clear();
 }
 
-/**
- * Ciclo completo de GET a la API: loading/refetching, error con `detail` del
- * backend, cancelación con AbortController al desmontar o cambiar deps, y
- * nunca setState tras unmount.
- *
- *   const { data, loading, error, refetch } = useApi<Source[]>("/sources");
- *
- *   // Recarga sola cuando cambia el filtro:
- *   const { data } = useApi<TopicsResponse>(`/analytics/topics?days=${days}`, [days]);
- *
- *   // Carga condicional - `null` pospone el fetch (p. ej. faltan fechas):
- *   const { data } = useApi<Metrics>(ready ? `/analytics?${qs}` : null, [ready, qs]);
- */
 export function useApi<T>(path: string | null, deps: unknown[] = []): UseApiResult<T> {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(path !== null);

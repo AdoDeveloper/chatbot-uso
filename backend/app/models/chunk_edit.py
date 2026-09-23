@@ -11,14 +11,7 @@ from app.db.session import Base
 
 
 class ChunkEdit(Base):
-    """
-    Registro de auditoría para ediciones de contenido de chunks.
-
-    Los chunks viven en Qdrant (no en una tabla SQL), así que esta auditoría
-    existe de forma independiente y referencia el punto por su UUID en texto.
-    Cada edición guarda el contenido anterior y el nuevo para poder ver el
-    historial o revertir si hace falta.
-    """
+    """Registro de auditoría para ediciones de contenido de chunks."""
     __tablename__ = "chunk_edits"
 
     id: Mapped[uuid.UUID] = mapped_column(

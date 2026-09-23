@@ -82,11 +82,7 @@ async def resolve_question(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_perm(P.CONVERSATIONS_UPDATE)),
 ):
-    """Marca una pregunta como resuelta sin crear FAQ.
-
-    Útil cuando el editor ya añadió un documento que cubre la pregunta y solo
-    necesita limpiar la cola de pendientes.
-    """
+    """Marca una pregunta como resuelta sin crear FAQ."""
     result = await db.execute(select(UnansweredQuestion).where(UnansweredQuestion.id == question_id))
     q = result.scalar_one_or_none()
     if not q:
@@ -115,14 +111,7 @@ async def create_faq_from_unanswered(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(_require_conversations_update_and_knowledge_create),
 ):
-    """Convierte una pregunta sin respuesta en una FAQ y la marca como resuelta.
-
-    Crea automáticamente:
-      - Un FAQEntry con la pregunta original + respuesta proporcionada.
-      - Una Source de tipo `faq` con sus chunks embedidos en Qdrant.
-    De esa forma la próxima vez que un usuario pregunte algo similar, el bot
-    encuentra la FAQ vía retrieval semántico.
-    """
+    """Convierte una pregunta sin respuesta en una FAQ y la marca como resuelta."""
     from app.services.knowledge import faq as faq_svc
 
     result = await db.execute(select(UnansweredQuestion).where(UnansweredQuestion.id == question_id))

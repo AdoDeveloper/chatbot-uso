@@ -123,7 +123,6 @@ interface ActivityData {
 }
 
 
-
 const PIE_COLORS = [CHART_NAVY, CHART_TEAL, CHART_GREEN, "var(--color-warning)", "var(--color-destructive)", "var(--color-brand-cornflower)"];
 const ROUTE_LABELS: Record<string, string> = { greeting: "Saludo", factual: "Factual", complex: "Complejo" };
 
@@ -655,9 +654,6 @@ function PeriodComparisonPanel({ comparison, loading }: {
   return `${s.toLocaleDateString("es", opts)} → ${e.toLocaleDateString("es", opts)}`;
  };
 
- // Con pocas muestras (tipico en trafico bajo) un solo mensaje lento puede
- // mover el promedio/P95 entero - se avisa el tamaño de muestra en vez de
- // dejar que un delta grande se lea como una tendencia real de rendimiento.
  const latencySampleNote = `${comparison.current.avg_latency_sample_size} vs. ${comparison.previous.avg_latency_sample_size} mensajes`;
 
  const rows: Array<{ label: string; current: string; previous: string; delta: number | null; invertColor?: boolean; absolute?: boolean; note?: string }> = [
@@ -905,10 +901,6 @@ function FeedbackPanel({ feedback, loading }: { feedback: AnalyticsFeedback | nu
  );
 }
 
-// Por debajo de este número de muestras, el promedio no es representativo:
-// una sola respuesta mala o buena mueve el porcentaje entero. Se muestra el
-// progreso hacia el mínimo en vez del porcentaje, para no leerse como un
-// dato confiable que todavía no lo es.
 const MIN_QUALITY_SAMPLES = 10;
 
 function ResponseQualityPanel({ quality, loading }: { quality: AnalyticsResponseQuality | null; loading: boolean }) {

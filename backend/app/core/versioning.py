@@ -1,7 +1,4 @@
-"""
-Middleware de versionado: captura automáticamente snapshots del sistema tras mutaciones.
-Tarea asyncio fire-and-forget, sin latencia adicional para la respuesta.
-"""
+"""Middleware de versionado: captura automáticamente snapshots del sistema tras mutaciones."""
 from __future__ import annotations
 
 import asyncio
@@ -22,12 +19,6 @@ log = structlog.get_logger()
 # se recolectan a mitad de ejecución); discard() en done_callback las limpia.
 _background_tasks: set[asyncio.Task] = set()
 
-# Mapea (método HTTP, prefijo de path) → etiqueta trigger_source
-#
-# Solo se versiona la configuración del asistente: lo que define cómo responde
-# el chatbot. Quedan fuera a propósito la gestión de contenido (documentos y
-# FAQ, que el rollback nunca revierte) y los ajustes operativos del sistema
-# (cache, rate limits, notificaciones, integraciones).
 _VERSIONED_ROUTES: list[tuple[str, str, str]] = [
     ("PUT",    "/api/v1/settings",                      "settings"),
     ("POST",   "/api/v1/providers",                     "providers"),
@@ -76,13 +67,7 @@ async def _capture_background(user_id: uuid.UUID, trigger_source: str) -> None:
 
 
 class VersioningMiddleware:
-    """
-    Middleware ASGI puro: captura snapshots del sistema tras mutaciones exitosas.
-
-    No hereda de BaseHTTPMiddleware a propósito: evita el wrapping con anyio
-    TaskGroup, que genera ExceptionGroups anidados cuando las excepciones
-    se propagan desde capas internas de middleware/endpoint.
-    """
+    """Middleware ASGI puro: captura snapshots del sistema tras mutaciones exitosas."""
 
     def __init__(self, app: ASGIApp) -> None:
         self.app = app

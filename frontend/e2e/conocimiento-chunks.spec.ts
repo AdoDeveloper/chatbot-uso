@@ -3,12 +3,6 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 
-/**
- * Functional coverage for /dashboard/conocimiento/documentos/[id]/chunks:
- * uploads a real source, waits for ingestion, then exercises discard/
- * restore and edit-content on one of its chunks. Cleans up by deleting the
- * source at the end (cascades chunk deletion in Qdrant/DB).
- */
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;
 

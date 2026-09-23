@@ -11,17 +11,7 @@ from app.db.session import Base
 
 
 class HealthSnapshot(Base):
-    """Muestra periódica del estado de un servicio.
-
-    Una fila por (service_name, recorded_at). El admin recolector escribe
-    una entrada cada N segundos por servicio (mysql, redis, qdrant, embedding).
-    Una caída produce un incidente: la primera entrada con `is_ok=False` tras
-    una racha de OK abre el incidente; la primera entrada `is_ok=True` lo cierra.
-
-    Latencia se guarda en `latency_ms` (NULL si el servicio falló por completo).
-    P95/P99 se calculan en Python sobre la columna `latency_ms` filtrada por
-    `is_ok=True` en una ventana temporal.
-    """
+    """Muestra periódica del estado de un servicio."""
 
     __tablename__ = "health_snapshots"
 

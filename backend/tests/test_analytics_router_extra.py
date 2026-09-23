@@ -1,12 +1,4 @@
-"""Tests para los endpoints de app/api/v1/analytics/router.py sin cobertura.
-
-/dashboard, /topics, /heatmap, /timeseries y /timeline ya tienen tests
-dedicados (test_analytics_api.py, test_analytics_timeline.py). Este archivo
-cubre el resto: son capas finas (auth + query params -> svc.get_*), así que
-se verifican con un smoke test paramétrico (401 sin auth, 200 con estructura
-esperada) en vez de un test dedicado por endpoint - la lógica de agregación
-real vive en app/services/monitoring/analytics.py, no en el router.
-"""
+"""Tests para los endpoints de app/api/v1/analytics/router.py sin cobertura."""
 from __future__ import annotations
 
 import pytest
@@ -96,9 +88,6 @@ class TestCsatAggregation:
 
 
 class TestEffectiveDaysDateRange:
-    """El resto de endpoints ya prueba el caso `days=N`; este cubre el otro
-    modo de la misma función interna (_effective_days): date_from/date_to
-    explícitos en vez de un entero de días."""
 
     async def test_topics_with_explicit_date_range(self, client, admin_user, auth_headers):
         r = await client.get(

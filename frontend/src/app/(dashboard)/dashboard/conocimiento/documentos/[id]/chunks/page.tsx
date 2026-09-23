@@ -134,9 +134,6 @@ export default function SourceChunksPage() {
 
  const totalWarnings = Object.values(data?.warning_counts ?? {}).reduce((a, b) => a + b, 0);
 
- // Filtro de texto local, solo sobre la página actual. Compara contra el
- // cuerpo del chunk, el encabezado de sección y el id del chunk (para que
- // el admin pueda pegar un point id de Qdrant y ubicarlo). No distingue mayúsculas/minúsculas.
  const filteredChunks = data?.chunks
   ? data.chunks.filter((c) => {
      if (!search.trim()) return true;
@@ -274,9 +271,6 @@ export default function SourceChunksPage() {
          const isExpanded = expanded === chunk.id;
          const isBusy = busyChunk === chunk.id;
          const charCount = chunk.text.length;
-         // Trunca el point id de Qdrant para mostrarlo compacto. El id completo
-         // está disponible vía el botón de copiar - útil cuando el admin necesita
-         // referenciar un chunk específico en logs o tickets.
          const shortId = chunk.id.length > 12 ? `${chunk.id.slice(0, 6)}…${chunk.id.slice(-4)}` : chunk.id;
          return (
           <TableRow key={chunk.id} className={`group ${chunk.is_discarded ? "opacity-60" : ""}`}>

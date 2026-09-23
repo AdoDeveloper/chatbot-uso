@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 
-
 class TestAnalyticsDashboard:
     async def test_dashboard_requires_auth(self, client):
         r = await client.get("/api/v1/analytics/dashboard")

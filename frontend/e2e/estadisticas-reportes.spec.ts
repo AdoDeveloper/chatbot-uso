@@ -2,11 +2,6 @@ import { test, expect } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 
-/**
- * Functional coverage for /dashboard/estadisticas (export dropdown) and
- * /dashboard/reportes (PDF generation), against the real backend export
- * endpoints. Both trigger a real blob download.
- */
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;
 
@@ -72,7 +67,6 @@ test.describe("Reportes", () => {
     await page.goto("/dashboard/reportes");
     const execTitle = page.getByText("Reporte Ejecutivo", { exact: true });
     await expect(execTitle).toBeVisible({ timeout: 10_000 });
-    // Each report is its own <Card> with one "Descargar PDF" button - find the smallest ancestor containing both the title and that button to scope the click.
     const execCard = execTitle.locator("xpath=(ancestor::*[.//button[contains(., 'Descargar PDF')]])[last()]");
     await expect(execCard.getByRole("button", { name: /descargar pdf/i })).toBeVisible({ timeout: 5_000 });
     await page.screenshot({ path: path.join(SHOT_DIR, "02-reportes.png") });

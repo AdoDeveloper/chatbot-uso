@@ -1,10 +1,3 @@
-/**
- * Constantes de strings de permisos para el sistema RBAC.
- * Formato: "module.action" - debe coincidir con MODULES_SEED en backend/services/system/rbac.py.
- *
- * Uso:  const can = usePermission();
- *         if (can(PERM.KNOWLEDGE_UPDATE)) { ... }
- */
 export const PERM = {
   DASHBOARD_READ: "dashboard.read",
 

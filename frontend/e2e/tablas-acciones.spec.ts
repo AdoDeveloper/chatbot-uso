@@ -17,18 +17,11 @@ const TABLES: { route: string; name: string }[] = [
 test.describe("Columna de Acciones - visual regression", () => {
   for (const { route, name } of TABLES) {
     test(`acciones column renders without overflow - ${name}`, async ({ page }) => {
-      // "documentos" corre al final de la suite y puede quedar sin filas si
-      // otros specs ya borraron sus fuentes desechables - sube y deja lista
-      // una propia para garantizar que la tabla (no el EmptyState) sea lo
-      // que se renderiza, sin depender del estado que dejen otros specs.
       let sourceName: string | null = null;
       if (name === "documentos") {
         const stamp = Date.now();
         sourceName = `E2E Tabla Acciones ${stamp}`;
         const filePath = path.join(os.tmpdir(), `e2e-tabla-acciones-${stamp}.txt`);
-        // Contenido unico por corrida: si una corrida previa dejo un source
-        // huerfano (ej. por un fallo a mitad de test), el backend detecta
-        // duplicados por contenido y bloquea el guardado con contenido fijo.
         fs.writeFileSync(filePath, `Contenido de prueba E2E ${stamp} para verificar la columna de acciones.`);
 
         await page.goto(route);

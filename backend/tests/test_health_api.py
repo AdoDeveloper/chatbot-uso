@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 
-
 class TestLiveness:
     async def test_liveness_returns_ok(self, client):
         r = await client.get("/api/v1/health/live")

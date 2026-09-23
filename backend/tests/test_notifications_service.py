@@ -1,8 +1,4 @@
-"""Tests unitarios para app/services/notifications/service.py y templates.py.
-
-Ejercita send_notification, _email_recipients, _html_body, _text_body,
-_daily_digest_body, y los helpers de templates.
-"""
+"""Tests unitarios para app/services/notifications/service.py y templates.py."""
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -74,8 +70,6 @@ class TestSendNotification:
             )
 
     async def test_uses_rule_target_instead_of_all_admins(self, db_session, make_user):
-        """Integración: send_notification debe respetar email_rule.target en
-        vez de reenviar siempre a todos los admins activos."""
         await make_user(email="admin@test.com", role=UserRole.admin)
         db_session.add(NotificationRule(
             event=NotificationEvent.doc_ready,
@@ -145,10 +139,6 @@ class TestSendNotification:
         assert recipients == {admin.id, editor.id}
 
     async def test_email_and_in_app_rows_share_trigger_id(self, db_session, make_user):
-        """Todas las filas de un mismo send_notification() (correo + cada
-        destinatario in_app) deben compartir trigger_id - es lo que permite
-        al historial (GET /notifications) agruparlas como un único disparo
-        en vez de mostrarlas como entregas sueltas sin relación entre sí."""
         from app.models.notification_log import NotificationLog
 
         await make_user(email="admin@test.com", role=UserRole.admin)
@@ -174,9 +164,6 @@ class TestSendNotification:
         assert len(trigger_ids) == 1
 
     async def test_two_separate_calls_get_different_trigger_ids(self, db_session, make_user):
-        """Dos disparos distintos (dos llamadas a send_notification) no
-        deben compartir trigger_id, ni siquiera para el mismo evento -
-        cada uno es un envío independiente en el historial."""
         from app.models.notification_log import NotificationLog
 
         await make_user(email="admin@test.com", role=UserRole.admin)
@@ -226,10 +213,6 @@ class TestLabeledRows:
         assert "Unknown key" in result
 
     def test_real_payload_keys_all_translated(self):
-        """Las claves que realmente arma cada send_notification(...) en
-        producción deben tener entrada en _FIELD_LABELS - si un payload real
-        usa una clave sin traducir, el correo muestra el nombre técnico crudo
-        (ej. "source_id") en vez de una etiqueta legible."""
         real_payload_keys = {
             "service", "error", "since",  # monitoring/alerts.py service_down
             "providers",  # monitoring/alerts.py notify_provider_down
@@ -309,9 +292,6 @@ class TestDailyDigestBody:
 
 
 class TestHumanizeSince:
-    """Convierte el ISO 8601 UTC crudo del payload a una fecha legible en
-    hora local y a un "hace cuánto" - antes el correo mostraba el timestamp
-    tal cual llegaba de la BD (ej. "2026-08-31T22:05:42.634191+00:00")."""
 
     def test_returns_readable_date_not_raw_iso(self):
         readable, _ago = service._humanize_since("2026-08-31T22:05:42.634191+00:00")
@@ -338,11 +318,6 @@ class TestHumanizeSince:
 
 
 class TestProviderDownBody:
-    """El correo de provider_down separa los proveedores en chips
-    individuales (no una sola línea con comas) y muestra la fecha en
-    formato legible - antes usaba el detail_table genérico que mostraba
-    "Groq Produccion, Ollama gpt-oss 20B" como texto corrido y el ISO
-    crudo sin conversión de zona horaria ni "hace cuánto"."""
 
     def test_providers_rendered_as_separate_tables(self):
         m = service._meta(NotificationEvent.provider_down)
@@ -398,8 +373,7 @@ class TestProviderDownBody:
         assert "(sin detalle)" not in html
 
     def test_dispatches_through_html_body(self):
-        """_html_body debe enrutar a _provider_down_body para este evento,
-        no caer en el detail_table genérico."""
+        """_html_body debe enrutar a _provider_down_body para este evento, no caer en el detail_table genérico."""
         html = service._html_body(NotificationEvent.provider_down, {
             "providers": "Groq, Mistral", "error": "boom", "since": "2026-08-31T22:05:42+00:00",
         })

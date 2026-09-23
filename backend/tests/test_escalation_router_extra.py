@@ -1,10 +1,3 @@
-"""Tests para los endpoints de app/api/v1/escalation/router.py no cubiertos
-por test_escalation_router.py (ping_smtp, test_rule, rules CRUD) ni por
-test_conversations_router.py (que no toca este router en absoluto).
-
-Cubre: list_trigger_schemas, test_escalation, get_escalation_metrics, y RBAC
-(admin/editor/viewer) para todos los endpoints del módulo.
-"""
 from __future__ import annotations
 
 import uuid

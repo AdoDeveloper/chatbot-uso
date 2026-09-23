@@ -2,12 +2,6 @@ import { test, expect } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 
-/**
- * Coverage for the "Tipos de proveedor" catalog card on
- * /dashboard/configuracion/proveedores (separate from the provider-instance
- * CRUD in configuracion-proveedores.spec.ts): create, edit and delete an
- * entry in provider_type catalog, including its HTTP headers sub-form.
- */
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;
 
@@ -34,10 +28,6 @@ test.describe("Configuracion > Proveedores > Tipos de proveedor", () => {
     await createDialog.getByPlaceholder("ej. together", { exact: true }).fill(typeKey);
     await createDialog.getByPlaceholder(/together ai/i).fill(displayName);
 
-    // Ejercita el sub-formulario de headers HTTP extra: el mismo control cuyo
-    // boton "Agregar" ambiguo (comparte label con el submit del dialog) causaba
-    // el fallo de selector en configuracion-proveedores.spec.ts. En el DOM
-    // aparece antes que el submit, de ahi first()/last() para desambiguar.
     await createDialog.getByRole("button", { name: /^agregar$/i }).first().click();
     await createDialog.getByPlaceholder(/nombre-header/i).fill("x-e2e-test");
     await createDialog.getByPlaceholder(/^valor$/i).fill("1");

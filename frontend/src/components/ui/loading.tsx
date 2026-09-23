@@ -3,14 +3,6 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
-/**
- * Indicador de carga estándar del sistema (estilo skeleton de sección).
- *
- * Se diseñó para reemplazar a la TARJETA COMPLETA durante la carga (no para
- * incrustarse dentro de una Card ya dibujada): muestra un placeholder de
- * encabezado y filas de contenido, de modo que no coexista con el marco
- * vacío de una Card y se perciba claramente como "cargando".
- */
 export function Loading({
   title,
   rows = 3,

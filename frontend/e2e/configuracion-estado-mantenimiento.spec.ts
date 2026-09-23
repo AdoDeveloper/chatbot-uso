@@ -1,15 +1,5 @@
 import { test, expect } from "@playwright/test";
 
-/**
- * Coverage for DELETE /cache/clear ("Limpiar caché completo") and
- * DELETE /maintenance/health-snapshots/outliers ("Limpiar P99"), both
- * deliberately excluded from configuracion-estado.spec.ts's header comment
- * as "destructive/irreversible". Unlike the SSO/rollback cases, neither
- * needs a disposable-data round-trip: both only delete regenerable data
- * (cached LLM responses, historical latency outliers) with no config or
- * access-control side effect - safe to run unconditionally, idempotent
- * (running with nothing to delete just returns deleted: 0).
- */
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;
 

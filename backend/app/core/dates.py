@@ -7,11 +7,7 @@ from datetime import datetime, timedelta, timezone
 def since_until(
     date_from: datetime | None, date_to: datetime | None
 ) -> tuple[datetime | None, datetime | None]:
-    """Normaliza un rango de fechas personalizado a (since, until) con tz UTC.
-
-    Si no se pasa `date_from`, ambos quedan en None y el caller usa su
-    ventana relativa por defecto (`hours`/`days`).
-    """
+    """Normaliza un rango de fechas personalizado a (since, until) con tz UTC."""
     if date_from is None:
         return None, None
     since = date_from.replace(tzinfo=timezone.utc) if date_from.tzinfo is None else date_from

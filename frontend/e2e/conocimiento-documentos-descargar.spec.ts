@@ -3,12 +3,6 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 
-/**
- * Coverage for GET /sources/{id}/download ("Descargar original" en el menu
- * de una fila), no cubierto por conocimiento-documentos.spec.ts. Sube una
- * fuente desechable propia, descarga el archivo original y confirma que el
- * contenido descargado coincide con el subido, luego la elimina.
- */
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;
 

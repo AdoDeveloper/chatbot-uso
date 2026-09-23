@@ -1,19 +1,5 @@
 import { test, expect } from "@playwright/test";
 
-/**
- * Coverage for PUT /integrations/auth-methods (toggle "Inicio de sesión con
- * contraseña"), deliberately excluded from configuracion-acceso-sso.spec.ts:
- * flipping it off without Microsoft SSO fully configured locks the whole
- * team out of the dashboard, and even with SSO configured (as in this
- * environment) this suite's own login uses username/password - disabling
- * it, even briefly, risks breaking every other spec's auth.
- *
- * Safe approach: read the real current value first, flip it, verify the
- * effect via a direct API read (not the UI toggle's own optimistic state),
- * then restore the original value in a `finally` before the page ever
- * reloads or another spec runs. The backend's own guard (won't disable
- * credentials unless Microsoft SSO is already active) is asserted too.
- */
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;
 
@@ -32,12 +18,6 @@ test.describe("Configuracion > Acceso > SSO > Inicio de sesion con contrasena", 
     await page.goto("/dashboard/configuracion/acceso/sso");
     const authHeader = await authHeaderFor(page);
 
-    // Red de respaldo: si el finally no llegara a correr (crash del proceso),
-    // que quede al menos una via de acceso (Microsoft SSO real) antes de
-    // arriesgarse a apagar el login por contraseña. Si SSO no esta activo
-    // en este entorno, el backend ya rechaza el PUT (ver saveCredentials en
-    // el componente), pero se aborta aqui explicitamente para no depender
-    // de ese guard como unica proteccion.
     const oauthResp = await request.get("/api/v1/integrations/oauth", { headers: { Authorization: authHeader } });
     const oauth: { is_active: boolean; configured: boolean } = await oauthResp.json();
     if (!oauth.is_active || !oauth.configured) {

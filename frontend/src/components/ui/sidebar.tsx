@@ -16,7 +16,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Tooltip as BaseTooltip } from "@base-ui/react/tooltip";
 import { cn as cnTooltip } from "@/lib/utils";
 
-// Patrón "detached triggers" de Base UI: un único Tooltip.Root compartido evita que, con ~20+ triggers independientes, quede más de un tooltip abierto a la vez.
 type SidebarTooltipPayload = { label: React.ReactNode };
 const sidebarTooltipHandle = BaseTooltip.createHandle<SidebarTooltipPayload>();
 
@@ -120,9 +119,6 @@ function SidebarProvider({
         >
           {children}
         </div>
-        {/* Único Tooltip.Root compartido por todos los ítems del sidebar
-            (ver sidebarTooltipHandle arriba) - solo puede haber un trigger
-            activo a la vez, eliminando la posibilidad de tooltips apilados. */}
         <BaseTooltip.Root handle={sidebarTooltipHandle}>
           {({ payload }) => (
             <BaseTooltip.Portal>
@@ -346,8 +342,6 @@ function SidebarContent({ className, ...props }: React.ComponentProps<"div">) {
       data-slot="sidebar-content"
       data-sidebar="content"
       className={cn(
-        // El scroll sigue funcionando (rueda del mouse / trackpad) pero la
-        // Scrollbar oculta en un panel angosto; cubre Firefox, legacy Edge/IE y navegadores modernos.
         "flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden",
         className
       )}
@@ -490,10 +484,6 @@ function SidebarMenuButton({
 
   if (!tooltip) return button;
 
-  // El tooltip solo se activa en modo colapsado (en modo expandido el label
-  // ya es visible junto al ícono, y en móvil el sidebar es un Sheet propio).
-  // Usa el handle compartido del sidebar (detached trigger) en vez de un
-  // Tooltip.Root independiente por botón - ver sidebarTooltipHandle arriba.
   const tooltipDisabled = state !== "collapsed" || isMobile;
 
   return (

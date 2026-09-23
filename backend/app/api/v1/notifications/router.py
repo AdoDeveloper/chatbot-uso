@@ -203,12 +203,7 @@ async def toggle_email_channel(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_perm(P.NOTIFICATIONS_UPDATE)),
 ):
-    """Activa o desactiva el canal email para TODOS los eventos a la vez.
-
-    Útil como un único interruptor "Correos" en la UI: el canal in_app queda
-    intacto (siempre activo para alertas en la app). Devuelve el estado
-    resultante y cuántas reglas email se modificaron.
-    """
+    """Activa o desactiva el canal email para TODOS los eventos a la vez."""
     result = await db.execute(
         select(NotificationRule).where(NotificationRule.channel == NotificationChannel.email)
     )
@@ -234,12 +229,7 @@ async def notifications_inbox(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Últimas N notificaciones in-app de ESTE usuario + count de no leídas.
-
-    Bandeja personal: basta con estar autenticado (las notificaciones llegan a
-    todos los usuarios activos y _visible_events ya filtra por rol);
-    notifications.read es para administrar reglas e historial global.
-    """
+    """Últimas N notificaciones in-app de ESTE usuario + count de no leídas."""
     visible = await _visible_events(db, current_user.role)
     result = await db.execute(
         select(NotificationLog)

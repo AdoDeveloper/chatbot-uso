@@ -2,11 +2,6 @@ import { test, expect } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 
-/**
- * Functional coverage for /dashboard/configuracion/filtros: create/edit/
- * delete a custom guardrail pattern, and run the inline text tester, against
- * the real backend.
- */
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;
 

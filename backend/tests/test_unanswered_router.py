@@ -1,8 +1,4 @@
-"""Tests de caracterización para app/api/v1/unanswered/router.py.
-
-test_unanswered_api.py solo cubre GET /unanswered (list_grouped). Los
-endpoints resolve_question y create_faq_from_unanswered no tenían ningún test.
-"""
+"""Tests de caracterización para app/api/v1/unanswered/router.py."""
 from __future__ import annotations
 
 import uuid

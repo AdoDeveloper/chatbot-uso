@@ -1,8 +1,4 @@
-"""Motor de alertas proactivas.
-
-Evalúa condiciones del sistema y dispara `send_notification()` cuando se cumplen.
-Aplica un cooldown por tipo de alerta + identificador para evitar spam.
-"""
+"""Motor de alertas proactivas."""
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -132,13 +128,7 @@ async def notify_provider_down(error: str, providers: list[str] | None = None) -
 
 
 async def notify_provider_degraded(provider_name: str, error: str) -> None:
-    """Avisa que un proveedor quedó fuera de la cadena, con los demás activos.
-
-    El cooldown va por proveedor: uno que falle repetidamente no silencia el
-    aviso de otro. Se dispara cuando el interruptor lo aparta, no en cada
-    fallo suelto, porque un 429 puntual lo resuelve el siguiente de la cadena
-    sin que el usuario lo note.
-    """
+    """Avisa que un proveedor quedó fuera de la cadena, con los demás activos."""
     if not await _can_fire(NotificationEvent.provider_degraded, provider_name):
         return
     try:
@@ -156,10 +146,7 @@ async def notify_provider_degraded(provider_name: str, error: str) -> None:
 
 
 async def notify_provider_misconfigured(provider_name: str, error: str) -> None:
-    """Avisa que un proveedor falla de forma permanente: modelo retirado,
-    credencial inválida o sin crédito. Reintentar no lo arregla, así que se
-    dispara en el primer error de este tipo, sin esperar al interruptor.
-    """
+    """Avisa que un proveedor falla de forma permanente: modelo retirado, credencial inválida o sin crédito."""
     if not await _can_fire(NotificationEvent.provider_misconfigured, provider_name):
         return
     try:

@@ -1,17 +1,5 @@
 import { test, expect } from "@playwright/test";
 
-/**
- * Coverage for the 13 backend routes with zero frontend caller (no button,
- * menu, or page in the dashboard ever calls them - confirmed by grepping
- * every api.get/post/put/patch/delete and useApi() call site against each
- * path before writing this file). Since there's no UI action to drive,
- * each is exercised directly against the backend: happy path + realistic
- * error cases (404 for a made-up ID, 403 for missing scope where
- * applicable, 400/422 for invalid input where the endpoint validates one).
- *
- * Scoped to genuinely dead-from-the-UI routes only - anything with a real
- * caller belongs in a UI-driven spec instead, not here.
- */
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;
 
@@ -226,9 +214,6 @@ test.describe("Endpoints sin UI propia - camino feliz y errores", () => {
   });
 
   test("GET /health y /health/ready: publicos, sin auth", async ({ request }) => {
-    // Ambos son probes de infraestructura sin Depends(require_perm) - se
-    // llaman sin Authorization a proposito, asi es como los usaria un
-    // uptime monitor o un orquestador real.
     const healthResp = await request.get(`${BACKEND_URL}/api/v1/health`);
     expect(healthResp.ok(), `unexpected status: ${healthResp.status()}`).toBeTruthy();
 

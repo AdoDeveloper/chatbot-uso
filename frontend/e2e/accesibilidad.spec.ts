@@ -1,13 +1,6 @@
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
-/**
- * Automated a11y audit via axe-core on a representative sample: the public
- * login page, the main dashboard, and one data-heavy admin form (usuarios).
- * Flags only serious/critical violations - axe surfaces some "moderate"
- * findings (color contrast on decorative elements, etc.) that don't block
- * usability and would make this test too noisy to keep green.
- */
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;
 

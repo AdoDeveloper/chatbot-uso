@@ -206,8 +206,6 @@ class TestPublicFeedback:
         assert r.status_code == 204
 
     async def test_feedback_requires_conversation_id(self, client, widget_config, db_session, make_conversation):
-        """conversation_id ahora es obligatorio - sin él, message_id por sí
-        solo no prueba que el llamante pertenezca a esa conversación."""
         from app.models.chat_message import ChatMessage
         from app.models.enums import MessageRole
 
@@ -226,10 +224,6 @@ class TestPublicFeedback:
     async def test_feedback_with_wrong_conversation_id_is_rejected(
         self, client, widget_config, db_session, make_conversation,
     ):
-        """IDOR: un mensaje real, pero con un conversation_id que no le
-        pertenece, no debe poder alterar el feedback - antes bastaba con
-        adivinar/interceptar el message_id, sin ninguna prueba de que el
-        llamante fuera parte de esa conversación."""
         from app.models.chat_message import ChatMessage
         from app.models.enums import MessageRole
 
@@ -321,10 +315,7 @@ class TestPublicCsat:
 
 class TestPublicChatLlmQueueTimeout:
     async def test_llm_queue_timeout_returns_503(self, client, widget_config, monkeypatch):
-        """Reproduce el timeout de adquisición del semáforo LLM. La rama de
-        error usa `log.warning(...)`, pero `log` nunca se define/importa en
-        app/api/v1/widget/router.py - esto dispara un NameError que oculta
-        el 503 real detrás de un 500 genérico del handler global."""
+        """Reproduce el timeout de adquisición del semáforo LLM."""
         import asyncio
         import app.api.v1.widget.router as widget_router
 

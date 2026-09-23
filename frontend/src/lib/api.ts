@@ -5,12 +5,6 @@ import type { TokenResponse } from "@/types";
 
 const API_PREFIX = "/api/v1";
 
-/** Construye una URL absoluta a un endpoint de la API. Útil para descargas
- * directas (exports CSV/JSON, streams de archivos) donde no se puede usar
- * la instancia de axios porque el navegador maneja la respuesta directamente vía window.open o <a>.
- *
- * Pasar el path SIN el prefijo /api/v1, ej. apiUrl("/audit/logs/export").
- */
 export function apiUrl(path: string): string {
   const clean = path.startsWith("/") ? path : `/${path}`;
   return `${BASE_URL}${API_PREFIX}${clean}`;

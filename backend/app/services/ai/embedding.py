@@ -1,18 +1,4 @@
-"""
-Embedding service - multilingual-e5-large via fastembed.
-
-Model: intfloat/multilingual-e5-large
-  - Dense:  1024 dims (vs 384 of MiniLM)
-  - Sparse: Qdrant/bm25 (statistical BM25 for hybrid search)
-  - Max tokens: 512 (vs 128 of MiniLM - 4× more context per chunk)
-  - Languages: 100+ including Spanish, SOTA on MIRACL multilingual benchmark
-  - Inference: ONNX Runtime - auto-detect GPU (CUDA), fallback CPU
-
-Important - e5 prefix convention:
-  embed_texts(texts, prefix="passage: ")  →  at ingestion time (documents)
-  embed_texts(texts, prefix="query: ")    →  at search time (user questions)
-  Omitting the prefix works but reduces retrieval accuracy.
-"""
+"""Embedding service - multilingual-e5-large via fastembed."""
 from __future__ import annotations
 
 import asyncio
@@ -68,14 +54,7 @@ def _get_sparse_model():
 
 
 def embed_texts(texts: list[str], prefix: str = "") -> list[dict]:
-    """
-    Genera embeddings densos y sparse para una lista de textos.
-    Retorna lista de dicts con keys: dense, sparse_indices, sparse_values.
-
-    prefix: e5 models require "query: " for search queries and "passage: "
-            for documents at ingestion time. Omitting degrades performance.
-    NOTA: función síncrona - usar embed_texts_async desde contextos async.
-    """
+    """Genera embeddings densos y sparse para una lista de textos."""
     if not texts:
         return []
 
@@ -99,15 +78,7 @@ def embed_texts(texts: list[str], prefix: str = "") -> list[dict]:
 
 
 async def embed_texts_async(texts: list[str], prefix: str = "") -> list[dict]:
-    """
-    Async wrapper - ejecuta la inferencia ONNX en un thread pool para no
-    bloquear el event loop.
-
-    El semáforo _ONNX_SEM(1) garantiza que solo un worker corre inferencia
-    ONNX a la vez. Los demás esperan en la cola async (sin bloquear el event
-    loop ni consumir CPU). Esto elimina la contención entre workers que
-    causaba spikes de 10–24s en CPU.
-    """
+    """Async wrapper - ejecuta la inferencia ONNX en un thread pool para no bloquear el event loop."""
     loop = asyncio.get_running_loop()
     async with _get_onnx_sem():
         return await loop.run_in_executor(None, embed_texts, texts, prefix)

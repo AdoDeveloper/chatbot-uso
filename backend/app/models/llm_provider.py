@@ -29,9 +29,6 @@ class LLMProvider(Base):
     # Para endpoints personalizados: Ollama, Azure, proxies, etc.
     api_base: Mapped[str | None] = mapped_column(String(512), nullable=True)
 
-    # Headers HTTP extra específicos de ESTA instancia (ej. cf-aig-gateway-id
-    # distinto por gateway de Cloudflare). Se mezclan sobre default_headers
-    # del catálogo del tipo, ganando esta instancia en caso de choque de clave.
     extra_headers: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
 
     # URL del dashboard del proveedor (opcional). Solo se usa para mostrar

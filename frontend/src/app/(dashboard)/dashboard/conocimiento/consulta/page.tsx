@@ -82,9 +82,6 @@ export default function ChunkTestPage() {
   return m ? { prefix: m[1], body: text.slice(m[0].length) } : { prefix: null, body: text };
  }
 
- // La búsqueda es semántica: un fragmento puede ser pertinente sin repetir las
- // palabras de la pregunta. Resaltarlas ayuda a ubicar el pasaje dentro de un
- // texto largo, no a juzgar la relevancia.
  const STOPWORDS = new Set([
   "cual", "cuál", "como", "cómo", "para", "que", "qué", "los", "las", "del",
   "una", "uno", "por", "con", "sin", "sobre", "este", "esta", "hay", "son",

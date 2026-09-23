@@ -59,14 +59,7 @@ def verify_password(plain: str, hashed: str | None) -> bool:
 
 
 def create_access_token(subject: str, permissions: list[str] | None = None) -> str:
-    """Emite un access JWT.
-
-    `permissions` (opcional) incrusta la lista de permisos 'modulo.accion' del
-    usuario en el payload. El frontend los decodifica para resolver la
-    visibilidad de la navegación sin depender de una llamada extra a la API;
-    el backend sigue autorizando por BD (require_perm), así que el claim del
-    JWT es solo una caché de lectura para la UI, no fuente de autoridad.
-    """
+    """Emite un access JWT."""
     settings = get_settings()
     now = datetime.now(timezone.utc)
     expire = now + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -100,10 +93,7 @@ def create_refresh_token(subject: str) -> str:
 
 
 def decode_token(token: str) -> dict:
-    """Decodifica y verifica un JWT.
-
-    Lanza pyjwt.PyJWTError si el token es inválido/expirado/falsificado, para que el caller distinga ese caso de "sin sujeto" y responda 401.
-    """
+    """Decodifica y verifica un JWT."""
     settings = get_settings()
     return pyjwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
 
@@ -119,9 +109,7 @@ def _derive_fernet_key(source: str) -> bytes:
 
 
 def _fernet() -> Fernet:
-    """Deriva una instancia de Fernet a partir de ENCRYPTION_KEY (preferida) o SECRET_KEY.
-    Se cachea para que PBKDF2 (480k iteraciones) corra una sola vez por proceso.
-    """
+    """Deriva una instancia de Fernet a partir de ENCRYPTION_KEY (preferida) o SECRET_KEY."""
     settings = get_settings()
     source = settings.ENCRYPTION_KEY or settings.SECRET_KEY
     cached = _FERNET_CACHE.get(source)
@@ -132,20 +120,12 @@ def _fernet() -> Fernet:
 
 
 def encrypt_secret(value: str) -> str:
-    """Cifra una cadena en texto plano (p. ej. una API key) para guardarla en BD.
-
-    Síncrono - útil para seeds / scripts. En endpoints async, prefiere
-    `await encrypt_secret_async(value)` para no bloquear el event loop.
-    """
+    """Cifra una cadena en texto plano."""
     return _fernet().encrypt(value.encode()).decode()
 
 
 def decrypt_secret(token: str) -> str:
-    """Descifra una cadena cifrada con Fernet.
-
-    Síncrono - útil para seeds / scripts. En endpoints async, prefiere
-    `await decrypt_secret_async(token)` para no bloquear el event loop.
-    """
+    """Descifra una cadena cifrada con Fernet."""
     return _fernet().decrypt(token.encode()).decode()
 
 

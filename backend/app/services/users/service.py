@@ -81,11 +81,6 @@ async def update_user(
     is_self = user_id == current_user.id
     actor_is_admin = current_user.role == UserRole.admin
 
-    # Guardas anti-escalada (espejan las de delete_user):
-    #  - Nadie puede cambiar su propio rol ni desactivarse a sí mismo (evita
-    #    auto-promoción a admin y auto-bloqueo accidental del último admin).
-    #  - Solo un admin puede otorgar/modificar el rol admin, y un no-admin no
-    #    puede modificar a un admin (escalada horizontal/vertical).
     if is_self and role is not None and role != user.role:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No puede cambiar su propio rol")
     if is_self and is_active is False:
@@ -130,9 +125,7 @@ async def update_user(
 
 
 def _generate_temp_password(length: int = 16) -> str:
-    """Contraseña temporal aleatoria: solo letras/dígitos (sin símbolos, para
-    que el admin pueda comunicarla de viva voz o por escrito sin ambigüedad),
-    garantizando al menos una mayúscula, una minúscula y un dígito."""
+    """Contraseña temporal aleatoria."""
     while True:
         candidate = "".join(secrets.choice(_TEMP_PASSWORD_ALPHABET) for _ in range(length))
         if (
@@ -150,14 +143,7 @@ async def reset_password(
     current_user: User,
     ip: str | None,
 ) -> tuple[User, str]:
-    """Genera una contraseña temporal para `user_id`, fuerza su cambio en el
-    próximo login e invalida sus sesiones activas.
-
-    Mismas guardas anti-escalada que update_user/delete_user: un admin no
-    puede quedar bloqueado de resetearse a sí mismo por accidente vía este
-    endpoint (se prohíbe, igual que update_user prohíbe auto-desactivación),
-    y solo un admin puede resetear a otro admin.
-    """
+    """Genera una contraseña temporal para `user_id`."""
     if user_id == current_user.id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

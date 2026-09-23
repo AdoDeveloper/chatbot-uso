@@ -33,8 +33,7 @@ class ChannelToggleIn(BaseModel):
 
 
 class NotificationItemOut(BaseModel):
-    """Una notificación en el inbox (target enmascarado). `summary` es el
-    dato distintivo de este disparo (documento, pregunta, servicio, etc.)."""
+    """Una notificación en el inbox (target enmascarado)."""
     id: str
     event: str
     channel: str
@@ -53,9 +52,7 @@ class InboxOut(BaseModel):
 
 
 class ChannelDeliveryOut(BaseModel):
-    """Estado de entrega de un canal dentro de un disparo agrupado.
-    `recipients` cuenta las filas de ese canal en el trigger; `target`
-    solo aplica al canal email."""
+    """Estado de entrega de un canal dentro de un disparo agrupado."""
     channel: str
     status: str
     recipients: int
@@ -64,9 +61,7 @@ class ChannelDeliveryOut(BaseModel):
 
 
 class NotificationTriggerOut(BaseModel):
-    """Un disparo agrupado por trigger_id, con un ChannelDeliveryOut por
-    canal. `own_log_id`/`own_read_at` son la entrega in_app del usuario
-    actual (si tuvo una), para marcarla leída sin afectar a otros admins."""
+    """Un disparo agrupado por trigger_id, con un ChannelDeliveryOut por canal."""
     id: str  # trigger_id
     event: str
     created_at: str
@@ -77,8 +72,7 @@ class NotificationTriggerOut(BaseModel):
 
 
 class NotificationListOut(BaseModel):
-    """Respuesta paginada de GET /notifications. `items` son disparos
-    agrupados, no filas crudas de NotificationLog."""
+    """Respuesta paginada de GET /notifications."""
     items: list[NotificationTriggerOut]
     total: int
     page: int
@@ -89,6 +83,5 @@ class MarkReadOut(BaseModel):
     """Respuesta de marcar-notificaciones-como-leídas."""
     ok: bool = True
     marked: int = 0
-
 
 

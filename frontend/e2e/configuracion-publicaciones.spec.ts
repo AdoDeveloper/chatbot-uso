@@ -3,16 +3,6 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 
-/**
- * Functional coverage for /dashboard/configuracion/publicaciones: saving a
- * manual restore point (non-destructive, always safe) and expanding a
- * version's diff, against the real backend.
- *
- * "Restaurar" (rollback) lives in its own file
- * (configuracion-publicaciones-rollback.spec.ts) with a disposable-safe
- * round-trip (snapshot the current state, roll back to it, net effect
- * zero) since a real rollback overwrites live global_settings/widget_config.
- */
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;
 
@@ -27,13 +17,6 @@ test.describe("Configuracion > Publicaciones", () => {
     await page.goto("/dashboard/configuracion/publicaciones");
     await expect(page.getByRole("heading", { name: /historial/i }).first()).toBeVisible({ timeout: 10_000 });
 
-    // El guardado manual envía force=true (POST /versions): captura_snapshot
-    // siempre crea la version aunque el diff ya haya sido capturado por el
-    // auto-snapshot del middleware segundos antes. Sin esto, el guardado
-    // manual perdía sistematicamente esa carrera (el middleware corre en
-    // background sin round-trip HTTP, siempre le ganaba) - no tenía sentido
-    // de producto de todos modos: el usuario pidió explícitamente un punto
-    // de restauración, debe crearse aunque no haya "nada nuevo" que capturar.
     await page.getByRole("button", { name: /guardar punto de restauración/i }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByRole("heading", { name: /guardar punto de restauración/i })).toBeVisible();
@@ -47,10 +30,8 @@ test.describe("Configuracion > Publicaciones", () => {
     ]);
     expect(versionsResp.status(), `unexpected /versions status: ${versionsResp.status()}`).toBe(201);
 
-    // Serializa toda la config del sistema; bajo contención real de E2E (workers:2, otros specs escribiendo las mismas tablas) puede superar 20s vs. 5.8s en solitario.
     await expect(page.getByRole("dialog")).not.toBeVisible({ timeout: 60_000 });
 
-    // Los snapshots manuales quedan ocultos por defecto (solo "Ver todo el historial") y el historial muestra un change_summary calculado, no la descripción libre enviada.
     await page.getByRole("button", { name: /ver todo el historial/i }).click();
     await expect(page.getByText(/snapshot manual/i).first()).toBeVisible({ timeout: 10_000 });
     await page.screenshot({ path: path.join(SHOT_DIR, "02-snapshot-en-historial.png") });
@@ -182,7 +163,6 @@ test.describe("Configuracion > Publicaciones", () => {
   });
 
   test("modal de snapshot: cerrar por Escape y por Cancelar sin dejar excepciones ni el dialogo abierto", async ({ page }) => {
-    // El texto del borrador NO se limpia en Escape/Cancel (solo al guardar con éxito) - quirk conocido y no destructivo; este test valida solo apertura/cierre limpios.
     await page.goto("/dashboard/configuracion/publicaciones");
     await expect(page.getByRole("heading", { name: /historial/i }).first()).toBeVisible({ timeout: 10_000 });
 

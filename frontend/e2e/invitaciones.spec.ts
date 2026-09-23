@@ -1,15 +1,5 @@
 import { test, expect } from "@playwright/test";
 
-/**
- * Coverage for the pending-invitation delete action: a physical-delete
- * button appears next to non-active invitations (revoked or expired), and
- * does not appear next to active ones (those only get "Revocar" - deleting
- * an active invite is blocked server-side).
- *
- * Doesn't create/revoke/delete a real invitation in every run (that would
- * mutate shared test data on each execution); it asserts the row-level
- * button visibility rule against whatever invitations already exist.
- */
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;
 
@@ -29,7 +19,6 @@ test.describe("Invitaciones pendientes", () => {
 
   test("delete action only appears on non-active invitations", async ({ page }) => {
     await page.goto("/dashboard/configuracion/acceso/usuarios");
-    // Don't gate on the skeleton's absence - right after goto() it may not be attached yet, so a "count 0" check resolves trivially true before data loads. Poll for the actual row instead.
     const revokedRows = page.locator("tr").filter({ hasText: /revocad|expirad/i });
     const hasRevoked = await revokedRows
       .first()

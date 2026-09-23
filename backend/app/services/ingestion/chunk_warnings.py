@@ -1,23 +1,4 @@
-"""
-Automatic warnings for chunks at ingestion time.
-
-These flags surface in the review UI to guide the admin: which chunks need
-attention before approving the source. They are stored on the Qdrant payload
-(no SQL table for chunks).
-
-Flags implemented:
-  - short:     length < MIN_LEN_CHARS (probably a stray header / page number / OCR garbage)
-  - long:      length > MAX_LEN_FACTOR × parent_size (parsing likely fused two chunks)
-  - pii:       regex detected email / phone number / national ID (DUI)
-  - injection: matches the same prompt-injection patterns that validate_input()
-               applies to user messages. Ingested documents never pass through
-               validate_input - only `question` does - so a chunk containing
-               "ignora todas las instrucciones..." or "[SYSTEM] ..." would
-               otherwise reach the LLM's prompt as trusted context with zero
-               screening. This doesn't block ingestion (a false positive would
-               stall a legitimate document); it flags the chunk so the human
-               reviewer sees it before approving the source for the public bot.
-"""
+"""Automatic warnings for chunks at ingestion time."""
 from __future__ import annotations
 
 import re
@@ -37,11 +18,7 @@ _DNI_RE = re.compile(r"\b\d{8}-\d\b")
 
 
 def compute_warnings(text: str, parent_size: int) -> list[str]:
-    """Devuelve una lista de flags de advertencia para el texto de un chunk.
-
-    Los flags son identificadores de texto cortos, así son económicos de
-    guardar en el payload de Qdrant y de indexar/filtrar.
-    """
+    """Devuelve una lista de flags de advertencia para el texto de un chunk."""
     warnings: list[str] = []
 
     length = len(text)

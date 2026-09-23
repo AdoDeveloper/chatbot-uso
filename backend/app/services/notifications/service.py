@@ -286,11 +286,7 @@ def _html_body(event: NotificationEvent, payload: dict[str, Any]) -> str:
 
 
 def _daily_digest_body(m: dict[str, str], p: dict[str, Any]) -> str:
-    """Cuerpo enriquecido del resumen diario.
-
-    El texto se adapta según haya o no preguntas pendientes: cuando no quedan
-    pendientes, el mensaje y la recomendación cambian para no sonar incoherentes.
-    """
+    """Cuerpo enriquecido del resumen diario."""
     total_open = int(p.get("total_open", 0) or 0)
 
     if total_open == 0:
@@ -328,8 +324,7 @@ def _daily_digest_body(m: dict[str, str], p: dict[str, Any]) -> str:
 
 
 def _provider_down_body(m: dict[str, str], p: dict[str, Any]) -> str:
-    """Cuerpo enriquecido de la alerta de proveedor caído: tabla propia por
-    proveedor, tabla de fecha/tiempo transcurrido, y tabla de error."""
+    """Cuerpo enriquecido de la alerta de proveedor caído."""
     content = tpl.paragraph(m["intro"])
 
     providers = [s.strip() for s in str(p.get("providers", "")).split(",") if s.strip()]

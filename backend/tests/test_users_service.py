@@ -82,10 +82,6 @@ async def test_authenticate_unknown_email(db_session):
     assert result is None
 
 
-# ---------------------------------------------------------------------------
-# update_user - bloque más grande sin cobertura (líneas 73-124)
-# ---------------------------------------------------------------------------
-
 async def test_update_user_not_found_raises(db_session, make_user):
     admin = await make_user(role=UserRole.admin)
     with pytest.raises(NotFoundError):
@@ -151,9 +147,6 @@ async def test_update_user_cannot_deactivate_self(db_session, make_user):
 async def test_update_user_cannot_deactivate_last_active_admin(db_session, make_user):
     actor_admin = await make_user(role=UserRole.admin)
     target_admin = await make_user(role=UserRole.admin)
-    # Desactivamos a todos los otros admins salvo target_admin para que sea
-    # el ultimo admin activo del sistema (actor_admin y target_admin cuentan
-    # como 2 activos hasta que forcemos el escenario).
     from sqlalchemy import update
     from app.models.user import User
     await db_session.execute(
@@ -279,10 +272,6 @@ async def test_update_user_no_changes_still_succeeds(db_session, make_user):
     assert updated.id == target.id
 
 
-# ---------------------------------------------------------------------------
-# delete_user (líneas 134-150)
-# ---------------------------------------------------------------------------
-
 async def test_delete_user_cannot_delete_self(db_session, make_user):
     admin = await make_user(role=UserRole.admin)
     with pytest.raises(HTTPException) as exc_info:
@@ -298,9 +287,6 @@ async def test_delete_user_not_found(db_session, make_user):
 
 
 async def test_delete_user_admin_can_delete_admin(db_session, make_user):
-    """Un admin tiene todos los permisos, incluido eliminar a otro admin -
-    la única guarda real es no dejar el sistema sin admins activos (ver
-    test_delete_user_last_active_admin_blocked_even_for_non_admin_actor)."""
     actor_admin = await make_user(role=UserRole.admin)
     target_admin = await make_user(role=UserRole.admin)
 
@@ -309,10 +295,6 @@ async def test_delete_user_admin_can_delete_admin(db_session, make_user):
 
 
 async def test_delete_user_last_active_admin_blocked_even_for_non_admin_actor(db_session, make_user):
-    """Mismo espíritu que la guarda de update_user (líneas 88-93): sin esto,
-    un actor no-admin con el permiso users.delete (p. ej. vía un rol
-    dinámico personalizado, que el sistema RBAC ya soporta) podría eliminar
-    al único admin del sistema."""
     from sqlalchemy import update
     from app.models.user import User
 
@@ -331,8 +313,6 @@ async def test_delete_user_last_active_admin_blocked_even_for_non_admin_actor(db
 
 
 async def test_delete_user_admin_when_another_admin_active_allowed(db_session, make_user):
-    """Con dos admins activos, eliminar uno (por un actor no-admin con
-    permiso) debe seguir funcionando - la guarda no debe bloquear de más."""
     first_admin = await make_user(role=UserRole.admin)
     second_admin = await make_user(role=UserRole.admin)
     non_admin_actor = await make_user(role=UserRole.editor)
@@ -363,7 +343,6 @@ async def test_reset_password_success_sets_temp_password_and_forces_change(db_se
 
     assert user.must_change_password is True
     assert user.tokens_valid_after is not None
-    # La contraseña vieja ya no debe funcionar; la temporal sí.
     assert await user_service.authenticate(db_session, target.email, "OldPass123!") is None
     authenticated = await user_service.authenticate(db_session, target.email, temp_password)
     assert authenticated is not None
@@ -371,9 +350,6 @@ async def test_reset_password_success_sets_temp_password_and_forces_change(db_se
 
 
 async def test_reset_password_temp_password_meets_min_length(db_session, make_user):
-    """ChangePasswordRequest exige min_length=8 - la temporal generada debe
-    cumplirlo siempre, o un admin podría generar una contraseña que el
-    propio backend rechazaría en el próximo cambio forzado."""
     admin = await make_user(role=UserRole.admin)
     target = await make_user(role=UserRole.viewer)
 
@@ -419,8 +395,6 @@ async def test_reset_password_non_admin_cannot_reset_admin(db_session, make_user
 
 
 async def test_reset_password_non_admin_can_reset_non_admin(db_session, make_user):
-    """La guarda solo protege a admins - un actor no-admin con el permiso
-    users.manage sí puede resetear a un usuario de menor rango."""
     non_admin_actor = await make_user(role=UserRole.editor)
     target = await make_user(role=UserRole.viewer)
 

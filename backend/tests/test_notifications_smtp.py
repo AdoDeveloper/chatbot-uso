@@ -1,12 +1,4 @@
-"""Tests unitarios de app.services.notifications.smtp.
-
-test_escalation_router.py ya cubre el endpoint smtp-ping mockeando
-get_smtp_config/send_email a nivel de router. Este archivo en cambio
-mockea aiosmtplib.send directamente para forzar cada rama de manejo de
-excepciones dentro de send_email (líneas 82-125 del módulo, antes sin
-cubrir), y cubre get_smtp_config con distintas combinaciones de
-variables de entorno.
-"""
+"""Tests unitarios de app.services.notifications.smtp."""
 from __future__ import annotations
 
 import os
@@ -36,11 +28,7 @@ def _cfg(**overrides) -> SMTPSettings:
 
 
 class _FakeSettings:
-    """Doble simple de Settings: get_smtp_config solo lee estos atributos.
-
-    Se usa en lugar de tocar variables de entorno reales, porque el .env
-    del repo (usado por pydantic-settings como fuente de menor prioridad)
-    trae credenciales SMTP reales y sobrevive a monkeypatch.delenv."""
+    """Doble simple de Settings: get_smtp_config solo lee estos atributos."""
 
     def __init__(self, *, host="", user="", password="", from_email="", tls=True, port=587):
         self.SMTP_HOST = host
@@ -273,9 +261,6 @@ class TestSendEmailErrorHandling:
         assert ok is False
 
     async def test_recipients_refused_is_handled_as_smtp_exception(self, monkeypatch):
-        """SMTPRecipientsRefused hereda de SMTPException: valida que la
-        rama genérica también cubra el caso típico de destinatario inválido,
-        sin que el proceso truene con una excepción no capturada."""
         refused = aiosmtplib.SMTPRecipientsRefused(
             [aiosmtplib.SMTPRecipientRefused("dest@example.org", 550, "mailbox unavailable")]
         )

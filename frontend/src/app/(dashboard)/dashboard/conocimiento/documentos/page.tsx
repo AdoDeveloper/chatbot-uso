@@ -242,9 +242,6 @@ export default function SourcesPage() {
     <div className="max-w-6xl mx-auto space-y-6">
       <AddSourcePanel open={panelOpen} onClose={() => setPanelOpen(false)} onCreated={load} />
 
-      {/* Stats como cards (Stripe / Linear pattern):
-          padding p-5, label uppercase 11px, valor 24px tabular-nums, hint debajo.
-          Grid responsive: 1 col móvil, 2 col tablet, 4 col desktop. */}
       <div className={`grid grid-cols-1 sm:grid-cols-2 ${errors > 0 ? "lg:grid-cols-4" : "lg:grid-cols-3"} gap-3`}>
         <StatCard
           title="Totales"
@@ -273,9 +270,6 @@ export default function SourcesPage() {
       </div>
 
       <Card className="overflow-hidden">
-        {/* Fila 1: búsqueda + acción primaria, siempre juntas y visibles.
-            Los filtros de tags (que pueden crecer mucho) van en su propia
-            fila para no empujar el botón "Agregar" fuera de vista. */}
         <div className="flex items-end gap-3 px-5 py-4 border-b border-border/60">
           <div className="flex-1 min-w-0 max-w-64">
             <label className="block text-2xs font-medium text-muted-foreground mb-1">Buscar</label>

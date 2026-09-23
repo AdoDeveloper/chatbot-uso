@@ -2,7 +2,6 @@ import { test, expect } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 
-// Coverage for the "Previsualizar" tab of /dashboard/configuracion/asistente (PlaygroundTab) - a live simulated widget running the real chat pipeline end to end.
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;
 

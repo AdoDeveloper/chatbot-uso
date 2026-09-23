@@ -1,14 +1,6 @@
 import { chromium, type FullConfig } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
 
-/**
- * Logs in once via the real UI form and persists the resulting cookies to
- * disk. Every spec that sets `storageState` to this file starts already
- * authenticated, avoiding a repeated login flow per test.
- *
- * Skips silently when E2E_USER / E2E_PASS aren't set - specs that depend on
- * the auth state file should gate on the same env vars.
- */
 export default async function globalSetup(config: FullConfig) {
   const { E2E_USER, E2E_PASS } = process.env;
   if (!E2E_USER || !E2E_PASS) return;
@@ -23,12 +15,6 @@ export default async function globalSetup(config: FullConfig) {
   await page.locator('button[type="submit"]').click();
   await page.waitForURL(/\/dashboard|\/cambiar-contrasena/, { timeout: 10_000 });
 
-  // Un admin recién sembrado (ej. el que crea el backend al primer arranque
-  // en CI) trae must_change_password=true y el login lo manda aquí en vez
-  // de a /dashboard. El backend rechaza la nueva contraseña si es igual a
-  // la actual, así que hay que generar una distinta - no importa cuál
-  // quede después: el resto de specs reutiliza las cookies persistidas
-  // más abajo, no vuelve a loguearse con E2E_PASS.
   if (page.url().includes("/cambiar-contrasena")) {
     const rotatedPassword = `${E2E_PASS}Aa1`;
 
@@ -49,9 +35,6 @@ export default async function globalSetup(config: FullConfig) {
     }
     await page.waitForURL(/\/dashboard/, { timeout: 10_000 });
 
-    // login.spec.ts hace un login real por UI con E2E_PASS (no reutiliza
-    // admin.json como el resto de specs) - sin esto, su contraseña queda
-    // obsoleta en cuanto este bloque la rota y ese spec falla siempre.
     mkdirSync("e2e/.auth", { recursive: true });
     writeFileSync("e2e/.auth/admin-password.json", JSON.stringify({ password: rotatedPassword }));
   }

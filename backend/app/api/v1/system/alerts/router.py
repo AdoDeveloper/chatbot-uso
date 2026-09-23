@@ -1,9 +1,4 @@
-"""Endpoint admin para disparar el motor de alertas proactivas.
-
-Pensado para llamarse periódicamente (cron, scheduler externo, o desde la UI
-con un botón "Evaluar ahora"). Devuelve el conteo de alertas disparadas por
-tipo. Si no hay reglas configuradas para el evento, no se envía nada.
-"""
+"""Endpoint admin para disparar el motor de alertas proactivas."""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request

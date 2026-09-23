@@ -3,7 +3,6 @@ from __future__ import annotations
 import uuid
 
 
-
 class TestUnansweredList:
     async def test_list_requires_auth(self, client):
         r = await client.get("/api/v1/unanswered")

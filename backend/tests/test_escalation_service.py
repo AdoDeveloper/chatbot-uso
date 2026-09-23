@@ -1,21 +1,4 @@
-"""Tests unitarios para app/services/escalation/service.py y engine.py.
-
-test_escalation_router.py y test_escalation_router_extra.py cubren estos
-módulos solo indirectamente vía HTTP (y en el caso de dispatch_escalation,
-mockeándolo por completo). test_escalation_triggers.py cubre el motor de
-reglas (engine.py) solo para los triggers no_answer y negative_feedback, vía
-detect_escalation. Este archivo cubre directamente:
-
-- engine.py: user_request, keyword_detected, confidence_below, loop_detected,
-  trigger no soportado, y schema_for_trigger para cada tipo.
-- service.py: dispatch_escalation vía send_notification() centralizado -
-  requiere una NotificationRule habilitada para el evento `escalation` (a
-  diferencia de la implementación anterior, que enviaba SMTP directo sin
-  consultar reglas). Cubre: notificación a múltiples admins, admin sin
-  email, admin inactivo/no-admin ignorado, fallo de envío, respeto al
-  toggle enabled=False del panel, y fallo en mark_escalated (conversation_id
-  inválido / conversación inexistente) sin romper el resto del flujo.
-"""
+"""Tests unitarios para app/services/escalation/service.py y engine.py."""
 from __future__ import annotations
 
 import uuid
@@ -29,10 +12,6 @@ from app.models.notification_rule import NotificationRule
 from app.models.user import User
 from app.services.escalation import engine, service
 
-
-# ---------------------------------------------------------------------------
-# engine.py - evaluadores no cubiertos por test_escalation_triggers.py
-# ---------------------------------------------------------------------------
 
 class TestUserRequestTrigger:
     def test_matches_default_keywords(self):
@@ -253,10 +232,6 @@ class TestSchemaForTrigger:
         assert "consecutive" in schema
 
 
-# ---------------------------------------------------------------------------
-# service.py - dispatch_escalation y _build_html
-# ---------------------------------------------------------------------------
-
 @pytest.fixture
 async def two_admins(db_session):
     a1 = User(
@@ -296,9 +271,6 @@ async def non_admin_user(db_session):
 
 
 async def _enable_escalation_rules(db_session, *, channels=(NotificationChannel.email, NotificationChannel.in_app)):
-    """send_notification() no envía nada sin una NotificationRule habilitada
-    para el evento - a diferencia de la implementación anterior de
-    dispatch_escalation, que enviaba SMTP directo sin consultar reglas."""
     for ch in channels:
         db_session.add(NotificationRule(event=NotificationEvent.escalation, channel=ch, enabled=True))
     await db_session.commit()
@@ -394,9 +366,6 @@ class TestDispatchEscalationNotifiesAdmins:
         await service.dispatch_escalation(
             db_session, conversation_id="", question="q", reason="r",
         )
-        # _email_recipients solo trae admins activos; non_admin_user es
-        # editor, así que no recibe email (pero SÍ debería aparecer en
-        # in_app, ya que EVENT_INAPP_AUDIENCE incluye admin y editor).
         assert calls == []
         result = await db_session.execute(NotificationLog.__table__.select())
         in_app_user_ids = {
@@ -441,8 +410,6 @@ class TestDispatchEscalationNotifiesAdmins:
         assert all("smtp connection refused" in (row.error_message or "") for row in email_logs)
 
     async def test_no_admins_logs_nothing(self, db_session, monkeypatch):
-        """Sin admins ni editores activos no hay a quién notificar en ningún
-        canal: el fan-out in-app es por destinatario real, no una fila global."""
         await _enable_escalation_rules(db_session)
         calls = []
 
@@ -489,9 +456,6 @@ class TestDispatchEscalationLifecycle:
         assert conv.escalated_at is not None
 
     async def test_invalid_conversation_id_does_not_raise(self, db_session, two_admins, monkeypatch):
-        """conversation_id que no es un UUID válido: mark_escalated falla con
-        ValueError, se captura y loguea, y el dispatch de notificaciones sigue
-        adelante con normalidad (no debe propagar la excepción)."""
         await _enable_escalation_rules(db_session)
 
         async def _fake_send_email(*, to, subject, body_html, **kwargs):
@@ -510,9 +474,6 @@ class TestDispatchEscalationLifecycle:
         assert len(email_logs) == 2
 
     async def test_nonexistent_conversation_id_does_not_raise(self, db_session, two_admins, monkeypatch):
-        """UUID válido pero de una conversación inexistente: mark_escalated
-        levanta HTTPException 404 desde lifecycle._load; dispatch_escalation
-        la traga (except (ValueError, Exception)) y continúa notificando."""
         await _enable_escalation_rules(db_session)
 
         async def _fake_send_email(*, to, subject, body_html, **kwargs):
@@ -532,10 +493,6 @@ class TestDispatchEscalationLifecycle:
 
 
 class TestDispatchEscalationPayload:
-    """dispatch_escalation ya no arma su propio HTML (_build_html fue
-    eliminado al centralizar en send_notification) - estos tests verifican
-    que el payload que llega a send_notification (y de ahí al email) sigue
-    incluyendo los mismos datos que antes construía _build_html a mano."""
 
     async def test_payload_includes_question_and_reason(self, db_session, two_admins, monkeypatch):
         await _enable_escalation_rules(db_session, channels=[NotificationChannel.email])

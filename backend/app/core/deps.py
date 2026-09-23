@@ -17,15 +17,7 @@ bearer = HTTPBearer(auto_error=False)
 
 
 async def resolve_user_from_access_token(token: str | None, db: AsyncSession) -> User:
-    """Valida un access JWT y devuelve el usuario, aplicando las mismas
-    verificaciones que get_current_user (firma, tipo, denylist de logout,
-    cuenta activa, invalidación por cambio de contraseña).
-
-    Extraído de get_current_user para que cualquier endpoint que necesite
-    decodificar el token a mano (en vez de vía Depends, ej. porque también
-    acepta una API key como autenticación alternativa) reutilice exactamente
-    esta lógica en vez de reimplementar una versión parcial.
-    """
+    """Valida un access JWT y devuelve el usuario, aplicando las mismas verificaciones que get_current_user."""
     if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autenticado")
     try:
@@ -97,20 +89,7 @@ def require_perm(permission: str):
 
 
 def get_client_ip(request: Request) -> str:
-    """Extrae la IP real del cliente, priorizando headers de proxy reverso.
-
-    Orden de precedencia:
-      1. CF-Connecting-IP (Cloudflare - confiable, no spoofeable tras CF)
-      2. X-Real-IP (Nginx de confianza)
-      3. X-Forwarded-For: se toma la ÚLTIMA IP de la cadena (la del cliente
-         real detrás de proxies legítimos), no la primera, que es la que el
-         cliente puede falsificar libremente.
-      4. request.client.host (conexión directa)
-
-    Nota: X-Forwarded-For es spoofeable por el cliente. En producción debe
-    venir siempre detrás de un proxy de confianza (Nginx/CF) que lo reescribe;
-    si no hay proxy, se prefiere request.client.host por sobre XFF.
-    """
+    """Extrae la IP real del cliente, priorizando headers de proxy reverso."""
     cf = request.headers.get("CF-Connecting-IP")
     if cf:
         return cf.strip()

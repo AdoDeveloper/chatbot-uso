@@ -1,11 +1,4 @@
-"""Tests de caracterización para app/api/v1/chunks/router.py.
-
-Estos tests fijan el comportamiento ACTUAL de los endpoints de chunks
-(no cubiertos por ningún otro archivo de test) antes de mover su lógica
-a una capa de servicio, para poder confirmar que la migración no cambia
-nada observable. Qdrant y el modelo de embeddings se sustituyen por
-monkeypatch - no hay Qdrant real en el entorno de test.
-"""
+"""Tests de caracterización para app/api/v1/chunks/router.py."""
 from __future__ import annotations
 
 import uuid
@@ -53,10 +46,7 @@ def _fake_chunk(source: Source, point_id: str, *, text="Texto original del chunk
 
 @pytest.fixture
 def patch_vector_store(monkeypatch):
-    """Sustituye las funciones de app.services.ingestion.vector_store usadas
-    por el router de chunks. Devuelve un dict mutable {point_id: chunk_dict}
-    que los tests pueblan directamente, más un stub de cliente Qdrant con
-    upsert/set_payload espiables."""
+    """Sustituye las funciones de app.services.ingestion.vector_store usadas por el router de chunks."""
     from app.services.ingestion import vector_store as vs
 
     store: dict[str, dict] = {}
@@ -259,21 +249,6 @@ class TestChunkHistory:
     async def test_history_lists_edits_newest_first(
         self, client, admin_user, auth_headers, patch_vector_store, seeded_source, db_session
     ):
-        """Dos ediciones consecutivas pueden caer en el mismo instante bajo
-        SQLite o incluso MySQL - DATETIME(fsp=6) tiene precisión de
-        microsegundos, pero `server_default=func.now()` puede evaluarse una
-        sola vez por transacción/statement y dos PATCH consecutivos corriendo
-        sin red real (solo el test client) pueden terminar con edited_at
-        idéntico. Forzamos edited_at distintos en vez de depender del reloj
-        real - lo que importa es que el endpoint efectivamente ordena DESC
-        por edited_at, no la precisión del reloj.
-
-        Identificar cuál fila es "v2" (la que hay que envejecer) por su
-        propio contenido (new_content), no por `ORDER BY edited_at` - ese
-        mismo ORDER BY es ambiguo sin desempate cuando ambas filas comparten
-        timestamp, exactamente el problema que este workaround intenta
-        evitar (confirmado empíricamente: ese SELECT hacía el test flaky,
-        pasando ~2 de cada 3 corridas)."""
         import datetime as dt
         from sqlalchemy import select
         from app.models.chunk_edit import ChunkEdit
@@ -305,9 +280,6 @@ class TestChunkHistory:
 
 
 class TestTestQueryValidation:
-    """ChunkTestRequest no tenía cotas (top_k sin ge/le, query sin
-    max_length) - un top_k extremo se pasaba directo a la búsqueda vectorial
-    en Qdrant sin ninguna barrera, arriesgando saturar memoria/latencia."""
 
     async def test_rejects_top_k_over_max(self, client, admin_user, auth_headers):
         r = await client.post(

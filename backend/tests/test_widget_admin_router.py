@@ -1,12 +1,3 @@
-"""Tests para los endpoints administrativos (protegidos) de
-app/api/v1/widget/router.py: GET/PUT /config, GET /embed-code y
-POST /regenerate-key.
-
-test_widget_public.py y test_widget_public_extra.py ya cubren los
-endpoints públicos (/public/*, autenticados solo por X-Widget-Key). Estos
-cuatro endpoints, en cambio, requieren sesión de usuario con permisos RBAC
-(bot_settings.read / bot_settings.update) y no tenían ninguna prueba.
-"""
 from __future__ import annotations
 
 import uuid
@@ -353,10 +344,6 @@ class TestCsatReasons:
     async def test_disabled_reason_not_offered_publicly_but_still_labeled_in_history(
         self, client, admin_user, auth_headers, widget_config, make_conversation, db_session,
     ):
-        """Un motivo deshabilitado desaparece de /public/config (no se ofrece a
-        nuevos usuarios) pero conversaciones ya calificadas con ese id deben
-        poder seguir resolviendo su etiqueta vía GET /csat-reasons (incluye
-        deshabilitados)."""
         created = await client.post(
             "/api/v1/widget/csat-reasons",
             json={"label": "Motivo a desactivar"},

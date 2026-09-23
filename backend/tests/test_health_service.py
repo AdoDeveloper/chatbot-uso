@@ -1,8 +1,4 @@
-"""Tests unitarios para app/services/monitoring/health.py.
-
-Ejercita la lógica de recolección de snapshots, cálculo de percentiles,
-historial, resumen de uptime y derivación de incidentes usando mocks.
-"""
+"""Tests unitarios para app/services/monitoring/health.py."""
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone

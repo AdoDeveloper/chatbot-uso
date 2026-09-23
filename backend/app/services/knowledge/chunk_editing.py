@@ -51,12 +51,7 @@ def _chunk_to_out(c: dict, *, was_edited: bool) -> ChunkOut:
 async def list_source_chunks(
     db: AsyncSession, *, source_id: str, page: int, page_size: int, warning: str | None,
 ) -> ChunkListOut:
-    """Lista los chunks de una fuente específica, paginados con el contrato
-    estándar de la app page/page_size/total (misma forma que /conversations, /audit/logs).
-
-    También devuelve un conteo agregado de warnings de toda la fuente para que
-    el UI de revisión pueda mostrar "12 chunks necesitan atención" arriba.
-    """
+    """Lista los chunks de una fuente específica, paginados con el contrato estándar de la app page/page_size/total."""
     all_chunks = await vector_store.list_all_chunks(source_id)
 
     counter: Counter[str] = Counter()
@@ -100,14 +95,7 @@ async def get_chunk(db: AsyncSession, *, point_id: str) -> ChunkOut:
 async def edit_chunk(
     db: AsyncSession, *, point_id: str, new_text: str, reason: str | None, current_user: User,
 ) -> ChunkOut:
-    """
-    Edit a chunk's text. The embedding is regenerated, warnings are recomputed,
-    and an audit row is written. The edit applies immediately - chunks are
-    editable at any time, in any review state.
-
-    Invalidates the semantic cache of the chunk's environment so stale answers
-    referencing the previous text won't be served.
-    """
+    """Edit a chunk's text."""
     existing = await vector_store.get_chunk(point_id)
     if not existing:
         raise NotFoundError("Chunk no encontrado")

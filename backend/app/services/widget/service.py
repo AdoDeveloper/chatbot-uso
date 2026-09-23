@@ -46,10 +46,7 @@ async def regenerate_api_key(db: AsyncSession) -> WidgetConfig:
 
 
 def generate_embed_code(cfg: WidgetConfig) -> EmbedCodeOut:
-    """Posición e ícono no van como atributos data-*: el widget los toma en
-    vivo desde /widget/public/config (igual que el resto de la config), así
-    que incluirlos aquí solo mostraría un valor congelado en el momento en
-    que se copió el snippet, sugiriendo falsamente que se controlan ahí."""
+    """Posición e ícono no van como atributos data-*."""
     settings = get_settings()
     base = settings.WIDGET_BASE_URL
     script_tag = (
@@ -62,12 +59,7 @@ def generate_embed_code(cfg: WidgetConfig) -> EmbedCodeOut:
 
 
 async def enforce_widget_caps(widget: WidgetConfig, session_id: str) -> None:
-    """Apply per-widget abuse caps (max_chats_per_session / per_day).
-
-    Both are independent of the global IP rate limit - they let the admin
-    cap THIS widget's usage regardless of whether the limits in
-    core.rate_limit kick in (límite de chats por sesión / por día).
-    """
+    """Apply per-widget abuse caps (max_chats_per_session / per_day)."""
     if widget.max_chats_per_session:
         if not session_id:
             # El límite es por sesión individual; sin session_id no hay identificador que limitar.
@@ -105,12 +97,7 @@ async def enforce_widget_caps(widget: WidgetConfig, session_id: str) -> None:
 async def handle_escalation_consent(
     db: AsyncSession, *, conversation_id, contact_type: str, contact_value: str,
 ) -> None:
-    """Registra el consentimiento del usuario para ser contactado.
-
-    Aplica tanto si el bot marcó `escalation_pending=True` como si el
-    usuario pide contacto por su cuenta (botón manual del widget); en
-    ambos casos el consentimiento explícito basta por sí solo.
-    """
+    """Registra el consentimiento del usuario para ser contactado."""
     from sqlalchemy import select as sa_select
 
     from app.core.constants import PANEL_AUTHENTICATED_BROWSERS

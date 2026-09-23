@@ -37,7 +37,6 @@ test.describe("Configuracion > Asistente > Previsualizar", () => {
     await expect(page.locator(".animate-spin")).toHaveCount(0, { timeout: 30_000 });
     await page.screenshot({ path: path.join(SHOT_DIR, "03-playground-respuesta.png") });
 
-    // The message can end up tracked as an unanswered question and later auto-promoted into a FAQ source - clean up so it doesn't accumulate on every run.
     const authHeader = `Bearer ${(await page.context().cookies()).find(c => c.name === "chatbot_access")?.value}`;
     const srcRes = await request.get(`${baseURL}/api/v1/sources?page_size=100`, {
       headers: { Authorization: authHeader },
@@ -65,7 +64,6 @@ test.describe("Configuracion > Asistente > Previsualizar", () => {
       }
     }
 
-    // Deleting the conversation does not remove its separately-tracked UnansweredQuestion row - resolve leftovers too, or every run leaves another permanently-open row in Pendientes.
     const uaRes = await request.get(`${baseURL}/api/v1/unanswered`, {
       headers: { Authorization: authHeader },
     }).catch(() => null);

@@ -3,13 +3,6 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 
-/**
- * Functional coverage for the bulk-delete action on
- * /dashboard/conocimiento/documentos (POST /sources/bulk/delete): uploads
- * two small disposable sources, selects both via their row checkboxes, and
- * deletes them together through the real bulk endpoint. Only ever acts on
- * sources this test itself created.
- */
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;
 

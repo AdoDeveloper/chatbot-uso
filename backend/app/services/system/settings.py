@@ -24,15 +24,6 @@ RUNTIME_DEFAULTS: dict = {
     "rate_limit_chat_per_hour": 100,
     "semantic_cache_enabled": True,
     "semantic_cache_ttl": 43200,
-    # Con e5 la similitud coseno entre preguntas distintas en español ya parte
-    # de valores altos, así que el margen util es estrecho: medido sobre este
-    # corpus, "CUM mínimo" y "CUM máximo" dan 0.9687 y "cuánto dura" contra
-    # "cuánto cuesta" la pasantía 0.9628, mientras que parafrasis reales bajan
-    # hasta 0.9555. Los rangos se solapan y ningún umbral acierta en todo; a
-    # 0.90 el caché respondía "$25 por cada cambio" a una pregunta sobre el
-    # curso preuniversitario. Se prefiere 0.97: no sirve respuestas ajenas, y
-    # una parafrasis que se pierda solo cuesta regenerar la respuesta. Ver la
-    # nota sobre anisotropía en services/rag/corrective.py.
     "semantic_cache_threshold": 0.97,
     "guardrails_enabled": True,
     "max_input_chars": 4000,
@@ -94,11 +85,7 @@ async def update_settings(db: AsyncSession, data: ChatbotSettings, user_id: uuid
 
 
 async def seed_default_settings(db: AsyncSession) -> None:
-    """Siembra los ajustes editables desde el panel con los defaults del código.
-
-    Los tamaños de chunk no se siembran: se leen siempre del .env porque
-    cambiarlos exige reingestar todas las fuentes.
-    """
+    """Siembra los ajustes editables desde el panel con los defaults del código."""
     initial = {**_DEFAULTS, **RUNTIME_DEFAULTS}
     for key, value in initial.items():
         existing = await db.get(GlobalSetting, key)
@@ -219,11 +206,7 @@ async def _safe_decrypt(encrypted: str | None, provider_name: str = "?") -> str 
 
 
 async def get_active_chain(db: AsyncSession) -> list[tuple[LLMProvider, str | None]]:
-    """
-    Devuelve la cadena de proveedores activos ordenada por prioridad.
-    Cada elemento es (provider, decrypted_api_key).
-    Proveedores cuya key no puede descifrarse se omiten de la cadena.
-    """
+    """Devuelve la cadena de proveedores activos ordenada por prioridad."""
     result = await db.execute(
         select(LLMProvider)
         .where(LLMProvider.is_active.is_(True), LLMProvider.priority.is_not(None))
@@ -258,11 +241,7 @@ async def _shift_priorities(db: AsyncSession, from_priority: int, exclude_id: uu
 
 
 async def reorder_providers(db: AsyncSession, items: list[tuple[uuid.UUID, int | None]]) -> list[ProviderOut]:
-    """Reordena en bulk la cadena de prioridad. Cada item es (id, priority|None).
-
-    Útil para drag-and-drop: el frontend envía la lista completa con la prioridad
-    objetivo y el backend la persiste atómicamente.
-    """
+    """Reordena en bulk la cadena de prioridad."""
     affected_ids = [i for i, _ in items]
     if affected_ids:
         result = await db.execute(select(LLMProvider).where(LLMProvider.id.in_(affected_ids)))

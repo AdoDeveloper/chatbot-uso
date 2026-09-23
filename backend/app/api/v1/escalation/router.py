@@ -69,8 +69,7 @@ async def ping_smtp(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_perm(P.ESCALATION_MANAGE)),
 ):
-    """Envía un email de prueba al usuario que lo solicita para verificar que
-    SMTP está configurado y que los escalamientos llegarán correctamente."""
+    """Envía un email de prueba al usuario que lo solicita para verificar que SMTP está configurado y que los escalamientos llegarán correctamente."""
     return await rules_svc.ping_smtp(db, current_user=current_user)
 
 
@@ -93,8 +92,7 @@ async def test_escalation(
     db: AsyncSession = Depends(get_db),
     _: object = Depends(require_perm(P.ESCALATION_MANAGE)),
 ):
-    """Dispara un escalamiento de prueba - los correos llegan a todos los
-    administradores activos registrados en el sistema."""
+    """Dispara un escalamiento de prueba."""
     await svc.dispatch_escalation(
         db,
         conversation_id="",

@@ -2,14 +2,6 @@ import { test, expect } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 
-/**
- * Functional coverage for /dashboard/configuracion/proveedores: full CRUD on
- * LLM providers against the real backend (create -> edit -> delete), plus
- * chain add/remove. Uses provider_type "custom" with a fake api_base so no
- * real LLM vendor is contacted (the "Probar" button is not clicked - it
- * would hang/fail against a fake endpoint and isn't required to prove the
- * CRUD surface works).
- */
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;
 
@@ -81,7 +73,6 @@ test.describe("Configuracion > Proveedores", () => {
       await page.screenshot({ path: path.join(SHOT_DIR, "04-en-cadena.png") });
     }
 
-    // El health polling refetchea la lista periódicamente y puede desmontar el dropdown a mitad de interacción; abrir menú + click van en el mismo retry loop.
     const finalRow = page.locator("tr", { hasText: renamed });
     await expect(finalRow).toBeVisible({ timeout: 10_000 });
     await finalRow.scrollIntoViewIfNeeded();
@@ -118,9 +109,6 @@ test.describe("Configuracion > Proveedores", () => {
     await dialog.getByLabel(/ocultar api key/i).click();
     await expect(keyInput).toHaveAttribute("type", "password");
 
-    // Modelo unico a este test: otros tests del mismo archivo usan
-    // "e2e-fake-model" y dejan filas reales en la tabla, lo que rompia la
-    // aserción de "no se creó nada" de abajo (matcheaba esas otras filas).
     const cancelModelName = `e2e-cancel-probe-${Date.now()}`;
     // Endpoint custom falso: nunca contacta a un proveedor real, resuelve a un estado de fallo manejado.
     await dialog.locator("select").first().selectOption("__custom__");
@@ -130,7 +118,6 @@ test.describe("Configuracion > Proveedores", () => {
     const probarBtn = dialog.getByRole("button", { name: /^probar$/i });
     await expect(probarBtn).toBeEnabled();
     await probarBtn.click();
-    // example.invalid tarda ~15-20s en fallar server-side (DNS); el error de red no siempre contiene la palabra "error", por eso el match amplio.
     await expect(dialog.getByText(/conexión exitosa|no se pudo|errno|name or service|falló|refus|timeout/i)).toBeVisible({ timeout: 45_000 });
 
     await dialog.getByRole("button", { name: /cancelar/i }).click();
@@ -162,7 +149,6 @@ test.describe("Configuracion > Proveedores", () => {
     await page.getByRole("menuitem", { name: /probar conexión/i }).click();
     await expect(page.getByText(/falló la conexión|conexión exitosa/i)).toBeVisible({ timeout: 45_000 });
 
-    // Con más de un proveedor encadenado ejercita el reordenamiento real; si es el único, el item queda deshabilitado (estado inerte esperado, se valida ese caso).
     await row.getByRole("button").last().click();
     const downItem = page.getByRole("menuitem", { name: /^mover abajo$/i });
     await expect(downItem).toBeVisible({ timeout: 5_000 });

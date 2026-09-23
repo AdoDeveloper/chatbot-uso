@@ -86,10 +86,7 @@ async def delete_pattern(db: AsyncSession, *, pattern_id: str) -> None:
 
 
 async def pattern_impact(db: AsyncSession, *, pattern_id: str, days: int) -> dict:
-    """Cuenta cuántos mensajes bloqueó este patrón en los últimos N días.
-
-    Usa el `matched_label` registrado en `audit_log.meta_json` por el motor.
-    """
+    """Cuenta cuántos mensajes bloqueó este patrón en los últimos N días."""
     await reload_custom_patterns(db)
     defs = get_injection_pattern_defs()
     target = next((p for p in defs if p["id"] == pattern_id), None)

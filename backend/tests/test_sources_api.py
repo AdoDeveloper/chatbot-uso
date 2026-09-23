@@ -1,10 +1,4 @@
-"""Tests para el flujo de revisión de fuentes (approve/reject).
-
-Cubren los endpoints añadidos tras eliminar `/environments/`:
-  - POST /api/v1/sources/{id}/approve
-  - POST /api/v1/sources/{id}/reject
-  - GET  /api/v1/sources (listado con filtro de soft-delete)
-"""
+"""Tests para el flujo de revisión de fuentes (approve/reject)."""
 from __future__ import annotations
 
 import uuid

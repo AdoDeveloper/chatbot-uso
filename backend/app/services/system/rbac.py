@@ -144,11 +144,7 @@ SYSTEM_ROLES: list[dict] = [
 
 
 async def seed_rbac(db: AsyncSession) -> dict[str, int]:
-    """Crea módulos, permisos, roles del sistema y permisos por defecto.
-
-    Admin recibe todos los permisos. Los demás roles reciben
-    sus permisos predeterminados definidos en SYSTEM_ROLES. Idempotente.
-    """
+    """Crea módulos, permisos, roles del sistema y permisos por defecto."""
     try:
         await db.execute(text("SELECT 1 FROM modules LIMIT 1"))
     except (ProgrammingError, IntegrityError):
@@ -276,12 +272,7 @@ async def get_role_permissions(db: AsyncSession, role: str) -> set[str]:
 
 
 async def issue_user_tokens(db: AsyncSession, user: object) -> tuple[str, str]:
-    """Emite un par (access, refresh) JWT para `user`, incrustando en el access
-    los permisos reales del rol (lista 'modulo.accion').
-
-    Centraliza la emisión para que TODO login/refresh/SSO/invitación incluya los
-    permisos en el token, manteniendo la UI sincronizada sin llamadas extra.
-    """
+    """Emite el par de tokens access/refresh del usuario."""
     from app.core.security import create_access_token, create_refresh_token
 
     perms = sorted(await get_role_permissions(db, user.role))
@@ -298,6 +289,5 @@ async def get_all_roles(db: AsyncSession) -> list[Role]:
     except ProgrammingError:
         await db.rollback()
         return []
-
 
 

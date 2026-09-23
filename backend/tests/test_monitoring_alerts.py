@@ -1,10 +1,4 @@
-"""Tests de app/services/monitoring/alerts.py - notify_provider_down().
-
-Cubre el payload que llega a send_notification(): debe incluir qué
-proveedores se intentaron y desde cuándo dura la incidencia, no solo un
-mensaje de error genérico (sin esto el admin no sabe cuál proveedor revisar
-ni si es una falla nueva o una que sigue arrastrándose).
-"""
+"""Tests de app/services/monitoring/alerts.py - notify_provider_down()."""
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, patch
@@ -17,16 +11,7 @@ from app.services.monitoring import alerts
 
 @pytest.fixture(autouse=True)
 def fake_redis(monkeypatch):
-    """Parchea el nombre `get_redis` tal como cada módulo lo importó.
-
-    alerts.py hace `from app.core.redis import get_redis` (no
-    `from app.core import redis`), así que parchear solo
-    `app.core.redis.get_redis` no alcanza - el nombre local de alerts.py ya
-    quedó ligado a la función original en tiempo de import y no ve el
-    reemplazo. Mismo patrón que usa el fixture `client` de conftest.py, pero
-    ese solo cubre módulos accedidos vía un request HTTP a través de la app;
-    aquí se llama a alerts.notify_provider_down() directamente.
-    """
+    """Parchea el nombre `get_redis` tal como cada módulo lo importó."""
     fake = fakeredis.aioredis.FakeRedis(decode_responses=True)
     from app.core import redis as redis_mod
     monkeypatch.setattr(redis_mod, "get_redis", lambda: fake)
@@ -53,13 +38,10 @@ class TestNotifyProviderDown:
         assert payload["since"]  # non-empty ISO string
 
     async def test_since_is_stable_across_calls_within_the_same_incident(self, fake_redis):
-        """Dos notificaciones de la misma racha deben reportar el mismo
-        `since` (el momento del primer fallo), no la hora de cada aviso."""
         with patch("app.services.monitoring.alerts.send_notification", AsyncMock()) as mock_send:
             await alerts.notify_provider_down("boom", providers=["Groq"])
             first_since = mock_send.call_args.kwargs["payload"]["since"]
 
-            # Salta el cooldown para forzar un segundo aviso: prueba _provider_down_since() en aislamiento, no el cooldown (ya cubierto por TestAlertsCooldown).
             second_since = await alerts._provider_down_since()
 
         assert first_since == second_since

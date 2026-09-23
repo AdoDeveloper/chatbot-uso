@@ -1,11 +1,4 @@
-"""
-Fases del pipeline de chat extraídas del router SSE.
-
-Cada función implementa una fase cohesiva (guardrails, límites, caché,
-fuentes, RAG, persistencia, escalación) y devuelve datos puros; el router
-decide qué eventos SSE emitir con ellos. Este módulo NO debe importar el
-router para evitar imports circulares.
-"""
+"""Fases del pipeline de chat extraídas del router SSE."""
 from __future__ import annotations
 
 import asyncio
@@ -54,11 +47,7 @@ def exact_cache_key(question: str, source_ids: list[str] | None, use_draft: bool
 
 
 async def load_chat_config(db: AsyncSession, use_draft: bool):
-    """Carga la configuración del chatbot desde la BD.
-
-    `use_draft` se conserva por compatibilidad con las llamadas existentes: la
-    configuración se aplica en vivo, así que no hay una variante desplegada.
-    """
+    """Carga la configuración del chatbot desde la BD."""
     return await settings_service.get_settings(db)
 
 
@@ -136,10 +125,7 @@ async def run_input_guardrails(
 
 
 async def check_limits(db: AsyncSession, client_ip: str, session_id: str | None, settings) -> str | None:
-    """Aplica rate limiting multidimensional; devuelve el mensaje de error si se excede.
-
-    Los límites por minuto y hora se leen de GlobalSetting.
-    """
+    """Aplica rate limiting multidimensional; devuelve el mensaje de error si se excede."""
     from app.services.system.settings import get_runtime_overrides
     overrides = await get_runtime_overrides(db)
     per_min = overrides["rate_limit_chat_per_min"]
@@ -166,8 +152,7 @@ async def check_limits(db: AsyncSession, client_ip: str, session_id: str | None,
 async def lookup_cache(
     db: AsyncSession, question: str, source_ids: list[str] | None, settings, use_draft: bool = False
 ) -> dict | None:
-    """Busca la respuesta primero en el caché exacto (Redis GET, O(1)) y luego
-    en el caché semántico (embedding + SCAN, costoso)."""
+    """Busca la respuesta primero en el caché exacto."""
     key = exact_cache_key(question, source_ids, use_draft)
     try:
         exact_cached = await get_redis().get(key)
@@ -202,11 +187,7 @@ async def store_cache(
     use_draft: bool = False,
     min_generation: int | None = None,
 ) -> None:
-    """Guarda la respuesta en el caché exacto y semántico (best-effort).
-    Si se proporciona `min_generation`, se verifica que la generación actual
-    sea la misma antes de almacenar en el caché. Si no lo es, se omite el
-    almacenamiento y se registra un mensaje de advertencia.
-    """
+    """Guarda la respuesta en el caché exacto y semántico (best-effort)."""
     from app.services.ai.semantic_cache import get_cache_generation
 
     if min_generation is not None:
@@ -279,12 +260,7 @@ async def retrieve_context(
     cfg,
     original_question: str | None = None,
 ) -> str | tuple[list[dict], float | None]:
-    """Ejecuta Adaptive RAG: devuelve un saludo (str) o (chunks, context_relevance_ratio).
-
-    `question` puede llegar expandida con el turno anterior para que la
-    búsqueda entienda una pregunta corta; `original_question` es lo que el
-    usuario escribió y es lo que se registra si queda sin respuesta.
-    """
+    """Ejecuta Adaptive RAG: devuelve un saludo (str) o (chunks, context_relevance_ratio)."""
     return await run_adaptive_rag(
         question=question,
         provider=provider,
@@ -302,9 +278,7 @@ _SOURCE_TEXT_MAX_LEN = 300
 
 
 def _truncate_at_word_boundary(text: str, max_len: int) -> str:
-    """Corta `text` a lo sumo en max_len caracteres, retrocediendo hasta el
-    último espacio para no partir una palabra o un número (ej. un teléfono)
-    a la mitad."""
+    """Corta `text` a lo sumo en max_len caracteres."""
     if len(text) <= max_len:
         return text
     cut = text[:max_len]
@@ -315,14 +289,7 @@ def _truncate_at_word_boundary(text: str, max_len: int) -> str:
 
 
 def format_sources(context_chunks: list[dict]) -> list[dict]:
-    """Formatea los chunks recuperados para el evento SSE `sources`, sin duplicados.
-
-    Dedup por parent_id (sección/sub-sección), no por source_id: un documento
-    tipo FAQ trae muchas preguntas independientes bajo un único source_id, y
-    deduplicar a ese nivel oculta de qué sección específica salió cada dato
-    citado en la respuesta - el usuario ve una sola fuente aunque el LLM haya
-    usado varias secciones distintas del mismo documento.
-    """
+    """Formatea los chunks recuperados para el evento SSE `sources`, sin duplicados."""
     seen: set[str] = set()
     result = []
     for c in context_chunks:
@@ -379,13 +346,7 @@ _SYSTEM_PROMPT_LEAK_MESSAGE = (
 def apply_output_guardrails(
     text: str, *, pii_entities: list[str] | None = None, context_chunks: list[dict] | None = None,
 ) -> str:
-    """Detecta fugas del system prompt y BLOQUEA la respuesta si el canario
-    aparece; además redacta PII que el LLM pueda haber repetido fuera del
-    contexto recuperado (documentos indexados nunca pasan por validate_input,
-    a diferencia del input del usuario). Un correo o teléfono que sí aparece
-    en `context_chunks` no se redacta: es información institucional que el
-    admin indexó a propósito para que el bot la comparta, no PII filtrada.
-    """
+    """Detecta fugas del system prompt y BLOQUEA la respuesta si el canario aparece."""
     if check_system_prompt_leak(text):
         log.warning("guardrails.system_prompt_leak_detected")
         return _SYSTEM_PROMPT_LEAK_MESSAGE
@@ -393,9 +354,7 @@ def apply_output_guardrails(
 
 
 async def _feedback_negative_ratio(db: AsyncSession, conversation_id) -> float | None:
-    """Proporción de mensajes del asistente con feedback negativo sobre el
-    total de mensajes con feedback registrado en la conversación. None si
-    aún no hay ninguna valoración (evita falsos positivos con 0/0)."""
+    """Proporción de mensajes del asistente con feedback negativo sobre el total de mensajes con feedback registrado en la conversación."""
     from sqlalchemy import func as sa_func
 
     from app.models.chat_message import ChatMessage
@@ -417,18 +376,7 @@ async def _feedback_negative_ratio(db: AsyncSession, conversation_id) -> float |
 
 
 async def _recent_assistant_rag_scores(db: AsyncSession, conversation_id, *, limit: int = 5) -> list[float]:
-    """Score de confianza (máximo entre sus fuentes) de los últimos N turnos
-    del asistente en esta conversación, en orden cronológico.
-
-    `confidence_below` necesita "N respuestas consecutivas con baja
-    confianza" - eso solo tiene sentido mirando el historial real de turnos,
-    no los chunks recuperados para la pregunta actual (que son N fragmentos
-    de UNA sola respuesta, una señal distinta y no lo que la regla promete).
-
-    Turnos sin `sources` (saludos, respuestas de caché sin retrieval) se
-    excluyen en vez de contar como score 0.0: 0.0 no es "confianza baja
-    medida", es "no hubo retrieval que medir".
-    """
+    """Score de confianza (máximo entre sus fuentes) de los últimos N turnos del asistente en esta conversación."""
     from app.models.chat_message import ChatMessage
 
     result = await db.execute(
@@ -456,11 +404,7 @@ async def detect_escalation(
     final_text: str,
     latency_ms: int | None = None,
 ) -> bool:
-    """Evalúa las reglas de escalación activas y marca la conversación si alguna dispara.
-
-    Solo se llama para tráfico público real (persist_turn la salta si
-    is_playground).
-    """
+    """Evalúa las reglas de escalación activas y marca la conversación si alguna dispara."""
     try:
         wc_result = await db.execute(select(WidgetConfig).limit(1))
         widget_cfg = wc_result.scalar_one_or_none()
@@ -576,11 +520,7 @@ async def evaluate_response_quality(
     provider,
     api_key: str | None,
 ) -> None:
-    """Evalúa faithfulness y answer relevance en background (fire-and-forget,
-    llamada desde el router tras persist_turn) y persiste el resultado sobre
-    el ChatMessage ya creado, en una sesión de BD nueva. Nunca levanta
-    excepción hacia el caller.
-    """
+    """Evalúa faithfulness y answer relevance en background."""
     from app.services.ai.llm_gateway import grade_faithfulness
     from app.services.rag.quality import compute_answer_relevance
 

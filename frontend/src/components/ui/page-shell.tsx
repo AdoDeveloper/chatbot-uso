@@ -15,14 +15,6 @@ interface PageShellProps {
   before?: React.ReactNode;
 }
 
-/**
- * Contenedor estándar de una vista del panel. Impone el ritmo vertical
- * (space-y-6) y la cabecera consistente vía PageHeader, para que ninguna
- * página vuelva a elegir su propio espaciado o maquetar su cabecera a mano.
- *
- * El padding lateral lo aporta el layout del dashboard; PageShell solo
- * gobierna el ritmo interno y la cabecera.
- */
 export function PageShell({
   title, description, icon, badge, action, children, className, before,
 }: PageShellProps) {

@@ -5,15 +5,6 @@ from typing import Any
 
 from app.models.enums import EscalationTrigger
 
-# Tipo de contexto
-# {
-#   "user_message": str,                 # último mensaje del usuario
-#   "bot_answers": list[str],            # últimas respuestas del bot (orden cronológico)
-#   "rag_scores": list[float],           # confianza de las últimas respuestas (mismo orden)
-#   "no_answer_seconds": int | None,     # segundos sin respuesta del bot a una pregunta
-#   "feedback_negative_ratio": float|None, # 0..1 - proporción de 👎 en la sesión
-# }
-
 
 def _eval_no_answer(ctx: dict, cfg: dict) -> tuple[bool, str]:
     wait = int(cfg.get("wait_seconds", 120))
@@ -121,10 +112,7 @@ def evaluate_rule(
 
 
 def schema_for_trigger(trigger_type: EscalationTrigger) -> dict[str, Any]:
-    """Schema de configuración esperado para cada trigger.
-
-    Útil para la UI dinámica del formulario y validación.
-    """
+    """Schema de configuración esperado para cada trigger."""
     schemas = {
         EscalationTrigger.no_answer: {
             # `no_answer_seconds` es la latencia del turno, no espera del usuario.

@@ -1,6 +1,4 @@
-"""Métricas de calidad de respuesta RAG (answer relevance), evaluadas
-async/fire-and-forget tras persistir el turno - ver también llm_gateway.grade_faithfulness.
-"""
+"""Métricas de calidad de respuesta RAG."""
 from __future__ import annotations
 
 import structlog

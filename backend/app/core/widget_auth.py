@@ -1,7 +1,4 @@
-"""
-Autenticación del widget y validación de dominio.
-Uso como dependencia de FastAPI: Depends(verify_widget_access)
-"""
+"""Autenticación del widget y validación de dominio."""
 from __future__ import annotations
 
 from fnmatch import fnmatch

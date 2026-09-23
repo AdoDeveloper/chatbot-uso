@@ -215,9 +215,6 @@ export const STYLES = `
   align-items: end;
 }
 
-/* El avatar se alinea con el borde inferior de la burbuja, no con la fila de
-   acciones que va debajo: el contenido del mensaje pasa a ser parte de la
-   grilla de la fila sin cambiar el DOM. */
 .msg-row-assistant > .msg-assistant:not(.escal-card) { display: contents; }
 .msg-row-assistant > .msg-avatar { grid-column: 1; grid-row: 1; margin: 0 0 2px; }
 .msg-row-assistant > .msg-assistant > *,

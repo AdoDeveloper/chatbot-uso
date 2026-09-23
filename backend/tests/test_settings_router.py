@@ -1,9 +1,4 @@
-"""Tests para app/api/v1/settings/router.py - no tenía ningún test.
-
-Cubre get/update settings (con warnings por parámetros riesgosos) y el
-ciclo completo export -> import, incluyendo las validaciones de import
-(extensión, content-type, tamaño, JSON malformado, versión incompatible).
-"""
+"""Tests para app/api/v1/settings/router.py - no tenía ningún test."""
 from __future__ import annotations
 
 import json

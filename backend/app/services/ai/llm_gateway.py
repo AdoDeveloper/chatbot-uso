@@ -1,25 +1,4 @@
-"""
-LLM Gateway - truly provider-agnostic streaming via httpx + native APIs.
-
-Adapter families:
-  - OpenAICompatAdapter: OpenAI, Groq, OpenRouter, DeepSeek, Together,
-    xAI, Ollama, Mistral, Fireworks, Perplexity, LMStudio, vLLM, Cerebras,
-    SambaNova, OVHCloud, Cloudflare Workers AI, NVIDIA NIM,
-    ANY OpenAI-compatible endpoint
-  - AzureOpenAIAdapter: Azure OpenAI (different URL scheme + api-key header)
-  - AnthropicAdapter: Anthropic /messages format
-  - GeminiAdapter: Google AI Studio / Vertex generateContent format
-  - CohereAdapter: Cohere /v2/chat format
-  - BedrockAdapter: AWS Bedrock (requires boto3, optional)
-
-Design principle: ANY unknown provider_type that has an api_base is routed
-to OpenAICompatAdapter as default - the OpenAI chat/completions format is
-the de-facto standard and ~90% of providers support it. The admin only
-needs to set provider_type + model_name + api_key + api_base in the panel.
-
-No hardcoded provider list. No enum restriction. New providers work without
-touching code as long as they speak OpenAI-compat (most do).
-"""
+"""LLM Gateway - truly provider-agnostic streaming via httpx + native APIs."""
 
 from __future__ import annotations
 
@@ -76,11 +55,7 @@ class CircuitBreaker:
         return False
 
     def record_failure(self, provider_id: str) -> bool:
-        """Registra el fallo y devuelve True si con este el circuito se abre.
-
-        El aviso se dispara desde el bucle de fallback: aquí no se conoce el
-        nombre del proveedor ni corresponde enviar notificaciones.
-        """
+        """Registra el fallo y devuelve True si con este el circuito se abre."""
         now = time.monotonic()
         ya_abierto = provider_id in self._open_until
         fails = self._failures.setdefault(provider_id, [])
@@ -98,12 +73,7 @@ class CircuitBreaker:
         self._open_until.pop(provider_id, None)
 
     def force_open(self, provider_id: str, cooldown: float | None = None) -> None:
-        """Abre el circuito de inmediato, sin esperar el umbral de fallos.
-
-        Para errores permanentes (modelo retirado, credencial inválida): el
-        cooldown por defecto es más largo que el de un fallo transitorio,
-        porque nada va a cambiar en los próximos 30 segundos.
-        """
+        """Abre el circuito de inmediato, sin esperar el umbral de fallos."""
         self._open_until[provider_id] = time.monotonic() + (cooldown or self._cooldown * 20)
 
 
@@ -111,8 +81,7 @@ _breaker = CircuitBreaker()
 
 
 def _avisar_degradado(provider_name: str, error: str) -> None:
-    """Lanza el aviso en segundo plano: la respuesta al usuario no espera al
-    envío del correo, y un fallo notificando no puede tumbar el fallback."""
+    """Lanza el aviso en segundo plano."""
     try:
         import asyncio as _asyncio
 
@@ -139,11 +108,6 @@ def _avisar_mal_configurado(provider_name: str, error: str) -> None:
         log.warning("llm.misconfigured_notify_failed", provider=provider_name, error=str(exc))
 
 
-# Códigos que reintentar no arregla: el modelo no existe o fue retirado
-# (404), la credencial no es válida o no tiene acceso a ese modelo (401/403),
-# o el proveedor se quedó sin crédito / se agotó la cuota diaria del modelo
-# gratuito (402, propio de OpenRouter). Se distinguen de 429/5xx, que sí se
-# resuelven solos y ya cubre el circuit breaker.
 _PERMANENT_STATUS_CODES = (401, 402, 403, 404)
 
 
@@ -160,15 +124,6 @@ def _is_retryable(exc: BaseException) -> bool:
     return isinstance(exc, (httpx.ConnectError, httpx.ReadTimeout))
 
 
-# El admin SIEMPRE puede sobrescribirlas vía api_base en el panel del
-# proveedor. Cuando no lo hace, se resuelve contra provider_type_catalog
-# (tabla editable desde Configuración → Tipos de proveedor) - no hay lista
-# de proveedores hardcodeada en el código; el catálogo es la fuente de
-# verdad y puede corregirse sin desplegar nada.
-
-# Caché de filas del catálogo por type_key: evita una consulta a BD en cada
-# petición de chat. TTL corto para que una edición desde el panel se refleje
-# sin necesidad de reiniciar el backend.
 _CATALOG_CACHE: dict[str, tuple[float, ProviderTypeCatalog | None]] = {}
 _CATALOG_CACHE_TTL = 300.0
 
@@ -196,8 +151,7 @@ async def _resolve_catalog_entry(type_key: str) -> ProviderTypeCatalog | None:
 async def _resolve_base_and_headers(
     provider_type: str, api_base: str | None, fallback_base: str | None = None,
 ) -> tuple[str | None, dict[str, str]]:
-    """api_base explícito > catálogo editable > constante fija del adaptador
-    (si el llamador la pasa como fallback_base)."""
+    """api_base explícito > catálogo editable > constante fija del adaptador."""
     if api_base:
         return api_base, {}
     entry = await _resolve_catalog_entry(provider_type)
@@ -211,9 +165,6 @@ _COHERE_BASE = "https://api.cohere.com/v2"          # endpoint de chat
 # Fecha fija que Anthropic exige en cada request (no es un "año de release" -
 # es su esquema real de versionado; sigue vigente y estable a la fecha).
 _ANTHROPIC_API_VERSION = "2023-06-01"
-# Última api-version estable de Azure OpenAI conocida. Azure la rota con
-# frecuencia; si un despliegue necesita otra, el admin puede pegar la URL
-# completa (con su propio ?api-version=...) en "URL base" del proveedor.
 _AZURE_API_VERSION = "2024-10-21"
 
 
@@ -255,14 +206,7 @@ class LLMAdapter(ABC):
 # Este es el adapter DEFAULT. Cualquier proveedor que la factory no haga
 # match explícito cae aquí. Funciona con ~90% de las APIs de LLM del mercado.
 class OpenAICompatAdapter(LLMAdapter):
-    """Universal OpenAI-compatible adapter.
-
-    Covers: OpenAI, Groq, OpenRouter, DeepSeek, Together, xAI, Ollama,
-    Mistral, Fireworks, Perplexity, LMStudio, vLLM, Cerebras, SambaNova,
-    NVIDIA NIM, Cloudflare Workers AI, OVHCloud, Scaleway, Nebius,
-    Infomaniak, and ANY endpoint that implements POST /chat/completions
-    with the OpenAI request/response schema.
-    """
+    """Universal OpenAI-compatible adapter."""
 
     def __init__(
         self, provider_type: str, model_name: str, api_key: str | None, api_base: str | None,
@@ -430,7 +374,6 @@ class AzureOpenAIAdapter(LLMAdapter):
         return data["choices"][0]["message"]["content"] or ""
 
 
-
 class AnthropicAdapter(LLMAdapter):
 
     def __init__(
@@ -518,7 +461,6 @@ class AnthropicAdapter(LLMAdapter):
         data = resp.json()
         blocks = data.get("content", [])
         return "".join(b.get("text", "") for b in blocks if b.get("type") == "text")
-
 
 
 class GeminiAdapter(LLMAdapter):
@@ -836,9 +778,6 @@ async def _get_adapter(
     return OpenAICompatAdapter(pt, model_name, api_key, resolved_base, merged_headers)
 
 
-# El prompt efectivo viene de la configuración; este es el respaldo para
-# cuando la base de datos no trae ninguno. Comparte la definición con el valor
-# por defecto de ChatbotSettings para que ambos no vuelvan a divergir.
 _SYSTEM_TEMPLATE = DEFAULT_SYSTEM_PROMPT
 
 
@@ -894,9 +833,6 @@ async def stream_chat(
         except Exception as exc:
             last_error = exc
             if _is_permanent_failure(exc):
-                # No tiene sentido gastar el margen de 5 fallos del interruptor
-                # en algo que un reintento no va a arreglar: se abre de una vez
-                # y se avisa como error de configuración, no como caída temporal.
                 _breaker.force_open(pid)
                 log.warning("llm.provider_misconfigured", provider=provider_name, error=str(exc),
                             status_code=exc.response.status_code, tokens_yielded=tokens_yielded)
@@ -992,21 +928,12 @@ async def grade_documents(
 
     try:
         for intento in range(2):
-            # 2000, no 512: un modelo con razonamiento oculto (exclude=true)
-            # gasta parte de ESTE mismo presupuesto pensando antes de escribir
-            # el JSON visible - con 512 el corte llega a mitad de la respuesta
-            # antes de emitir los 12 juicios completos (confirmado con Nemotron
-            # Ultra: finish_reason="length" con el array a medio terminar).
             text = await adapter.complete(
                 messages, temperature=0.0, max_tokens=2000,
             )
             grades = _parse(text)
             if grades is not None:
                 return grades
-            # Un array corto no dice nada sobre los documentos que faltan: no
-            # hay forma de saber si eran relevantes o no, así que se reintenta
-            # una vez antes de degradar - más barato que rechazar contexto
-            # bueno por un problema de formato en la respuesta del juez.
             log.warning("llm.grade_retry", reason="short_or_unparsable",
                         docs=len(documents), provider=provider.name, intento=intento)
 
@@ -1026,11 +953,7 @@ async def classify_topic(
     question: str, provider: LLMProvider, api_key: str | None,
     existing_topics: list[str] | None = None,
 ) -> str | None:
-    """Clasifica una pregunta sin respuesta en un tema corto (1-3 palabras),
-    para agrupar "Temas más consultados" en las estadísticas y el resumen
-    semanal. Fail-open a None (no bloquea nada más): sin tema asignado, la
-    fila simplemente no entra en el agrupado por tema.
-    """
+    """Clasifica una pregunta sin respuesta en un tema corto."""
     topics_hint = (
         f"\n\nTemas ya existentes (usa uno de estos EXACTAMENTE igual si la "
         f"pregunta encaja en alguno, en vez de crear una variante nueva): "
@@ -1051,9 +974,6 @@ async def classify_topic(
     ]
     adapter = await _get_adapter(provider.name, provider.provider_type, provider.model_name, provider.api_base, api_key, provider.extra_headers)
     try:
-        # El JSON del tema ocupa poco, pero un modelo de razonamiento gasta
-        # parte del presupuesto antes de escribirlo: con 32 tokens la respuesta
-        # llegaba vacía y ninguna pregunta se clasificaba.
         text = await adapter.complete(
             messages, temperature=0.0, max_tokens=128,
         )
@@ -1089,9 +1009,6 @@ async def _extract_statements(
         {"role": "user", "content": f"Respuesta: {answer[:2000]}"},
     ]
     adapter = await _get_adapter(provider.name, provider.provider_type, provider.model_name, provider.api_base, api_key, provider.extra_headers)
-    # 2000, no 512: mismo motivo que grade_documents - un modelo con
-    # razonamiento oculto puede agotar un presupuesto chico antes de escribir
-    # el JSON visible.
     text = await adapter.complete(messages, temperature=0.0, max_tokens=2000)
     if not text or not text.strip():
         return None
@@ -1110,13 +1027,7 @@ async def grade_faithfulness(
     provider: LLMProvider,
     api_key: str | None,
 ) -> float | None:
-    """LLM-juez en 2 pasos (metodología RAGAS): extrae statements atómicos de
-    `answer`, verifica cada uno contra `context_chunks`. Score = soportados/total.
-    None si no hay claims verificables o si alguna llamada LLM falla - a
-    diferencia de grade_documents, aquí "fail open" significa no forzar un
-    valor, porque esto es una métrica de observación, no un filtro que
-    bloquea el flujo de respuesta al usuario.
-    """
+    """LLM-juez en 2 pasos (metodología RAGAS)."""
     if not answer.strip() or not context_chunks:
         return None
     try:
@@ -1165,14 +1076,7 @@ async def rewrite_query(
     api_key: str | None,
     avoid: str | None = None,
 ) -> str:
-    """Reescribe la pregunta como términos de búsqueda.
-
-    `avoid` es la reformulación que ya se intentó y no recuperó nada útil: se
-    le pasa al modelo para que produzca una alternativa distinta (sinónimos,
-    otra terminología). Sin esto, reintentar con la misma entrada y
-    temperature=0.0 devuelve la misma consulta y el ciclo de reescritura del
-    CRAG no aporta nada.
-    """
+    """Reescribe la pregunta como términos de búsqueda."""
     system = (
         "Convierte la pregunta en términos de búsqueda concretos para una base de conocimiento universitaria "
         "(trámites, procesos, requisitos, fechas, documentos, normativas). "

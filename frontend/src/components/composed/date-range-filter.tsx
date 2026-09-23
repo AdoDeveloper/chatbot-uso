@@ -24,13 +24,6 @@ const SIZE_CLASS = {
   default: "h-9 text-13 pl-3 pr-8",
 }
 
-// input[type=date] nativo no soporta placeholder (se ignora por spec) y su
-// formato de despliegue depende del locale del SO del usuario, no del lang
-// del documento - en Firefox/Safari ni siquiera el atributo lang lo fuerza.
-// Único modo confiable de mostrar siempre dd/mm/aaaa en cualquier navegador:
-// un input de texto propio que controla el formato, con el date picker
-// nativo montado invisible encima del ícono de calendario (mismo valor,
-// showPicker() al hacer clic) para no perder el selector visual del SO.
 function isoToDisplay(iso: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso)
   if (!m) return ""
@@ -140,8 +133,6 @@ function DateRangeFilter({
   className,
   showLabels = true,
 }: DateRangeFilterProps) {
-  // Estándar: grid de 2 columnas fijas (nunca flex+separador, que rompía el
-  // layout en mobile) - cada input ocupa su celda al 100%, sin desbordes.
   const inputClass = cn(SIZE_CLASS[size], "w-full min-w-0")
   const labelClass = "text-2xs font-medium text-muted-foreground block mb-1"
   const visibleFrom = fromLabel.length > 12 ? "Desde" : fromLabel

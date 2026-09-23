@@ -1,7 +1,4 @@
-"""
-Corrective RAG - LangGraph state machine: expand → retrieve → grade → optional rewrite.
-Greeting/factual shortcuts skip grading/rewriting. Max 1 rewrite to avoid loops.
-"""
+"""Corrective RAG - LangGraph state machine: expand → retrieve → grade → optional rewrite."""
 from __future__ import annotations
 
 import asyncio
@@ -20,19 +17,6 @@ log = structlog.get_logger()
 
 MAX_REWRITES = 1
 
-# Scores RRF de este corpus rondan 0.03; por encima de este techo, la escala no aplica.
-#
-# score_threshold no filtra por relevancia semántica de forma confiable, ni en
-# esta escala RRF ni aplicado como coseno puro sobre el prefetch dense (0-1):
-# verificado con multilingual-e5-large y gte-large contra el corpus real, una
-# pregunta totalmente fuera de dominio obtiene coseno ~0.80-0.85, igual o por
-# encima de preguntas relevantes reales - el hueco entre "relevante" e
-# "irrelevante" es de centésimas o directamente inexistente. No es un defecto
-# de un modelo puntual: con textos cortos en español, la similitud coseno
-# entre embeddings de oraciones tiende a ser alta y poco discriminativa en
-# general (anisotropía del espacio vectorial). El filtro de relevancia real de
-# este pipeline es grade_documents (juicio semántico por LLM), no un umbral
-# numérico - ver retrieve_context/_grade más abajo.
 _MAX_SANE_THRESHOLD = 0.05
 
 
@@ -48,19 +32,10 @@ def _sane_threshold(configured: float) -> float:
     return configured
 
 
-# El juez semántico es la única barrera de relevancia, y con preguntas cuya
-# respuesta se reparte entre varios artículos tiende a aprobar uno solo. Un
-# contexto tan escaso empuja al generador a rellenar los huecos: medido sobre
-# el tráfico real, la fidelidad de la respuesta sube de 0.51 con un chunk a
-# 0.84 con tres. Cuando el filtro deja menos de este mínimo, se completan con
-# los mejores del recuperador, que ya vienen ordenados por score.
 _MIN_DOCS_TRAS_FILTRO = 3
 
 
 def _completar_con_mejores(docs: list[dict], relevantes: list[dict]) -> list[dict]:
-    # Sin ningún documento aprobado, la pregunta queda fuera del corpus: añadir
-    # los mejores del recuperador solo daría al generador material ajeno sobre
-    # el que apoyarse. El complemento es para un filtro corto, no vacío.
     if not relevantes:
         return []
     elegidos = list(relevantes)
@@ -76,12 +51,7 @@ def _completar_con_mejores(docs: list[dict], relevantes: list[dict]) -> list[dic
 
 
 def _sin_respuesta(docs: list[dict], ratio: float | None) -> bool:
-    """Una pregunta queda sin responder cuando el evaluador no aprueba nada.
-
-    No basta con mirar si la lista está vacía: el complemento de contexto
-    devuelve fragmentos aunque el juicio haya sido negativo, y sin esta
-    comprobación esas preguntas dejarían de registrarse.
-    """
+    """Una pregunta queda sin responder cuando el evaluador no aprueba nada."""
     return not docs or ratio == 0
 
 
@@ -200,9 +170,7 @@ _graph = _build_graph()
 async def _classify_and_store_topic(
     question_id, question: str, provider: LLMProvider, api_key: str | None,
 ) -> None:
-    """Clasifica el tema en background y lo persiste en una sesión aparte,
-    fuera de la ruta de respuesta al usuario: se dispara fire-and-forget,
-    sin bloquear ni afectar la latencia del turno de chat."""
+    """Clasifica el tema en background y lo persiste en una sesión aparte, fuera de la ruta de respuesta al usuario."""
     from app.services.ai.llm_gateway import classify_topic
 
     existing_topics: list[str] = []
@@ -281,19 +249,7 @@ async def run_adaptive_rag(
     greeting_response: str | None = None,
     original_question: str | None = None,
 ) -> tuple[list[dict], float | None] | str:
-    """
-    Adaptive RAG entry point. Returns either:
-      - tuple[list[dict], float | None]: context chunks + context_relevance_ratio
-        (fracción de chunks recuperados que el grading marcó como relevantes)
-      - str: direct response (for greetings, no retrieval needed)
-
-    `greeting_response` lets the caller pass the admin-customized greeting from
-    ChatbotSettings; falls back to the hardcoded default when not provided.
-
-    `question` puede venir expandida con el turno anterior para que la búsqueda
-    entienda una pregunta corta; `original_question` es lo que el usuario
-    escribió, y es lo que se registra como pregunta sin respuesta.
-    """
+    """Adaptive RAG entry point."""
     a_registrar = original_question or question
     route = classify_query(question)
     log.info("rag.route", question=question[:80], route=route)
@@ -351,9 +307,6 @@ async def run_corrective_rag(
     final_state = await _graph.ainvoke(initial)
     context = final_state["relevant_docs"]
     total_docs = final_state["documents"]
-    # Sobre lo aprobado por el evaluador, no sobre el contexto ya completado:
-    # de otro modo el ratio nunca sería cero y una pregunta sin respuesta
-    # pasaría por respondida.
     aprobados = final_state.get("approved_count", len(context))
     ratio = (aprobados / len(total_docs)) if total_docs else None
 
@@ -369,18 +322,7 @@ async def run_simple_rag(
     provider: LLMProvider | None = None,
     api_key: str | None = None,
 ) -> tuple[list[dict], float | None]:
-    """Recuperación sin expansión/reescritura de la consulta (sin costo de LLM para esa parte).
-
-    Si se pasa `provider`, aplica el mismo grading de relevancia que
-    run_corrective_rag (grade_documents) sobre los resultados - pero sin el
-    ciclo de expand/rewrite del grafo CRAG completo, que agrega una llamada
-    LLM extra innecesaria para preguntas "factual" ya bien formuladas. Este
-    es el filtro que evita pasarle al LLM de generación chunks de score
-    bajo-medio como si fueran contexto confiable (ver docstring del módulo
-    de evaluación de calidad RAG - sin esto, preguntas fuera del corpus con
-    retrieval "ruidoso" podían producir respuestas inventadas con aparente
-    confianza, ej. un teléfono inexistente).
-    """
+    """Recuperación sin expansión/reescritura de la consulta (sin costo de LLM para esa parte)."""
     embeddings = await embed_texts_async([question], prefix="query: ")
     emb = embeddings[0]
 

@@ -1,17 +1,5 @@
 import { test, expect } from "@playwright/test";
 
-/**
- * End-to-end coverage for the real widget's escalation contact form
- * (correo/WhatsApp), running against the actual widget.js bundle served by
- * the backend and the real /widget/public/escalation/contact endpoint - not
- * the simulated playground in configuracion-asistente-preview.spec.ts.
- *
- * Requiere un proveedor LLM real y funcional: sin uno, el backend responde
- * type="error" y el widget nunca muestra la tarjeta de escalamiento (la
- * trata como fallo, con botón "Reintentar"). CI no tiene ningún proveedor
- * configurado, así que estos tests se saltan ahí y solo corren en local
- * contra un stack con un proveedor real.
- */
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;
 
@@ -19,9 +7,6 @@ test.use({ storageState: "e2e/.auth/admin.json" });
 test.skip(!E2E_USER || !E2E_PASS, "E2E_USER / E2E_PASS not set - skipping");
 test.skip(!!process.env.CI, "requiere un proveedor LLM real; CI no tiene ninguno configurado");
 
-// 127.0.0.1, no "localhost": en el runner de CI "localhost" resuelve a
-// IPv6 (::1) antes que a IPv4, donde nada escucha - el <script src> del
-// widget fallaba en silencio y el botón "Abrir chat" nunca se renderizaba.
 const BACKEND_URL = "http://127.0.0.1:8000";
 
 async function getWidgetKey(request: import("@playwright/test").APIRequestContext, authHeader: string): Promise<string> {
@@ -32,13 +17,6 @@ async function getWidgetKey(request: import("@playwright/test").APIRequestContex
 }
 
 async function loadWidgetPage(page: import("@playwright/test").Page, widgetKey: string) {
-  // page.route + page.goto a una página real (no page.setContent ni
-  // reescribir el DOM de una página ajena como /api/docs): setContent sirve
-  // el documento sobre un origen opaco donde localStorage lanza
-  // SecurityError, y sobreescribir innerHTML encima de Swagger dejaba su
-  // propio React montado por debajo, compartiendo scope global con el
-  // widget. Se sirve un HTML minimo propio en el mismo origen del backend
-  // interceptando una ruta que de otro modo devolvería 404.
   await page.route(`${BACKEND_URL}/__e2e_widget_host__`, (route) => {
     route.fulfill({
       contentType: "text/html",
@@ -63,17 +41,10 @@ async function loadWidgetPage(page: import("@playwright/test").Page, widgetKey: 
 async function sendMessageAndWaitReply(messageInput: import("@playwright/test").Locator, page: import("@playwright/test").Page, question: string) {
   await messageInput.fill(question);
   await messageInput.press("Enter");
-  // 45s, no 30s: el ultimo test del archivo (feedback) corre despues de
-  // ~65s de actividad previa del mismo LLM real en la misma corrida, y
-  // choco repetidamente justo en el borde de 30s bajo esa carga acumulada
-  // aunque la misma llamada por API sola tarda ~7s.
   await expect(page.locator('[aria-label="Escribiendo"]')).toHaveCount(0, { timeout: 45_000 });
 }
 
 async function fillAndSubmitContact(page: import("@playwright/test").Page, type: "email" | "whatsapp", value: string) {
-  // La tarjeta de escalamiento aparece como burbuja del bot en el flujo
-  // (disparada por escalationPrompt en la respuesta), no detrás de un botón
-  // de pie de página siempre visible.
   const promptYesBtn = page.getByRole("button", { name: /^sí$/i });
   await expect(promptYesBtn).toBeVisible({ timeout: 10_000 });
   await promptYesBtn.click();
@@ -95,10 +66,6 @@ test.describe("Widget real - escalamiento con contacto", () => {
     const widgetKey = await getWidgetKey(request, authHeader);
 
     const messageInput = await loadWidgetPage(page, widgetKey);
-    // "agente" dispara la regla sembrada por defecto "Usuario solicita
-    // agente" (user_request) en un solo turno - las demás reglas por
-    // defecto (no_answer, confidence_below) exigen 2+ turnos consecutivos
-    // o un umbral de latencia de 120s, poco fiables para un E2E rápido.
     const uniqueQuestion = `Quiero hablar con un agente E2E ${Date.now()}`;
     await sendMessageAndWaitReply(messageInput, page, uniqueQuestion);
 
@@ -136,10 +103,6 @@ test.describe("Widget real - escalamiento con contacto", () => {
   });
 });
 
-// ── CSAT y feedback del widget publico (POST /widget/public/csat,
-// PATCH /widget/public/messages/{id}/feedback) ─────────────────────────────
-// Mismo widget real de arriba, distinto flujo: valoracion al finalizar el
-// chat y feedback (pulgar arriba/abajo) sobre una respuesta del asistente.
 test.describe("Widget real - CSAT y feedback de mensajes", () => {
   test("csat: finalizar chat, calificar y enviar llega al backend", async ({ page, request }) => {
     test.setTimeout(60_000);

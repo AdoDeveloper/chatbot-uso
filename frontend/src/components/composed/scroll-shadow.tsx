@@ -5,17 +5,9 @@ import { useEffect, useRef, useState } from "react";
 interface ScrollShadowProps {
   children: React.ReactNode;
   className?: string;
-  /** Color del que parte el degradado - debe coincidir con el fondo real
-   * detrás del contenido (bg-card en tarjetas, bg-background en el fondo de
-   * página). Por defecto "card". */
   fadeFrom?: "card" | "background";
 }
 
-/**
- * Envuelve contenido con scroll horizontal (tablas anchas, filas de tabs)
- * y muestra una sombra en el borde derecho/izquierdo cuando hay más
- * contenido fuera de vista.
- */
 export function ScrollShadow({ children, className, fadeFrom = "card" }: ScrollShadowProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [showLeft, setShowLeft] = useState(false);

@@ -59,9 +59,6 @@ describe("AuthProvider", () => {
   });
 
   it("resolves to unauthenticated when no token", async () => {
-    // Sin token, AuthProvider resuelve loading síncronamente (dentro del
-    // mismo act() de render); por eso no se afirma el estado "loading"
-    // intermedio, solo el resultado final.
     render(
       <AuthProvider>
         <TestConsumer />
