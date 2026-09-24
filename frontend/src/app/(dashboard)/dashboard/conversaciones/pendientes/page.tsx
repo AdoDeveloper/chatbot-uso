@@ -188,7 +188,7 @@ export default function PendientesPage() {
                                   onClick={() => openFaqModal(q)}
                                   className="gap-1.5 text-xs"
                                 >
-                                  <Plus className="w-3.5 h-3.5" /> Crear FAQ
+                                  <Plus className="w-3.5 h-3.5" /> Crear
                                 </Button>
                               </Tooltip>
                               <Tooltip content="Marcar como resuelta sin crear FAQ">
@@ -236,7 +236,7 @@ export default function PendientesPage() {
               disabled={!faqModal?.answer.trim() || faqModal?.saving}
             >
               {faqModal?.saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-              {faqModal?.saving ? "Creando..." : "Crear FAQ"}
+              {faqModal?.saving ? "Creando..." : "Crear"}
             </Button>
           </>
         }

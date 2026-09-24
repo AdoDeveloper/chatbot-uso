@@ -16,15 +16,15 @@ test.describe("Configuracion > Acceso > Usuarios", () => {
     const email = `e2e-test-${Date.now()}@invalid.example`;
 
     await page.goto("/dashboard/configuracion/acceso/usuarios");
-    await expect(page.getByRole("button", { name: /invitar usuario/i })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("button", { name: /^invitar$/i })).toBeVisible({ timeout: 10_000 });
 
-    await page.getByRole("button", { name: /invitar usuario/i }).click();
+    await page.getByRole("button", { name: /^invitar$/i }).click();
     const inviteDialog = page.getByRole("dialog");
     await expect(inviteDialog.getByRole("heading", { name: /invitar usuario/i })).toBeVisible();
     await inviteDialog.locator('input[type="email"]').fill(email);
     await page.screenshot({ path: path.join(SHOT_DIR, "01-invitar-formulario.png") });
-    await inviteDialog.getByRole("button", { name: /enviar invitación/i }).click();
-    await expect(inviteDialog.getByRole("button", { name: /copiar enlace/i })).toBeVisible({ timeout: 10_000 });
+    await inviteDialog.getByRole("button", { name: /^enviar$/i }).click();
+    await expect(inviteDialog.getByRole("button", { name: /^copiar$/i })).toBeVisible({ timeout: 10_000 });
     await page.screenshot({ path: path.join(SHOT_DIR, "02-invitacion-creada.png") });
     await inviteDialog.getByRole("button", { name: /^cerrar$/i }).click();
 
@@ -76,19 +76,19 @@ test.describe("Configuracion > Acceso > Usuarios", () => {
 
   test("modal invitar: validacion de correo invalido, cierre por Escape y por Cancelar", async ({ page }) => {
     await page.goto("/dashboard/configuracion/acceso/usuarios");
-    await page.getByRole("button", { name: /invitar usuario/i }).click();
+    await page.getByRole("button", { name: /^invitar$/i }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByRole("heading", { name: /invitar usuario/i })).toBeVisible();
 
     await dialog.locator('input[type="email"]').fill("no-es-un-correo");
-    await dialog.getByRole("button", { name: /enviar invitación/i }).click();
+    await dialog.getByRole("button", { name: /^enviar$/i }).click();
     await expect(dialog.getByText(/correo válido/i)).toBeVisible({ timeout: 5_000 });
     await expect(dialog).toBeVisible();
 
     await page.keyboard.press("Escape");
     await expect(dialog).not.toBeVisible({ timeout: 5_000 });
 
-    await page.getByRole("button", { name: /invitar usuario/i }).click();
+    await page.getByRole("button", { name: /^invitar$/i }).click();
     const dialog2 = page.getByRole("dialog");
     await expect(dialog2.locator('input[type="email"]')).toHaveValue("");
     await expect(dialog2.getByText(/correo válido/i)).toHaveCount(0);
@@ -96,12 +96,12 @@ test.describe("Configuracion > Acceso > Usuarios", () => {
     await dialog2.getByRole("button", { name: /cancelar/i }).click();
     await expect(dialog2).not.toBeVisible({ timeout: 5_000 });
 
-    await expect(page.getByRole("button", { name: /invitar usuario/i })).toBeEnabled();
+    await expect(page.getByRole("button", { name: /^invitar$/i })).toBeEnabled();
   });
 
   test("select de rol: las tres opciones (viewer/editor/admin) se pueden elegir en el formulario de invitar", async ({ page }) => {
     await page.goto("/dashboard/configuracion/acceso/usuarios");
-    await page.getByRole("button", { name: /invitar usuario/i }).click();
+    await page.getByRole("button", { name: /^invitar$/i }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByRole("heading", { name: /invitar usuario/i })).toBeVisible();
 
@@ -117,7 +117,7 @@ test.describe("Configuracion > Acceso > Usuarios", () => {
 
   test("slider de validez del enlace: mueve dias entre 1 y 30", async ({ page }) => {
     await page.goto("/dashboard/configuracion/acceso/usuarios");
-    await page.getByRole("button", { name: /invitar usuario/i }).click();
+    await page.getByRole("button", { name: /^invitar$/i }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByText(/expira el/i)).toBeVisible();
 
@@ -142,13 +142,13 @@ test.describe("Configuracion > Acceso > Usuarios", () => {
     await page.context().grantPermissions(["clipboard-write", "clipboard-read"]);
 
     await page.goto("/dashboard/configuracion/acceso/usuarios");
-    await page.getByRole("button", { name: /invitar usuario/i }).click();
+    await page.getByRole("button", { name: /^invitar$/i }).click();
     const inviteDialog = page.getByRole("dialog");
     await inviteDialog.locator('input[type="email"]').fill(email);
-    await inviteDialog.getByRole("button", { name: /enviar invitación/i }).click();
-    await expect(inviteDialog.getByRole("button", { name: /copiar enlace/i })).toBeVisible({ timeout: 10_000 });
+    await inviteDialog.getByRole("button", { name: /^enviar$/i }).click();
+    await expect(inviteDialog.getByRole("button", { name: /^copiar$/i })).toBeVisible({ timeout: 10_000 });
 
-    await inviteDialog.getByRole("button", { name: /copiar enlace/i }).click();
+    await inviteDialog.getByRole("button", { name: /^copiar$/i }).click();
     await expect(inviteDialog.getByText(/¡copiado!/i)).toBeVisible({ timeout: 5_000 });
     await inviteDialog.getByRole("button", { name: /^cerrar$/i }).click();
     await expect(inviteDialog).not.toBeVisible({ timeout: 5_000 });

@@ -251,7 +251,7 @@ function InvitePanel({ open, availableRoles, onClose, onCreated }: {
             <Button variant="outline" className="flex-1 gap-1.5" onClick={onClose} type="button"><X className="w-3.5 h-3.5" /> Cancelar</Button>
             <Button className="flex-1 gap-1.5" type="submit" disabled={isSubmitting}>
               {isSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-              {isSubmitting ? "Enviando..." : "Enviar invitación"}
+              {isSubmitting ? "Enviando..." : "Enviar"}
             </Button>
           </div>
         )
@@ -276,7 +276,7 @@ function InvitePanel({ open, availableRoles, onClose, onCreated }: {
           </div>
           <p className="text-2xs text-muted-foreground -mt-2">Si el correo no llega, comparte este enlace manualmente.</p>
           <Button className={`w-full gap-2 ${copied ? "bg-success hover:bg-success" : ""}`} onClick={handleCopy}>
-            {copied ? <><Check className="w-4 h-4" /> ¡Copiado!</> : <><Copy className="w-4 h-4" /> Copiar enlace</>}
+            {copied ? <><Check className="w-4 h-4" /> ¡Copiado!</> : <><Copy className="w-4 h-4" /> Copiar</>}
           </Button>
         </div>
       ) : (
@@ -502,7 +502,7 @@ function UsuariosTab() {
           {canManageUsers && (
             <div className="grid grid-cols-1 sm:flex sm:justify-end gap-2">
               <Button size="sm" onClick={() => setInviteOpen(true)} className="gap-1.5">
-                <UserPlus className="w-3.5 h-3.5" /> Invitar usuario
+                <UserPlus className="w-3.5 h-3.5" /> Invitar
               </Button>
             </div>
           )}

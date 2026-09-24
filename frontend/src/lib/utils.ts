@@ -50,3 +50,19 @@ export function timeAgo(iso: string | null): string {
   if (d < 7) return `hace ${d} días`
   return new Date(iso).toLocaleDateString("es-ES", { day: "2-digit", month: "short" })
 }
+
+export function filenameFromDisposition(header: string | undefined, fallback: string): string {
+  const cd = header ?? ""
+  const encoded = cd.match(/filename\*\s*=\s*([^;]+)/i)
+  if (encoded) {
+    const value = encoded[1].trim().replace(/^"|"$/g, "").replace(/^[\w-]+'[^']*'/, "")
+    try {
+      return decodeURIComponent(value)
+    } catch {
+      return value
+    }
+  }
+  const plain = cd.match(/filename\s*=\s*"([^"]+)"|filename\s*=\s*([^;]+)/i)
+  const name = (plain?.[1] ?? plain?.[2])?.trim()
+  return name || fallback
+}

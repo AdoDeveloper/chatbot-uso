@@ -31,7 +31,7 @@ test("descargar el archivo original de una fuente", async ({ page }) => {
   await row.getByRole("button").last().click();
   const [download] = await Promise.all([
     page.waitForEvent("download", { timeout: 15_000 }),
-    page.getByRole("menuitem", { name: /descargar original/i }).click(),
+    page.getByRole("menuitem", { name: /^descargar$/i }).click(),
   ]);
   const downloadedPath = await download.path();
   expect(downloadedPath).toBeTruthy();

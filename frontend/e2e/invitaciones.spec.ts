@@ -10,7 +10,7 @@ test.describe("Invitaciones pendientes", () => {
   test("invite button opens the invite modal", async ({ page }) => {
     await page.goto("/dashboard/configuracion/acceso/usuarios");
 
-    const inviteButton = page.getByRole("button", { name: /invitar usuario/i });
+    const inviteButton = page.getByRole("button", { name: /^invitar$/i });
     await expect(inviteButton).toBeVisible({ timeout: 10_000 });
     await inviteButton.click();
 

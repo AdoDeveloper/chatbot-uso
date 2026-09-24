@@ -67,12 +67,12 @@ test.describe("Reportes", () => {
     await page.goto("/dashboard/reportes");
     const execTitle = page.getByText("Reporte Ejecutivo", { exact: true });
     await expect(execTitle).toBeVisible({ timeout: 10_000 });
-    const execCard = execTitle.locator("xpath=(ancestor::*[.//button[contains(., 'Descargar PDF')]])[last()]");
-    await expect(execCard.getByRole("button", { name: /descargar pdf/i })).toBeVisible({ timeout: 5_000 });
+    const execCard = execTitle.locator("xpath=(ancestor::*[.//button[contains(., 'Descargar')]])[last()]");
+    await expect(execCard.getByRole("button", { name: /^descargar$/i })).toBeVisible({ timeout: 5_000 });
     await page.screenshot({ path: path.join(SHOT_DIR, "02-reportes.png") });
 
     const downloadPromise = page.waitForEvent("download", { timeout: 30_000 });
-    await execCard.getByRole("button", { name: /descargar pdf/i }).first().click();
+    await execCard.getByRole("button", { name: /^descargar$/i }).first().click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toBeTruthy();
     await page.screenshot({ path: path.join(SHOT_DIR, "03-reporte-descargado.png") });
@@ -85,8 +85,8 @@ test.describe("Reportes", () => {
 
     for (const title of ["Uso y Temas", "Escalamientos", "Base de Conocimiento"]) {
       const cardTitle = page.getByText(title, { exact: true });
-      const card = cardTitle.locator("xpath=(ancestor::*[.//button[contains(., 'Descargar PDF')]])[last()]");
-      const downloadBtn = card.getByRole("button", { name: /descargar pdf/i });
+      const card = cardTitle.locator("xpath=(ancestor::*[.//button[contains(., 'Descargar')]])[last()]");
+      const downloadBtn = card.getByRole("button", { name: /^descargar$/i });
       await expect(downloadBtn).toBeVisible({ timeout: 5_000 });
       const downloadPromise = page.waitForEvent("download", { timeout: 30_000 });
       await downloadBtn.click();
@@ -108,8 +108,8 @@ test.describe("Reportes", () => {
 
     await expect(page.getByText(/la fecha inicial debe ser anterior o igual a la final/i)).toBeVisible({ timeout: 5_000 });
     const execTitle = page.getByText("Reporte Ejecutivo", { exact: true });
-    const execCard = execTitle.locator("xpath=(ancestor::*[.//button[contains(., 'Descargar PDF')]])[last()]");
-    await expect(execCard.getByRole("button", { name: /descargar pdf/i })).toBeDisabled();
+    const execCard = execTitle.locator("xpath=(ancestor::*[.//button[contains(., 'Descargar')]])[last()]");
+    await expect(execCard.getByRole("button", { name: /^descargar$/i })).toBeDisabled();
 
     await dateInputs.first().fill(toValue);
     await expect(page.getByText(/la fecha inicial debe ser anterior o igual a la final/i)).toHaveCount(0, { timeout: 5_000 });

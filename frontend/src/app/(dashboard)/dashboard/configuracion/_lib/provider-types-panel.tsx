@@ -188,7 +188,7 @@ export function ProviderTypesPanel({
     {canUpdate && (
     <div className="grid grid-cols-1 sm:flex sm:justify-end gap-2">
      <Button size="sm" variant="outline" className="gap-1.5" onClick={() => { setEditing(null); setPanelOpen(true); }}>
-      <Plus className="w-3.5 h-3.5" /> Agregar tipo
+      <Plus className="w-3.5 h-3.5" /> Agregar
      </Button>
     </div>
     )}

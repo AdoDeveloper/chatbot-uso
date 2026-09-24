@@ -210,7 +210,7 @@ export default function ReportesPage() {
                     {isLoading ? (
                       <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generando...</>
                     ) : (
-                      <><Download className="w-3.5 h-3.5" /> Descargar PDF</>
+                      <><Download className="w-3.5 h-3.5" /> Descargar</>
                     )}
                   </Button>
                 </div>

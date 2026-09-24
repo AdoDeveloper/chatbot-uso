@@ -161,7 +161,7 @@ test.describe("Conversaciones > Pendientes", () => {
 
     const [createResponse] = await Promise.all([
       page.waitForResponse((r) => /\/unanswered\/.+\/create-faq$/.test(r.url()) && r.request().method() === "POST"),
-      dialog.getByRole("button", { name: /crear faq/i }).click(),
+      dialog.getByRole("button", { name: /^crear$/i }).click(),
     ]);
     await expect(dialog).not.toBeVisible({ timeout: 10_000 });
     await page.screenshot({ path: path.join(SHOT_DIR, "06-faq-creada-desde-pendiente.png") });

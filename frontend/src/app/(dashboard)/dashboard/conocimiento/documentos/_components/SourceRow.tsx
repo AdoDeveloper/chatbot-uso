@@ -1,5 +1,6 @@
 "use client";
 
+import { filenameFromDisposition } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -176,10 +177,8 @@ export function SourceRow({
       const res = await api.get(`/sources/${source.id}/download`, { responseType: "blob" });
       const url = URL.createObjectURL(res.data as Blob);
       const a = document.createElement("a");
-      const cd = (res.headers["content-disposition"] as string | undefined) ?? "";
-      const match = cd.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/);
       a.href = url;
-      a.download = match ? decodeURIComponent(match[1]) : source.name;
+      a.download = filenameFromDisposition(res.headers["content-disposition"] as string | undefined, source.name);
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
@@ -308,7 +307,7 @@ export function SourceRow({
           {downloading
             ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
             : <Download className="w-3.5 h-3.5 mr-2" />}
-          {downloading ? "Descargando..." : "Descargar original"}
+          {downloading ? "Descargando..." : "Descargar"}
          </DropdownMenuItem>
          {isReady && source.chunk_count > 0 && (
           <DropdownMenuItem onClick={() => router.push(`/dashboard/conocimiento/documentos/${source.id}/chunks`)}>

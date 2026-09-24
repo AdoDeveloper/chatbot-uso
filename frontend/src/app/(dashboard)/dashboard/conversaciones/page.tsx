@@ -11,7 +11,7 @@ import api from "@/lib/api";
 import { useApi, getErrorMessage } from "@/hooks/use-api";
 import { usePermission } from "@/hooks/use-permission";
 import { PERM } from "@/lib/permissions";
-import { timeAgo } from "@/lib/utils";
+import { timeAgo, filenameFromDisposition } from "@/lib/utils";
 import { renderMarkdown } from "@/lib/render-markdown";
 import { CONVERSATION_STATUS_LABEL } from "@/lib/conversation-labels";
 import type {
@@ -213,10 +213,11 @@ export default function HistorialPage() {
    const res = await api.get(`/conversations/export?${params}`, { responseType: "blob" });
    const url = URL.createObjectURL(res.data as Blob);
    const a = document.createElement("a");
-   const cd = (res.headers["content-disposition"] as string | undefined) ?? "";
-   const match = cd.match(/filename="?([^"]+)"?/);
    a.href = url;
-   a.download = match?.[1] ?? `conversaciones-${new Date().toISOString().slice(0, 10)}.${format}`;
+   a.download = filenameFromDisposition(
+    res.headers["content-disposition"] as string | undefined,
+    `conversaciones-${new Date().toISOString().slice(0, 10)}.${format}`,
+   );
    a.click();
    URL.revokeObjectURL(url);
   } catch (err) {

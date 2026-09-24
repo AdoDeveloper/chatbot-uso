@@ -18,10 +18,12 @@ test.describe("Configuracion > Proveedores > Tipos de proveedor", () => {
     const renamedDisplayName = `${displayName} (editado)`;
 
     await page.goto("/dashboard/configuracion/proveedores");
-    await expect(page.getByRole("button", { name: /agregar tipo/i })).toBeVisible({ timeout: 10_000 });
+    const typesSection = page.locator("div", { has: page.getByText("Tipos de proveedor", { exact: true }) })
+      .filter({ has: page.getByRole("button", { name: /^agregar$/i }) }).last();
+    await expect(typesSection.getByRole("button", { name: /^agregar$/i })).toBeVisible({ timeout: 10_000 });
     const catalogCard = page.locator("table").filter({ has: page.getByRole("columnheader", { name: /^clave$/i }) });
 
-    await page.getByRole("button", { name: /agregar tipo/i }).click();
+    await typesSection.getByRole("button", { name: /^agregar$/i }).click();
     const createDialog = page.getByRole("dialog");
     await expect(createDialog.getByRole("heading", { name: /agregar tipo de proveedor/i })).toBeVisible();
 
