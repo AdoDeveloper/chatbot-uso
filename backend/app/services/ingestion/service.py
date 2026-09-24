@@ -46,6 +46,7 @@ async def ingest(db: AsyncSession, source: Source) -> None:
     source_id = str(source.id)
     log.info("ingestion.start", source_id=source_id, type=source.type, name=source.name)
 
+    was_approved = source.review_status == ReviewStatus.aprobada
     source.status = SourceStatus.processing
     source.review_status = ReviewStatus.procesando
     source.error_message = None
@@ -119,7 +120,7 @@ async def ingest(db: AsyncSession, source: Source) -> None:
         source.chunk_count = total_upserted
         source.progress_stage = None
         source.updated_at = datetime.now(timezone.utc)
-        source.review_status = ReviewStatus.pendiente_revision
+        source.review_status = ReviewStatus.aprobada if was_approved else ReviewStatus.pendiente_revision
         await db.commit()
 
         await invalidate_by_source(source_id)

@@ -76,8 +76,8 @@ export default function SourcesPage() {
     if (s.review_status === "aprobada") {
       const ok = await confirm({
         title: `¿Reingestar "${s.name}"?`,
-        message: "Esta fuente está aprobada y el chatbot la usa en sus respuestas. Al reingestarla quedará pendiente de revisión y dejará de estar disponible hasta que se apruebe de nuevo.",
-        confirmText: "Reingestar", variant: "danger",
+        message: "El chatbot no podrá usar esta fuente mientras se procesa. Al terminar seguirá aprobada.",
+        confirmText: "Reingestar",
       });
       if (!ok) return;
     }
@@ -183,8 +183,8 @@ export default function SourcesPage() {
     if (approvedCount > 0) {
       const ok = await confirm({
         title: "¿Reingestar fuentes seleccionadas?",
-        message: `${approvedCount} de las fuentes seleccionadas ${approvedCount === 1 ? "está aprobada" : "están aprobadas"} y en uso por el chatbot. Al reingestarlas quedarán pendientes de revisión y dejarán de estar disponibles hasta que se aprueben de nuevo.`,
-        confirmText: "Reingestar", variant: "danger",
+        message: `${approvedCount} de las fuentes seleccionadas ${approvedCount === 1 ? "está aprobada" : "están aprobadas"}. El chatbot no podrá usarlas mientras se procesan; al terminar seguirán aprobadas.`,
+        confirmText: "Reingestar",
       });
       if (!ok) return;
     }
