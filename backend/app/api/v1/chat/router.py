@@ -15,8 +15,9 @@ from app.core.versioning import _background_tasks
 from app.db import session as db_session
 from app.db.session import get_db
 from app.schemas.settings import NO_CONTEXT_MESSAGE
-from app.services.ai.llm_gateway import stream_chat
+from app.services.ai.llm_gateway import set_fallback_chain, stream_chat
 from app.services.chat import pipeline
+from app.services.rag.quality import is_no_answer_reply
 from app.services.system.rbac import has_permission
 
 log = structlog.get_logger()
@@ -25,6 +26,8 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 
 _llm_semaphore = asyncio.Semaphore(get_settings().LLM_MAX_CONCURRENCY)
 _LLM_QUEUE_TIMEOUT = get_settings().LLM_QUEUE_TIMEOUT_SECONDS
+_TURN_BUDGET_SECONDS = 40.0
+_MIN_LLM_SECONDS = 10.0
 
 class ChatMessage(BaseModel):
     role: str = Field(..., max_length=32)
@@ -174,6 +177,7 @@ async def _run_chat_inner(
             response_kwargs={"type": "error", "message": cfg.no_providers_message},
         )
 
+    set_fallback_chain(chain)
     primary_provider, primary_key = chain[0]
     provider_name = primary_provider.name
     model_name = primary_provider.model_name
@@ -198,7 +202,7 @@ async def _run_chat_inner(
                 rag_question, primary_provider, primary_key, effective_source_ids, cfg,
                 original_question=request.question,
             ),
-            timeout=35.0,
+            timeout=25.0,
         )
     except asyncio.TimeoutError:
         log.warning("chat.rag_timeout", session_id=request.session_id)
@@ -264,7 +268,8 @@ async def _run_chat_inner(
 
     sources = pipeline.format_sources(llm_chunks)
     full_content: list[str] = []
-    deadline = asyncio.get_running_loop().time() + 70.0
+    budget = max(_MIN_LLM_SECONDS, _TURN_BUDGET_SECONDS - (time.monotonic() - t_start))
+    deadline = asyncio.get_running_loop().time() + budget
 
     await db.close()
 
@@ -282,10 +287,16 @@ async def _run_chat_inner(
         served=served,
     )
     try:
-        async for token in llm_gen:
-            if asyncio.get_running_loop().time() > deadline:
+        while True:
+            remaining = deadline - asyncio.get_running_loop().time()
+            try:
+                token = await asyncio.wait_for(llm_gen.__anext__(), timeout=max(remaining, 0.01))
+            except StopAsyncIteration:
+                break
+            except asyncio.TimeoutError:
                 log.warning("chat.llm_stream_timeout", session_id=request.session_id)
-                full_content.append(" [respuesta incompleta por timeout]")
+                if full_content:
+                    full_content.append(" [respuesta incompleta por timeout]")
                 timed_out = True
                 break
             full_content.append(token)
@@ -350,6 +361,14 @@ async def _run_chat_inner(
             rag_route=_detected_route,
         )
 
+        if not is_playground and context_relevance_ratio != 0 and is_no_answer_reply(final_text):
+            from app.services.rag.corrective import _maybe_flag_unanswered
+            task = asyncio.create_task(_maybe_flag_unanswered(
+                request.question, conversation_id, provider=primary_provider, api_key=primary_key,
+            ))
+            _background_tasks.add(task)
+            task.add_done_callback(_background_tasks.discard)
+
         if assistant_message_id and not use_draft:
             task = asyncio.create_task(pipeline.evaluate_response_quality(
                 assistant_message_id, request.question, final_text, llm_chunks,
@@ -358,7 +377,7 @@ async def _run_chat_inner(
             _background_tasks.add(task)
             task.add_done_callback(_background_tasks.discard)
 
-        if use_cache and full_content and not timed_out:
+        if use_cache and full_content and not timed_out and not is_no_answer_reply(final_text):
             await pipeline.store_cache(
                 fresh_db, request.question, request.source_ids, sources, final_text, settings, use_draft,
                 min_generation=cache_generation_at_start,

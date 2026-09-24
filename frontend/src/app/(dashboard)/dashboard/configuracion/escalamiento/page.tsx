@@ -69,10 +69,10 @@ const EMPTY_RULE: RuleForm = {
 // Texto de ayuda contextual por campo - no viene del schema del backend, es contenido pedagógico propio de este panel.
 const TRIGGER_FIELD_HINTS: Partial<Record<EscalationTrigger, Record<string, string>>> = {
   no_answer: {
-    wait_seconds: "Si el bot tarda más de N segundos en responder, se activa el escalamiento.",
+    consecutive: "Escala cuando el asistente responde N veces seguidas que no tiene la información pedida.",
   },
   user_request: {
-    keywords: "Dejar vacío para escalar ante cualquier solicitud explícita.",
+    keywords: "Déjelo vacío para detectar automáticamente frases como «hablar con un agente» o «que me atienda una persona».",
   },
   negative_feedback: {
     threshold: "Escala si la proporción de 👎 en la sesión supera este valor.",
@@ -117,7 +117,6 @@ export default function EscalamientoConfigPage() {
   const [ruleTestUserMsg, setRuleTestUserMsg] = useState("");
   const [ruleTestBotAnswers, setRuleTestBotAnswers] = useState("");
   const [ruleTestRagScores, setRuleTestRagScores] = useState("");
-  const [ruleTestNoAnswerSec, setRuleTestNoAnswerSec] = useState("");
   const [ruleTestNegRatio, setRuleTestNegRatio] = useState("");
   const [ruleTestRunning, setRuleTestRunning] = useState(false);
   const [ruleTestResult, setRuleTestResult] = useState<RuleTestResult | null>(null);
@@ -227,7 +226,6 @@ export default function EscalamientoConfigPage() {
           user_message: ruleTestUserMsg || null,
           bot_answers: parseLines(ruleTestBotAnswers),
           rag_scores: parseFloats(ruleTestRagScores),
-          no_answer_seconds: ruleTestNoAnswerSec ? Number(ruleTestNoAnswerSec) : null,
           feedback_negative_ratio: ruleTestNegRatio ? Number(ruleTestNegRatio) : null,
         },
       });
@@ -572,19 +570,6 @@ export default function EscalamientoConfigPage() {
                 </div>
               )}
 
-              {ruleTestForm.trigger_type === "no_answer" && (
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Segundos sin respuesta</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={ruleTestNoAnswerSec}
-                    onChange={(e) => setRuleTestNoAnswerSec(e.target.value)}
-                    placeholder="180"
-                  />
-                </div>
-              )}
-
               {ruleTestForm.trigger_type === "negative_feedback" && (
                 <div className="space-y-1.5">
                   <Label className="text-xs">Proporción de valoraciones negativas (0–1)</Label>
@@ -609,7 +594,7 @@ export default function EscalamientoConfigPage() {
                 </div>
               )}
 
-              {ruleTestForm.trigger_type === "loop_detected" && (
+              {(ruleTestForm.trigger_type === "loop_detected" || ruleTestForm.trigger_type === "no_answer") && (
                 <div className="space-y-1.5">
                   <Label className="text-xs">Últimas respuestas del bot (una por línea)</Label>
                   <textarea

@@ -56,7 +56,6 @@ class RuleTestContext(BaseModel):
     user_message: str | None = None
     bot_answers: list[str] = []
     rag_scores: list[float] = []
-    no_answer_seconds: int | None = None
     feedback_negative_ratio: float | None = None
 
 

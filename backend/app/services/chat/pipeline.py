@@ -395,14 +395,24 @@ async def _recent_assistant_rag_scores(db: AsyncSession, conversation_id, *, lim
     return list(reversed(scores))  # cronológico: más antiguo primero
 
 
+async def _recent_assistant_replies(db: AsyncSession, conversation_id, limit: int = 5) -> list[str]:
+    from app.models.chat_message import ChatMessage
+
+    result = await db.execute(
+        select(ChatMessage.content)
+        .where(ChatMessage.conversation_id == conversation_id)
+        .where(ChatMessage.role == MessageRole.assistant)
+        .order_by(ChatMessage.created_at.desc())
+        .limit(limit)
+    )
+    return list(reversed(result.scalars().all()))
+
+
 async def detect_escalation(
     db: AsyncSession,
     conv,
     *,
     question: str,
-    history: list[dict],
-    final_text: str,
-    latency_ms: int | None = None,
 ) -> bool:
     """Evalúa las reglas de escalación activas y marca la conversación si alguna dispara."""
     try:
@@ -417,9 +427,7 @@ async def detect_escalation(
         active_rules = rules_result.scalars().all()
 
         if active_rules:
-            bot_answers_ctx = [
-                m["content"] for m in history if m.get("role") == "assistant"
-            ] + [final_text]
+            bot_answers_ctx = await _recent_assistant_replies(db, conv.id, limit=5)
             # El turno actual ya está persistido, es parte del historial leído.
             rag_scores_ctx = await _recent_assistant_rag_scores(db, conv.id, limit=5)
 
@@ -427,7 +435,6 @@ async def detect_escalation(
                 "user_message": question,
                 "bot_answers": bot_answers_ctx[-5:],
                 "rag_scores": rag_scores_ctx[-5:],
-                "no_answer_seconds": (latency_ms / 1000) if latency_ms is not None else None,
                 "feedback_negative_ratio": await _feedback_negative_ratio(db, conv.id),
             }
 
@@ -498,9 +505,6 @@ async def persist_turn(
                         db,
                         conv,
                         question=question,
-                        history=history,
-                        final_text=final_text,
-                        latency_ms=latency_ms,
                     ),
                     timeout=3.0,
                 )

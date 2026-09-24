@@ -48,7 +48,7 @@ class TestUserRequestTrigger:
             context={"user_message": "cual es el horario de atencion"},
         )
         assert matches is False
-        assert "Ninguna keyword" in detail
+        assert "No se detectó una solicitud" in detail
 
     def test_no_match_without_user_message(self):
         matches, detail = engine.evaluate_rule(
@@ -222,9 +222,8 @@ class TestSchemaForTrigger:
         assert engine.schema_for_trigger("bogus") == {}
 
     def test_no_answer_schema_fields(self):
-        # Default bajado de 120 a 8: mide latency_ms del turno, no espera del usuario; 120s hacía la regla casi inalcanzable.
         schema = engine.schema_for_trigger(EscalationTrigger.no_answer)
-        assert schema["wait_seconds"]["default"] == 8
+        assert schema["consecutive"]["default"] == 2
 
     def test_confidence_below_schema_has_two_fields(self):
         schema = engine.schema_for_trigger(EscalationTrigger.confidence_below)
@@ -541,3 +540,42 @@ class TestDispatchEscalationPayload:
         )
         assert "Contacto por WhatsApp" in captured["body_html"]
         assert "+50370000000" in captured["body_html"]
+
+
+@pytest.mark.parametrize("message", [
+    "Quiero hablar con un agente humano, por favor",
+    "Necesito que me atienda una persona real",
+    "¿Me puede comunicar con un asesor?",
+    "pásame con un humano",
+    "quiero hablar con alguien de registro",
+    "necesito un operador",
+    "no quiero hablar con un bot",
+])
+def test_user_request_detects_explicit_requests(message):
+    matches, _ = engine.evaluate_rule(
+        trigger_type=EscalationTrigger.user_request, trigger_config={}, context={"user_message": message},
+    )
+    assert matches is True
+
+
+@pytest.mark.parametrize("message", [
+    "¿Cuántos grupos puede asesorar un asesor a la vez?",
+    "¿Qué documentos necesita una persona para inscribirse?",
+    "¿Qué hace el operador del laboratorio?",
+    "¿Quién es el asesor de tesis de ingeniería?",
+    "¿Qué pasa si una persona reprueba una materia?",
+])
+def test_user_request_ignores_questions_that_only_mention_people(message):
+    matches, _ = engine.evaluate_rule(
+        trigger_type=EscalationTrigger.user_request, trigger_config={}, context={"user_message": message},
+    )
+    assert matches is False
+
+
+def test_user_request_custom_keywords_match_whole_words():
+    cfg = {"keywords": ["asesor"]}
+    hit, _ = engine.evaluate_rule(trigger_type=EscalationTrigger.user_request, trigger_config=cfg,
+                                  context={"user_message": "quiero un asesor"})
+    miss, _ = engine.evaluate_rule(trigger_type=EscalationTrigger.user_request, trigger_config=cfg,
+                                   context={"user_message": "¿quién puede asesorar mi tesis?"})
+    assert hit is True and miss is False

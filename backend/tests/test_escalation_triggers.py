@@ -76,52 +76,61 @@ async def test_negative_feedback_rule_triggers_with_real_ratio(db_session):
     await db_session.commit()
 
     escalated = await detect_escalation(
-        db_session, conv, question="test", history=[], final_text="respuesta",
-        latency_ms=500,
+        db_session, conv, question="test",
     )
     assert escalated is True
     assert conv.escalation_pending is True
     assert "Feedback negativo" in conv.escalation_trigger_reason
 
 
-@pytest.mark.asyncio
-async def test_no_answer_rule_triggers_with_real_latency(db_session):
-    conv = await _make_conversation(db_session)
-
-    rule = EscalationRule(
-        id=uuid.uuid4(), name="Respuesta lenta", trigger_type="no_answer",
-        trigger_config={"wait_seconds": 5}, enabled=True,
-    )
-    db_session.add(rule)
+async def _add_assistant_text(db_session, conv_id, content: str) -> None:
+    db_session.add(ChatMessage(
+        id=uuid.uuid4(), conversation_id=conv_id, role=MessageRole.assistant, content=content,
+        created_at=datetime(2025, 1, 1, tzinfo=timezone.utc) + timedelta(seconds=next(_next_ts)),
+    ))
     await db_session.commit()
 
-    # latency_ms=8000 → 8s, por encima del umbral de 5s configurado.
-    escalated = await detect_escalation(
-        db_session, conv, question="test", history=[], final_text="respuesta",
-        latency_ms=8000,
-    )
+
+async def _no_answer_rule(db_session, consecutive: int = 2) -> None:
+    db_session.add(EscalationRule(
+        id=uuid.uuid4(), name="Sin respuesta", trigger_type="no_answer",
+        trigger_config={"consecutive": consecutive}, enabled=True,
+    ))
+    await db_session.commit()
+
+
+@pytest.mark.asyncio
+async def test_no_answer_rule_triggers_after_consecutive_unanswered_replies(db_session):
+    conv = await _make_conversation(db_session)
+    await _no_answer_rule(db_session)
+    await _add_assistant_text(db_session, conv.id, "El trámite cuesta $25.")
+    await _add_assistant_text(db_session, conv.id, "No dispongo de esa información.")
+    await _add_assistant_text(db_session, conv.id, "No tengo información sobre el horario de la cafetería.")
+
+    escalated = await detect_escalation(db_session, conv, question="¿y el horario?")
     assert escalated is True
-    assert conv.escalation_pending is True
-    assert "Respuesta lenta" in conv.escalation_trigger_reason
+    assert "Sin respuesta" in conv.escalation_trigger_reason
 
 
 @pytest.mark.asyncio
-async def test_no_answer_rule_does_not_trigger_when_fast(db_session):
+async def test_no_answer_rule_ignores_a_single_or_interrupted_miss(db_session):
     conv = await _make_conversation(db_session)
+    await _no_answer_rule(db_session)
+    await _add_assistant_text(db_session, conv.id, "No dispongo de esa información.")
+    await _add_assistant_text(db_session, conv.id, "El trámite tarda 3 días hábiles.")
+    await _add_assistant_text(db_session, conv.id, "No dispongo de esa información.")
 
-    rule = EscalationRule(
-        id=uuid.uuid4(), name="Respuesta lenta", trigger_type="no_answer",
-        trigger_config={"wait_seconds": 120}, enabled=True,
-    )
-    db_session.add(rule)
-    await db_session.commit()
+    assert await detect_escalation(db_session, conv, question="otra") is False
 
-    escalated = await detect_escalation(
-        db_session, conv, question="test", history=[], final_text="respuesta",
-        latency_ms=500,
-    )
-    assert escalated is False
-    assert conv.escalation_pending is False
+
+@pytest.mark.asyncio
+async def test_no_answer_rule_ignores_off_topic_refusals(db_session):
+    conv = await _make_conversation(db_session)
+    await _no_answer_rule(db_session)
+    for _ in range(3):
+        await _add_assistant_text(db_session, conv.id, "Solo puedo ayudarle con temas de la Universidad de Sonsonate.")
+
+    assert await detect_escalation(db_session, conv, question="receta") is False
 
 
 @pytest.mark.asyncio
@@ -170,8 +179,7 @@ async def test_confidence_below_rule_does_not_trigger_on_greetings_without_sourc
     await db_session.commit()
 
     escalated = await detect_escalation(
-        db_session, conv, question="hola", history=[], final_text="¡Hola! ¿En qué puedo ayudarte?",
-        latency_ms=100,
+        db_session, conv, question="hola",
     )
     assert escalated is False
     assert conv.escalation_pending is False
@@ -201,8 +209,7 @@ async def test_detect_escalation_fails_safe_and_logs_degraded(db_session, monkey
     )
 
     escalated = await detect_escalation(
-        db_session, conv, question="test", history=[], final_text="respuesta",
-        latency_ms=500,
+        db_session, conv, question="test",
     )
 
     assert escalated is False
@@ -228,8 +235,7 @@ async def test_confidence_below_rule_triggers_on_real_consecutive_turns(db_sessi
     await db_session.commit()
 
     escalated = await detect_escalation(
-        db_session, conv, question="test", history=[], final_text="respuesta",
-        latency_ms=500,
+        db_session, conv, question="test",
     )
     assert escalated is True
     assert "Confianza baja" in conv.escalation_trigger_reason
@@ -249,7 +255,6 @@ async def test_confidence_below_rule_does_not_trigger_with_one_good_turn(db_sess
     await db_session.commit()
 
     escalated = await detect_escalation(
-        db_session, conv, question="test", history=[], final_text="respuesta",
-        latency_ms=500,
+        db_session, conv, question="test",
     )
     assert escalated is False

@@ -399,3 +399,24 @@ async def test_injected_system_role_in_messages_does_not_reach_stream_chat(
     assert all(m["role"] != "system" for m in history), \
         f"un mensaje con role=system llegó a stream_chat: {history}"
     assert history == [{"role": "user", "content": "pregunta anterior"}]
+
+
+async def test_silent_provider_is_cut_by_turn_budget(client, admin_user, auth_headers, mock_pipeline, monkeypatch):
+    import asyncio
+
+    async def _retrieve_context(*a, **k):
+        return [{"text": "dato", "source_name": "doc.pdf", "score": 0.9, "parent_text": "dato"}], 1.0
+
+    async def _silent_stream_chat(**kwargs):
+        await asyncio.sleep(30)
+        yield "tarde"  # pragma: no cover
+
+    monkeypatch.setattr(pipeline, "retrieve_context", _retrieve_context)
+    monkeypatch.setattr(chat_router, "stream_chat", _silent_stream_chat)
+    monkeypatch.setattr(chat_router, "_TURN_BUDGET_SECONDS", 0.5)
+    monkeypatch.setattr(chat_router, "_MIN_LLM_SECONDS", 0.5)
+
+    body = await _post_playground_chat(client, {"question": "¿Qué es Sonsonate?"}, auth_headers(admin_user))
+
+    assert "respuesta incompleta" not in body["content"]
+    assert body["content"].strip()

@@ -1,34 +1,64 @@
 """Motor de evaluación de reglas de escalación. Triggers como funciones puras."""
 from __future__ import annotations
 
+import re
+import unicodedata
 from typing import Any
 
 from app.models.enums import EscalationTrigger
 
 
 def _eval_no_answer(ctx: dict, cfg: dict) -> tuple[bool, str]:
-    wait = int(cfg.get("wait_seconds", 120))
-    elapsed = ctx.get("no_answer_seconds")
-    if elapsed is None:
-        return False, "No hay tiempo de espera registrado en el contexto."
-    if elapsed >= wait:
-        return True, f"Sin respuesta por {elapsed}s (umbral {wait}s)."
-    return False, f"Tiempo de espera {elapsed}s aún no supera el umbral {wait}s."
+    from app.services.rag.quality import is_no_answer_reply
+
+    needed = int(cfg.get("consecutive", 2))
+    answers = ctx.get("bot_answers") or []
+    if not answers:
+        return False, "Sin respuestas del bot en el contexto."
+    streak = 0
+    for answer in reversed(answers):
+        if not is_no_answer_reply(answer):
+            break
+        streak += 1
+    if streak >= needed:
+        return True, f"{streak} respuestas seguidas sin la información pedida (umbral {needed})."
+    return False, f"{streak} respuesta(s) seguidas sin información; umbral {needed}."
+
+
+_HUMAN = r"(agente|humano|humana|persona|asesor|asesora|operador|operadora|representante|alguien|encargad[oa]|funcionari[oa])"
+_ART = r"(?:(?:un|una|el|la|algun|alguna|otro|otra|a un|a una)\s+)?"
+_HUMAN_REQUEST = re.compile(
+    r"\b(hablar|comunicar(?:me|nos)?|contactar(?:me)?|conversar|chatear|conectar(?:me)?|pasar(?:me)?|"
+    r"transferir(?:me)?|comuniqueme|comunicame|pasame|paseme|conecteme|conectame|transfierame|transfiereme)"
+    rf"\s+(?:con|a)\s+{_ART}{_HUMAN}\b"
+    rf"|\b(atienda|atiendan|atenderme|atiendame|responda)\s+{_ART}{_HUMAN}\b"
+    r"|\b(agente|persona|ser)\s+(humano|humana|real)\b"
+    rf"|\b(quiero|necesito|deseo|solicito|pido|prefiero)\s+{_ART}(agente|humano|operador|operadora|representante|asesor|asesora)\b"
+    r"|\bno\s+(quiero|deseo)\s+(hablar\s+con\s+)?(un\s+)?(bot|robot|maquina)\b"
+)
+
+
+def _normalize(text: str) -> str:
+    text = unicodedata.normalize("NFD", text.lower())
+    return "".join(c for c in text if unicodedata.category(c) != "Mn")
 
 
 def _eval_user_request(ctx: dict, cfg: dict) -> tuple[bool, str]:
     keywords = cfg.get("keywords") or []
     if isinstance(keywords, str):
         keywords = [k.strip() for k in keywords.split(",") if k.strip()]
-    msg = (ctx.get("user_message") or "").lower()
+    msg = _normalize(ctx.get("user_message") or "")
     if not msg:
         return False, "Sin mensaje de usuario en el contexto."
-    if not keywords:
-        keywords = ["agente", "humano", "persona", "asesor", "operador"]
-    matched = [k for k in keywords if k.lower() in msg]
-    if matched:
-        return True, f"Keywords detectadas: {', '.join(matched)}."
-    return False, "Ninguna keyword de solicitud detectada."
+    if keywords:
+        matched = [k for k in keywords if re.search(rf"\b{re.escape(_normalize(k))}\b", msg)]
+        if matched:
+            return True, f"Keywords detectadas: {', '.join(matched)}."
+        return False, "Ninguna keyword de solicitud detectada."
+    match = _HUMAN_REQUEST.search(msg)
+    if match:
+        return True, f"Solicitud de atención humana: «{match.group(0)}»."
+    return False, "No se detectó una solicitud de atención humana."
 
 
 def _eval_negative_feedback(ctx: dict, cfg: dict) -> tuple[bool, str]:
@@ -115,13 +145,12 @@ def schema_for_trigger(trigger_type: EscalationTrigger) -> dict[str, Any]:
     """Schema de configuración esperado para cada trigger."""
     schemas = {
         EscalationTrigger.no_answer: {
-            # `no_answer_seconds` es la latencia del turno, no espera del usuario.
-            "wait_seconds": {"type": "int", "default": 8, "min": 3, "max": 70,
-                             "label": "Latencia de respuesta lenta (segundos)"},
+            "consecutive": {"type": "int", "default": 2, "min": 1, "max": 5,
+                            "label": "Respuestas seguidas sin información"},
         },
         EscalationTrigger.user_request: {
             "keywords": {"type": "list[str]", "default": [],
-                         "label": "Palabras clave de solicitud (vacío = defaults)"},
+                         "label": "Frases de solicitud propias (vacío = detección automática)"},
         },
         EscalationTrigger.negative_feedback: {
             "threshold": {"type": "float", "default": 0.5, "min": 0, "max": 1, "step": 0.05,

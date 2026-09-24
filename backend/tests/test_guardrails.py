@@ -164,6 +164,14 @@ class TestRedactPiiConfigurableEntities:
         result = redact_pii("mi DUI es 12345678-9", entities=[])
         assert "12345678-9" not in result
 
+    def test_dui_is_labeled_as_dui_not_nrc(self):
+        result = redact_pii("mi DUI es 01234567-8", entities=[])
+        assert "<SV_DUI>" in result and "SV_NRC" not in result
+
+    def test_nrc_is_still_detected(self):
+        result = redact_pii("el NRC de la empresa es 123456-7", entities=[])
+        assert "<SV_NRC>" in result
+
     def test_custom_entities_list_is_respected_for_email(self):
         result = redact_pii("mi correo es juan@example.com", entities=["EMAIL_ADDRESS"])
         assert "juan@example.com" not in result

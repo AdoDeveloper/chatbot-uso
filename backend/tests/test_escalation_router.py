@@ -13,10 +13,10 @@ from app.models.escalation_rule import EscalationRule
 async def seeded_rule(db_session):
     rule = EscalationRule(
         id=uuid.uuid4(),
-        name="Sin respuesta 2 min",
+        name="Sin respuesta 2 veces",
         description="",
         trigger_type=EscalationTrigger.no_answer,
-        trigger_config={"wait_seconds": 120},
+        trigger_config={"consecutive": 2},
         enabled=True,
     )
     db_session.add(rule)
@@ -85,7 +85,7 @@ class TestRuleTest:
             "/api/v1/escalation/rules/test",
             json={
                 "rule_id": str(seeded_rule.id),
-                "context": {"no_answer_seconds": 200},
+                "context": {"bot_answers": ["No dispongo de esa información.", "No tengo esa información."]},
             },
             headers=auth_headers(admin_user),
         )
@@ -108,8 +108,8 @@ class TestRuleTest:
             "/api/v1/escalation/rules/test",
             json={
                 "trigger_type": "no_answer",
-                "trigger_config": {"wait_seconds": 60},
-                "context": {"no_answer_seconds": 30},
+                "trigger_config": {"consecutive": 2},
+                "context": {"bot_answers": ["No dispongo de esa información.", "El arancel es de $25."]},
             },
             headers=auth_headers(admin_user),
         )

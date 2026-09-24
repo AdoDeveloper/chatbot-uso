@@ -19,7 +19,7 @@ from app.schemas.chunk import (
     ChunkTestResult,
 )
 from app.services.ai.embedding import embed_texts_async
-from app.services.ai.llm_gateway import grade_documents
+from app.services.ai.llm_gateway import grade_documents, set_fallback_chain
 from app.services.ingestion import vector_store
 from app.services.knowledge import chunk_editing
 from app.services.system import audit as audit_svc
@@ -142,6 +142,7 @@ async def test_query(
     grades: list[bool] = []
     chain = await settings_service.get_active_chain(db)
     if results and chain:
+        set_fallback_chain(chain)
         provider, api_key = chain[0]
         grades = await grade_documents(body.query, results, provider, api_key)
 

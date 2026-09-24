@@ -36,16 +36,11 @@ _MIN_DOCS_TRAS_FILTRO = 3
 
 
 def _completar_con_mejores(docs: list[dict], relevantes: list[dict]) -> list[dict]:
+    """Aprobados por el evaluador más los mejores de la búsqueda, en el orden de la búsqueda."""
     if not relevantes:
         return []
-    elegidos = list(relevantes)
-    vistos = {id(d) for d in elegidos}
-    for d in docs:
-        if len(elegidos) >= _MIN_DOCS_TRAS_FILTRO:
-            break
-        if id(d) not in vistos:
-            elegidos.append(d)
-            vistos.add(id(d))
+    conservar = {id(d) for d in docs[:_MIN_DOCS_TRAS_FILTRO]} | {id(d) for d in relevantes}
+    elegidos = [d for d in docs if id(d) in conservar]
     log.info("rag.grade_completado", aprobados=len(relevantes), final=len(elegidos))
     return elegidos
 
@@ -125,8 +120,7 @@ async def _grade(state: RagState) -> dict:
     relevant = [d for d, g in zip(docs, grades) if g]
     aprobados = len(relevant)
     log.info("rag.grade", total=len(docs), relevant=aprobados)
-    if docs and aprobados < _MIN_DOCS_TRAS_FILTRO:
-        relevant = _completar_con_mejores(docs, relevant)
+    relevant = _completar_con_mejores(docs, relevant)
     return {"relevant_docs": relevant, "approved_count": aprobados}
 
 
@@ -353,9 +347,7 @@ async def run_simple_rag(
         relevantes = [d for d, g in zip(docs, grades) if g]
         aprobados = len(relevantes)
         log.info("rag.simple_grade", relevant=aprobados)
-        if len(relevantes) < _MIN_DOCS_TRAS_FILTRO:
-            relevantes = _completar_con_mejores(docs, relevantes)
-        docs = relevantes
+        docs = _completar_con_mejores(docs, relevantes)
 
     # El ratio mide el juicio del filtro, no lo que se envía tras completar.
     ratio = (aprobados / total_before_grade) if total_before_grade else None

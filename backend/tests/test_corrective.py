@@ -71,7 +71,7 @@ class TestGrade:
         result = await _grade(state)
         assert result == {"relevant_docs": []}
 
-    async def test_filters_by_grade(self):
+    async def test_filters_by_grade_but_keeps_top_results(self):
         docs = [SAMPLE_DOC, {"id": "chunk-2"}, {"id": "chunk-3"}, {"id": "chunk-4"}]
         state = _make_state(documents=docs)
         with patch(
@@ -79,7 +79,7 @@ class TestGrade:
             AsyncMock(return_value=[True, False, True, True]),
         ):
             result = await _grade(state)
-        assert [d["id"] for d in result["relevant_docs"]] == ["chunk-1", "chunk-3", "chunk-4"]
+        assert [d["id"] for d in result["relevant_docs"]] == ["chunk-1", "chunk-2", "chunk-3", "chunk-4"]
 
     async def test_completes_context_when_grader_approves_too_few(self):
         docs = [SAMPLE_DOC, {"id": "chunk-2"}, {"id": "chunk-3"}]
@@ -274,7 +274,7 @@ class TestRunSimpleRag:
         assert result == docs
         assert ratio == 1.0
 
-    async def test_with_provider_filters_by_grade(self):
+    async def test_with_provider_keeps_top_results_after_grading(self):
         docs = [{"id": "chunk-%d" % i} for i in range(1, 5)]
         with (
             patch("app.services.rag.corrective.embed_texts_async", AsyncMock(return_value=[SAMPLE_EMB])),
@@ -285,7 +285,7 @@ class TestRunSimpleRag:
             ),
         ):
             result, ratio = await run_simple_rag("¿Qué carrera ofrece?", provider=_PROVIDER_STUB, api_key="key")
-        assert result == [docs[0], docs[2], docs[3]]
+        assert result == [docs[0], docs[1], docs[2], docs[3]]
         assert ratio == 3 / 4
 
     async def test_ratio_reflects_the_grader_not_the_completed_context(self):
@@ -465,3 +465,20 @@ class TestRunAdaptiveRag:
         assert result == []
         assert ratio is None
         flag.assert_awaited_once()
+
+
+def test_grading_never_drops_the_top_search_results():
+    from app.services.rag.corrective import _completar_con_mejores
+
+    docs = [{"text": f"d{i}"} for i in range(8)]
+    approved = [docs[4], docs[5], docs[6]]
+
+    result = _completar_con_mejores(docs, approved)
+
+    assert [d["text"] for d in result] == ["d0", "d1", "d2", "d4", "d5", "d6"]
+
+
+def test_grading_with_nothing_approved_means_no_context():
+    from app.services.rag.corrective import _completar_con_mejores
+
+    assert _completar_con_mejores([{"text": "d0"}], []) == []

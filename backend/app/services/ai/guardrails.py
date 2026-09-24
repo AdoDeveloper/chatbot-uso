@@ -203,7 +203,7 @@ _SV_PII_PATTERNS: list[tuple[str, str, str]] = [
     # Teléfono SV: +503 ####-####, 503####-####, o 7###-#### (celular).
     (r"\b(?:\+?503[-.\s]?)?[267]\d{3}[-.\s]?\d{4}\b", "SV_PHONE", "Teléfono El Salvador"),
     # NRC: ######-# (dígitos + guión + verificador)
-    (r"\b\d{2,8}[-]\d\b", "SV_NRC", "Número de Registro de Comercio (El Salvador)"),
+    (r"\b\d{2,7}[-]\d\b", "SV_NRC", "Número de Registro de Comercio (El Salvador)"),
 ]
 
 def _build_recognizers() -> list:

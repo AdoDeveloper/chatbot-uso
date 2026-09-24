@@ -58,14 +58,14 @@ class TestGetHttpClient:
 
 
 class TestIsRetryable:
-    @pytest.mark.parametrize("status", [429, 500, 502, 503, 504])
+    @pytest.mark.parametrize("status", [500, 502, 503, 504])
     def test_retryable_status_codes(self, status):
         req = httpx.Request("POST", "https://x.example.com")
         resp = httpx.Response(status, request=req)
         exc = httpx.HTTPStatusError("boom", request=req, response=resp)
         assert gw._is_retryable(exc) is True
 
-    @pytest.mark.parametrize("status", [400, 401, 403, 404])
+    @pytest.mark.parametrize("status", [400, 401, 403, 404, 429])
     def test_non_retryable_status_codes(self, status):
         req = httpx.Request("POST", "https://x.example.com")
         resp = httpx.Response(status, request=req)
@@ -776,3 +776,73 @@ class TestClassifyTopic:
         monkeypatch.setattr(gw.OpenAICompatAdapter, "complete", fake_complete)
         await gw.classify_topic("pregunta", provider, "key")
         assert "Temas ya existentes" not in captured["system_prompt"]
+
+
+class TestAuxiliaryFallback:
+    async def test_rewrite_uses_next_provider_when_primary_is_rate_limited(self, monkeypatch):
+        primary = _make_provider(name="Groq", model_name="g")
+        backup = _make_provider(name="Ollama", model_name="o")
+        req = httpx.Request("POST", "https://x.example.com")
+
+        async def fake_complete(self, messages, **kwargs):
+            if self.model_name == "g":
+                raise httpx.HTTPStatusError("429", request=req, response=httpx.Response(429, request=req))
+            return "requisitos graduación"
+
+        monkeypatch.setattr(gw.OpenAICompatAdapter, "complete", fake_complete)
+        gw.set_fallback_chain([(primary, "k1"), (backup, "k2")])
+
+        assert await gw.rewrite_query("¿qué necesito para graduarme?", primary, "k1") == "requisitos graduación"
+
+    async def test_grade_fails_open_only_when_every_provider_fails(self, monkeypatch):
+        primary = _make_provider(name="Groq", model_name="g")
+        backup = _make_provider(name="Ollama", model_name="o")
+
+        async def fake_complete(self, messages, **kwargs):
+            if self.model_name == "g":
+                raise httpx.ConnectError("caído")
+            return '{"grades": [true, false]}'
+
+        monkeypatch.setattr(gw.OpenAICompatAdapter, "complete", fake_complete)
+        gw.set_fallback_chain([(primary, "k1"), (backup, "k2")])
+
+        grades = await gw.grade_documents("p", [{"text": "a"}, {"text": "b"}], primary, "k1")
+        assert grades == [True, False]
+
+    async def test_open_circuit_provider_is_skipped(self, monkeypatch):
+        primary = _make_provider(name="Groq", model_name="g")
+        backup = _make_provider(name="Ollama", model_name="o")
+        called = []
+
+        async def fake_complete(self, messages, **kwargs):
+            called.append(self.model_name)
+            return "ok"
+
+        monkeypatch.setattr(gw.OpenAICompatAdapter, "complete", fake_complete)
+        gw._breaker.force_open(str(primary.id))
+        gw.set_fallback_chain([(primary, "k1"), (backup, "k2")])
+
+        await gw.rewrite_query("pregunta", primary, "k1")
+        assert called == ["o"]
+
+
+class TestFirstTokenTimeout:
+    async def test_silent_provider_is_skipped_for_the_next_one(self, monkeypatch):
+        import asyncio
+
+        slow = _make_provider(name="Lento", model_name="lento")
+        fast = _make_provider(name="Rápido", model_name="rapido")
+
+        async def fake_stream(self, messages, temperature, max_tokens):
+            if self.model_name == "lento":
+                await asyncio.sleep(5)
+            yield "hola"
+
+        monkeypatch.setattr(gw.OpenAICompatAdapter, "stream_chat", fake_stream)
+        monkeypatch.setattr(gw, "_FIRST_TOKEN_TIMEOUT", 0.2)
+        served: dict = {}
+
+        chunks = [c async for c in gw.stream_chat("p", [], [(slow, "k1"), (fast, "k2")], served=served)]
+
+        assert chunks == ["hola"]
+        assert served["provider_name"] == "Rápido"

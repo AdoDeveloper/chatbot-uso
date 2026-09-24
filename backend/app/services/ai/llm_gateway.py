@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 import time
 from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator
+from contextvars import ContextVar
 from typing import TYPE_CHECKING
 
 import httpx
@@ -109,6 +111,7 @@ def _avisar_mal_configurado(provider_name: str, error: str) -> None:
 
 
 _PERMANENT_STATUS_CODES = (401, 402, 403, 404)
+_FIRST_TOKEN_TIMEOUT = 15.0
 
 
 def _is_permanent_failure(exc: BaseException) -> bool:
@@ -120,7 +123,7 @@ def _is_permanent_failure(exc: BaseException) -> bool:
 
 def _is_retryable(exc: BaseException) -> bool:
     if isinstance(exc, httpx.HTTPStatusError):
-        return exc.response.status_code in (429, 500, 502, 503, 504)
+        return exc.response.status_code in (500, 502, 503, 504)
     return isinstance(exc, (httpx.ConnectError, httpx.ReadTimeout))
 
 
@@ -826,11 +829,22 @@ async def stream_chat(
             adapter = await _get_adapter(provider_name, provider_type, model_name, api_base, api_key, extra_headers)
             log.info("llm.request", provider=provider_name, model=model_name,
                      adapter=type(adapter).__name__)
-            async for token in adapter.stream_chat(messages, temperature, max_tokens):
-                if not tokens_yielded and served is not None:
+            stream = adapter.stream_chat(messages, temperature, max_tokens).__aiter__()
+            try:
+                first = await asyncio.wait_for(stream.__anext__(), timeout=_FIRST_TOKEN_TIMEOUT)
+            except StopAsyncIteration:
+                first = None
+            except asyncio.TimeoutError:
+                await stream.aclose()
+                raise RuntimeError(f"El proveedor '{provider_name}' no respondió a tiempo.") from None
+            if first is not None:
+                if served is not None:
                     served.update(provider_name=provider_name, model_name=model_name)
                 tokens_yielded += 1
-                yield token
+                yield first
+                async for token in stream:
+                    tokens_yielded += 1
+                    yield token
             if not tokens_yielded:
                 raise RuntimeError(f"El proveedor '{provider_name}' devolvió una respuesta vacía.")
             _breaker.record_success(pid)
@@ -867,6 +881,42 @@ async def stream_chat(
     except Exception as _log_exc:
         log.warning("llm.provider_failure_audit_failed", error=str(_log_exc))
     raise RuntimeError("El servicio de IA no está disponible en este momento. Intenta de nuevo en unos minutos.")
+
+
+_fallback_chain: ContextVar[list | None] = ContextVar("llm_fallback_chain", default=None)
+
+
+def set_fallback_chain(chain: list) -> None:
+    """Cadena de proveedores del turno, usada como respaldo por las llamadas auxiliares."""
+    _fallback_chain.set(list(chain))
+
+
+async def _complete(provider: LLMProvider, api_key: str | None, messages: list[dict], **kwargs) -> str:
+    """Completa con el proveedor indicado y, si falla, con el resto de la cadena del turno."""
+    candidates = [(provider, api_key)] + [
+        (p, k) for p, k in (_fallback_chain.get() or []) if str(p.id) != str(provider.id)
+    ]
+    last_error: Exception | None = None
+    for candidate, key in candidates:
+        pid = str(candidate.id)
+        if _breaker.is_open(pid):
+            continue
+        try:
+            adapter = await _get_adapter(
+                candidate.name, candidate.provider_type, candidate.model_name,
+                candidate.api_base, key, candidate.extra_headers,
+            )
+            text = await adapter.complete(messages, **kwargs)
+            _breaker.record_success(pid)
+            return text
+        except Exception as exc:
+            last_error = exc
+            if _is_permanent_failure(exc):
+                _breaker.force_open(pid)
+            else:
+                _breaker.record_failure(pid)
+            log.info("llm.aux_fallback", provider=candidate.name, error=str(exc)[:160])
+    raise last_error or RuntimeError("No hay proveedores LLM disponibles.")
 
 
 async def test_connection(
@@ -910,7 +960,6 @@ async def grade_documents(
         {"role": "system", "content": prompt},
         {"role": "user", "content": f"Pregunta: {question}\n\nDocumentos:\n{doc_list}"},
     ]
-    adapter = await _get_adapter(provider.name, provider.provider_type, provider.model_name, provider.api_base, api_key, provider.extra_headers)
 
     def _parse(text: str) -> list[bool] | None:
         """Intenta extraer los juicios del texto. None si el formato no sirve."""
@@ -933,8 +982,8 @@ async def grade_documents(
 
     try:
         for intento in range(2):
-            text = await adapter.complete(
-                messages, temperature=0.0, max_tokens=2000,
+            text = await _complete(
+                provider, api_key, messages, temperature=0.0, max_tokens=2000,
             )
             grades = _parse(text)
             if grades is not None:
@@ -977,10 +1026,9 @@ async def classify_topic(
         {"role": "system", "content": prompt},
         {"role": "user", "content": f"Pregunta: {question}"},
     ]
-    adapter = await _get_adapter(provider.name, provider.provider_type, provider.model_name, provider.api_base, api_key, provider.extra_headers)
     try:
-        text = await adapter.complete(
-            messages, temperature=0.0, max_tokens=128,
+        text = await _complete(
+            provider, api_key, messages, temperature=0.0, max_tokens=128,
         )
         if not text or not text.strip():
             return None
@@ -1013,8 +1061,7 @@ async def _extract_statements(
         {"role": "system", "content": prompt},
         {"role": "user", "content": f"Respuesta: {answer[:2000]}"},
     ]
-    adapter = await _get_adapter(provider.name, provider.provider_type, provider.model_name, provider.api_base, api_key, provider.extra_headers)
-    text = await adapter.complete(messages, temperature=0.0, max_tokens=2000)
+    text = await _complete(provider, api_key, messages, temperature=0.0, max_tokens=2000)
     if not text or not text.strip():
         return None
     cleaned = text.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
@@ -1052,8 +1099,7 @@ async def grade_faithfulness(
             {"role": "system", "content": prompt},
             {"role": "user", "content": f"Contexto:\n{context_text}\n\nStatements:\n{stmt_list}"},
         ]
-        adapter = await _get_adapter(provider.name, provider.provider_type, provider.model_name, provider.api_base, api_key, provider.extra_headers)
-        text = await adapter.complete(messages, temperature=0.0, max_tokens=2000)
+        text = await _complete(provider, api_key, messages, temperature=0.0, max_tokens=2000)
         if not text or not text.strip():
             return None
         cleaned = text.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
@@ -1099,11 +1145,10 @@ async def rewrite_query(
         {"role": "system", "content": system},
         {"role": "user", "content": question},
     ]
-    adapter = await _get_adapter(provider.name, provider.provider_type, provider.model_name, provider.api_base, api_key, provider.extra_headers)
     try:
         # Con `avoid` se sube la temperatura para variar la reformulación.
         temperature = 0.4 if avoid else 0.0
-        raw = (await adapter.complete(messages, temperature=temperature, max_tokens=128)).strip()
+        raw = (await _complete(provider, api_key, messages, temperature=temperature, max_tokens=128)).strip()
         rewritten = _clean_rewrite(raw) or question
         log.info("llm.rewrite", original=question[:80], rewritten=rewritten[:80],
                  retry=bool(avoid))
