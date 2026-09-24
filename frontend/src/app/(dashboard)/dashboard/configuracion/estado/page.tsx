@@ -113,7 +113,7 @@ const CacheConfigCard = forwardRef<CacheConfigCardHandle>(function CacheConfigCa
   const { data, loading, refetch } = useApi<CacheStatsOut>("/cache/stats");
   const [enabled, setEnabled] = useState(true);
   const [ttlHours, setTtlHours] = useState(12);
-  const [threshold, setThreshold] = useState(0.9);
+  const [threshold, setThreshold] = useState(0.97);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState<{ enabled: boolean; ttlHours: number; threshold: number } | null>(null);
   const [showEntries, setShowEntries] = useState(false);
@@ -190,12 +190,12 @@ const CacheConfigCard = forwardRef<CacheConfigCardHandle>(function CacheConfigCa
         </div>
         <div>
           <label htmlFor="cache-threshold" className="text-2xs font-medium block mb-1">
-            Umbral de similitud (0.5 a 0.99)
+            Umbral de similitud (0.95 a 0.99)
           </label>
           <Input
             id="cache-threshold"
             type="number"
-            min={0.5}
+            min={0.95}
             max={0.99}
             step={0.01}
             value={threshold}

@@ -270,6 +270,7 @@ async def _run_chat_inner(
 
     timed_out = False
     t_llm_start = time.monotonic()
+    served: dict = {}
     llm_gen = stream_chat(
         question=request.question,
         context_chunks=llm_chunks,
@@ -278,6 +279,7 @@ async def _run_chat_inner(
         temperature=cfg.temperature,
         max_tokens=min(cfg.max_tokens, overrides['max_output_tokens']),
         history=history or None,
+        served=served,
     )
     try:
         async for token in llm_gen:
@@ -309,6 +311,8 @@ async def _run_chat_inner(
     finally:
         await llm_gen.aclose()
 
+    provider_name = served.get("provider_name", provider_name)
+    model_name = served.get("model_name", model_name)
     final_text = "".join(full_content)
     if not final_text.strip():
         log.warning(

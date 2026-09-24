@@ -69,7 +69,7 @@ class TestGetStats:
     async def test_reflects_config_overrides(self, client, admin_user, auth_headers):
         await client.patch(
             "/api/v1/cache/config",
-            json={"enabled": False, "ttl_seconds": 3600, "similarity_threshold": 0.8},
+            json={"enabled": False, "ttl_seconds": 3600, "similarity_threshold": 0.96},
             headers=auth_headers(admin_user),
         )
         r = await client.get("/api/v1/cache/stats", headers=auth_headers(admin_user))
@@ -77,7 +77,7 @@ class TestGetStats:
         body = r.json()
         assert body["enabled"] is False
         assert body["ttl_seconds"] == 3600
-        assert body["similarity_threshold"] == 0.8
+        assert body["similarity_threshold"] == 0.96
 
 
 class TestListEntries:
@@ -209,7 +209,7 @@ class TestUpdateConfig:
     async def test_updates_ttl_and_threshold(self, client, admin_user, auth_headers):
         r = await client.patch(
             "/api/v1/cache/config",
-            json={"ttl_seconds": 7200, "similarity_threshold": 0.85},
+            json={"ttl_seconds": 7200, "similarity_threshold": 0.98},
             headers=auth_headers(admin_user),
         )
         assert r.status_code == 200
@@ -217,7 +217,7 @@ class TestUpdateConfig:
         stats = await client.get("/api/v1/cache/stats", headers=auth_headers(admin_user))
         body = stats.json()
         assert body["ttl_seconds"] == 7200
-        assert body["similarity_threshold"] == 0.85
+        assert body["similarity_threshold"] == 0.98
 
     async def test_empty_body_is_a_noop(self, client, admin_user, auth_headers):
         before = await client.get("/api/v1/cache/stats", headers=auth_headers(admin_user))
@@ -251,6 +251,12 @@ class TestUpdateConfig:
     async def test_rejects_similarity_threshold_below_zero(self, client, admin_user, auth_headers):
         r = await client.patch(
             "/api/v1/cache/config", json={"similarity_threshold": -0.5}, headers=auth_headers(admin_user),
+        )
+        assert r.status_code == 422
+
+    async def test_rejects_similarity_threshold_that_mixes_different_questions(self, client, admin_user, auth_headers):
+        r = await client.patch(
+            "/api/v1/cache/config", json={"similarity_threshold": 0.9}, headers=auth_headers(admin_user),
         )
         assert r.status_code == 422
 

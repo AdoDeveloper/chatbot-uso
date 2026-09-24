@@ -33,7 +33,7 @@ class CacheEntry(BaseModel):
 class CacheConfigUpdate(BaseModel):
     enabled: bool | None = None
     ttl_seconds: int | None = Field(None, ge=60, le=604800)  # 1 min .. 7 días
-    similarity_threshold: float | None = Field(None, ge=0.0, le=1.0)
+    similarity_threshold: float | None = Field(None, ge=0.95, le=0.99)
 
 
 @router.get("/stats", response_model=CacheStats)

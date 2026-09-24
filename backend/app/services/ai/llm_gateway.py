@@ -789,6 +789,7 @@ async def stream_chat(
     temperature: float = 0.3,
     max_tokens: int = 1024,
     history: list[dict] | None = None,
+    served: dict | None = None,
 ) -> AsyncGenerator[str, None]:
     if not chain:
         raise RuntimeError("No hay proveedores LLM activos en la cadena.")
@@ -826,8 +827,12 @@ async def stream_chat(
             log.info("llm.request", provider=provider_name, model=model_name,
                      adapter=type(adapter).__name__)
             async for token in adapter.stream_chat(messages, temperature, max_tokens):
+                if not tokens_yielded and served is not None:
+                    served.update(provider_name=provider_name, model_name=model_name)
                 tokens_yielded += 1
                 yield token
+            if not tokens_yielded:
+                raise RuntimeError(f"El proveedor '{provider_name}' devolvió una respuesta vacía.")
             _breaker.record_success(pid)
             return
         except Exception as exc:

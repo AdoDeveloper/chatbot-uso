@@ -219,6 +219,37 @@ class TestStreamChatOrchestration:
         system_msg = captured["messages"][0]["content"]
         assert "dato relevante" in system_msg
 
+    async def test_empty_stream_falls_back_and_reports_served_provider(self, monkeypatch):
+        first = _make_provider(name="Primero", model_name="m1")
+        second = _make_provider(name="Segundo", model_name="m2")
+
+        async def fake_stream(self, messages, temperature, max_tokens):
+            if self.model_name == "m1":
+                return
+            yield "respuesta"
+
+        monkeypatch.setattr(gw.OpenAICompatAdapter, "stream_chat", fake_stream)
+        served: dict = {}
+        chunks = [
+            c async for c in gw.stream_chat(
+                "pregunta", [], [(first, "k1"), (second, "k2")], served=served,
+            )
+        ]
+        assert chunks == ["respuesta"]
+        assert served == {"provider_name": "Segundo", "model_name": "m2"}
+
+    async def test_all_empty_streams_raise(self, monkeypatch):
+        provider = _make_provider()
+
+        async def fake_stream(self, messages, temperature, max_tokens):
+            return
+            yield
+
+        monkeypatch.setattr(gw.OpenAICompatAdapter, "stream_chat", fake_stream)
+        with pytest.raises(RuntimeError, match="no está disponible"):
+            async for _ in gw.stream_chat("pregunta", [], [(provider, "key")]):
+                pass
+
     async def test_uses_placeholder_when_no_context_chunks(self, monkeypatch):
         provider = _make_provider()
         captured = {}
