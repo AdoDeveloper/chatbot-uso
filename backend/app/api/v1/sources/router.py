@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.services.ai.semantic_cache import invalidate_by_source
 from app.core.config import get_settings
 from app.core.deps import require_perm
 from app.core.permissions import P
@@ -146,7 +147,7 @@ async def reingest_source(
     if source.status == SourceStatus.processing:
         raise HTTPException(
             status_code=409,
-            detail="Esta fuente ya se está procesando. Espera a que termine antes de reintentar.",
+            detail="Esta fuente ya se está procesando. Espere a que termine antes de reintentar.",
         )
     source.status = SourceStatus.pending
     source.error_message = None
@@ -207,6 +208,7 @@ async def approve_source(
         user_agent=req.headers.get("user-agent"),
     )
     await db.commit()
+    await invalidate_by_source(str(source.id))
     result = await db.execute(
         select(Source).where(Source.id == source.id)
         .options(*sources_svc.with_user_options())
@@ -240,6 +242,7 @@ async def reject_source(
         user_agent=req.headers.get("user-agent"),
     )
     await db.commit()
+    await invalidate_by_source(str(source.id))
     result = await db.execute(
         select(Source).where(Source.id == source.id)
         .options(*sources_svc.with_user_options())

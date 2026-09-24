@@ -25,6 +25,10 @@ _NO_ANSWER_MARKERS = re.compile(
     r"\bno encontr[eé] informaci[oó]n\b|\bno (aparece|se menciona|se indica|se especifica)\b",
     re.IGNORECASE,
 )
+_NO_ANSWER_OPENING = re.compile(
+    r"^\W*(lo siento,?\s*)?(no (tengo|dispongo|cuento|encontr[eé]|encuentro)|desconozco|no s[eé]\b)",
+    re.IGNORECASE,
+)
 
 
 def is_no_answer_reply(text: str | None) -> bool:
@@ -35,4 +39,4 @@ def is_no_answer_reply(text: str | None) -> bool:
         return False
     if text.strip() == NO_CONTEXT_MESSAGE.strip():
         return True
-    return bool(_NO_ANSWER_MARKERS.search(text[:300]))
+    return bool(_NO_ANSWER_OPENING.search(text) or _NO_ANSWER_MARKERS.search(text[:300]))

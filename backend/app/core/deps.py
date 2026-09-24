@@ -90,9 +90,6 @@ def require_perm(permission: str):
 
 def get_client_ip(request: Request) -> str:
     """Extrae la IP real del cliente, priorizando headers de proxy reverso."""
-    cf = request.headers.get("CF-Connecting-IP")
-    if cf:
-        return cf.strip()
     real_ip = request.headers.get("X-Real-IP")
     if real_ip:
         return real_ip.strip()

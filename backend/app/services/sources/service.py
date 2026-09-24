@@ -191,7 +191,7 @@ async def replace_source_file(
     if source.status == SourceStatus.processing:
         raise HTTPException(
             status_code=409,
-            detail="Esta fuente ya se está procesando. Espera a que termine antes de reemplazar el archivo.",
+            detail="Esta fuente ya se está procesando. Espere a que termine antes de reemplazar el archivo.",
         )
 
     source_type = detect_type(file.filename or "", file.content_type or "")

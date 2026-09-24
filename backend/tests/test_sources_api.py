@@ -68,6 +68,23 @@ class TestSourcesList:
 
 
 class TestSourceApprove:
+    async def test_approve_and_reject_invalidate_the_answer_cache(
+        self, client, db_session, admin_user, auth_headers, monkeypatch
+    ):
+        from unittest.mock import AsyncMock
+
+        from app.api.v1.sources import router as sources_router
+
+        invalidate = AsyncMock()
+        monkeypatch.setattr(sources_router, "invalidate_by_source", invalidate)
+        src = await _create_source(db_session, review_status=ReviewStatus.pendiente_revision)
+
+        await client.post(f"/api/v1/sources/{src.id}/approve", headers=auth_headers(admin_user))
+        await client.post(f"/api/v1/sources/{src.id}/reject", headers=auth_headers(admin_user),
+                          json={"reason": "Contenido desactualizado"})
+
+        assert invalidate.await_count == 2
+
     async def test_admin_can_approve_pending_source(
         self, client, db_session, admin_user, auth_headers
     ):

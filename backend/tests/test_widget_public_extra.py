@@ -338,3 +338,16 @@ class TestPublicChatLlmQueueTimeout:
         )
         assert r.status_code == 503
         assert "solicitado" in r.json()["detail"]
+
+
+def test_client_ip_ignores_spoofable_cloudflare_header():
+    from starlette.requests import Request
+
+    from app.core.deps import get_client_ip
+
+    def req(headers):
+        return Request({"type": "http", "headers": [(k.lower().encode(), v.encode()) for k, v in headers.items()],
+                        "client": ("198.51.100.7", 1234)})
+
+    assert get_client_ip(req({"CF-Connecting-IP": "10.9.9.9"})) == "198.51.100.7"
+    assert get_client_ip(req({"CF-Connecting-IP": "10.9.9.9", "X-Real-IP": "203.0.113.5"})) == "203.0.113.5"

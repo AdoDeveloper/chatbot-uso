@@ -202,7 +202,7 @@ async def _run_chat_inner(
                 rag_question, primary_provider, primary_key, effective_source_ids, cfg,
                 original_question=request.question,
             ),
-            timeout=25.0,
+            timeout=30.0,
         )
     except asyncio.TimeoutError:
         log.warning("chat.rag_timeout", session_id=request.session_id)
