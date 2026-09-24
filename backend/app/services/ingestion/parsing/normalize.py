@@ -27,7 +27,7 @@ _PIE_PAGINA = re.compile(r"^\s*(?:P[áa]gina\s+\d+(?:\s+de\s+\d+)?|\d+\s*/\s*\d+
 _ESPACIOS_REPETIDOS = re.compile(r"[ \t]{2,}")
 _ESPACIO_ANTES_SALTO = re.compile(r"[ \t]+\n")
 _SALTOS_EXCESIVOS = re.compile(r"\n{3,}")
-_GUION_CORTE = re.compile(r"(\w)-\n(\w)")
+_GUION_CORTE = re.compile(r"([^\W\d_])-\n([^\W\d_])")
 
 
 def _es_fila_de_tabla(linea: str) -> bool:

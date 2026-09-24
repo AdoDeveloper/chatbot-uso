@@ -209,6 +209,26 @@ async def delete_source(source_id: str) -> None:
     log.info("qdrant.deleted_source", source_id=source_id)
 
 
+async def delete_points(point_ids: list[str]) -> None:
+    if not point_ids:
+        return
+    from qdrant_client.models import PointIdsList
+    await _get_client().delete(collection_name=COLLECTION, points_selector=PointIdsList(points=point_ids))
+
+
+async def delete_source_except(source_id: str, keep_ids: list[str]) -> None:
+    """Elimina los vectores de la fuente que no estén en keep_ids."""
+    from qdrant_client.models import HasIdCondition
+    await _get_client().delete(
+        collection_name=COLLECTION,
+        points_selector=Filter(
+            must=[FieldCondition(key="source_id", match=MatchValue(value=source_id))],
+            must_not=[HasIdCondition(has_id=keep_ids)],
+        ),
+    )
+    log.info("qdrant.replaced_source", source_id=source_id, kept=len(keep_ids))
+
+
 async def get_source_info() -> tuple[set[str], dict[str, int]]:
     """Retorna (source_ids, source_id->chunk_count) de todos los puntos en Qdrant."""
     client = _get_client()

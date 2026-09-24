@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from app.models.enums import SourceType
 from app.services.ingestion.parsing.docx import parse_docx
 from app.services.ingestion.parsing.normalize import normalizar_texto
@@ -20,4 +22,6 @@ async def parse_source(source_type: SourceType, file_path: str | None) -> str:
         raise ValueError(f"Tipo de fuente no soportado: {source_type}")
     if not file_path:
         raise ValueError(f"{source_type.value.upper()} requiere file_path")
+    if not Path(file_path).is_file():
+        raise FileNotFoundError("El archivo original ya no está en el servidor")
     return normalizar_texto(await parser(file_path))

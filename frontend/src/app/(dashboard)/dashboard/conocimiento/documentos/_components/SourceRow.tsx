@@ -209,6 +209,9 @@ export function SourceRow({
   const errorTooltip = isError && source.error_message
     ? `${source.error_code ? `[${source.error_code}] ` : ""}${source.error_message}${source.error_hint ? `: ${source.error_hint}` : ""}`
     : undefined;
+  const reprocessWarning = isReady && source.error_message
+    ? `No se pudo reprocesar; se mantiene la versión anterior. ${source.error_message}`
+    : undefined;
   const rejectionTooltip = source.review_status === "rechazada" && source.rejection_reason
     ? `${source.rejection_reason}${source.reviewed_by_name ? ` (${source.reviewed_by_name})` : ""}`
     : undefined;
@@ -237,6 +240,11 @@ export function SourceRow({
        <Badge variant="outline" size="xs" className={`whitespace-nowrap border-transparent ${STATUS_BADGE[source.status]}`}>
         {STATUS_LABEL[source.status] ?? formatSourceFallback(source.status)}
        </Badge>
+       {reprocessWarning && (
+        <Tooltip content={reprocessWarning}>
+         <AlertCircle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" aria-label="No se pudo reprocesar" />
+        </Tooltip>
+       )}
        {isBusy && stage && (
         <span className="text-3xs text-muted-foreground tabular-nums" title={stage.label}>
          {stage.percent !== null ? `${stage.percent}%` : "…"}

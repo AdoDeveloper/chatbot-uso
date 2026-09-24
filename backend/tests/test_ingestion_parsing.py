@@ -276,58 +276,49 @@ class TestParsePdf:
         import pymupdf4llm
         from app.services.ingestion.parsing import pdf as pdf_mod
 
-        calls = []
+        monkeypatch.setattr(pymupdf4llm, "to_markdown", lambda path, **kw: "x" * 500)
 
-        def fake_to_markdown(path, force_text=True):
-            calls.append(force_text)
-            return "x" * 500
+        assert await pdf_mod.parse_pdf("fake.pdf") == "x" * 500
 
-        monkeypatch.setattr(pymupdf4llm, "to_markdown", fake_to_markdown)
+    async def test_pdf_without_text_raises_clear_error(self, monkeypatch):
+        import pymupdf4llm
+        from app.services.ingestion.parsing import pdf as pdf_mod
+        from app.services.ingestion.source_quality import classify_error
 
-        text = await pdf_mod.parse_pdf("fake.pdf")
+        monkeypatch.setattr(pymupdf4llm, "to_markdown", lambda path, **kw: "  ")
 
-        assert text == "x" * 500
-        assert calls == [True]  # no debió intentar el fallback OCR
+        with pytest.raises(ValueError) as exc:
+            await pdf_mod.parse_pdf("fake.pdf")
+        assert classify_error(str(exc.value))[0] == "PDF_NO_TEXT"
 
-    async def test_falls_back_to_ocr_when_force_text_returns_empty(self, monkeypatch):
+    async def test_raises_runtime_error_when_library_fails(self, monkeypatch):
         import pymupdf4llm
         from app.services.ingestion.parsing import pdf as pdf_mod
 
-        def fake_to_markdown(path, force_text=True):
-            return "" if force_text else "contenido ocr"
-
-        monkeypatch.setattr(pymupdf4llm, "to_markdown", fake_to_markdown)
-
-        text = await pdf_mod.parse_pdf("fake.pdf")
-
-        assert text == "contenido ocr"
-
-    async def test_falls_back_to_ocr_when_force_text_raises(self, monkeypatch):
-        import pymupdf4llm
-        from app.services.ingestion.parsing import pdf as pdf_mod
-
-        def fake_to_markdown(path, force_text=True):
-            if force_text:
-                raise ValueError("corrupt pdf")
-            return "contenido ocr"
-
-        monkeypatch.setattr(pymupdf4llm, "to_markdown", fake_to_markdown)
-
-        text = await pdf_mod.parse_pdf("fake.pdf")
-
-        assert text == "contenido ocr"
-
-    async def test_raises_runtime_error_when_both_strategies_fail(self, monkeypatch):
-        import pymupdf4llm
-        from app.services.ingestion.parsing import pdf as pdf_mod
-
-        def boom(path, force_text=True):
+        def boom(path, **kw):
             raise ValueError("corrupt pdf")
 
         monkeypatch.setattr(pymupdf4llm, "to_markdown", boom)
 
         with pytest.raises(RuntimeError, match="No se pudo parsear el PDF"):
             await pdf_mod.parse_pdf("fake.pdf")
+
+    async def test_image_only_pdf_raises_clear_error(self, tmp_path):
+        import pymupdf
+
+        from app.services.ingestion.parsing.pdf import parse_pdf
+
+        path = str(tmp_path / "escaneado.pdf")
+        doc = pymupdf.open()
+        page = doc.new_page()
+        pix = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, 50, 50), 0)
+        pix.clear_with(200)
+        page.insert_image(pymupdf.Rect(72, 72, 272, 272), pixmap=pix)
+        doc.save(path)
+        doc.close()
+
+        with pytest.raises((ValueError, RuntimeError)):
+            await parse_pdf(path)
 
     async def test_parses_real_pdf_with_text(self, tmp_path):
         """Ejercita parse_pdf real (sin mock) contra un PDF generado con pymupdf."""
@@ -368,3 +359,56 @@ class TestDispatcher:
 
         with pytest.raises(ValueError, match="requiere file_path"):
             await parse_source(SourceType.txt, "")
+
+
+class TestDocxHiddenStructures:
+    async def test_extracts_content_controls_textboxes_insertions_nested_tables_and_margins(self, tmp_path):
+        from docx import Document
+        from docx.oxml import parse_xml
+        from docx.oxml.ns import nsdecls
+
+        w = nsdecls("w")
+        doc = Document()
+        body = doc.element.body
+        body.insert(len(body) - 1, parse_xml(
+            f'<w:sdt {w}><w:sdtContent><w:p><w:r><w:t>matrícula vence el 15 de marzo</w:t></w:r></w:p></w:sdtContent></w:sdt>'))
+        p = doc.add_paragraph("Antes del cuadro. ")
+        p._p.append(parse_xml(
+            f'<w:r {w}><w:pict><v:shape xmlns:v="urn:schemas-microsoft-com:vml"><v:textbox><w:txbxContent>'
+            f'<w:p><w:r><w:t>caja@usonsonate.edu.sv</w:t></w:r></w:p></w:txbxContent></v:textbox></v:shape></w:pict></w:r>'))
+        p = doc.add_paragraph("Plazo: ")
+        p._p.append(parse_xml(f'<w:ins {w} w:id="1" w:author="x"><w:r><w:t>15 días hábiles</w:t></w:r></w:ins>'))
+        p._p.append(parse_xml(f'<w:del {w} w:id="2" w:author="x"><w:r><w:delText>30 días</w:delText></w:r></w:del>'))
+        table = doc.add_table(rows=1, cols=2)
+        table.cell(0, 0).text = "Constancia"
+        inner = table.cell(0, 1).add_table(rows=1, cols=1)
+        inner.cell(0, 0).text = "arancel $45"
+        doc.sections[0].header.paragraphs[0].text = "Registro Académico"
+        doc.sections[0].footer.paragraphs[0].text = "Documento oficial 2025"
+        path = str(tmp_path / "estructuras.docx")
+        doc.save(path)
+
+        text = await parse_docx(path)
+
+        for expected in ("matrícula vence el 15 de marzo", "caja@usonsonate.edu.sv", "15 días hábiles",
+                         "arancel $45", "Registro Académico", "Documento oficial 2025"):
+            assert expected in text
+        assert "30 días" not in text
+
+
+def test_hyphen_join_only_applies_to_words():
+    from app.services.ingestion.parsing.normalize import normalizar_texto
+
+    assert normalizar_texto("inscrip-\nción") == "inscripción"
+    assert "7851-\n7588" in normalizar_texto("Teléfono 7851-\n7588")
+
+
+
+async def test_missing_file_gives_clear_error(tmp_path):
+    from app.models.enums import SourceType
+    from app.services.ingestion.parsing import parse_source
+    from app.services.ingestion.source_quality import classify_error
+
+    with pytest.raises(FileNotFoundError) as exc:
+        await parse_source(SourceType.pdf, str(tmp_path / "no-existe.pdf"))
+    assert classify_error(str(exc.value))[0] == "FILE_MISSING"

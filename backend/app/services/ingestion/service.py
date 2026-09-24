@@ -77,9 +77,11 @@ async def _carry_review_marks(db: AsyncSession, source_id: str, chunks: list[dic
         match = edited.pop(_body(chunk["text"]), None)
         if match:
             old_pid, edited_text = match
+            body = _body(chunk["text"])
             if chunk.get("parent_text"):
-                chunk["parent_text"] = chunk["parent_text"].replace(_body(chunk["text"]), _body(edited_text), 1)
-            chunk["text"] = edited_text
+                chunk["parent_text"] = chunk["parent_text"].replace(body, _body(edited_text), 1)
+            prefix = _SECTION_PREFIX.match(chunk["text"])
+            chunk["text"] = (prefix.group(0) if prefix else "") + _body(edited_text)
             chunk["point_id"] = str(uuid.uuid4())
             repointed[old_pid] = chunk["point_id"]
         if _body(chunk["text"]) in discarded:
@@ -92,7 +94,9 @@ async def ingest(db: AsyncSession, source: Source) -> None:
     source_id = str(source.id)
     log.info("ingestion.start", source_id=source_id, type=source.type, name=source.name)
 
+    previous = (source.review_status, source.chunk_count)
     was_approved = source.review_status == ReviewStatus.aprobada
+    written: list[str] = []
     source.status = SourceStatus.processing
     source.review_status = ReviewStatus.procesando
     source.error_message = None
@@ -148,9 +152,8 @@ async def ingest(db: AsyncSession, source: Source) -> None:
         await vector_store.ensure_collection()
         repointed = await _carry_review_marks(db, source_id, chunks)
 
-        await _abort_if_deleted(db, source.id)
-        await _set_stage(db, source, "cleaning")
-        await vector_store.delete_source(source_id)
+        for chunk in chunks:
+            chunk.setdefault("point_id", str(uuid.uuid4()))
 
         total_upserted = 0
         total_batches = (len(chunks) + _EMBED_BATCH - 1) // _EMBED_BATCH
@@ -160,9 +163,12 @@ async def ingest(db: AsyncSession, source: Source) -> None:
             batch = chunks[i: i + _EMBED_BATCH]
             texts = [c["text"] for c in batch]
             embeddings = await embed_texts_async(texts, prefix="passage: ")
+            written += [c["point_id"] for c in batch]
             total_upserted += await vector_store.upsert_chunks(batch, embeddings)
 
         await _abort_if_deleted(db, source.id)
+        await _set_stage(db, source, "cleaning")
+        await vector_store.delete_source_except(source_id, written)
         for old_pid, new_pid in repointed.items():
             await db.execute(
                 update(ChunkEdit).where(ChunkEdit.chunk_point_id == old_pid).values(chunk_point_id=new_pid)
@@ -202,13 +208,16 @@ async def ingest(db: AsyncSession, source: Source) -> None:
         raw = str(exc)[:1000]
         code, friendly, hint = classify_error(raw)
         log.error("ingestion.failed", source_id=source_id, error=raw, code=code)
-        source.status = SourceStatus.error
-        # El chunk_count parcial no representa el documento completo; se limpia lo indexado.
-        source.chunk_count = 0
         try:
-            await vector_store.delete_source(source_id)
+            await vector_store.delete_points(written)
         except Exception as vec_exc:
             log.warning("ingestion.vector_cleanup_failed", source_id=source_id, error=str(vec_exc))
+        prev_review, prev_count = previous
+        if prev_count:
+            source.status, source.review_status, source.chunk_count = SourceStatus.ready, prev_review, prev_count
+        else:
+            source.status = SourceStatus.error
+            source.chunk_count = 0
         source.error_message = friendly or raw
         source.error_code = code
         source.error_hint = hint
@@ -227,4 +236,3 @@ async def ingest(db: AsyncSession, source: Source) -> None:
             })
         except Exception as notify_exc:
             log.debug("ingestion.notify_doc_error_failed", source_id=source_id, error=str(notify_exc))
-        raise

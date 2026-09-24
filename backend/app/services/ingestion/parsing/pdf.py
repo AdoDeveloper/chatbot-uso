@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 
 import structlog
 
@@ -16,22 +17,12 @@ async def parse_pdf(file_path: str) -> str:
     try:
         text = await loop.run_in_executor(
             None,
-            lambda: pymupdf4llm.to_markdown(file_path, force_text=True),
+            lambda: pymupdf4llm.to_markdown(file_path, force_text=True, show_progress=False),
         )
-        if text and text.strip():
-            log.info("pdf.parsed", method="pymupdf4llm", path=file_path, chars=len(text))
-            return text
-        log.info("pdf.empty_output", path=file_path, fallback="ocr")
-    except Exception as exc:
-        log.warning("pdf.layout_extract_failed", error=str(exc), path=file_path)
-
-    try:
-        text = await loop.run_in_executor(
-            None,
-            lambda: pymupdf4llm.to_markdown(file_path, force_text=False),
-        )
-        log.info("pdf.parsed", method="pymupdf4llm+ocr", path=file_path, chars=len(text))
-        return text
     except Exception as exc:
         log.error("pdf.parse_failed", error=str(exc), path=file_path)
         raise RuntimeError(f"No se pudo parsear el PDF: {exc}") from exc
+    if not text or not re.search(r"\w", text):
+        raise ValueError("El PDF está sin texto seleccionable")
+    log.info("pdf.parsed", method="pymupdf4llm", path=file_path, chars=len(text))
+    return text

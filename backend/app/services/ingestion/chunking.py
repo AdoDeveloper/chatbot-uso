@@ -33,9 +33,11 @@ def _make_splitters(
     )
     return parent, child
 
+_NUMBERED_PATTERN = re.compile(r"^(\d+(?:\.\d+)*\.?)\s+\**(.+?)\**\s*$", re.MULTILINE)
+_MAX_NUMBERED_HEADING_CHARS = 80
 _SECTION_PATTERNS = [
     re.compile(r"^(#{2,4})\s+(.+)$", re.MULTILINE),
-    re.compile(r"^(\d+(?:\.\d+)*\.?)\s+\**(.+?)\**\s*$", re.MULTILINE),
+    _NUMBERED_PATTERN,
     re.compile(r"^\*\*(.+?)\*\*\s*$", re.MULTILINE),
 ]
 
@@ -51,11 +53,15 @@ def _detect_sections(text: str) -> list[tuple[str, str]]:
             if match.lastindex is None:
                 continue
             title = match.group(match.lastindex).strip().strip("*").strip()
+            if pattern is _NUMBERED_PATTERN:
+                if len(match.group(0)) > _MAX_NUMBERED_HEADING_CHARS:
+                    continue
+                title = f"{match.group(1)} {title}"
             if len(title) > 2:
                 headings.append((match.start(), title))
 
     for match in _ALLCAPS_PATTERN.finditer(text):
-        title = match.group(1).strip().title()
+        title = match.group(1).strip()
         if len(title) > 3 and not title.isdigit():
             headings.append((match.start(), title))
 
@@ -67,13 +73,14 @@ def _detect_sections(text: str) -> list[tuple[str, str]]:
 
     sections: list[tuple[str, str]] = []
 
-    first_pos = headings[0][0]
-    if first_pos > 0:
-        preamble = text[:first_pos].strip()
-        if len(preamble) > 50:
-            sections.append(("General", preamble))
-
     pending: list[str] = []
+    preamble = text[:headings[0][0]].strip()
+    if preamble:
+        if "\n" in preamble or len(preamble) > 120:
+            sections.append(("General", preamble))
+        else:
+            pending.append(preamble)
+
     for i, (pos, title) in enumerate(headings):
         body_end = headings[i + 1][0] if i + 1 < len(headings) else len(text)
         body = text[pos:body_end]

@@ -150,4 +150,27 @@ def test_allcaps_heading_does_not_span_lines():
 
     sections = _detect_sections("REQUISITOS\n\nPRESENTAR PARTIDA\n\nTexto normal del documento.")
     assert all("\n" not in title for title, _ in sections)
-    assert any("Requisitos" in title for title, _ in sections)
+    assert any("REQUISITOS" in title for title, _ in sections)
+
+
+_TRICKY_TEXTS = {
+    "líneas que empiezan con número": "Plazos\n\nEl pago es en ventanilla.\n30 días hábiles para presentar.\n2025 es el año de vigencia.",
+    "preámbulo corto": "Universidad de Sonsonate\n\n## Reglamento\n\nArt. 1.- Texto del artículo.",
+    "siglas en mayúsculas": "REQUISITOS DEL DUI Y NIT\n\nPresentar copia del DUI.",
+    "títulos encadenados": "## Capítulo I\n\n### Sección A\n\n**Nota**\n\n**Aviso**\n\nContenido final.",
+    "lista numerada": "## Pasos\n\n1. Pagar $25 en caja.\n2. Llenar la solicitud.\n3. Esperar 8 días.",
+    "tabla": "## Aranceles\n\n| Trámite | Costo |\n|---|---|\n| Constancia | $10 |\n| Cambio | $25 |",
+    "documento largo": "\n\n".join(f"## Art. {i}\n\n" + f"El plazo {i} es de {i * 3} días y cuesta ${i * 7}. " * 30 for i in range(1, 15)),
+}
+
+
+@pytest.mark.parametrize("name", list(_TRICKY_TEXTS))
+def test_every_word_and_number_reaches_the_chunks(name):
+    import re
+
+    from app.services.ingestion.chunking import chunk_text
+
+    text = _TRICKY_TEXTS[name]
+    joined = " ".join(c["text"] for c in chunk_text(text, "s", "n"))
+    missing = set(re.findall(r"\w+", text)) - set(re.findall(r"\w+", joined))
+    assert not missing, f"{name}: se perdieron {sorted(missing)}"
