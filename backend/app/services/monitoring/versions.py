@@ -504,6 +504,8 @@ async def restore_snapshot(
 
         for pid, p in db_providers.items():
             if pid not in snap_providers:
+                if p.is_active:
+                    warnings.append(f"Proveedor '{p.name}' desactivado porque no existía en esta versión")
                 p.is_active = False
                 p.priority = None
 

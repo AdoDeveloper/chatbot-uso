@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import re
+import uuid
 from datetime import datetime, timezone
 
 import structlog
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings as get_env_settings
+from app.models.chunk_edit import ChunkEdit
 from app.models.enums import ReviewStatus, SourceStatus, SourceType
 from app.models.source import Source
 from app.services.ai.embedding import embed_texts_async
@@ -39,6 +42,49 @@ async def _abort_if_deleted(db: AsyncSession, source_pk) -> None:
     deleted_at = result.scalar_one_or_none()
     if deleted_at is not None:
         raise _SourceDeletedDuringIngestion()
+
+
+_SECTION_PREFIX = re.compile(r"^\[Sección:.*?\]\n")
+
+
+def _body(text: str) -> str:
+    return _SECTION_PREFIX.sub("", text, count=1).strip()
+
+
+async def _carry_review_marks(db: AsyncSession, source_id: str, chunks: list[dict]) -> dict[str, str]:
+    """Reaplica ediciones y descartes del panel a los fragmentos nuevos con el mismo texto."""
+    existing = await vector_store.list_all_chunks(source_id)
+    if not existing:
+        return {}
+    rows = (await db.execute(
+        select(ChunkEdit).where(ChunkEdit.source_id == uuid.UUID(source_id)).order_by(ChunkEdit.edited_at)
+    )).scalars().all()
+    original_by_point: dict[str, str] = {}
+    for row in rows:
+        original_by_point.setdefault(row.chunk_point_id, row.previous_content)
+
+    edited: dict[str, tuple[str, str]] = {}
+    discarded: set[str] = set()
+    for point in existing:
+        pid, text = point["id"], point.get("text", "")
+        if pid in original_by_point:
+            edited.setdefault(_body(original_by_point[pid]), (pid, text))
+        if point.get("is_discarded"):
+            discarded.add(_body(text))
+
+    repointed: dict[str, str] = {}
+    for chunk in chunks:
+        match = edited.pop(_body(chunk["text"]), None)
+        if match:
+            old_pid, edited_text = match
+            if chunk.get("parent_text"):
+                chunk["parent_text"] = chunk["parent_text"].replace(_body(chunk["text"]), _body(edited_text), 1)
+            chunk["text"] = edited_text
+            chunk["point_id"] = str(uuid.uuid4())
+            repointed[old_pid] = chunk["point_id"]
+        if _body(chunk["text"]) in discarded:
+            chunk["is_discarded"] = True
+    return repointed
 
 
 async def ingest(db: AsyncSession, source: Source) -> None:
@@ -100,6 +146,7 @@ async def ingest(db: AsyncSession, source: Source) -> None:
                 c["warnings"] = compute_warnings(c["text"], env.CHATBOT_CHUNK_PARENT_SIZE)
 
         await vector_store.ensure_collection()
+        repointed = await _carry_review_marks(db, source_id, chunks)
 
         await _abort_if_deleted(db, source.id)
         await _set_stage(db, source, "cleaning")
@@ -116,6 +163,10 @@ async def ingest(db: AsyncSession, source: Source) -> None:
             total_upserted += await vector_store.upsert_chunks(batch, embeddings)
 
         await _abort_if_deleted(db, source.id)
+        for old_pid, new_pid in repointed.items():
+            await db.execute(
+                update(ChunkEdit).where(ChunkEdit.chunk_point_id == old_pid).values(chunk_point_id=new_pid)
+            )
         source.status = SourceStatus.ready
         source.chunk_count = total_upserted
         source.progress_stage = None

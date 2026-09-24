@@ -125,3 +125,29 @@ class TestCustomSizes:
         small = chunk_text(text, SOURCE_ID, SOURCE_NAME, child_size=200, parent_size=800)
         large = chunk_text(text, SOURCE_ID, SOURCE_NAME, child_size=1000, parent_size=2000)
         assert len(small) > len(large)
+
+
+
+def test_consecutive_headings_are_kept_as_hierarchy():
+    from app.services.ingestion.chunking import chunk_text
+
+    text = "## Capítulo V\n\n### Proyecto de investigación\n\nArt. 16.- Es el proceso de investigación."
+    chunks = chunk_text(text, "s", "n")
+    assert any("[Sección: Capítulo V > Proyecto de investigación]" in c["text"] for c in chunks)
+
+
+def test_trailing_headings_without_body_are_not_lost():
+    from app.services.ingestion.chunking import chunk_text
+
+    text = "## Sección\n\nContenido de la sección.\n\n**Aviso final importante**\n\n**Última línea**"
+    joined = " ".join(c["text"] for c in chunk_text(text, "s", "n"))
+    assert "Aviso final importante" in joined
+    assert "Última línea" in joined
+
+
+def test_allcaps_heading_does_not_span_lines():
+    from app.services.ingestion.chunking import _detect_sections
+
+    sections = _detect_sections("REQUISITOS\n\nPRESENTAR PARTIDA\n\nTexto normal del documento.")
+    assert all("\n" not in title for title, _ in sections)
+    assert any("Requisitos" in title for title, _ in sections)

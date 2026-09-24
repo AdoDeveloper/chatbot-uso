@@ -114,8 +114,7 @@ async def upsert_chunks(
             "source_id": chunk["source_id"],
             "source_name": chunk["source_name"],
             "chunk_index": chunk["chunk_index"],
-            # Flags de revisión por defecto: el admin puede alternar is_discarded desde el UI de revisión
-            "is_discarded": False,
+            "is_discarded": bool(chunk.get("is_discarded", False)),
         }
         if "section" in chunk:
             payload["section"] = chunk["section"]
@@ -127,7 +126,7 @@ async def upsert_chunks(
 
         points.append(
             PointStruct(
-                id=str(uuid.uuid4()),
+                id=chunk.get("point_id") or str(uuid.uuid4()),
                 vector={
                     DENSE_VECTOR: emb["dense"],
                     SPARSE_VECTOR: SparseVector(

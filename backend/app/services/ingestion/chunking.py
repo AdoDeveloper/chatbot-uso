@@ -40,7 +40,7 @@ _SECTION_PATTERNS = [
 ]
 
 
-_ALLCAPS_PATTERN = re.compile(r"^([A-ZÁÉÍÓÚÑÜ\s]{4,})$", re.MULTILINE)
+_ALLCAPS_PATTERN = re.compile(r"^([A-ZÁÉÍÓÚÑÜ \t]{4,})$", re.MULTILINE)
 
 
 def _detect_sections(text: str) -> list[tuple[str, str]]:
@@ -73,19 +73,25 @@ def _detect_sections(text: str) -> list[tuple[str, str]]:
         if len(preamble) > 50:
             sections.append(("General", preamble))
 
+    pending: list[str] = []
     for i, (pos, title) in enumerate(headings):
         body_end = headings[i + 1][0] if i + 1 < len(headings) else len(text)
         body = text[pos:body_end]
         body_lines = body.split("\n", 1)
         body = body_lines[1].strip() if len(body_lines) > 1 else ""
-        if body:
-            sections.append((title, body))
+        if not body:
+            pending.append(title)
+            continue
+        sections.append((" > ".join([*pending, title]), body))
+        pending = []
+    if pending:
+        sections.append(("General", "\n\n".join(pending)))
 
     return sections if sections else [("General", text)]
 
 
 def _deduplicate_headings(
-    headings: list[tuple[int, str]], min_distance: int = 20
+    headings: list[tuple[int, str]], min_distance: int = 1
 ) -> list[tuple[int, str]]:
     if not headings:
         return headings

@@ -256,3 +256,20 @@ class TestRollback:
 
         settings = await client.get("/api/v1/settings", headers=auth_headers(admin_user))
         assert settings.json()["system_prompt"] == "Prompt original"
+
+    async def test_rollback_warns_about_providers_it_deactivates(
+        self, client, admin_user, auth_headers, db_session,
+    ):
+        from app.models.llm_provider import LLMProvider
+
+        await _add_setting(db_session, "system_prompt", "Antes del proveedor")
+        v1 = await client.post("/api/v1/versions", json={"description": "v1"}, headers=auth_headers(admin_user))
+        db_session.add(LLMProvider(
+            id=uuid.uuid4(), name="Proveedor nuevo", provider_type="openai",
+            model_name="m", is_active=True, priority=1,
+        ))
+        await db_session.commit()
+
+        r = await client.post(f"/api/v1/versions/{v1.json()['id']}/rollback", headers=auth_headers(admin_user))
+        assert r.status_code == 200
+        assert any("Proveedor nuevo" in w and "desactivado" in w for w in r.json()["warnings"])
