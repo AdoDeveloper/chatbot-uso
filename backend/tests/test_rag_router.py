@@ -39,6 +39,8 @@ class TestGreetingDetection:
         "hola, ¿qué tal?",
         "gracias, hola",
         "ok gracias perfecto",
+        "muchas gracias",
+        "Mil gracias!",
     ])
     def test_classifies_greetings(self, query: str):
         assert classify_query(query) == QueryRoute.GREETING

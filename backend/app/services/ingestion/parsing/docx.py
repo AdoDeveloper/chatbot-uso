@@ -44,6 +44,10 @@ _HEADING_STYLES: dict[str, str] = {
     "título 4":    "#####",
 }
 
+# Párrafos de cuerpo con estilo de título por error de formato: tratados como
+# encabezado, el fragmentador los descartaría por no tener contenido debajo.
+_MAX_HEADING_CHARS = 150
+
 
 async def parse_docx(file_path: str) -> str:
     """Extrae texto de un archivo DOCX preservando estructura."""
@@ -68,7 +72,7 @@ async def parse_docx(file_path: str) -> str:
 
                 style_name = (para.style.name or "").strip().lower()
 
-                if style_name in _HEADING_STYLES:
+                if style_name in _HEADING_STYLES and len(text) <= _MAX_HEADING_CHARS:
                     parts.append(f"{_HEADING_STYLES[style_name]} {text}")
                     continue
 

@@ -12,7 +12,8 @@ _GREETING_TOKENS: set[tuple[str, ...]] = {
     ("hola",), ("hey",), ("hi",), ("hello",),
     ("buen",), ("buena",), ("buenos",), ("buenas",),
     ("buenos", "dias"), ("buenas", "tardes"), ("buenas", "noches"),
-    ("gracias",), ("ok",), ("vale",), ("perfecto",), ("entendido",),
+    ("gracias",), ("muchas", "gracias"), ("mil", "gracias"),
+    ("ok",), ("vale",), ("perfecto",), ("entendido",),
     ("como", "estas"), ("que", "tal"),
 }
 _MAX_PHRASE_WORDS = max(len(t) for t in _GREETING_TOKENS)

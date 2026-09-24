@@ -147,6 +147,26 @@ class TestParseDocx:
         text = await parse_docx(path)
         assert "## Encabezado en español" in text
 
+    async def test_long_paragraph_with_heading_style_is_kept_as_body(self, tmp_path):
+        from docx import Document
+
+        from app.services.ingestion.chunking import chunk_text
+
+        body = ("Los derechos patrimoniales derivados de los trabajos de graduación pertenecerán "
+                "a la Universidad, la cual podrá ejercerlos con fines académicos e institucionales.")
+        path = str(tmp_path / "mal_formato.docx")
+        doc = Document()
+        for line in ("Art. 11- Derechos de autor.", body):
+            doc.add_paragraph(line).style = doc.styles["Heading 1"]
+        doc.add_paragraph("Art. 12").style = doc.styles["Heading 1"]
+        doc.save(path)
+
+        text = await parse_docx(path)
+        assert "## Art. 11- Derechos de autor." in text
+        assert f"## {body}" not in text
+        chunks = chunk_text(text, "sid", "Reglamento")
+        assert any("derechos patrimoniales" in c["text"] for c in chunks)
+
     def test_heading_styles_dict_covers_es_variants(self):
         from app.services.ingestion.parsing.docx import _HEADING_STYLES
 
