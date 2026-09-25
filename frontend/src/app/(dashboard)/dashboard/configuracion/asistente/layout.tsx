@@ -92,8 +92,15 @@ export default function AsistenteLayout({ children }: { children: React.ReactNod
     setSaving(true);
     try {
       invalidateApiCache("/settings");
-      const { data } = await api.put<ChatbotSettings & { warnings?: string[] }>("/settings", form);
-      setSavedForm(form);
+      const changes = savedForm
+        ? Object.fromEntries(Object.entries(form).filter(([k, v]) =>
+          JSON.stringify(v) !== JSON.stringify(savedForm[k as keyof ChatbotSettings])))
+        : form;
+      const { data } = await api.put<ChatbotSettings & { warnings?: string[] }>("/settings", changes);
+      const saved: ChatbotSettings & { warnings?: string[] } = { ...data };
+      delete saved.warnings;
+      setForm(saved);
+      setSavedForm(saved);
       refetchSettings();
       if (data.warnings?.length) {
         toast({ type: "warning", title: "Guardado con advertencias", message: data.warnings.join(" | ") });

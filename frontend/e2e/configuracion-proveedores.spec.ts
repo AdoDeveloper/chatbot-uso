@@ -19,7 +19,7 @@ test.describe("Configuracion > Proveedores", () => {
     await page.goto("/dashboard/configuracion/proveedores");
     await expect(page.getByText(/cadena de proveedores/i)).toBeVisible({ timeout: 10_000 });
 
-    await page.getByRole("button", { name: /^agregar$/i }).click();
+    await page.getByRole("button", { name: /^agregar$/i }).first().click();
     const createDialog = page.getByRole("dialog");
     await expect(createDialog.getByRole("heading", { name: /agregar proveedor/i })).toBeVisible();
 
@@ -95,7 +95,7 @@ test.describe("Configuracion > Proveedores", () => {
   test("modal agregar proveedor: mostrar/ocultar API key, boton Probar, cancelar", async ({ page }) => {
     test.setTimeout(70_000);
     await page.goto("/dashboard/configuracion/proveedores");
-    await page.getByRole("button", { name: /^agregar$/i }).click();
+    await page.getByRole("button", { name: /^agregar$/i }).first().click();
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByRole("heading", { name: /agregar proveedor/i })).toBeVisible();
 
@@ -129,7 +129,7 @@ test.describe("Configuracion > Proveedores", () => {
     test.setTimeout(70_000);
     const name = `E2E Chain Order ${Date.now()}`;
     await page.goto("/dashboard/configuracion/proveedores");
-    await page.getByRole("button", { name: /^agregar$/i }).click();
+    await page.getByRole("button", { name: /^agregar$/i }).first().click();
     const createDialog = page.getByRole("dialog");
     await createDialog.locator("input").first().fill(name);
     await createDialog.locator("select").first().selectOption("__custom__");

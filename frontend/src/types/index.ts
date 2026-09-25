@@ -69,6 +69,7 @@ export interface LLMProvider {
   extra_headers: Record<string, string>;
   dashboard_url: string | null;
   has_api_key: boolean;
+  api_key_unreadable?: boolean;
   is_active: boolean;
   priority: number | null;
   created_at: string;

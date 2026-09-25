@@ -47,7 +47,9 @@ se pueden crear roles adicionales ni cambiar qué puede hacer cada uno (ver
 
 Al entrar se muestra el **panel principal** con un resumen del estado del sistema:
 consultas del día, tasa de resolución, fuentes activas y accesos rápidos a las
-tareas más comunes.
+tareas más comunes. La **tasa de resolución** es el porcentaje de preguntas
+sin respuesta de la semana que el equipo ya atendió (por ejemplo, creando una
+FAQ); si en la semana no hubo preguntas sin respuesta, muestra 100%.
 
 Si el sistema está recién instalado, aparece un **asistente de configuración**
 que guía los pasos iniciales en orden:

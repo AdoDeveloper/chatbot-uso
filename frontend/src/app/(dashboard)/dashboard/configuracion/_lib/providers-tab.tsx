@@ -518,7 +518,9 @@ function ProviderRow({
 
  // Badge de estado real
  let healthBadge: { label: string; cls: string } | null = null;
- if (p.last_test_at == null) {
+ if (p.api_key_unreadable) {
+  healthBadge = { label: "Reingresar clave", cls: "bg-destructive/5 text-destructive border-destructive/20" };
+ } else if (p.last_test_at == null) {
   healthBadge = { label: "Sin probar", cls: "bg-muted text-muted-foreground border-border" };
  } else if (p.last_test_ok) {
   healthBadge = { label: `OK · ${p.last_test_latency_ms ?? "?"}ms`, cls: "bg-success/10 text-success border-success/30" };

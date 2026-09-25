@@ -425,7 +425,11 @@ export function WidgetTab({
    setSaving(true);
    try {
     invalidateApiCache("/widget/config");
-    const { data } = await api.put<WidgetConfig>("/widget/config", config);
+    const changes = effectiveSavedConfig
+     ? Object.fromEntries(Object.entries(config).filter(([k, v]) =>
+       JSON.stringify(v) !== JSON.stringify(effectiveSavedConfig[k as keyof WidgetConfig])))
+     : config;
+    const { data } = await api.put<WidgetConfig>("/widget/config", changes);
     setConfig(data);
     if (isControlled) setSavedConfigProp?.(data); else setSavedConfig(data);
     toast({ type: "success", message: "Configuración del widget guardada." });
