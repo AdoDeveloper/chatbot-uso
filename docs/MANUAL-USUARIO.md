@@ -101,6 +101,12 @@ Las FAQ son pares de pregunta y respuesta que se crean directamente desde el
 panel, sin subir un archivo. A diferencia de los documentos, **se aprueban
 automáticamente** al crearse.
 
+Una FAQ puede apuntar a una imagen o a un documento PDF publicado en internet.
+Para que el asistente lo ofrezca cuando corresponde, describa en la respuesta
+qué contiene el enlace, por ejemplo «Los aranceles de Ingeniería en Sistemas
+están en este documento: https://…/aranceles.pdf». Una respuesta que solo
+contiene la URL hace que el asistente a veces diga que no tiene el dato.
+
 ### 3.4 Consulta
 
 La pantalla **Consulta** permite hacer una pregunta de prueba directamente
@@ -171,16 +177,17 @@ mensaje de bienvenida, sugerencias, etiqueta junto al botón flotante, dominios
 permitidos y opciones de visualización. Genera el código de integración para
 el sitio.
 
-En pantallas de celular, el chat se abre a pantalla completa. Si un documento
-fuente incluye el enlace a una imagen o a un PDF, el chatbot puede mostrarlo
-directamente en la conversación (la imagen se ve embebida; el PDF aparece
-como un botón para abrirlo).
+En pantallas de celular, el chat se abre a pantalla completa. Los límites
+de uso del widget se configuran aquí: **mensajes por sesión** (por cada
+visitante) y **mensajes por día**, que es un tope **global** para todos los
+visitantes; al alcanzarlo, el chat deja de responder a todos hasta el día
+siguiente, por lo que conviene dejarlo vacío o con un valor holgado.
 
-### 4.7 Playground y Publicaciones
+### 4.7 Previsualizar e Historial
 
-- **Playground**: prueba el chatbot tal como lo vería un visitante, con la
-  configuración vigente.
-- **Publicaciones**: historial de cambios de la configuración. Cada cambio se
+- **Previsualizar** (Asistente → Previsualizar): prueba el chatbot tal como lo
+  vería un visitante, con la configuración vigente.
+- **Historial**: historial de cambios de la configuración. Cada cambio se
   aplica **de inmediato** al widget (no hay un paso de publicación aparte), y
   el sistema guarda una versión **automáticamente** cada vez que se modifica
   algo (proveedores, asistente, widget, escalamiento, etc.), además de los
@@ -313,7 +320,24 @@ Al pasar el cursor sobre una respuesta del asistente aparecen tres controles:
   su consulta. Esta valoración queda disponible para el equipo administrador
   en Estadísticas → Retroalimentación.
 
-### 9.3 Accesibilidad
+### 9.3 Imágenes y documentos PDF en las respuestas
+
+Cuando la información aprobada incluye el enlace a una imagen (.png, .jpg,
+.jpeg, .gif o .webp) o a un documento PDF relacionado con la pregunta, el
+asistente lo incluye en la respuesta:
+
+- **Imágenes**: se muestran dentro de la respuesta, ajustadas al ancho del chat.
+- **PDF**: aparecen como un botón con el ícono de documento y su nombre (por
+  ejemplo «Aranceles Ingeniería en Sistemas»); si el nombre no está disponible
+  se muestra «Documento PDF». Al hacer clic, el documento se abre en una
+  pestaña nueva.
+
+El asistente solo comparte imágenes y documentos relacionados con la pregunta
+y nunca escribe enlaces que no estén en la información aprobada. Por
+seguridad, el contenido de las respuestas se filtra antes de mostrarse: se
+eliminan scripts, enlaces `javascript:` y atributos de eventos.
+
+### 9.4 Accesibilidad
 
 Desde el menú de opciones del widget, el botón **Accesibilidad** abre un
 panel con dos ajustes que se recuerdan entre visitas (guardados en el
@@ -322,18 +346,21 @@ navegador del visitante):
 - **Tamaño del texto**: pequeño, normal o grande.
 - **Alto contraste**: activa una paleta de colores de mayor contraste.
 
-### 9.4 Encuesta de satisfacción (CSAT)
+### 9.5 Encuesta de satisfacción (CSAT)
 
 Al finalizar la conversación (menú de opciones → Finalizar chat), se invita
 al visitante a calificarla del 1 al 5, opcionalmente indicar un motivo y
 dejar un comentario. Estos datos alimentan el indicador de satisfacción en
 Estadísticas.
 
-### 9.5 Solicitar contacto humano (escalamiento)
+### 9.6 Solicitar contacto humano (escalamiento)
 
 Cuando una regla de escalamiento se activa (por ejemplo, el visitante pide
 hablar con una persona, o el asistente detecta baja confianza en sus
 respuestas), el chat muestra una tarjeta ofreciendo derivar la conversación.
+Si el visitante pide directamente hablar con una persona, el asistente le
+responde que puede dejar su correo o su WhatsApp, sin buscar en los
+documentos.
 Si el visitante acepta, puede dejar su correo o número de WhatsApp; el
 sistema notifica al personal administrador según las reglas configuradas en
 Configuración → Escalamiento.

@@ -76,7 +76,7 @@ async def enforce_widget_caps(widget: WidgetConfig, session_id: str) -> None:
         except RateLimitExceeded as exc:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Has alcanzado el límite de mensajes para esta sesión.",
+                detail="Ha alcanzado el límite de mensajes de esta conversación. Finalice el chat e inicie uno nuevo para continuar.",
                 headers={"Retry-After": str(exc.retry_after)},
             )
     if widget.max_chats_per_day:
@@ -89,7 +89,7 @@ async def enforce_widget_caps(widget: WidgetConfig, session_id: str) -> None:
         except RateLimitExceeded as exc:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="El chatbot ha alcanzado su límite diario de mensajes.",
+                detail="El asistente alcanzó el límite de consultas de hoy. Por favor, inténtelo de nuevo mañana.",
                 headers={"Retry-After": str(exc.retry_after)},
             )
 

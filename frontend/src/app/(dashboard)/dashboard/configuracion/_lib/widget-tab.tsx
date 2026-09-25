@@ -538,7 +538,7 @@ export function WidgetTab({
          <Input
           value={config.csat_question ?? ""}
           onChange={(e) => setConfig((c) => c ? { ...c, csat_question: e.target.value } : c)}
-          placeholder="¿Cómo calificarías esta conversación?"
+          placeholder="¿Cómo calificaría esta conversación?"
           maxLength={200}
          />
          <p className="text-2xs text-muted-foreground mt-1">{(config.csat_question ?? "").length}/200 caracteres</p>

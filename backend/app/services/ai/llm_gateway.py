@@ -865,7 +865,7 @@ async def stream_chat(
                     _avisar_degradado(provider_name, str(exc))
             if tokens_yielded > 0:
                 raise RuntimeError(
-                    "La respuesta del servicio de IA se interrumpió. Intenta de nuevo."
+                    "La respuesta del servicio de IA se interrumpió. Inténtelo de nuevo."
                 ) from exc
             continue
 
@@ -881,7 +881,7 @@ async def stream_chat(
             await _db.commit()
     except Exception as _log_exc:
         log.warning("llm.provider_failure_audit_failed", error=str(_log_exc))
-    raise RuntimeError("El servicio de IA no está disponible en este momento. Intenta de nuevo en unos minutos.")
+    raise RuntimeError("El servicio de IA no está disponible en este momento. Inténtelo de nuevo en unos minutos.")
 
 
 _fallback_chain: ContextVar[list | None] = ContextVar("llm_fallback_chain", default=None)

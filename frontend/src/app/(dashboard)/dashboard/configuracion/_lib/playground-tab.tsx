@@ -339,7 +339,7 @@ export function PlaygroundTab({
 
   const primaryColor = activeWidgetConfig?.primary_color ?? "#1C386D";
   const chatbotName = activeWidgetConfig?.chatbot_name ?? "Asistente";
-  const welcomeMessage = activeWidgetConfig?.welcome_message ?? "¡Hola! ¿En qué puedo ayudarte?";
+  const welcomeMessage = activeWidgetConfig?.welcome_message ?? "¡Hola! ¿En qué puedo ayudarle?";
   const showBotIcon = activeWidgetConfig?.show_bot_icon ?? true;
   const suggestions: string[] = activeWidgetConfig?.suggestions ?? [];
   const logoUrl = activeWidgetConfig?.logo_url ?? null;
@@ -361,7 +361,7 @@ export function PlaygroundTab({
   const enableCsat = activeWidgetConfig?.enable_csat ?? false;
   const csatQuestion =
     activeWidgetConfig?.csat_question ??
-    "¿Cómo calificarías esta conversación?";
+    "¿Cómo calificaría esta conversación?";
   const enableEscalation = activeWidgetConfig?.enable_escalation ?? true;
   const launcherLabel = activeWidgetConfig?.launcher_label ?? "";
   const proactiveMessage = activeWidgetConfig?.proactive_message ?? "";
@@ -1220,7 +1220,7 @@ export function PlaygroundTab({
                               type={escalType === "email" ? "email" : "tel"}
                               inputMode={escalType === "email" ? "email" : "tel"}
                               className={`w-full h-8 rounded-lg px-2.5 text-xs outline-none border ${highContrast ? "bg-black text-white placeholder:text-white/50" : "bg-card placeholder:text-muted-foreground/70"} ${escalError ? "border-destructive" : highContrast ? "border-white/40" : "border-border"}`}
-                              placeholder={escalType === "email" ? "tucorreo@ejemplo.com" : "+503 7777 7777"}
+                              placeholder={escalType === "email" ? "correo@ejemplo.com" : "+503 7777 7777"}
                               value={escalValue}
                               onChange={(e) => { setEscalValue(e.target.value); if (escalError) setEscalError(""); }}
                               maxLength={200}
@@ -1305,7 +1305,7 @@ export function PlaygroundTab({
                     )}
                     <textarea
                       className={`w-full rounded-lg px-2.5 py-2 text-xs outline-none border resize-none mt-1 focus:border-(--csat-focus-color) ${highContrast ? "bg-black text-white border-white/40 placeholder:text-white/50" : "bg-card border-border placeholder:text-muted-foreground"}`}
-                      placeholder="Cuéntanos tu experiencia, es opcional…"
+                      placeholder="Cuéntenos su experiencia, es opcional…"
                       maxLength={300}
                       rows={2}
                       value={csatComment}
@@ -1376,7 +1376,7 @@ export function PlaygroundTab({
                     <div className="flex gap-1.5 items-center">
                       <input
                         className="flex-1 h-9 bg-muted rounded-full px-4 text-xs outline-none border border-transparent focus:border-primary placeholder:text-muted-foreground transition-colors"
-                        placeholder="Escribe un mensaje..."
+                        placeholder="Escriba un mensaje..."
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={(e) =>

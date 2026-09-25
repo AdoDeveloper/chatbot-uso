@@ -366,7 +366,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     vertical-align: middle;
-    font-size: 0;
+    font-size: 13px;
   }
   .md-content a.pdf-link::before {
     content: "";
@@ -377,10 +377,10 @@
     -webkit-mask: no-repeat center / contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/%3E%3Cpolyline points='14 2 14 8 20 8'/%3E%3C/svg%3E");
     mask: no-repeat center / contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/%3E%3Cpolyline points='14 2 14 8 20 8'/%3E%3C/svg%3E");
   }
-  .md-content a.pdf-link::after {
-    content: "PDF";
-    flex: 0 0 auto;
-    font-size: 13px;
+  .md-content a.pdf-link .pdf-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .md-content a.pdf-link:hover { background: color-mix(in srgb, var(--pdf-link-color, #1e40af) 18%, transparent); }
   .md-content code { background: rgba(0,0,0,0.06); padding: 1px 5px; border-radius: 4px; font-family: "Fira Code", Consolas, monospace; font-size: 12.5px; }

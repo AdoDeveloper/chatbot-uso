@@ -162,7 +162,7 @@ async def test_quality_evaluation_runs_only_outside_the_draft(
 async def test_greeting_route_returns_message(client, admin_user, auth_headers, mock_pipeline, monkeypatch):
     """Ruta greeting: retrieve_context devuelve un string directo (sin LLM)."""
     async def _retrieve_context(*a, **k):
-        return "¡Hola! ¿En qué puedo ayudarte?"
+        return "¡Hola! ¿En qué puedo ayudarle?"
 
     monkeypatch.setattr(pipeline, "retrieve_context", _retrieve_context)
 

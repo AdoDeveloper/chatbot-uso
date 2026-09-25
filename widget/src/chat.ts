@@ -51,6 +51,15 @@ function parseRetryAfter(resp: Response): number | undefined {
   return Number.isFinite(seconds) && seconds >= 0 ? seconds : undefined;
 }
 
+async function limitDetail(resp: Response): Promise<string | undefined> {
+  try {
+    const data = await resp.clone().json();
+    return typeof data?.detail === "string" && data.detail.trim() ? data.detail : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function wait(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) { reject(new DOMException("Aborted", "AbortError")); return; }
@@ -137,6 +146,14 @@ export async function streamChat(
       return;
     }
     cleanup();
+
+    if (resp.status === 429) {
+      const detail = await limitDetail(resp);
+      if (detail) {
+        callbacks.onError(detail);
+        return;
+      }
+    }
 
     if (resp.status === 429 || resp.status >= 500) {
       lastMessage = resp.status === 429 ? BUSY_MESSAGE : SERVICE_UNAVAILABLE_MESSAGE;

@@ -49,7 +49,7 @@ class TestGreetingDetection:
         response = get_greeting_response()
         assert isinstance(response, str)
         assert len(response) > 0
-        assert "asistente" in response.lower() or "ayudarte" in response.lower()
+        assert "asistente" in response.lower() or "ayudarle" in response.lower()
 
 
 class TestFactualRoute:

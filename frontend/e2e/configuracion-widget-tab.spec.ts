@@ -78,9 +78,9 @@ test.describe("Configuracion > Asistente > Apariencia", () => {
     const csatSwitch = page.getByText(/encuesta de satisfacción/i).locator("../..").locator('[role="switch"]');
     const csatWasOn = (await csatSwitch.getAttribute("aria-checked")) === "true";
     if (!csatWasOn) await csatSwitch.click();
-    await expect(page.getByPlaceholder(/cómo calificarías esta conversación/i)).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByPlaceholder(/cómo calificaría esta conversación/i)).toBeVisible({ timeout: 5_000 });
 
-    const questionInput = page.getByPlaceholder(/cómo calificarías esta conversación/i);
+    const questionInput = page.getByPlaceholder(/cómo calificaría esta conversación/i);
     const originalQuestion = await questionInput.inputValue();
     await questionInput.fill("Pregunta de prueba E2E para CSAT");
     await expect(page.getByText(/32\/200 caracteres/)).toBeVisible();

@@ -92,9 +92,11 @@ marked.use({ breaks: true, gfm: true });
 marked.use({
   renderer: {
     link({ href, text }: { href: string; title?: string | null; text: string }) {
-      const isPdf = /\.pdf(\?.*)?$/i.test(href || "");
-      const cls = isPdf ? ' class="pdf-link"' : "";
-      return `<a href="${href}" target="_blank" rel="noopener noreferrer"${cls}>${text}</a>`;
+      if (!/\.pdf(\?.*)?$/i.test(href || "")) {
+        return `<a href="${href}" target="_blank" rel="noopener noreferrer">${text}</a>`;
+      }
+      const label = !text.trim() || /^https?:\/\//i.test(text.trim()) ? "Documento PDF" : text;
+      return `<a href="${href}" target="_blank" rel="noopener noreferrer" class="pdf-link"><span class="pdf-name">${label}</span></a>`;
     },
     image({ href, text }: { href: string; title?: string | null; text: string }) {
       const raw = href || "";
@@ -1316,7 +1318,7 @@ function ChatWidget({
                           inputMode={escalType === "email" ? "email" : "tel"}
                           autoComplete={escalType === "email" ? "email" : "tel"}
                           class="escal-input"
-                          placeholder={escalType === "email" ? "tucorreo@ejemplo.com" : "+503 7777 7777"}
+                          placeholder={escalType === "email" ? "correo@ejemplo.com" : "+503 7777 7777"}
                           value={escalValue}
                           onInput={(e) => { setEscalValue((e.target as HTMLInputElement).value); if (escalError) setEscalError(""); }}
                           maxLength={200}
@@ -1422,7 +1424,7 @@ function ChatWidget({
                 )}
                 <textarea
                   class="csat-comment"
-                  placeholder="Cuéntanos tu experiencia, es opcional…"
+                  placeholder="Cuéntenos su experiencia, es opcional…"
                   maxLength={300}
                   value={csatComment}
                   onInput={(e) => setCsatComment((e.target as HTMLTextAreaElement).value)}
@@ -1464,7 +1466,7 @@ function ChatWidget({
           <textarea
             ref={inputRef}
             class="input"
-            placeholder={offlineMode ? "Servicio no disponible" : "Escribe un mensaje…"}
+            placeholder={offlineMode ? "Servicio no disponible" : "Escriba un mensaje…"}
             value={input}
             onInput={handleInput}
             onKeyDown={handleKeyDown}
@@ -1580,7 +1582,7 @@ class ChatbotWidgetElement extends HTMLElement {
     const welcomeMessage  =
       this.getAttribute("welcome-message") ??
       this.getAttribute("greeting-message") ??
-      "¡Hola! ¿En qué puedo ayudarte?";
+      "¡Hola! ¿En qué puedo ayudarle?";
     const openOnLoad      = this.getAttribute("open-on-load") === "true";
     const suggestions     = parseSuggestions(this.getAttribute("suggestions"));
     const proactiveMessage = this.getAttribute("proactive-message") ?? "";

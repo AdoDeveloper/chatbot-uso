@@ -16,7 +16,7 @@ from app.core.rate_limit import (
 )
 from app.core.redis import get_redis
 from app.models.audit_log import AuditLog
-from app.models.enums import MessageRole, ReviewStatus, SourceStatus
+from app.models.enums import EscalationTrigger, MessageRole, ReviewStatus, SourceStatus
 from app.models.escalation_rule import EscalationRule
 from app.models.source import Source
 from app.models.widget_config import WidgetConfig
@@ -145,7 +145,7 @@ async def check_limits(db: AsyncSession, client_ip: str, session_id: str | None,
             limit_value=per_min,
             retry_after_seconds=exc.retry_after,
         )
-        return f"Demasiadas peticiones. Espera {exc.retry_after}s e intenta de nuevo."
+        return f"Demasiadas peticiones. Espere {exc.retry_after} s e inténtelo de nuevo."
     return None
 
 
@@ -393,6 +393,33 @@ async def _recent_assistant_rag_scores(db: AsyncSession, conversation_id, *, lim
         if sources
     ]
     return list(reversed(scores))  # cronológico: más antiguo primero
+
+
+HUMAN_REQUEST_REPLY = (
+    "Con gusto. Puede dejar su correo electrónico o su número de WhatsApp y el personal "
+    "de la universidad se comunicará con usted."
+)
+
+
+async def human_request_reply(db: AsyncSession, question: str) -> str | None:
+    """Respuesta directa cuando el usuario pide atención humana y el escalamiento está disponible."""
+    widget = (await db.execute(select(WidgetConfig).limit(1))).scalar_one_or_none()
+    if widget is None or not widget.enable_escalation:
+        return None
+    rules = (await db.execute(
+        select(EscalationRule).where(
+            EscalationRule.enabled.is_(True),
+            EscalationRule.trigger_type == EscalationTrigger.user_request,
+        )
+    )).scalars().all()
+    for rule in rules:
+        matches, _ = evaluate_rule(
+            trigger_type=rule.trigger_type, trigger_config=rule.trigger_config or {},
+            context={"user_message": question},
+        )
+        if matches:
+            return HUMAN_REQUEST_REPLY
+    return None
 
 
 async def _recent_assistant_replies(db: AsyncSession, conversation_id, limit: int = 5) -> list[str]:

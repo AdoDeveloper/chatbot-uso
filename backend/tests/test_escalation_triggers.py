@@ -258,3 +258,33 @@ async def test_confidence_below_rule_does_not_trigger_with_one_good_turn(db_sess
         db_session, conv, question="test",
     )
     assert escalated is False
+
+
+async def _widget(db_session, enable_escalation: bool):
+    from app.models.widget_config import WidgetConfig
+
+    db_session.add(WidgetConfig(
+        id=uuid.uuid4(), chatbot_name="Asistente", welcome_message="Hola", primary_color="#2563EB",
+        position="right", api_key=f"k-{uuid.uuid4().hex[:8]}", domain_allowlist=["*"], suggestions=[],
+        proactive_message="", enable_escalation=enable_escalation,
+    ))
+    db_session.add(EscalationRule(id=uuid.uuid4(), name="Solicita agente", trigger_type="user_request",
+                                  trigger_config={}, enabled=True))
+    await db_session.commit()
+
+
+@pytest.mark.asyncio
+async def test_human_request_gets_direct_reply_when_escalation_is_available(db_session):
+    from app.services.chat.pipeline import HUMAN_REQUEST_REPLY, human_request_reply
+
+    await _widget(db_session, enable_escalation=True)
+    assert await human_request_reply(db_session, "Quiero hablar con una persona") == HUMAN_REQUEST_REPLY
+    assert await human_request_reply(db_session, "¿Qué necesita una persona para inscribirse?") is None
+
+
+@pytest.mark.asyncio
+async def test_human_request_is_answered_normally_when_escalation_is_disabled(db_session):
+    from app.services.chat.pipeline import human_request_reply
+
+    await _widget(db_session, enable_escalation=False)
+    assert await human_request_reply(db_session, "Quiero hablar con una persona") is None

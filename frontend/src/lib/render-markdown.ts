@@ -4,9 +4,11 @@ const _marked = new Marked({ breaks: true, gfm: true, async: false });
 _marked.use({
   renderer: {
     link({ href, text }: { href: string; text: string }) {
-      const isPdf = /\.pdf(\?.*)?$/i.test(href || "");
-      const cls = isPdf ? ' class="pdf-link"' : "";
-      return `<a href="${href}" target="_blank" rel="noopener noreferrer"${cls}>${text}</a>`;
+      if (!/\.pdf(\?.*)?$/i.test(href || "")) {
+        return `<a href="${href}" target="_blank" rel="noopener noreferrer">${text}</a>`;
+      }
+      const label = !text.trim() || /^https?:\/\//i.test(text.trim()) ? "Documento PDF" : text;
+      return `<a href="${href}" target="_blank" rel="noopener noreferrer" class="pdf-link"><span class="pdf-name">${label}</span></a>`;
     },
     image({ href, text }: { href: string; text: string }) {
       const src = href.startsWith("http") || href.startsWith("data:") || href.startsWith("/") ? href : `/uploads/${href}`;

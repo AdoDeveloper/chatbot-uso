@@ -50,7 +50,7 @@ def _is_greeting_only(q: str) -> bool:
 
 _GREETING_RESPONSE = (
     "¡Hola! Soy el asistente virtual de la universidad. "
-    "¿En qué puedo ayudarte? Puedo resolver dudas sobre trámites, "
+    "¿En qué puedo ayudarle? Puedo resolver dudas sobre trámites, "
     "requisitos, fechas, normativas y más."
 )
 

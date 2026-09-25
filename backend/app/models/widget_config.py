@@ -71,8 +71,8 @@ class WidgetConfig(Base):
     show_new_chat_button: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, server_default=sa_text("(1)"))
     enable_csat: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default=sa_text("(0)"))
     csat_question: Mapped[str] = mapped_column(
-        Text, default="¿Cómo calificarías esta conversación?", nullable=False,
-        server_default=sa_text("('¿Cómo calificarías esta conversación?')"),
+        Text, default="¿Cómo calificaría esta conversación?", nullable=False,
+        server_default=sa_text("('¿Cómo calificaría esta conversación?')"),
     )
     enable_escalation: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, server_default=sa_text("(1)"))
     launcher_label: Mapped[str] = mapped_column(

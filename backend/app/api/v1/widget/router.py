@@ -252,7 +252,7 @@ async def public_chat(
         log.warning("widget.chat.llm_queue_timeout", session_id=chat_req.session_id)
         raise HTTPException(
             status_code=503,
-            detail="El asistente está muy solicitado en este momento. Inténtalo de nuevo en unos segundos.",
+            detail="El asistente está muy solicitado en este momento. Inténtelo de nuevo en unos segundos.",
         )
 
     return await run_chat(chat_req, db, client_ip, origin_url)

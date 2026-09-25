@@ -359,7 +359,7 @@ def validate_input(
             log.warning("guardrails.injection_detected", pattern=pat.pattern[:50], label=label)
             return GuardrailResult(
                 False,
-                "No puedo procesar esa solicitud. ¿Puedo ayudarte con algo sobre la universidad?",
+                "No puedo procesar esa solicitud. ¿Puedo ayudarle con algo sobre la universidad?",
                 matched_pattern=pat.pattern,
                 matched_label=label,
                 matched_category=category,

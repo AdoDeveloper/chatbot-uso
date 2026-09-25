@@ -135,6 +135,21 @@ async def _run_chat_inner(
     if limit_error:
         return ChatResponse(type="error", message=limit_error)
 
+    if not is_playground:
+        human_reply = await pipeline.human_request_reply(db, request.question)
+        if human_reply:
+            return await _persist_and_respond(
+                request,
+                client_ip=client_ip,
+                origin_url=origin_url,
+                is_playground=is_playground,
+                final_text=human_reply,
+                sources=[],
+                latency_ms=int((time.monotonic() - t_start) * 1000),
+                history=[],
+                response_kwargs={"rag_route": "escalation"},
+            )
+
     use_cache = not request.messages
     if use_cache:
         cached = await pipeline.lookup_cache(db, request.question, request.source_ids, settings, use_draft)
@@ -206,7 +221,7 @@ async def _run_chat_inner(
         )
     except asyncio.TimeoutError:
         log.warning("chat.rag_timeout", session_id=request.session_id)
-        return ChatResponse(type="error", message="La consulta tardó demasiado en procesarse. Por favor, intenta de nuevo.")
+        return ChatResponse(type="error", message="La consulta tardó demasiado en procesarse. Por favor, inténtelo de nuevo.")
     except Exception as exc:
         log.error("chat.rag_failed", session_id=request.session_id, error=str(exc))
         return ChatResponse(type="error", message=cfg.no_providers_message)
@@ -429,7 +444,7 @@ async def chat(
         log.warning("chat.llm_queue_timeout", session_id=request.session_id)
         raise HTTPException(
             status_code=503,
-            detail="El asistente está muy solicitado en este momento. Inténtalo de nuevo en unos segundos.",
+            detail="El asistente está muy solicitado en este momento. Inténtelo de nuevo en unos segundos.",
         )
 
     if not is_authenticated_playground:
