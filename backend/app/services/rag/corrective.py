@@ -33,6 +33,7 @@ def _sane_threshold(configured: float) -> float:
 
 
 _MIN_DOCS_TRAS_FILTRO = 3
+_GRADE_MAX_DOCS = 8
 
 
 def _completar_con_mejores(docs: list[dict], relevantes: list[dict]) -> list[dict]:
@@ -107,7 +108,7 @@ async def _retrieve(state: RagState) -> dict:
 
 
 async def _grade(state: RagState) -> dict:
-    docs = state["documents"]
+    docs = state["documents"][:_GRADE_MAX_DOCS]
     if not docs:
         return {"relevant_docs": []}
 
@@ -343,6 +344,8 @@ async def run_simple_rag(
     total_before_grade = len(docs)
     aprobados = len(docs)
     if docs and provider is not None:
+        docs = docs[:_GRADE_MAX_DOCS]
+        total_before_grade = len(docs)
         grades = await grade_documents(question, docs, provider, api_key)
         relevantes = [d for d, g in zip(docs, grades) if g]
         aprobados = len(relevantes)

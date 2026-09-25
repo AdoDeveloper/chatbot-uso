@@ -586,7 +586,7 @@ class TestGradeDocuments:
         result = await gw.grade_documents("pregunta", docs, provider, "key")
         assert result == [True]
 
-    async def test_truncates_document_text_to_1000_chars_in_prompt(self, monkeypatch):
+    async def test_truncates_document_text_in_prompt(self, monkeypatch):
         provider = _make_provider()
         captured = {}
 
@@ -598,8 +598,8 @@ class TestGradeDocuments:
         long_text = "x" * 5000
         await gw.grade_documents("pregunta", [{"text": long_text}], provider, "key")
         user_msg = captured["messages"][1]["content"]
-        assert "x" * 1000 in user_msg
-        assert "x" * 1001 not in user_msg
+        assert "x" * gw._GRADE_EXCERPT_CHARS in user_msg
+        assert "x" * (gw._GRADE_EXCERPT_CHARS + 1) not in user_msg
 
 
 class TestOpenAICompatAdapterCompleteReasoningEffort:
@@ -846,3 +846,4 @@ class TestFirstTokenTimeout:
 
         assert chunks == ["hola"]
         assert served["provider_name"] == "Rápido"
+

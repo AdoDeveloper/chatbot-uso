@@ -54,6 +54,14 @@ externo tiene un rate limit más estricto (ver, por ejemplo, la
 que en su plan gratuito limita a 30 peticiones/min y 8,000 tokens/min para
 modelos grandes - verificar el plan contratado antes de subir este valor).
 
+En la práctica, el límite de tokens del proveedor se agota antes que el
+semáforo. Cada pregunta consume dos llamadas: el evaluador de relevancia (los 8
+mejores fragmentos, recortados a 500 caracteres) y la generación de la
+respuesta. Con el plan gratuito de Groq, medido con 4 preguntas simultáneas:
+la primera se responde en unos 4 s, y el resto pasa a los proveedores de
+respaldo por el error 429, con respuestas de 20 a 35 s. Para atender a muchos
+estudiantes a la vez, el proveedor principal debe tener un plan con más cuota.
+
 **Límite aparte, no relacionado con la cola de chats:** el circuit breaker
 de proveedores LLM (`app/services/ai/llm_gateway.py`) guarda su estado en
 memoria del proceso. Con un solo proceso backend (la configuración de esta
@@ -483,6 +491,23 @@ sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t
 sudo systemctl reload nginx
 ```
+
+**IP del cliente.** Los límites del chat se aplican por IP, así que el backend
+necesita la IP real de cada visitante:
+
+- nginx debe fijar `X-Real-IP $remote_addr` (como en la configuración de
+  arriba) y el backend no debe quedar accesible desde fuera sin pasar por nginx
+  (escucha solo en `127.0.0.1:8000`). Si se expone directamente, cualquiera
+  puede enviar su propio `X-Real-IP`.
+- Si hay otro proxy delante de nginx (Cloudflare, un balanceador), nginx verá la
+  IP de ese proxy para todos los visitantes. En ese caso configure
+  `set_real_ip_from` y `real_ip_header` con los rangos de ese proxy.
+- Con Docker Desktop (Windows o Mac) nginx recibe siempre la IP interna de
+  Docker (`172.x.0.1`), no la del visitante: todos compartirían el mismo límite.
+  En un servidor Linux con Docker Engine la IP real se conserva, salvo en modo
+  sin privilegios (rootless) o con clientes IPv6.
+- Verificación: tras desplegar, revise en el registro de nginx que
+  `$remote_addr` muestre IP distintas y no una fija.
 
 ### 9.2 Certificado HTTPS (Let's Encrypt)
 

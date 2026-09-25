@@ -112,6 +112,7 @@ def _avisar_mal_configurado(provider_name: str, error: str) -> None:
 
 _PERMANENT_STATUS_CODES = (401, 402, 403, 404)
 _FIRST_TOKEN_TIMEOUT = 15.0
+_GRADE_EXCERPT_CHARS = 500
 
 
 def _is_permanent_failure(exc: BaseException) -> bool:
@@ -946,7 +947,7 @@ async def grade_documents(
     if not documents:
         return []
 
-    doc_list = "\n".join(f"[{i}] {d['text'][:1000]}" for i, d in enumerate(documents))
+    doc_list = "\n".join(f"[{i}] {d['text'][:_GRADE_EXCERPT_CHARS]}" for i, d in enumerate(documents))
     prompt = (
         "Eres un evaluador de relevancia para un sistema de búsqueda sobre reglamentos "
         "universitarios. Para cada documento numerado, indica true si el documento aporta "

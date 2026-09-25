@@ -389,7 +389,7 @@ chatbot-uso/
 | Redacción de PII | Presidio en español: email, teléfono, tarjeta, IBAN + documentos de El Salvador (DUI, NIT, NRC) |
 | Rate limiting del chat | Multidimensional: por IP/minuto, por IP/hora y por sesión |
 | Widget público | Validación de API key + allowlist de dominios por `Origin` |
-| IP real tras proxy | `CF-Connecting-IP` / `X-Real-IP` / `X-Forwarded-For` |
+| IP real tras proxy | `X-Real-IP` que fija nginx, o el último valor de `X-Forwarded-For`. `CF-Connecting-IP` no se usa porque el cliente puede falsearlo |
 
 ## 9. Notificaciones (correo + bandeja in-app)
 

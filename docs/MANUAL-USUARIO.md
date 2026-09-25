@@ -78,13 +78,22 @@ En **Conocimiento → Documentos** puede:
   no lo usa. Esto evita publicar contenido sin verificar.
 - **Rechazar**: si el contenido no es correcto, puede rechazarse (queda
   archivado, no se elimina).
+- **Reprocesar**: vuelve a extraer y fragmentar el mismo archivo. Si el
+  documento estaba aprobado, sigue aprobado al terminar; mientras se procesa, el
+  chatbot no lo usa. Si el reprocesamiento falla, se conserva la versión anterior
+  y aparece un aviso junto al estado con el motivo.
+- **Reemplazar**: sube una nueva versión del archivo. Como el contenido cambió,
+  el documento vuelve a quedar *pendiente de revisión*.
 
 ### 3.2 Fragmentos (chunks)
 
 Cada documento se divide en **fragmentos** para que el chatbot pueda buscar en
 él. Desde el detalle de un documento puede revisar sus fragmentos, ver
 advertencias automáticas (fragmento muy corto, muy largo, con datos personales)
-y descartar fragmentos individuales que no deban usarse.
+y descartar fragmentos individuales que no deban usarse. También puede
+**editar** el texto de un fragmento; el cambio se aplica al instante en las
+respuestas. Las ediciones y los descartes se conservan al reprocesar el
+documento, siempre que el texto original del fragmento no haya cambiado.
 
 ### 3.3 Preguntas frecuentes (FAQ)
 
@@ -136,9 +145,18 @@ permite crear patrones personalizados.
 ### 4.4 Escalamiento
 
 Configura cuándo una conversación debe derivarse a una persona. Las reglas se
-basan en disparadores como: sin respuesta tras N segundos, solicitud explícita
-del usuario, proporción alta de valoraciones negativas, palabras clave, o
-detección de bucles. Incluye una herramienta para **probar reglas** y un envío
+basan en disparadores como:
+
+- **Sin respuesta**: el asistente responde varias veces seguidas (2 por
+  defecto) que no tiene la información pedida.
+- **Solicitud del usuario**: el visitante pide explícitamente atención humana,
+  con frases como «hablar con un agente» o «que me atienda una persona». Una
+  pregunta que solo menciona a una persona («¿qué necesita una persona para
+  inscribirse?») no la activa. Puede definir frases propias.
+- Proporción alta de valoraciones negativas, palabras clave críticas, baja
+  confianza de la búsqueda o detección de bucles.
+
+ Incluye una herramienta para **probar reglas** y un envío
 de **correo de prueba** para verificar las notificaciones.
 
 ### 4.5 Integraciones
@@ -227,7 +245,8 @@ se muestran según los permisos de cada usuario.
 
 Salud en vivo de los servicios (base de datos, caché, vector store, modelo de
 embeddings) con uptime y percentiles de respuesta. Incluye la configuración del
-**caché de respuestas** (activación, vigencia en horas y umbral de similitud) y
+**caché de respuestas** (activación, vigencia en horas y umbral de similitud,
+entre 0,95 y 0,99) y
 herramientas de mantenimiento:
 
 - **Sincronizar Qdrant ↔ BD**: elimina fragmentos huérfanos del índice.

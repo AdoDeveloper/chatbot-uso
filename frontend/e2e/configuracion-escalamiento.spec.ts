@@ -122,7 +122,7 @@ test.describe("Configuracion > Escalamiento", () => {
     await expect(testDialog.getByText(/probar regla/i)).toBeVisible();
     await expect(testDialog.getByText(/completar el contexto/i)).toBeVisible();
 
-    await testDialog.getByPlaceholder("180").fill("200");
+    await testDialog.locator("textarea").fill("No dispongo de esa información.\nNo tengo esa información.");
     await testDialog.getByRole("button", { name: /ejecutar prueba/i }).click();
     await expect(testDialog.getByText(/la regla (se activaría|no se activaría)/i)).toBeVisible({ timeout: 10_000 });
     await expect(testDialog.getByText(/payload que se enviaría/i)).toBeVisible();

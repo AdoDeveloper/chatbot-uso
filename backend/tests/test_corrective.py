@@ -482,3 +482,21 @@ def test_grading_with_nothing_approved_means_no_context():
     from app.services.rag.corrective import _completar_con_mejores
 
     assert _completar_con_mejores([{"text": "d0"}], []) == []
+
+
+async def test_grader_only_sees_the_top_candidates():
+    from unittest.mock import AsyncMock, patch
+
+    from app.services.rag.corrective import _GRADE_MAX_DOCS, run_simple_rag
+
+    docs = [{"id": f"c{i}", "text": "x" * 2000} for i in range(15)]
+    grade = AsyncMock(side_effect=lambda q, d, p, k: [True] * len(d))
+    with (
+        patch("app.services.rag.corrective.embed_texts_async", AsyncMock(return_value=[SAMPLE_EMB])),
+        patch("app.services.rag.corrective.vector_store.hybrid_search", AsyncMock(return_value=docs)),
+        patch("app.services.rag.corrective.grade_documents", grade),
+    ):
+        result, _ = await run_simple_rag("pregunta", top_k=15, provider=_PROVIDER_STUB, api_key="k")
+
+    assert len(grade.await_args.args[1]) == _GRADE_MAX_DOCS
+    assert len(result) == _GRADE_MAX_DOCS

@@ -302,7 +302,7 @@ export default function EscalamientoConfigPage() {
                             </Badge>
                           </div>
                           <p className="text-2xs text-muted-foreground mt-0.5">
-                            <span className="font-medium">Trigger:</span> {TRIGGER_LABELS[rule.trigger_type]}
+                            <span className="font-medium">Activación:</span> {TRIGGER_LABELS[rule.trigger_type]}
                           </p>
                           {rule.description && (
                             <p className="text-2xs text-muted-foreground mt-1 leading-snug break-words">{rule.description}</p>

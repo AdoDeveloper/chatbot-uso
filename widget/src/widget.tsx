@@ -1422,7 +1422,7 @@ function ChatWidget({
                 )}
                 <textarea
                   class="csat-comment"
-                  placeholder="Cuéntenos su experiencia, es opcional…"
+                  placeholder="Cuéntanos tu experiencia, es opcional…"
                   maxLength={300}
                   value={csatComment}
                   onInput={(e) => setCsatComment((e.target as HTMLTextAreaElement).value)}
