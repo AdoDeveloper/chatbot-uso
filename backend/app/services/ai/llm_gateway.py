@@ -112,6 +112,7 @@ def _avisar_mal_configurado(provider_name: str, error: str) -> None:
 
 _PERMANENT_STATUS_CODES = (401, 402, 403, 404)
 _FIRST_TOKEN_TIMEOUT = 15.0
+_FALLBACK_FIRST_TOKEN_TIMEOUT = 25.0
 _GRADE_EXCERPT_CHARS = 500
 
 
@@ -819,11 +820,12 @@ async def stream_chat(
     ]
 
     last_error: Exception | None = None
-    for pid, provider_name, model_name, provider_type, api_base, api_key, extra_headers in plain_chain:
+    for position, (pid, provider_name, model_name, provider_type, api_base, api_key, extra_headers) in enumerate(plain_chain):
         if _breaker.is_open(pid):
             log.info("llm.circuit_open_skip", provider=provider_name)
             continue
         tokens_yielded = 0
+        first_token_timeout = _FIRST_TOKEN_TIMEOUT if position == 0 else _FALLBACK_FIRST_TOKEN_TIMEOUT
         try:
             # _get_adapter() dentro del try: un proveedor mal configurado no debe
             # tumbar el bucle de fallback sin probar el resto de la cadena.
@@ -832,7 +834,7 @@ async def stream_chat(
                      adapter=type(adapter).__name__)
             stream = adapter.stream_chat(messages, temperature, max_tokens).__aiter__()
             try:
-                first = await asyncio.wait_for(stream.__anext__(), timeout=_FIRST_TOKEN_TIMEOUT)
+                first = await asyncio.wait_for(stream.__anext__(), timeout=first_token_timeout)
             except StopAsyncIteration:
                 first = None
             except asyncio.TimeoutError:

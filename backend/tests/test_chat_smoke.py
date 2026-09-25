@@ -16,6 +16,7 @@ def _fake_cfg():
     """Config mínima del chatbot que el pipeline espera (atributos accedidos)."""
     return SimpleNamespace(
         use_corrective_rag=False,
+        quality_eval_rate=100,
         system_prompt="Eres un asistente.",
         temperature=0.2,
         max_tokens=512,
@@ -436,3 +437,37 @@ async def test_answer_uses_plain_hyphens(client, admin_user, auth_headers, mock_
     body = await _post_playground_chat(client, {"question": "¿Teléfono?"}, auth_headers(admin_user))
 
     assert "7851-7588" in body["content"]
+
+
+async def test_faithfulness_is_skipped_outside_the_sample(client, admin_user, auth_headers, mock_pipeline, monkeypatch):
+    async def _retrieve_context(*a, **k):
+        return [{"text": "Contenido.", "source_name": "doc.pdf", "score": 0.9,
+                 "parent_text": "Contenido completo."}], 1.0
+
+    async def _fake_stream_chat(**kwargs):
+        yield "Respuesta."
+
+    async def _load_chat_config(db, use_draft):
+        cfg = _fake_cfg()
+        cfg.quality_eval_rate = 0
+        return cfg
+
+    calls: list[dict] = []
+
+    async def _fake_evaluate_response_quality(*a, **k):
+        calls.append(k)
+
+    monkeypatch.setattr(pipeline, "retrieve_context", _retrieve_context)
+    monkeypatch.setattr(pipeline, "load_chat_config", _load_chat_config)
+    monkeypatch.setattr(chat_router, "stream_chat", _fake_stream_chat)
+    monkeypatch.setattr(pipeline, "evaluate_response_quality", _fake_evaluate_response_quality)
+
+    resp = await client.post(
+        "/api/v1/chat",
+        json={"question": "¿Qué es esto?", "browser": "preview-production", "source_scope": "production"},
+        headers=auth_headers(admin_user),
+    )
+    assert resp.status_code == 200
+    await asyncio.sleep(0)
+
+    assert calls and calls[0]["with_faithfulness"] is False

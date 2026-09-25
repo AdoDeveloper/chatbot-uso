@@ -184,6 +184,8 @@ async def update_provider(db: AsyncSession, provider_id: uuid.UUID, data: Provid
         if data.priority is not None:
             await _shift_priorities(db, data.priority, exclude_id=provider_id)
         provider.priority = data.priority
+        await db.flush()
+        await _compact_priorities(db)
 
     await db.commit()
     await db.refresh(provider)
@@ -196,6 +198,8 @@ async def delete_provider(db: AsyncSession, provider_id: uuid.UUID) -> bool:
     if not provider:
         return False
     await db.delete(provider)
+    await db.flush()
+    await _compact_priorities(db)
     await db.commit()
     log.info("provider.deleted", id=str(provider_id))
     return True
@@ -236,6 +240,14 @@ async def get_provider_with_key(db: AsyncSession, provider_id: uuid.UUID) -> tup
         return None
     key = await _safe_decrypt(provider.api_key_encrypted, provider.name)
     return provider, key
+
+
+async def _compact_priorities(db: AsyncSession) -> None:
+    result = await db.execute(
+        select(LLMProvider).where(LLMProvider.priority.is_not(None)).order_by(LLMProvider.priority.asc())
+    )
+    for position, p in enumerate(result.scalars().all(), start=1):
+        p.priority = position
 
 
 async def _shift_priorities(db: AsyncSession, from_priority: int, exclude_id: uuid.UUID | None) -> None:

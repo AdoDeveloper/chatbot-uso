@@ -55,6 +55,7 @@ class ChatbotSettings(BaseModel):
     temperature: float = Field(0.3, ge=0.0, le=2.0)
     max_tokens: int = Field(1024, ge=64, le=8192)
     use_corrective_rag: bool = True
+    quality_eval_rate: int = Field(20, ge=0, le=100)
     greeting_response: str = Field(
         "¡Hola! Soy el asistente virtual de la universidad. "
         "¿En qué puedo ayudarle? Puedo resolver dudas sobre trámites, "

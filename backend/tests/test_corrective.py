@@ -328,16 +328,17 @@ class TestRunCorrectiveRag:
         assert result == [initial_doc]
         assert ratio == 1.0
 
-    async def test_returns_empty_when_no_relevant_docs(self):
+    async def test_passes_the_top_results_when_nothing_is_approved(self):
+        docs = [{"id": f"chunk-{i}"} for i in range(5)]
         fake_graph = AsyncMock()
-        fake_graph.ainvoke.return_value = {"documents": [{"id": "chunk-1"}], "relevant_docs": []}
+        fake_graph.ainvoke.return_value = {"documents": docs, "relevant_docs": [], "approved_count": 0}
         with patch("app.services.rag.corrective._graph", fake_graph):
             result, ratio = await run_corrective_rag(
                 question="¿Qué carrera ofrece?",
                 provider=_PROVIDER_STUB,
                 api_key=None,
             )
-        assert result == []
+        assert result == docs[:3]
         assert ratio == 0.0
 
 
@@ -500,3 +501,37 @@ async def test_grader_only_sees_the_top_candidates():
 
     assert len(grade.await_args.args[1]) == _GRADE_MAX_DOCS
     assert len(result) == _GRADE_MAX_DOCS
+
+
+async def test_simple_rag_keeps_the_top_results_when_the_grader_rejects_all():
+    from unittest.mock import AsyncMock, patch
+
+    from app.services.rag.corrective import run_simple_rag
+
+    docs = [{"text": f"d{i}", "source_id": "s"} for i in range(6)]
+    emb = [{"dense": [0.0], "sparse_indices": [], "sparse_values": []}]
+    with (
+        patch("app.services.rag.corrective.embed_texts_async", AsyncMock(return_value=emb)),
+        patch("app.services.rag.corrective.vector_store.hybrid_search", AsyncMock(return_value=docs)),
+        patch("app.services.rag.corrective.grade_documents", AsyncMock(return_value=[False] * 6)),
+    ):
+        result, ratio = await run_simple_rag("pregunta", provider=_PROVIDER_STUB, api_key=None)
+
+    assert [d["text"] for d in result] == ["d0", "d1", "d2"]
+    assert ratio == 0.0
+
+
+async def test_rejected_context_is_not_flagged_before_the_model_answers():
+    from unittest.mock import AsyncMock, patch
+
+    from app.services.rag.corrective import run_adaptive_rag
+    from app.services.rag.router import QueryRoute
+
+    with (
+        patch("app.services.rag.corrective.classify_query", return_value=QueryRoute.FACTUAL),
+        patch("app.services.rag.corrective.run_simple_rag", AsyncMock(return_value=([SAMPLE_DOC], 0.0))),
+        patch("app.services.rag.corrective._maybe_flag_unanswered", AsyncMock()) as flag,
+    ):
+        await run_adaptive_rag(question="pregunta", provider=_PROVIDER_STUB, api_key=None)
+
+    flag.assert_not_awaited()

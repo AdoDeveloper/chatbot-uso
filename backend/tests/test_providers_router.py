@@ -71,6 +71,54 @@ class TestCreateProvider:
         assert "api_key" not in body
 
 
+class TestRevealApiKey:
+    async def test_admin_sees_the_saved_key(self, client, admin_user, auth_headers):
+        created = await _create_provider(client, admin_user, auth_headers)
+
+        r = await client.get(f"/api/v1/providers/{created['id']}/api-key", headers=auth_headers(admin_user))
+
+        assert r.status_code == 200
+        assert r.json() == {"api_key": "sk-test-123"}
+
+    async def test_reader_cannot_see_the_key(self, client, admin_user, viewer_user, auth_headers):
+        created = await _create_provider(client, admin_user, auth_headers)
+
+        r = await client.get(f"/api/v1/providers/{created['id']}/api-key", headers=auth_headers(viewer_user))
+
+        assert r.status_code == 403
+
+    async def test_revealing_is_audited(self, client, admin_user, auth_headers, db_session):
+        from sqlalchemy import select
+
+        from app.models.audit_log import AuditLog
+
+        created = await _create_provider(client, admin_user, auth_headers)
+        await client.get(f"/api/v1/providers/{created['id']}/api-key", headers=auth_headers(admin_user))
+
+        actions = (await db_session.execute(select(AuditLog.action))).scalars().all()
+        assert "provider.api_key_revealed" in actions
+
+
+class TestChainPriorities:
+    async def test_deleting_the_main_provider_promotes_the_next_one(self, client, admin_user, auth_headers):
+        main = await _create_provider(client, admin_user, auth_headers, name="Principal", priority=1)
+        await _create_provider(client, admin_user, auth_headers, name="Respaldo", priority=2)
+
+        await client.delete(f"/api/v1/providers/{main['id']}", headers=auth_headers(admin_user))
+
+        body = (await client.get("/api/v1/providers", headers=auth_headers(admin_user))).json()
+        assert [(p["name"], p["priority"]) for p in body] == [("Respaldo", 1)]
+
+    async def test_removing_from_the_chain_closes_the_gap(self, client, admin_user, auth_headers):
+        first = await _create_provider(client, admin_user, auth_headers, name="Uno", priority=1)
+        await _create_provider(client, admin_user, auth_headers, name="Dos", priority=2)
+
+        await client.patch(f"/api/v1/providers/{first['id']}", json={"priority": None}, headers=auth_headers(admin_user))
+
+        body = (await client.get("/api/v1/providers", headers=auth_headers(admin_user))).json()
+        assert {p["name"]: p["priority"] for p in body} == {"Dos": 1, "Uno": None}
+
+
 class TestUpdateProvider:
     async def test_not_found_returns_404(self, client, admin_user, auth_headers):
         r = await client.patch(

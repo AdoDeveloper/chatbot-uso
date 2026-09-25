@@ -78,6 +78,25 @@ async def update_provider(
     return result
 
 
+@router.get("/{provider_id}/api-key")
+async def reveal_api_key(
+    provider_id: uuid.UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(_admin),
+) -> dict:
+    found = await settings_service.get_provider_with_key(db, provider_id)
+    if not found:
+        raise NotFoundError("Proveedor no encontrado")
+    await log_action(
+        db, action="provider.api_key_revealed", resource_type="llm_provider",
+        actor_id=current_user.id, resource_id=str(provider_id),
+        ip=get_client_ip(request),
+    )
+    await db.commit()
+    return {"api_key": found[1]}
+
+
 @router.delete("/{provider_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_provider(
     provider_id: uuid.UUID,

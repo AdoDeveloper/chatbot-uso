@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import random
 import time
 
 import structlog
@@ -377,7 +378,7 @@ async def _run_chat_inner(
             rag_route=_detected_route,
         )
 
-        if not is_playground and context_relevance_ratio != 0 and is_no_answer_reply(final_text):
+        if not is_playground and is_no_answer_reply(final_text):
             from app.services.rag.corrective import _maybe_flag_unanswered
             task = asyncio.create_task(_maybe_flag_unanswered(
                 request.question, conversation_id, provider=primary_provider, api_key=primary_key,
@@ -389,6 +390,7 @@ async def _run_chat_inner(
             task = asyncio.create_task(pipeline.evaluate_response_quality(
                 assistant_message_id, request.question, final_text, llm_chunks,
                 primary_provider, primary_key,
+                with_faithfulness=random.random() * 100 < cfg.quality_eval_rate,
             ))
             _background_tasks.add(task)
             task.add_done_callback(_background_tasks.discard)

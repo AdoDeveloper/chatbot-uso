@@ -550,12 +550,15 @@ async def evaluate_response_quality(
     llm_chunks: list[dict],
     provider,
     api_key: str | None,
+    with_faithfulness: bool = True,
 ) -> None:
     """Evalúa faithfulness y answer relevance en background."""
     from app.services.ai.llm_gateway import grade_faithfulness
     from app.services.rag.quality import compute_answer_relevance
 
-    faithfulness = await grade_faithfulness(final_text, llm_chunks, provider, api_key)
+    faithfulness = (
+        await grade_faithfulness(final_text, llm_chunks, provider, api_key) if with_faithfulness else None
+    )
     relevance = await compute_answer_relevance(question, final_text)
 
     values: dict = {}

@@ -47,8 +47,8 @@ def _completar_con_mejores(docs: list[dict], relevantes: list[dict]) -> list[dic
 
 
 def _sin_respuesta(docs: list[dict], ratio: float | None) -> bool:
-    """Una pregunta queda sin responder cuando el evaluador no aprueba nada."""
-    return not docs or ratio == 0
+    """Sin fragmentos no hay respuesta; con fragmentos lo decide la respuesta del modelo."""
+    return not docs
 
 
 class RagState(TypedDict):
@@ -302,6 +302,8 @@ async def run_corrective_rag(
     final_state = await _graph.ainvoke(initial)
     context = final_state["relevant_docs"]
     total_docs = final_state["documents"]
+    if not context:
+        context = total_docs[:_MIN_DOCS_TRAS_FILTRO]
     aprobados = final_state.get("approved_count", len(context))
     ratio = (aprobados / len(total_docs)) if total_docs else None
 
@@ -350,7 +352,7 @@ async def run_simple_rag(
         relevantes = [d for d, g in zip(docs, grades) if g]
         aprobados = len(relevantes)
         log.info("rag.simple_grade", relevant=aprobados)
-        docs = _completar_con_mejores(docs, relevantes)
+        docs = _completar_con_mejores(docs, relevantes) or docs[:_MIN_DOCS_TRAS_FILTRO]
 
     # El ratio mide el juicio del filtro, no lo que se envía tras completar.
     ratio = (aprobados / total_before_grade) if total_before_grade else None

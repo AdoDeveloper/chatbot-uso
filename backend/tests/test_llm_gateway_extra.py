@@ -847,3 +847,24 @@ class TestFirstTokenTimeout:
         assert chunks == ["hola"]
         assert served["provider_name"] == "Rápido"
 
+    async def test_fallback_provider_gets_more_time(self, monkeypatch):
+        import asyncio
+
+        down = _make_provider(name="Caído", model_name="caido")
+        slow_backup = _make_provider(name="Respaldo lento", model_name="respaldo")
+
+        async def fake_stream(self, messages, temperature, max_tokens):
+            if self.model_name == "caido":
+                raise RuntimeError("sin cuota")
+            await asyncio.sleep(0.4)
+            yield "hola"
+
+        monkeypatch.setattr(gw.OpenAICompatAdapter, "stream_chat", fake_stream)
+        monkeypatch.setattr(gw, "_FIRST_TOKEN_TIMEOUT", 0.2)
+        monkeypatch.setattr(gw, "_FALLBACK_FIRST_TOKEN_TIMEOUT", 1.0)
+        served: dict = {}
+
+        chunks = [c async for c in gw.stream_chat("p", [], [(down, "k1"), (slow_backup, "k2")], served=served)]
+
+        assert chunks == ["hola"]
+        assert served["provider_name"] == "Respaldo lento"
