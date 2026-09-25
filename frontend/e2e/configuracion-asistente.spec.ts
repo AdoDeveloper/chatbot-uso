@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { guardConfig } from "./config-guard";
 
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;
@@ -10,6 +11,16 @@ test.skip(!E2E_USER || !E2E_PASS, "E2E_USER / E2E_PASS not set - skipping");
 
 const SHOT_DIR = path.join("e2e", ".report-screenshots", "configuracion-asistente");
 fs.mkdirSync(SHOT_DIR, { recursive: true });
+
+test.describe.configure({ mode: "default" });
+
+let restoreConfig: () => Promise<void> = async () => {};
+test.beforeEach(async ({ page }) => {
+  restoreConfig = await guardConfig(page, ["/api/v1/settings"]);
+});
+test.afterEach(async () => {
+  await restoreConfig();
+});
 
 test.describe("Configuracion > Asistente", () => {
   test("exportar la configuracion", async ({ page }) => {

@@ -126,7 +126,10 @@ En **Configuración → Proveedores** se conectan los modelos de lenguaje (Groq,
 OpenAI, Google Gemini, Anthropic, o modelos locales como Ollama). Para cada
 proveedor:
 
-- Se introduce la API key (se guarda cifrada).
+- Se introduce la API key (se guarda cifrada). El botón del ojo muestra u
+  oculta la clave; al editar un proveedor, muestra la clave guardada y deja
+  constancia en Actividad → Auditoría. Si la clave guardada no se puede leer,
+  el proveedor aparece con la etiqueta «Reingresar clave».
 - Se puede **probar** la conexión con un mensaje de prueba.
 - Se ordena la **cadena de proveedores** arrastrando: si el primero falla, el
   sistema intenta con el siguiente.
@@ -143,6 +146,11 @@ Define el comportamiento del chatbot: nombre, mensaje de bienvenida,
 instrucciones (prompt del sistema), número de fragmentos a recuperar,
 temperatura y mensajes para casos especiales (saludo, sin información,
 solicitud bloqueada).
+
+En la pestaña **Prompt**, «Respuestas con control de fidelidad» indica qué
+porcentaje de respuestas se revisa contra los documentos para la métrica de
+calidad de Estadísticas. Cada revisión hace dos consultas extra al proveedor de
+IA, por eso conviene un valor bajo (20% por defecto); 0% la desactiva.
 
 ### 4.3 Filtros de seguridad
 

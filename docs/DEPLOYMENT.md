@@ -61,6 +61,10 @@ respuesta. Con el plan gratuito de Groq, medido con 4 preguntas simultáneas:
 la primera se responde en unos 4 s, y el resto pasa a los proveedores de
 respaldo por el error 429, con respuestas de 20 a 35 s. Para atender a muchos
 estudiantes a la vez, el proveedor principal debe tener un plan con más cuota.
+El control de fidelidad de las respuestas agrega dos llamadas más, pero solo
+en el porcentaje configurado en Asistente → Prompt (20% por defecto). Los
+proveedores de respaldo tienen 25 s para empezar a responder (el principal,
+15 s).
 
 **Límite aparte, no relacionado con la cola de chats:** el circuit breaker
 de proveedores LLM (`app/services/ai/llm_gateway.py`) guarda su estado en

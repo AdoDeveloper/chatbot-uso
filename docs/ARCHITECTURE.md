@@ -306,8 +306,13 @@ stateDiagram-v2
     Grade --> [*]: relevantes>0
     Grade --> Rewrite: relevantes=0 && rewrites<1
     Rewrite --> Retrieve2
-    Grade --> [*]: rewrites=1 (devuelve todos)
+    Grade --> [*]: rewrites=1 (los 3 mejores de la búsqueda)
 ```
+
+Si el evaluador no aprueba ningún fragmento, el modelo recibe igualmente los
+3 mejores de la búsqueda y el prompt le indica decir que no tiene el dato si
+no le sirven. La pregunta se registra como «sin respuesta» solo cuando la
+respuesta del modelo lo dice (`quality.is_no_answer_reply`).
 
 **Ahorro de tokens**:
 
@@ -321,7 +326,10 @@ fire-and-forget calcula `context_relevance_ratio` (fracción de chunks
 recuperados que resultaron relevantes), `faithfulness_score` (fracción de
 afirmaciones de la respuesta respaldadas por el contexto, vía LLM-juez en 2
 pasos siguiendo la metodología RAGAS) y `answer_relevance_score` (similitud
-coseno entre pregunta y respuesta), y las persiste en `ChatMessage`. No
+coseno entre pregunta y respuesta), y las persiste en `ChatMessage`. La
+fidelidad cuesta dos llamadas extra al modelo, por eso se calcula solo en un
+porcentaje de las respuestas (`quality_eval_rate`, 20% por defecto, editable
+en Asistente → Prompt). No
 bloquea la respuesta al usuario. Se agregan en `GET /analytics/quality` y se
 muestran en el panel de Estadísticas.
 

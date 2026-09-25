@@ -100,6 +100,7 @@ export interface ChatbotSettings {
   temperature: number;
   max_tokens: number;
   use_corrective_rag: boolean;
+  quality_eval_rate: number;
   greeting_response: string;
   no_providers_message: string;
   guardrail_blocked_message: string;

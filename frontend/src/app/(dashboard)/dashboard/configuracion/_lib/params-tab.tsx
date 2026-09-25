@@ -141,6 +141,18 @@ export function ParamsTab({ form, set }: { form: ChatbotSettings; set: (k: keyof
       <Input type="number" min={64} max={8192} step={64} value={form.max_tokens}
        onChange={(e) => set("max_tokens", Number(e.target.value))} />
      </ParamField>
+     <ParamField
+      label="Respuestas con control de fidelidad"
+      valueBadge={`${form.quality_eval_rate}%`}
+      hint="Porcentaje de respuestas que se revisan contra los documentos"
+      help={{
+       description: "Revisa si la respuesta se apoya en la información aprobada. Cada revisión hace dos consultas adicionales al modelo, por lo que un porcentaje alto consume más cuota del proveedor.",
+       example: "20% da una métrica confiable con poco consumo. 0% desactiva el control.",
+      }}
+     >
+      <input type="range" min={0} max={100} step={5} value={form.quality_eval_rate}
+       onChange={(e) => set("quality_eval_rate", Number(e.target.value))} className="w-full accent-primary" />
+     </ParamField>
     </div>
    </div>
   </div>

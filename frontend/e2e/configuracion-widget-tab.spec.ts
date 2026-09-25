@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { guardConfig } from "./config-guard";
 
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;
@@ -10,6 +11,16 @@ test.skip(!E2E_USER || !E2E_PASS, "E2E_USER / E2E_PASS not set - skipping");
 
 const SHOT_DIR = path.join("e2e", ".report-screenshots", "configuracion-widget-tab");
 fs.mkdirSync(SHOT_DIR, { recursive: true });
+
+test.describe.configure({ mode: "default" });
+
+let restoreConfig: () => Promise<void> = async () => {};
+test.beforeEach(async ({ page }) => {
+  restoreConfig = await guardConfig(page, ["/api/v1/widget/config"]);
+});
+test.afterEach(async () => {
+  await restoreConfig();
+});
 
 test.describe("Configuracion > Asistente > Apariencia", () => {
   test("selector de posicion (4 esquinas), color, iconos y toggles avanzados, restaurado", async ({ page }) => {
@@ -152,7 +163,7 @@ test.describe("Configuracion > Asistente > Apariencia", () => {
     await labelInput.fill("Hola E2E");
     await expect(page.getByText(/8\/80 caracteres/)).toBeVisible();
 
-    const proactiveInput = page.getByPlaceholder(/tienes dudas sobre la universidad/i);
+    const proactiveInput = page.getByPlaceholder(/tiene dudas sobre la universidad/i);
     const originalProactive = await proactiveInput.inputValue();
     await proactiveInput.fill("Mensaje proactivo E2E de prueba");
     await expect(page.getByText(/vista previa:/i)).toBeVisible();
@@ -190,7 +201,7 @@ test.describe("Configuracion > Asistente > Integración", () => {
     await expect(page.getByText(/^copiado$/i)).toBeVisible({ timeout: 5_000 });
     await page.screenshot({ path: path.join(SHOT_DIR, "03-integracion-snippet.png") });
 
-    const apiKeyCopyBtn = page.locator("input.font-mono.select-all").locator("..").getByRole("button").first();
+    const apiKeyCopyBtn = page.getByRole("button", { name: "Copiar clave" });
     if (await apiKeyCopyBtn.isVisible().catch(() => false)) {
       await apiKeyCopyBtn.click();
     }

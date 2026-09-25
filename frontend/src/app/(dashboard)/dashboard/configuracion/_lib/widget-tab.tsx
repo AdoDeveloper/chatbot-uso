@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
- Copy, Check, Plus, X, ChevronRight, Eye, RefreshCw, Loader2,
+ Copy, Check, Plus, X, ChevronRight, Eye, EyeOff, RefreshCw, Loader2,
 } from "lucide-react";
 
 import api from "@/lib/api";
@@ -58,6 +58,7 @@ function WidgetApiKey({ config, onRegenerated, canUpdate }: {
  const { toast, confirm } = useToast();
  const [copying, setCopying] = useState(false);
  const [regenerating, setRegenerating] = useState(false);
+ const [showKey, setShowKey] = useState(false);
 
  if (!config?.api_key) return null;
 
@@ -70,7 +71,7 @@ function WidgetApiKey({ config, onRegenerated, canUpdate }: {
  async function handleRegenerate() {
   const ok = await confirm({
    title: "¿Regenerar clave del widget?",
-   message: "Todos los widgets existentes dejarán de funcionar hasta que actualices el código de integración.",
+   message: "Todos los widgets existentes dejarán de funcionar hasta que actualice el código de integración.",
    confirmText: "Regenerar", variant: "danger",
   });
   if (!ok) return;
@@ -95,13 +96,19 @@ function WidgetApiKey({ config, onRegenerated, canUpdate }: {
     Esta clave identifica su widget y se incluye automáticamente en el código de integración.
    </p>
    <div className="flex gap-2">
-    <Input
-     readOnly
-     value={config.api_key}
-     className="flex-1 font-mono select-all"
-     onClick={(e) => (e.target as HTMLInputElement).select()}
-    />
-    <Button variant="outline" size="sm" className="h-9 px-3" onClick={handleCopy}>
+    <div className="relative flex-1">
+     <Input
+      readOnly
+      type={showKey ? "text" : "password"}
+      value={config.api_key}
+      className="w-full pr-10 font-mono select-all"
+      onClick={(e) => (e.target as HTMLInputElement).select()}
+     />
+     <button type="button" onClick={() => setShowKey((v) => !v)} className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50" aria-label={showKey ? "Ocultar clave" : "Mostrar clave"}>
+      {showKey ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
+     </button>
+    </div>
+    <Button variant="outline" size="sm" className="h-9 px-3" onClick={handleCopy} aria-label="Copiar clave">
      {copying ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}
     </Button>
     {canUpdate && (
@@ -164,7 +171,7 @@ function DomainAllowlist({
     <h3 className="text-15 font-semibold tracking-tight">Dominios permitidos</h3>
    </div>
    <p className="text-13 text-muted-foreground mb-4">
-    Sitios web que pueden cargar el widget. Usa <code className="text-xs bg-muted px-1 rounded">*.ejemplo.com</code> para incluir subdominios. Si la lista está vacía, cualquier sitio puede usarlo.
+    Sitios web que pueden cargar el widget. Use <code className="text-xs bg-muted px-1 rounded">*.ejemplo.com</code> para incluir subdominios. Si la lista está vacía, cualquier sitio puede usarlo.
    </p>
    <div className={`flex gap-2 ${domainError ? "mb-1.5" : "mb-3"}`}>
     <Input
@@ -261,7 +268,7 @@ function ProactiveMessageInput({ value, onChange }: { value: string; onChange: (
      type="text"
      value={value}
      onChange={(e) => onChange(e.target.value)}
-     placeholder='Ej: "¿Tienes dudas sobre la universidad? Pregúntame."'
+     placeholder='Ej: "¿Tiene dudas sobre la universidad? Pregúnteme."'
      maxLength={MAX_PROACTIVE_LEN + 20}  // tope con margen, validacion real abajo
      className={`pr-14 ${overLimit ? "border-destructive" : ""}`}
     />
@@ -605,7 +612,7 @@ export function WidgetTab({
       <div className="flex flex-col gap-3 mb-4">
        <div className="min-w-0">
         <h3 className="text-15 font-semibold tracking-tight">Código de integración</h3>
-        <p className="text-13 text-muted-foreground mt-0.5">Pega este snippet antes del cierre de &lt;/body&gt;.</p>
+        <p className="text-13 text-muted-foreground mt-0.5">Pegue este código antes del cierre de &lt;/body&gt;.</p>
        </div>
        <div className="grid grid-cols-1 sm:flex sm:justify-end gap-2">
         <Button variant="outline" size="sm" className="gap-1.5 h-8"

@@ -48,6 +48,13 @@ test.describe("Configuracion > Proveedores", () => {
     }).toPass({ timeout: 15_000 });
     const editDialog = page.getByRole("dialog");
     await expect(editDialog.getByRole("heading", { name: /editar proveedor/i })).toBeVisible();
+    const keyInput = editDialog.getByPlaceholder("••••••••••••••••");
+    await expect(keyInput).toHaveValue("");
+    await editDialog.getByLabel(/mostrar api key/i).click();
+    await expect(keyInput).toHaveValue("sk-e2e-fake-key");
+    await expect(keyInput).toHaveAttribute("type", "text");
+    await editDialog.getByLabel(/ocultar api key/i).click();
+    await expect(keyInput).toHaveAttribute("type", "password");
     await editDialog.locator("input").first().fill(renamed);
     await editDialog.getByRole("button", { name: /^guardar$/i }).click();
     await expect(editDialog).not.toBeVisible({ timeout: 10_000 });

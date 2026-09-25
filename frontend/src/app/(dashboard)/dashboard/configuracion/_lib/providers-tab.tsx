@@ -56,6 +56,7 @@ const ProviderPanel = forwardRef<ProviderPanelHandle, {
  const { toast } = useToast();
  const [form, setForm] = useState<ProviderForm>(emptyForm);
  const [showKey, setShowKey] = useState(false);
+ const [revealing, setRevealing] = useState(false);
  const [testState, setTestState] = useState<TestState>("idle");
  const [testMsg, setTestMsg] = useState("");
  const [testMs, setTestMs] = useState<number | null>(null);
@@ -71,8 +72,24 @@ const ProviderPanel = forwardRef<ProviderPanelHandle, {
     is_active: editing.is_active,
     priority: editing.priority !== null ? String(editing.priority) : "" });
   } else { setForm(emptyForm()); }
-  setTestState("idle"); setTestMsg("");
+  setTestState("idle"); setTestMsg(""); setShowKey(false);
  }, [editing, catalogTypes]);
+
+ async function toggleKey() {
+  if (showKey || form.api_key || !editing?.has_api_key) { setShowKey((s) => !s); return; }
+  setRevealing(true);
+  try {
+   const { data } = await api.get<{ api_key: string | null }>(`/providers/${editing.id}/api-key`);
+   if (!data.api_key) {
+    toast({ type: "error", message: "La clave guardada no se puede leer. Vuelva a ingresarla." });
+    return;
+   }
+   setForm((f) => ({ ...f, api_key: data.api_key ?? "" }));
+   setShowKey(true);
+  } catch (err) {
+   toast({ type: "error", message: getErrorMessage(err, "No se pudo mostrar la clave.") });
+  } finally { setRevealing(false); }
+ }
 
  const set = (k: keyof ProviderForm, v: unknown) => { setForm((f) => ({ ...f, [k]: v })); setTestState("idle"); };
 
@@ -184,8 +201,8 @@ const ProviderPanel = forwardRef<ProviderPanelHandle, {
       onChange={(e) => set("api_key", e.target.value)}
       placeholder={editing?.has_api_key ? "••••••••••••••••" : "sk-..."}
       className="pr-10" autoComplete="new-password" />
-     {form.api_key && (
-      <button type="button" onClick={() => setShowKey((s) => !s)} className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50" aria-label={showKey ? "Ocultar API key" : "Mostrar API key"}>
+     {(form.api_key || editing?.has_api_key) && (
+      <button type="button" onClick={toggleKey} disabled={revealing} className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-50" aria-label={showKey ? "Ocultar API key" : "Mostrar API key"}>
        {showKey ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
       </button>
      )}
