@@ -13,6 +13,7 @@ from app.models.global_setting import GlobalSetting
 from app.models.llm_provider import LLMProvider
 from app.schemas.provider import ProviderCreate, ProviderOut, ProviderUpdate
 from app.schemas.settings import ChatbotSettings
+from app.services.ai.semantic_cache import clear_all
 
 log = structlog.get_logger()
 
@@ -72,7 +73,7 @@ async def get_settings(db: AsyncSession) -> ChatbotSettings:
 
 async def update_settings(db: AsyncSession, data: ChatbotSettings, user_id: uuid.UUID) -> ChatbotSettings:
     # El auto-snapshot lo maneja VersioningMiddleware (después de la respuesta)
-    for key, value in data.model_dump().items():
+    for key, value in data.model_dump(exclude_unset=True).items():
         existing = await db.get(GlobalSetting, key)
         if existing:
             existing.value = value
@@ -80,8 +81,9 @@ async def update_settings(db: AsyncSession, data: ChatbotSettings, user_id: uuid
         else:
             db.add(GlobalSetting(key=key, value=value, updated_by_id=user_id))
     await db.commit()
+    await clear_all()
     log.info("settings.updated", user_id=str(user_id))
-    return data
+    return await get_settings(db)
 
 
 async def seed_default_settings(db: AsyncSession) -> None:
@@ -124,7 +126,13 @@ async def list_providers(db: AsyncSession) -> list[ProviderOut]:
             LLMProvider.created_at.asc(),
         )
     )
-    return [_to_out(p) for p in result.scalars().all()]
+    out = []
+    for p in result.scalars().all():
+        item = _to_out(p)
+        if p.api_key_encrypted and await _safe_decrypt(p.api_key_encrypted, p.name) is None:
+            item.api_key_unreadable = True
+        out.append(item)
+    return out
 
 
 async def create_provider(db: AsyncSession, data: ProviderCreate) -> ProviderOut:

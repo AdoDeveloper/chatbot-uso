@@ -49,6 +49,32 @@ class TestUpdateSettings:
         assert r2.status_code == 200
         assert r2.json()["warnings"] == []
 
+    async def test_saving_settings_clears_the_answer_cache(self, client, admin_user, auth_headers, monkeypatch):
+        from unittest.mock import AsyncMock
+
+        from app.services.system import settings as settings_service
+
+        cleared = AsyncMock()
+        monkeypatch.setattr(settings_service, "clear_all", cleared)
+        current = (await client.get("/api/v1/settings", headers=auth_headers(admin_user))).json()
+        current["system_prompt"] = current["system_prompt"] + "\n- Responda con cortesía."
+
+        r = await client.put("/api/v1/settings", json=current, headers=auth_headers(admin_user))
+
+        assert r.status_code == 200
+        cleared.assert_awaited_once()
+
+    async def test_partial_update_keeps_the_other_fields(self, client, admin_user, auth_headers):
+        current = (await client.get("/api/v1/settings", headers=auth_headers(admin_user))).json()
+        current["temperature"] = 0.4
+        await client.put("/api/v1/settings", json=current, headers=auth_headers(admin_user))
+
+        r = await client.put("/api/v1/settings", json={"top_k": 7}, headers=auth_headers(admin_user))
+
+        assert r.status_code == 200
+        assert r.json()["top_k"] == 7
+        assert r.json()["temperature"] == 0.4
+
     async def test_returns_warnings_for_risky_values(self, client, admin_user, auth_headers):
         r = await client.get("/api/v1/settings", headers=auth_headers(admin_user))
         current = r.json()

@@ -61,7 +61,7 @@ async def get_or_create_conversation(
         result = await db.execute(
             select(ChatConversation)
             .where(ChatConversation.session_id == session_id)
-            .where(ChatConversation.status == ConversationStatus.active)
+            .where(ChatConversation.status.in_((ConversationStatus.active, ConversationStatus.escalated)))
             .order_by(ChatConversation.started_at.desc())
             .limit(1)
         )

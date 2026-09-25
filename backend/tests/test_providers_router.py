@@ -42,6 +42,18 @@ class TestListProviders:
         assert r.status_code == 200
         assert r.json() == []
 
+    async def test_flags_a_key_that_cannot_be_read(self, client, admin_user, auth_headers, db_session):
+        from app.models.llm_provider import LLMProvider
+
+        created = await _create_provider(client, admin_user, auth_headers)
+        provider = await db_session.get(LLMProvider, uuid.UUID(created["id"]))
+        provider.api_key_encrypted = "gAAAAAclave-cifrada-con-otra-secret-key"
+        await db_session.commit()
+
+        r = await client.get("/api/v1/providers", headers=auth_headers(admin_user))
+
+        assert r.json()[0]["api_key_unreadable"] is True
+
 
 class TestCreateProvider:
     async def test_requires_admin_perm(self, client, viewer_user, auth_headers):

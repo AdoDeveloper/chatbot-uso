@@ -58,6 +58,7 @@ class ProviderOut(BaseModel):
     extra_headers: dict[str, str]
     dashboard_url: str | None
     has_api_key: bool
+    api_key_unreadable: bool = False
     is_active: bool
     priority: int | None
     created_at: datetime

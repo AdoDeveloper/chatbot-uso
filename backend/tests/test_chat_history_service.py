@@ -77,6 +77,15 @@ async def test_get_or_create_conversation_creates_new(db_session):
     assert row.session_id == session_id
 
 
+async def test_messages_after_escalation_stay_in_the_escalated_conversation(db_session):
+    escalated = await _make_conversation(db_session, status=ConversationStatus.escalated)
+
+    conv = await history.get_or_create_conversation(db_session, session_id=escalated.session_id)
+
+    assert conv.id == escalated.id
+    assert conv.status == ConversationStatus.escalated
+
+
 async def test_get_or_create_conversation_returns_existing_active(db_session):
     existing = await _make_conversation(db_session, status=ConversationStatus.active)
 

@@ -28,6 +28,7 @@ _llm_semaphore = asyncio.Semaphore(get_settings().LLM_MAX_CONCURRENCY)
 _LLM_QUEUE_TIMEOUT = get_settings().LLM_QUEUE_TIMEOUT_SECONDS
 _TURN_BUDGET_SECONDS = 40.0
 _MIN_LLM_SECONDS = 10.0
+_HYPHENS = str.maketrans({"\u2010": "-", "\u2011": "-"})
 
 class ChatMessage(BaseModel):
     role: str = Field(..., max_length=32)
@@ -339,7 +340,7 @@ async def _run_chat_inner(
 
     provider_name = served.get("provider_name", provider_name)
     model_name = served.get("model_name", model_name)
-    final_text = "".join(full_content)
+    final_text = "".join(full_content).translate(_HYPHENS)
     if not final_text.strip():
         log.warning(
             "chat.empty_response", session_id=request.session_id,

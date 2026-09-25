@@ -45,8 +45,8 @@ async def update_settings(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_perm(P.BOT_SETTINGS_UPDATE)),
 ) -> ChatbotSettingsWithWarnings:
-    warnings = _validate_settings(data)
     result = await settings_service.update_settings(db, data, current_user.id)
+    warnings = _validate_settings(result)
     return ChatbotSettingsWithWarnings(**result.model_dump(), warnings=warnings)
 
 
@@ -102,6 +102,6 @@ async def import_settings(
     except Exception as exc:
         raise HTTPException(status_code=422, detail=f"Configuración inválida: {exc}")
 
-    warnings = _validate_settings(data)
     result = await settings_service.update_settings(db, data, current_user.id)
+    warnings = _validate_settings(result)
     return ChatbotSettingsWithWarnings(**result.model_dump(), warnings=warnings)

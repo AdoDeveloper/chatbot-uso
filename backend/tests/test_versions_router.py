@@ -273,3 +273,17 @@ class TestRollback:
         r = await client.post(f"/api/v1/versions/{v1.json()['id']}/rollback", headers=auth_headers(admin_user))
         assert r.status_code == 200
         assert any("Proveedor nuevo" in w and "desactivado" in w for w in r.json()["warnings"])
+
+    async def test_rollback_clears_the_answer_cache(self, client, admin_user, auth_headers, db_session, monkeypatch):
+        from unittest.mock import AsyncMock
+
+        from app.api.v1.versions import router as versions_router
+
+        cleared = AsyncMock()
+        monkeypatch.setattr(versions_router, "clear_all", cleared)
+        await _add_setting(db_session, "system_prompt", "Prompt A")
+        v1 = await client.post("/api/v1/versions", json={"description": "v1"}, headers=auth_headers(admin_user))
+
+        await client.post(f"/api/v1/versions/{v1.json()['id']}/rollback", headers=auth_headers(admin_user))
+
+        cleared.assert_awaited()

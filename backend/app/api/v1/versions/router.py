@@ -17,6 +17,7 @@ from app.core.permissions import P
 from app.db.session import get_db
 from app.models.config_version import ConfigVersion
 from app.models.user import User
+from app.services.ai.semantic_cache import clear_all
 from app.services.monitoring import versions as svc
 
 router = APIRouter(prefix="/versions", tags=["versions"])
@@ -210,6 +211,7 @@ async def rollback_version(
         raise HTTPException(status_code=404, detail=str(exc))
 
     await db.commit()
+    await clear_all()
     await db.refresh(rollback_version)
     await db.refresh(rollback_version, ["created_by"])
     return RollbackResult(

@@ -33,7 +33,7 @@ def _make_splitters(
     )
     return parent, child
 
-_NUMBERED_PATTERN = re.compile(r"^(\d+(?:\.\d+)*\.?)\s+\**(.+?)\**\s*$", re.MULTILINE)
+_NUMBERED_PATTERN = re.compile(r"^(\d{1,3}(?:\.\d+)*\.?)\s+\**(.+?)\**\s*$", re.MULTILINE)
 _MAX_NUMBERED_HEADING_CHARS = 80
 _SECTION_PATTERNS = [
     re.compile(r"^(#{2,4})\s+(.+)$", re.MULTILINE),

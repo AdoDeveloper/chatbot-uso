@@ -174,3 +174,10 @@ def test_every_word_and_number_reaches_the_chunks(name):
     joined = " ".join(c["text"] for c in chunk_text(text, "s", "n"))
     missing = set(re.findall(r"\w+", text)) - set(re.findall(r"\w+", joined))
     assert not missing, f"{name}: se perdieron {sorted(missing)}"
+
+
+def test_line_wrapped_phone_number_is_not_a_heading():
+    from app.services.ingestion.chunking import _detect_sections
+
+    sections = _detect_sections("Teléfono de Registro: 7851-\n7588 en horario laboral.\n\n## Otro\n\nTexto.")
+    assert all("7588" not in title for title, _ in sections)

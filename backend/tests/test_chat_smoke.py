@@ -420,3 +420,19 @@ async def test_silent_provider_is_cut_by_turn_budget(client, admin_user, auth_he
 
     assert "respuesta incompleta" not in body["content"]
     assert body["content"].strip()
+
+
+async def test_answer_uses_plain_hyphens(client, admin_user, auth_headers, mock_pipeline, monkeypatch):
+    async def _retrieve_context(*a, **k):
+        return [{"text": "Teléfono 7851-7588.", "source_name": "doc.pdf", "score": 0.9,
+                 "parent_text": "Teléfono 7851-7588."}], 1.0
+
+    async def _fake_stream_chat(**kwargs):
+        yield "Teléfono: 7851‑7588"
+
+    monkeypatch.setattr(pipeline, "retrieve_context", _retrieve_context)
+    monkeypatch.setattr(chat_router, "stream_chat", _fake_stream_chat)
+
+    body = await _post_playground_chat(client, {"question": "¿Teléfono?"}, auth_headers(admin_user))
+
+    assert "7851-7588" in body["content"]
