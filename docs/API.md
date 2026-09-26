@@ -12,7 +12,7 @@ API REST del backend. Prefijo base: `/api/v1`.
 - **Autorización**: los endpoints administrativos exigen un permiso RBAC
   concreto `(módulo.acción)`; un rol sin ese permiso recibe `403`.
 - **Formato**: peticiones y respuestas en JSON, salvo subida de archivos
-  (multipart) y las descargas de reportes y exportaciones (PDF/CSV).
+  (multipart) y las descargas de reportes y exportaciones (PDF/Excel).
 - **Códigos**: `200` OK, `201` creado, `204` sin contenido, `401` no
   autenticado, `403` sin permiso, `404` no encontrado, `409` conflicto, `422`
   validación, `429` límite de tasa.
@@ -34,7 +34,7 @@ completa de la API. Solo están disponibles en un entorno con
 | --- | --- | --- |
 | GET | `/auth/providers` | Métodos de login disponibles (credenciales, Microsoft) |
 | POST | `/auth/login` | Autenticar y emitir par de tokens |
-| POST | `/auth/refresh` | Rotar el refresh token por uno nuevo |
+| POST | `/auth/refresh` | Rotar el refresh token por uno nuevo (cada refresh token sirve una sola vez) |
 | POST | `/auth/logout` | Revocar la sesión actual |
 | GET | `/auth/me` | Datos del usuario autenticado |
 | POST | `/auth/change-password` | Cambiar la propia contraseña |
@@ -49,7 +49,7 @@ completa de la API. Solo están disponibles en un entorno con
 
 | Método | Ruta | Descripción |
 | --- | --- | --- |
-| POST | `/chat` | Conversación con el chatbot (respuesta única completa, sin streaming) |
+| POST | `/chat` | Conversación con el chatbot (respuesta única completa, sin streaming). Sin sesión del panel exige la clave del widget y aplica sus mismos límites |
 
 ## Conocimiento - Fuentes (`/sources`)
 
@@ -83,7 +83,7 @@ completa de la API. Solo están disponibles en un entorno con
 | POST | `/chunks/{point_id}/discard` | Descartar un fragmento del uso |
 | POST | `/chunks/{point_id}/restore` | Restaurar un fragmento descartado |
 | GET | `/chunks/{point_id}/history` | Historial de ediciones del fragmento |
-| POST | `/chunks/test-query` | Búsqueda de prueba contra los fragmentos |
+| POST | `/chunks/test-query` | Búsqueda de prueba con la misma recuperación y evaluación de relevancia que el chat |
 
 ## Conocimiento - FAQ (`/faq`)
 
@@ -202,7 +202,7 @@ completa de la API. Solo están disponibles en un entorno con
 | Método | Ruta | Descripción | Auth |
 | --- | --- | --- | --- |
 | GET | `/widget/config` | Configuración del widget (admin) | JWT |
-| PUT | `/widget/config` | Editar configuración | JWT |
+| PUT | `/widget/config` | Editar configuración (solo se guardan los campos enviados) | JWT |
 | GET | `/widget/csat-reasons` | Listar motivos seleccionables de la encuesta CSAT | JWT |
 | POST | `/widget/csat-reasons` | Crear un motivo | JWT |
 | PATCH | `/widget/csat-reasons/{id}` | Editar un motivo (texto, activo/inactivo) | JWT |
@@ -254,6 +254,7 @@ común: cada grupo vive en su propia carpeta bajo `backend/app/api/v1/`.
 | PATCH | `/providers/{id}` | Editar proveedor |
 | DELETE | `/providers/{id}` | Eliminar proveedor |
 | POST | `/providers/{id}/test` | Probar un proveedor existente |
+| GET | `/providers/{id}/api-key` | Mostrar la clave guardada de un proveedor (requiere permiso de edición; queda en auditoría) |
 | POST | `/providers/test` | Probar una configuración no guardada |
 | POST | `/providers/reorder` | Reordenar la cadena de proveedores |
 
@@ -277,7 +278,7 @@ configurada, sin necesidad de desplegar código.
 | Método | Ruta | Descripción |
 | --- | --- | --- |
 | GET | `/settings` | Configuración del asistente |
-| PUT | `/settings` | Actualizar configuración |
+| PUT | `/settings` | Actualizar configuración (solo se guardan los campos enviados) |
 | GET | `/settings/export` | Exportar configuración |
 | POST | `/settings/import` | Importar configuración |
 
@@ -303,7 +304,7 @@ configurada, sin necesidad de desplegar código.
 | GET | `/integrations/oauth` | Configuración OAuth (Microsoft) |
 | PUT | `/integrations/oauth` | Actualizar OAuth |
 | GET | `/integrations/auth-methods` | Métodos de autenticación activos |
-| PUT | `/integrations/auth-methods` | Activar/desactivar métodos |
+| PUT | `/integrations/auth-methods` | Activar/desactivar métodos (no permite apagar la contraseña sin Microsoft SSO activo) |
 
 ### Sistema - caché, cuotas, seguridad, guardrails y mantenimiento (`system/`)
 

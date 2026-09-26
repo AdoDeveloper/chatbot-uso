@@ -72,7 +72,10 @@ sección gestiona ese contenido.
 En **Conocimiento → Documentos** puede:
 
 - **Subir documentos**: PDF, DOCX o TXT. Arrastre los archivos o
-  pulse para seleccionarlos. Puede subir varios a la vez.
+  pulse para seleccionarlos. Puede subir varios a la vez. El tipo se reconoce
+  por la extensión del archivo (.pdf, .docx o .txt); cualquier otra se rechaza.
+- **Renombrar**: el nuevo nombre se aplica también a las fuentes que cita el
+  asistente en sus respuestas.
 - **Seguir el progreso**: cada documento pasa por las etapas de extracción,
   fragmentación e indexación. El estado se actualiza en tiempo real.
 - **Revisar y aprobar**: tras procesarse, el documento queda en estado
@@ -92,7 +95,9 @@ En **Conocimiento → Documentos** puede:
 Cada documento se divide en **fragmentos** para que el chatbot pueda buscar en
 él. Desde el detalle de un documento puede revisar sus fragmentos, ver
 advertencias automáticas (fragmento muy corto, muy largo, con datos personales)
-y descartar fragmentos individuales que no deban usarse. También puede
+y descartar fragmentos individuales que no deban usarse; el texto descartado
+deja de llegar al asistente, también dentro del contexto que comparte con los
+fragmentos vecinos. También puede
 **editar** el texto de un fragmento; el cambio se aplica al instante en las
 respuestas. Las ediciones y los descartes se conservan al reprocesar el
 documento, siempre que el texto original del fragmento no haya cambiado.
@@ -113,8 +118,9 @@ contiene la URL hace que el asistente a veces diga que no tiene el dato.
 
 La pantalla **Consulta** permite hacer una pregunta de prueba directamente
 contra la base de conocimiento para ver qué fragmentos recupera el sistema, sin
-generar una respuesta completa. Útil para verificar que un documento se indexó
-bien.
+generar una respuesta completa. Usa la misma búsqueda que el chat e indica qué
+fragmentos considera relevantes el evaluador. Útil para verificar que un
+documento se indexó bien.
 
 ---
 
@@ -132,7 +138,8 @@ proveedor:
   el proveedor aparece con la etiqueta «Reingresar clave».
 - Se puede **probar** la conexión con un mensaje de prueba.
 - Se ordena la **cadena de proveedores** arrastrando: si el primero falla, el
-  sistema intenta con el siguiente.
+  sistema intenta con el siguiente. Al quitar o eliminar un proveedor, los
+  demás suben de posición y el primero pasa a ser el principal.
 
 Debajo de la lista de proveedores, la tabla **Tipos de proveedor** muestra los
 proveedores conocidos con su dirección por defecto. Sirve para agregar un tipo
@@ -232,6 +239,11 @@ Métricas de uso del chatbot: consultas por periodo, tasa de resolución,
 latencia, canales, dispositivos, páginas de origen, temas más consultados,
 mapa de calor de horarios y **valoración de respuestas** (positivas/negativas).
 
+El selector **Producción / Previsualizar** separa el tráfico real de los
+visitantes (widget y API) de las pruebas hechas desde el panel en Asistente →
+Previsualizar, incluso cuando la prueba usa la configuración real. Así las
+pruebas del personal no se cuentan como consultas de los usuarios.
+
 ### 6.2 Reportes
 
 Genera y descarga reportes en PDF para el rango de fechas que se indique:
@@ -256,7 +268,12 @@ se muestran según los permisos de cada usuario.
 - **Permisos**: matriz de consulta que muestra qué puede hacer cada rol por
   módulo.
 - **Inicio de sesión**: acceso con cuentas corporativas de Microsoft 365 (si
-  está configurado).
+  está configurado). Solo se aceptan cuentas de la organización configurada y
+  que ya existan como usuarios del panel. El acceso con contraseña no se puede
+  desactivar mientras Microsoft SSO no esté activo, para que nadie quede sin
+  poder entrar.
+- **Invitaciones**: crear, reenviar, revocar y aceptar invitaciones queda
+  registrado en Actividad → Auditoría.
 
 ### 7.2 Estado
 

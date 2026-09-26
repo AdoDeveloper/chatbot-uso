@@ -145,7 +145,7 @@ chatbot-uso/
 ├── nginx/                  Configuración del proxy inverso
 ├── docs/                   Documentación técnica
 ├── docker-compose.yml      Stack completo para desarrollo
-├── docker-compose.prod.yml Ajustes de producción (límites de memoria, réplicas)
+├── docker-compose.prod.yml Ajustes de producción (contraseñas obligatorias, API key de Qdrant, límites de memoria)
 ├── docker-compose.ci.yml   Override del E2E en CI (caché de modelos)
 ├── Makefile                Atajos
 └── README.md               Este archivo
@@ -193,5 +193,4 @@ hacen falta y es seguro repetirlas.
 
 | Script | Uso |
 | --- | --- |
-| `init_db.py` | Crear el esquema y sembrar los datos iniciales |
-| `seed_provider_catalog.py` | Poblar el catálogo de tipos de proveedor LLM (URL base y headers por defecto) |
+| `init_db.py` | Crear el esquema y sembrar los datos iniciales, incluido el catálogo de tipos de proveedor LLM (URL base y headers por defecto) |

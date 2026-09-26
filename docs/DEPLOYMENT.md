@@ -269,6 +269,13 @@ SMTP_USER=correo@tudominio.com
 SMTP_PASSWORD=APP_PASSWORD
 SMTP_FROM=noreply@tudominio.com
 SMTP_TLS=true
+
+# Microsoft SSO (opcional). TENANT_ID es el Directory (tenant) ID de la
+# universidad: solo se aceptan cuentas de ese tenant ("common" no funciona).
+# MICROSOFT_CLIENT_ID=
+# MICROSOFT_CLIENT_SECRET=
+# MICROSOFT_TENANT_ID=
+# MICROSOFT_REDIRECT_URI=https://chatbot.tudominio.com/api/auth/callback/microsoft
 ```
 
 ```bash
@@ -430,6 +437,7 @@ upstream chatbot_frontend { server 127.0.0.1:3000; keepalive 16; }
 server {
     listen 80;
     server_name chatbot.tudominio.com;
+    server_tokens off;
 
     client_max_body_size 55m;
 
