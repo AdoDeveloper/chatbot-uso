@@ -36,7 +36,18 @@ async def mark_escalated(
     """Marca la conversación como escalada cuando el usuario da su consentimiento."""
     conv = await _load(db, conversation_id)
     if conv.status == ConversationStatus.escalated:
-        return conv  # idempotente
+        if meta and meta.get("contact"):
+            last = (await db.execute(
+                select(EscalationEvent)
+                .where(EscalationEvent.conversation_id == conv.id)
+                .where(EscalationEvent.event_type == EscalationEventType.escalated)
+                .order_by(EscalationEvent.created_at.desc())
+                .limit(1)
+            )).scalar_one_or_none()
+            if last:
+                last.meta_json = {**(last.meta_json or {}), "contact": meta["contact"]}
+                await db.commit()
+        return conv
     conv.status = ConversationStatus.escalated
     conv.escalated_at = datetime.now(timezone.utc)
     ev = EscalationEvent(
@@ -79,3 +90,21 @@ async def record_csat(
     db.add(ev)
     await db.commit()
     return conv
+
+
+async def latest_contacts(db: AsyncSession, conversation_ids: list[uuid.UUID]) -> dict[uuid.UUID, dict]:
+    """Contacto que dejó el visitante al escalar, por conversación."""
+    if not conversation_ids:
+        return {}
+    rows = (await db.execute(
+        select(EscalationEvent.conversation_id, EscalationEvent.meta_json)
+        .where(EscalationEvent.conversation_id.in_(conversation_ids))
+        .where(EscalationEvent.event_type == EscalationEventType.escalated)
+        .order_by(EscalationEvent.created_at.desc())
+    )).all()
+    contacts: dict[uuid.UUID, dict] = {}
+    for conv_id, meta in rows:
+        contact = (meta or {}).get("contact")
+        if conv_id not in contacts and isinstance(contact, dict) and contact.get("value"):
+            contacts[conv_id] = {"type": str(contact.get("type", "")), "value": str(contact["value"])}
+    return contacts

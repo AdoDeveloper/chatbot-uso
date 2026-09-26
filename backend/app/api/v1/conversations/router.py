@@ -81,10 +81,12 @@ async def list_conversations(
         .group_by(ChatMessage.conversation_id)
     )
     counts = {row.conversation_id: row.n for row in cnt_rows}
+    contacts = await lifecycle_svc.latest_contacts(db, conv_ids)
     items = []
     for c in convs:
         out = ChatConversationOut.model_validate(c)
         out.message_count = counts.get(c.id, 0)
+        out.escalation_contact = contacts.get(c.id)
         preview = first_msgs.get(c.id)
         if preview:
             out.first_user_message = preview[:160]
@@ -300,6 +302,7 @@ async def get_conversation(
     count = len(conv.messages)
     out = ChatConversationDetail.model_validate(conv)
     out.message_count = count
+    out.escalation_contact = (await lifecycle_svc.latest_contacts(db, [conv.id])).get(conv.id)
     return out
 
 

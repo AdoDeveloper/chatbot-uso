@@ -29,7 +29,11 @@ async def dispatch_escalation(
             await escalation_lifecycle.mark_escalated(
                 db, conversation_id=conv_uuid,
                 trigger_type=trigger_type,
-                meta={"reason": reason, "question": question[:500] if question else None},
+                meta={
+                    "reason": reason,
+                    "question": question[:500] if question else None,
+                    **({"contact": extra["contact_info"]} if extra and extra.get("contact_info") else {}),
+                },
             )
         except Exception as e:
             log.warning("escalation.lifecycle_mark_failed", error=str(e), conversation_id=conversation_id)

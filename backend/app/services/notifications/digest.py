@@ -1,4 +1,4 @@
-"""Recopilación de estadísticas para el resumen diario (unanswered_digest)."""
+"""Recopilación de estadísticas para el resumen de preguntas sin respuesta (unanswered_digest)."""
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -18,10 +18,13 @@ _RECENT_LIMIT = 5
 _TOPIC_LIMIT = 5
 
 
-async def collect_digest_stats(db: AsyncSession) -> dict[str, Any]:
-    """Devuelve el payload completo del resumen diario."""
+PERIOD_DAYS = {"daily": 1, "weekly": 7, "monthly": 30, "yearly": 365}
+
+
+async def collect_digest_stats(db: AsyncSession, period_days: int = 1) -> dict[str, Any]:
+    """Devuelve el payload del resumen para los últimos `period_days` días."""
     now = datetime.now(timezone.utc)
-    since = now - timedelta(hours=24)
+    since = now - timedelta(days=period_days)
 
     # Preguntas sin responder: acumuladas (open) y nuevas en las últimas 24 h.
     total_open = (await db.execute(
@@ -77,6 +80,7 @@ async def collect_digest_stats(db: AsyncSession) -> dict[str, Any]:
 
     return {
         "date": utc_to_sv(now).strftime("%Y-%m-%d"),
+        "period_days": period_days,
         "total_open": total_open,
         "new_open": new_open,
         "resolved_today": resolved_today,

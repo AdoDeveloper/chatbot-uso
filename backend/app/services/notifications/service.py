@@ -163,17 +163,17 @@ _EVENT_META = {
         "action": "Revise el modelo configurado, la vigencia de la credencial y el crédito disponible de ese proveedor.",
     },
     NotificationEvent.unanswered_digest: {
-        "subject": "Resumen diario de preguntas sin respuesta",
+        "subject": "Resumen de preguntas sin respuesta",
         "severity": "info",
-        "eyebrow": "Resumen diario",
-        "intro": "Este es el resumen de las preguntas que el asistente no pudo responder en el último día.",
+        "eyebrow": "Resumen periódico",
+        "intro": "Este es el resumen de las preguntas que el asistente no pudo responder en {periodo}.",
         "action": "Le recomendamos revisar las preguntas pendientes y considerar ampliar la base de conocimiento para cubrirlas.",
     },
     NotificationEvent.rate_limit_threshold: {
         "subject": "Límite de solicitudes cerca del máximo",
         "severity": "warning",
         "eyebrow": "Estado del sistema",
-        "intro": "El número de solicitudes se aproxima al límite configurado. Si se alcanza, nuevas solicitudes podrían ser rechazadas temporalmente.",
+        "intro": "Una o más direcciones IP se acercan a su límite de mensajes por hora. Si lo alcanzan, sus nuevas consultas se rechazarán temporalmente.",
         "action": "Le recomendamos revisar el tráfico reciente en la sección de cuotas y ajustar los límites si corresponde.",
     },
     NotificationEvent.service_down: {
@@ -199,6 +199,8 @@ _FIELD_LABELS = {
     "service": "Servicio",
     "providers": "Proveedores intentados",
     "since": "Sin responder desde",
+    "ip": "IP con más solicitudes",
+    "ips_near_limit": "IP cerca del límite",
     "current_requests_last_hour": "Solicitudes en la última hora",
     "limit_per_hour": "Límite por hora",
     "percent": "Porcentaje del límite",
@@ -285,21 +287,25 @@ def _html_body(event: NotificationEvent, payload: dict[str, Any]) -> str:
     return tpl.render_email(title=m["subject"], content=content, preheader=m["intro"])
 
 
+_PERIOD_LABELS = {1: "el último día", 7: "la última semana", 30: "el último mes", 365: "el último año"}
+
+
 def _daily_digest_body(m: dict[str, str], p: dict[str, Any]) -> str:
-    """Cuerpo enriquecido del resumen diario."""
+    """Cuerpo enriquecido del resumen de preguntas sin respuesta."""
     total_open = int(p.get("total_open", 0) or 0)
+    periodo = _PERIOD_LABELS.get(int(p.get("period_days", 1) or 1), "el último periodo")
 
     if total_open == 0:
-        intro = "Durante el último día el asistente respondió todas las consultas y no quedaron preguntas pendientes de atención."
+        intro = f"Durante {periodo} el asistente respondió todas las consultas y no quedaron preguntas pendientes de atención."
     else:
-        intro = m["intro"]
+        intro = m["intro"].format(periodo=periodo)
     content = tpl.paragraph(intro)
 
     # Cifras principales: nuevas, acumuladas, resueltas, escaladas.
     content += tpl.stat_grid([
         (p.get("new_open", 0), "Nuevas sin responder"),
         (p.get("total_open", 0), "Acumuladas pendientes"),
-        (p.get("resolved_today", 0), "Resueltas hoy"),
+        (p.get("resolved_today", 0), "Resueltas hoy" if periodo == "el último día" else "Resueltas en el periodo"),
         (p.get("escalated_today", 0), "Conversaciones escaladas"),
     ])
 
@@ -361,7 +367,8 @@ def _text_body(event: NotificationEvent, payload: dict[str, Any]) -> str:
     m = _meta(event)
     lines = [m["subject"], ""]
     if m["intro"]:
-        lines += [m["intro"], ""]
+        periodo = _PERIOD_LABELS.get(int(payload.get("period_days", 1) or 1), "el último periodo")
+        lines += [m["intro"].replace("{periodo}", periodo), ""]
 
     if event is NotificationEvent.provider_down and "since" in payload:
         readable, ago = _humanize_since(str(payload["since"]))

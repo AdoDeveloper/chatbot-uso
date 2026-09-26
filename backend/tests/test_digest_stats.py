@@ -128,3 +128,29 @@ class TestCollectDigestStats:
 
         assert stats["escalated_today"] == 1
         assert stats["conversations_resolved_today"] == 1
+
+    async def test_weekly_period_covers_the_last_seven_days(self, db_session):
+        now = datetime.now(timezone.utc)
+        db_session.add_all([
+            _make_question(created_at=now - timedelta(days=3)),
+            _make_question(created_at=now - timedelta(days=9)),
+        ])
+        await db_session.commit()
+
+        daily = await collect_digest_stats(db_session)
+        weekly = await collect_digest_stats(db_session, 7)
+
+        assert daily["new_open"] == 0
+        assert weekly["new_open"] == 1
+        assert weekly["period_days"] == 7
+
+
+def test_digest_email_names_the_period():
+    from app.models.enums import NotificationEvent
+    from app.services.notifications.service import _html_body, _text_body
+
+    payload = {"total_open": 2, "new_open": 1, "period_days": 7}
+    html = _html_body(NotificationEvent.unanswered_digest, payload)
+    text = _text_body(NotificationEvent.unanswered_digest, payload)
+    assert "la última semana" in html and "Resueltas en el periodo" in html
+    assert "la última semana" in text and "{periodo}" not in text

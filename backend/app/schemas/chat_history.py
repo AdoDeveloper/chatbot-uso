@@ -42,6 +42,7 @@ class ChatConversationOut(BaseModel):
     csat_comment: str | None = None
     csat_reasons: list[str] = []
     escalation_trigger_reason: str | None = None
+    escalation_contact: dict[str, str] | None = None
     tags: list[str] = []
     message_count: int = 0
     first_user_message: str | None = None

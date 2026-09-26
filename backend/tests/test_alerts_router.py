@@ -132,9 +132,6 @@ class TestRunProactiveChecks:
     async def test_rate_limit_threshold_fires_when_usage_over_ratio(
         self, client, admin_user, auth_headers, db_session,
     ):
-        from app.models.chat_message import ChatMessage
-        from app.models.enums import MessageRole
-
         r_upd = await client.put(
             "/api/v1/rate-limits/config",
             json={"chat_per_min": 10, "chat_per_hour": 10},
@@ -143,12 +140,7 @@ class TestRunProactiveChecks:
         assert r_upd.status_code == 200
 
         await _enable_rule(db_session, event=NotificationEvent.rate_limit_threshold)
-        conv = await _make_conversation(db_session)
-
-        now = datetime.now(timezone.utc)
-        for _ in range(9):
-            db_session.add(ChatMessage(conversation_id=conv.id, role=MessageRole.user, content="hola", created_at=now))
-        await db_session.commit()
+        await _set_hourly_count("203.0.113.7", 9)
 
         r = await client.post("/api/v1/alerts/run", headers=auth_headers(admin_user))
         assert r.status_code == 200
@@ -159,9 +151,6 @@ class TestRunProactiveChecks:
     async def test_rate_limit_threshold_does_not_fire_when_under_ratio(
         self, client, admin_user, auth_headers, db_session,
     ):
-        from app.models.chat_message import ChatMessage
-        from app.models.enums import MessageRole
-
         r_upd = await client.put(
             "/api/v1/rate-limits/config",
             json={"chat_per_min": 10, "chat_per_hour": 100},
@@ -170,11 +159,8 @@ class TestRunProactiveChecks:
         assert r_upd.status_code == 200
 
         await _enable_rule(db_session, event=NotificationEvent.rate_limit_threshold)
-        conv = await _make_conversation(db_session)
-
-        now = datetime.now(timezone.utc)
-        db_session.add(ChatMessage(conversation_id=conv.id, role=MessageRole.user, content="hola", created_at=now))
-        await db_session.commit()
+        for i in range(20):
+            await _set_hourly_count(f"203.0.113.{i}", 10)
 
         r = await client.post("/api/v1/alerts/run", headers=auth_headers(admin_user))
         assert r.status_code == 200
@@ -205,9 +191,6 @@ class TestRunProactiveChecks:
     async def test_both_checks_can_fire_in_same_run(
         self, client, admin_user, auth_headers, db_session,
     ):
-        from app.models.chat_message import ChatMessage
-        from app.models.enums import MessageRole
-
         now = datetime.now(timezone.utc)
         await _add_snapshot(db_session, service="redis", is_ok=False, recorded_at=now - timedelta(minutes=1), error="conn refused")
         await _add_snapshot(db_session, service="redis", is_ok=False, recorded_at=now, error="conn refused")
@@ -219,11 +202,7 @@ class TestRunProactiveChecks:
             headers=auth_headers(admin_user),
         )
         await _enable_rule(db_session, event=NotificationEvent.rate_limit_threshold)
-        conv = await _make_conversation(db_session)
-
-        for _ in range(9):
-            db_session.add(ChatMessage(conversation_id=conv.id, role=MessageRole.user, content="hola", created_at=now))
-        await db_session.commit()
+        await _set_hourly_count("203.0.113.7", 9)
 
         r = await client.post("/api/v1/alerts/run", headers=auth_headers(admin_user))
         assert r.status_code == 200
@@ -231,3 +210,9 @@ class TestRunProactiveChecks:
         assert body["fired_by_check"]["service_down"] == 1
         assert body["fired_by_check"]["rate_limit_threshold"] == 1
         assert body["total_fired"] == 2
+
+
+async def _set_hourly_count(ip: str, count: int) -> None:
+    from app.core import redis as redis_mod
+
+    await redis_mod.get_redis().set(f"rl:chat:hour:{ip}:3600", count, ex=3600)

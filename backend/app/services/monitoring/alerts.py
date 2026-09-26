@@ -1,10 +1,8 @@
 """Motor de alertas proactivas."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-
 import structlog
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.redis import get_redis
@@ -65,31 +63,33 @@ async def check_service_down(db: AsyncSession) -> int:
 
 
 async def check_rate_limit_threshold(db: AsyncSession, *, ratio: float = 0.8) -> int:
+    """Avisa cuando alguna IP se acerca a su límite de mensajes por hora (el límite es por IP)."""
+    from app.core.rate_limit import get_throttled_ips
     from app.services.system.settings import get_runtime_overrides
     overrides = await get_runtime_overrides(db)
     limit_per_hour = int(overrides.get("rate_limit_chat_per_hour") or 0)
     if limit_per_hour <= 0:
         return 0
-
-    since = datetime.now(timezone.utc) - timedelta(hours=1)
-    from app.models.chat_message import ChatMessage
-    from app.models.enums import MessageRole
-    cnt_q = await db.execute(
-        select(func.count(ChatMessage.id))
-        .where(ChatMessage.role == MessageRole.user)
-        .where(ChatMessage.created_at >= since)
-    )
-    cnt = int(cnt_q.scalar_one() or 0)
-    pct = cnt / limit_per_hour
-
-    if pct >= ratio and await _can_fire(NotificationEvent.rate_limit_threshold, "global"):
-        await send_notification(db, event=NotificationEvent.rate_limit_threshold, payload={
-            "current_requests_last_hour": cnt,
-            "limit_per_hour": limit_per_hour,
-            "percent": round(pct * 100, 1),
-        })
-        return 1
-    return 0
+    near = [
+        ip for ip in await get_throttled_ips(
+            limit_per_min=int(overrides.get("rate_limit_chat_per_min") or 0) or None,
+            limit_per_hour=limit_per_hour,
+        )
+        if ip["window"] == "per_hour" and ip["current_count"] >= ratio * limit_per_hour
+    ]
+    if not near:
+        return 0
+    top = max(near, key=lambda ip: ip["current_count"])
+    if not await _can_fire(NotificationEvent.rate_limit_threshold, "global"):
+        return 0
+    await send_notification(db, event=NotificationEvent.rate_limit_threshold, payload={
+        "ip": top["ip"],
+        "ips_near_limit": len(near),
+        "current_requests_last_hour": top["current_count"],
+        "limit_per_hour": limit_per_hour,
+        "percent": round(top["current_count"] / limit_per_hour * 100, 1),
+    })
+    return 1
 
 
 _PROVIDER_DOWN_SINCE_KEY = "alert:since:provider_down:all"
