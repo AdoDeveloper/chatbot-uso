@@ -97,3 +97,16 @@ class TestPublicCsat:
             json={"conversation_id": str(uuid.uuid4()), "score": 4},
         )
         assert r.status_code == 403
+
+
+async def test_chat_endpoint_applies_the_widget_session_cap(client, widget_config, db_session):
+    widget_config.max_chats_per_session = 1
+    await db_session.commit()
+    headers = {"X-Widget-Key": widget_config.api_key}
+    body = {"question": "hola", "session_id": "sesion-con-tope"}
+
+    first = await client.post("/api/v1/chat", json=body, headers=headers)
+    second = await client.post("/api/v1/chat", json=body, headers=headers)
+
+    assert first.status_code == 200
+    assert second.status_code == 429

@@ -5,7 +5,7 @@ import uuid
 from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.deps import require_perm
+from app.core.deps import get_client_ip, require_perm
 from app.core.exceptions import NotFoundError
 from app.core.permissions import P
 from app.db.session import get_db
@@ -47,7 +47,7 @@ async def create_faq(
         actor_id=current_user.id,
         resource_id=str(entry.id),
         meta={"question": entry.question},
-        ip=req.client.host if req.client else None,
+        ip=get_client_ip(req),
         user_agent=req.headers.get("user-agent"),
     )
     await db.commit()
@@ -86,7 +86,7 @@ async def update_faq(
         actor_id=current_user.id,
         resource_id=str(entry.id),
         meta={"question": entry.question},
-        ip=req.client.host if req.client else None,
+        ip=get_client_ip(req),
         user_agent=req.headers.get("user-agent"),
     )
     await db.commit()
@@ -111,7 +111,7 @@ async def delete_faq(
         actor_id=current_user.id,
         resource_id=str(entry.id),
         meta={"question": entry.question},
-        ip=req.client.host if req.client else None,
+        ip=get_client_ip(req),
         user_agent=req.headers.get("user-agent"),
     )
     await svc.delete_faq(db, entry)

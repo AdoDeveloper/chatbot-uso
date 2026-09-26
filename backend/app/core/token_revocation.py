@@ -28,6 +28,20 @@ async def revoke_jti(jti: str, expires_at: datetime) -> None:
         log.warning("token_revocation.revoke_failed", jti=jti[:8])
 
 
+async def claim_jti(jti: str | None, expires_at: datetime) -> bool:
+    """Revoca el jti solo si nadie lo hizo antes; False si ya estaba usado. Fail-open."""
+    if not jti:
+        return True
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    ttl = max(int((expires_at - datetime.now(timezone.utc)).total_seconds()), 1)
+    try:
+        return bool(await redis_mod.get_redis().set(f"{_DENY_PREFIX}{jti}", "1", ex=ttl, nx=True))
+    except Exception:
+        log.warning("token_revocation.claim_failed", jti=jti[:8])
+        return True
+
+
 async def is_jti_revoked(jti: str | None) -> bool:
     """Devuelve True si este jti fue revocado explícitamente. Fail-open."""
     if not jti:

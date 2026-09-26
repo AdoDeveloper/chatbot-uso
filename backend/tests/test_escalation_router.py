@@ -166,3 +166,32 @@ class TestRulesCrud:
             headers=auth_headers(admin_user),
         )
         assert r.status_code == 404
+
+
+@pytest.mark.parametrize("config", [
+    {"keywords": "urgente"},
+    {"keywords": []},
+    {"umbral": 3},
+])
+async def test_invalid_trigger_config_is_rejected(client, auth_headers, make_user, config):
+    from app.models.enums import UserRole
+
+    admin = await make_user(role=UserRole.admin)
+    r = await client.post(
+        "/api/v1/escalation/rules",
+        json={"name": "Críticas", "trigger_type": "keyword_detected", "trigger_config": config},
+        headers=auth_headers(admin),
+    )
+    assert r.status_code == 422
+
+
+async def test_out_of_range_number_is_rejected(client, auth_headers, make_user):
+    from app.models.enums import UserRole
+
+    admin = await make_user(role=UserRole.admin)
+    r = await client.post(
+        "/api/v1/escalation/rules",
+        json={"name": "Sin respuesta", "trigger_type": "no_answer", "trigger_config": {"consecutive": 0}},
+        headers=auth_headers(admin),
+    )
+    assert r.status_code == 422

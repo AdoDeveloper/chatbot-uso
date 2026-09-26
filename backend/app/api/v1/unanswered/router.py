@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.deps import get_current_user, require_perm
+from app.core.deps import get_client_ip, get_current_user, require_perm
 from app.core.exceptions import NotFoundError
 from app.core.permissions import P
 from app.db.session import get_db
@@ -97,7 +97,7 @@ async def resolve_question(
         actor_id=current_user.id,
         resource_id=str(q.id),
         meta={"question": q.question},
-        ip=req.client.host if req.client else None,
+        ip=get_client_ip(req),
         user_agent=req.headers.get("user-agent"),
     )
     await db.commit()
@@ -118,6 +118,8 @@ async def create_faq_from_unanswered(
     q = result.scalar_one_or_none()
     if not q:
         raise NotFoundError("Pregunta no encontrada")
+    if q.status == UnansweredStatus.resolved:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Esta pregunta ya fue resuelta.")
 
     entry = await faq_svc.create_faq(
         db,
@@ -136,7 +138,7 @@ async def create_faq_from_unanswered(
         actor_id=current_user.id,
         resource_id=str(q.id),
         meta={"question": q.question, "faq_id": str(entry.id)},
-        ip=req.client.host if req.client else None,
+        ip=get_client_ip(req),
         user_agent=req.headers.get("user-agent"),
     )
     await db.commit()

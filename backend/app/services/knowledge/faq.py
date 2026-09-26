@@ -39,7 +39,7 @@ async def create_faq(
 ) -> FAQEntry:
     full_text = f"P: {question}\nR: {answer}"
     source = Source(
-        name=f"FAQ: {question[:80]}",
+        name=_source_name(question),
         type=SourceType.faq,
         status=SourceStatus.processing,
         review_status=ReviewStatus.aprobada,
@@ -108,13 +108,15 @@ async def update_faq(
 
     if changed and entry.source_id:
         re_embed_ok = await _re_embed_faq(entry)
-        if not re_embed_ok:
-            # El vector en Qdrant quedó desactualizado; se refleja el error en la Source.
-            src = await db.get(Source, entry.source_id)
-            if src:
-                src.status = SourceStatus.error
-                src.error_message = "No se pudo reindexar la FAQ tras la edición. Guarde de nuevo para reintentar."
-    if active_changed and entry.source_id:
+        src = await db.get(Source, entry.source_id)
+        if src and re_embed_ok:
+            src.name = _source_name(entry.question)
+            src.status = SourceStatus.ready
+            src.error_message = None
+        elif src:
+            src.status = SourceStatus.error
+            src.error_message = "No se pudo reindexar la FAQ tras la edición. Guarde de nuevo para reintentar."
+    if (active_changed or changed) and entry.source_id:
         # `if` independiente, no `elif`: debe ejecutar aunque también haya cambiado el texto.
         try:
             await vector_store.set_source_active(str(entry.source_id), entry.is_active)
@@ -132,15 +134,21 @@ async def update_faq(
     return entry
 
 
+def _source_name(question: str) -> str:
+    return f"FAQ: {question[:80]}"
+
+
 async def _re_embed_faq(entry: FAQEntry) -> bool:
-    """Reindexar una FAQ en Qdrant tras editar su texto."""
+    """Reindexa una FAQ tras editar su texto; la versión anterior se borra solo si la nueva quedó guardada."""
     full_text = f"P: {entry.question}\nR: {entry.answer}"
     source_id = str(entry.source_id)
     try:
-        await vector_store.delete_source(source_id)
-        chunks = chunk_text(full_text, source_id=source_id, source_name=f"FAQ: {entry.question[:80]}")
+        chunks = chunk_text(full_text, source_id=source_id, source_name=_source_name(entry.question))
         embeddings = await embed_texts_async([c["text"] for c in chunks], prefix="passage: ")
+        for c in chunks:
+            c["point_id"] = str(uuid.uuid4())
         await vector_store.upsert_chunks(chunks, embeddings)
+        await vector_store.delete_source_except(source_id, [c["point_id"] for c in chunks])
         return True
     except Exception as exc:
         log.error("faq.re_embed_failed", faq_id=str(entry.id), error=str(exc))
@@ -150,11 +158,11 @@ async def _re_embed_faq(entry: FAQEntry) -> bool:
 async def delete_faq(db: AsyncSession, entry: FAQEntry) -> None:
     if entry.source_id:
         source_id = str(entry.source_id)
+        src = await db.get(Source, entry.source_id)
+        if src:
+            await db.delete(src)
         try:
             await vector_store.delete_source(source_id)
-            src = await db.get(Source, entry.source_id)
-            if src:
-                await db.delete(src)
         except Exception as exc:
             log.error("faq.delete_vector_failed", error=str(exc))
         try:

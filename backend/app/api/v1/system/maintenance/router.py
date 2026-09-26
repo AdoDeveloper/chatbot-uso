@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.deps import require_perm
+from app.core.deps import get_client_ip, require_perm
 from app.core.permissions import P
 from app.db.session import get_db
 from app.models.health_snapshot import HealthSnapshot
@@ -42,7 +42,7 @@ async def sync_qdrant(
         resource_type="system",
         actor_id=current_user.id,
         meta=result,
-        ip=req.client.host if req.client else None,
+        ip=get_client_ip(req),
         user_agent=req.headers.get("user-agent"),
     )
     await db.commit()
@@ -72,7 +72,7 @@ async def purge_health_outliers(
         resource_type="system",
         actor_id=current_user.id,
         meta={"deleted": deleted, "threshold_ms": threshold},
-        ip=req.client.host if req.client else None,
+        ip=get_client_ip(req),
         user_agent=req.headers.get("user-agent"),
     )
     await db.commit()

@@ -382,6 +382,11 @@ _SV_ENTITIES = ["SV_DUI", "SV_NIT", "SV_NRC", "SV_PHONE"]
 _DEFAULT_PII_ENTITIES = ["PHONE_NUMBER", "EMAIL_ADDRESS", "CREDIT_CARD", "IBAN_CODE"]
 
 
+def supported_pii_entities() -> set[str] | None:
+    analyzer = _get_presidio_analyzer()
+    return set(analyzer.get_supported_entities("es")) if analyzer else None
+
+
 def redact_pii(
     text: str, *, entities: list[str] | None = None, allow_list: list[str] | None = None,
 ) -> str:

@@ -100,3 +100,20 @@ class TestCreateFaqFromUnanswered:
             headers=auth_headers(limited_user),
         )
         assert r.status_code == 403
+
+
+async def test_resolved_question_cannot_become_a_second_faq(client, auth_headers, make_user, db_session):
+    from app.models.enums import UnansweredStatus, UserRole
+    from app.models.unanswered_question import UnansweredQuestion
+
+    admin = await make_user(role=UserRole.admin)
+    q = UnansweredQuestion(question="¿Hay parqueo?", status=UnansweredStatus.resolved)
+    db_session.add(q)
+    await db_session.commit()
+
+    r = await client.post(
+        f"/api/v1/unanswered/{q.id}/create-faq",
+        json={"answer": "Sí, hay parqueo."},
+        headers=auth_headers(admin),
+    )
+    assert r.status_code == 409

@@ -10,7 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.deps import require_perm
+from app.core.deps import get_client_ip, require_perm
 from app.core.exceptions import NotFoundError
 from app.core.permissions import P
 from app.core.rate_limit import RateLimitExceeded, check_rate_limit
@@ -214,7 +214,7 @@ async def bulk_action(
                     actor_id=current_user.id,
                     resource_id=str(cid),
                     meta={"session_id": conv.session_id, "status": conv.status.value, "bulk": True},
-                    ip=request.client.host if request.client else None,
+                    ip=get_client_ip(request),
                     user_agent=request.headers.get("user-agent"),
                 )
                 await db.delete(conv)
@@ -280,7 +280,7 @@ async def delete_conversation(
         actor_id=current_user.id,
         resource_id=str(conversation_id),
         meta={"session_id": conv.session_id, "status": conv.status.value},
-        ip=request.client.host if request.client else None,
+        ip=get_client_ip(request),
         user_agent=request.headers.get("user-agent"),
     )
     await db.delete(conv)

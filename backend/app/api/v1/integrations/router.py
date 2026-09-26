@@ -32,6 +32,12 @@ async def _set_row(db: AsyncSession, key: str, value: object) -> None:
         db.add(GlobalSetting(key=key, value=value))
 
 
+def _microsoft_configured() -> bool:
+    from app.core.config import get_settings
+    s = get_settings()
+    return bool(s.MICROSOFT_CLIENT_ID and s.MICROSOFT_CLIENT_SECRET and s.MICROSOFT_TENANT_ID)
+
+
 class SMTPConfigOut(BaseModel):
     host: str
     port: int
@@ -91,6 +97,13 @@ async def update_auth_methods(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(_admin),
 ):
+    if not body.credentials_enabled:
+        oauth_active = bool(await _get_row(db, "oauth_active") or False)
+        if not (oauth_active and _microsoft_configured()):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No puede desactivar el acceso con contraseña mientras Microsoft SSO no esté activo y configurado: nadie podría iniciar sesión.",
+            )
     await _set_row(db, "auth_credentials_enabled", body.credentials_enabled)
     await audit_svc.log_action(
         db,
@@ -98,7 +111,7 @@ async def update_auth_methods(
         resource_type="integration",
         actor_id=current_user.id,
         meta={"credentials_enabled": body.credentials_enabled},
-        ip=req.client.host if req.client else None,
+        ip=get_client_ip(req),
         user_agent=req.headers.get("user-agent"),
     )
     await db.commit()
@@ -157,6 +170,13 @@ async def update_oauth(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(_admin),
 ):
+    credentials_raw = await _get_row(db, "auth_credentials_enabled")
+    credentials_enabled = bool(credentials_raw) if credentials_raw is not None else True
+    if not credentials_enabled and not (body.is_active and _microsoft_configured()):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No puede desactivar Microsoft SSO mientras el acceso con contraseña esté desactivado: nadie podría iniciar sesión.",
+        )
     await _set_row(db, "oauth_allowed_domains", body.allowed_domains)
     await _set_row(db, "oauth_active", body.is_active)
     await audit_svc.log_action(
@@ -165,7 +185,7 @@ async def update_oauth(
         resource_type="integration",
         actor_id=current_user.id,
         meta={"allowed_domains": body.allowed_domains, "is_active": body.is_active},
-        ip=req.client.host if req.client else None,
+        ip=get_client_ip(req),
         user_agent=req.headers.get("user-agent"),
     )
     await db.commit()

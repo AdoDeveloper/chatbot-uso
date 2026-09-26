@@ -11,7 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import NotFoundError
-from app.core.security import hash_password, verify_password
+from app.core.security import hash_password_async, verify_password_async
 from app.core.token_revocation import revocation_cutoff
 from app.models.enums import UserRole
 from app.models.rbac import Role
@@ -41,7 +41,7 @@ async def create(
     user = User(
         email=email,
         full_name=full_name,
-        hashed_password=hash_password(password),
+        hashed_password=await hash_password_async(password),
         role=role,
     )
     db.add(user)
@@ -57,9 +57,9 @@ async def authenticate(db: AsyncSession, email: str, password: str) -> User | No
     user = await get_by_email(db, email)
     _DUMMY_HASH = "$2b$12$KIXnatB2zMqfZOEbLDwVFOeOS8yh6oq5FzCSRXJAZ8M/J8yXxf7Vy"
     if not user:
-        verify_password(password, _DUMMY_HASH)
+        await verify_password_async(password, _DUMMY_HASH)
         return None
-    if not verify_password(password, user.hashed_password):
+    if not await verify_password_async(password, user.hashed_password):
         return None
     return user
 
@@ -157,7 +157,7 @@ async def reset_password(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo un admin puede resetear la contraseña de otro admin")
 
     temp_password = _generate_temp_password()
-    user.hashed_password = hash_password(temp_password)
+    user.hashed_password = await hash_password_async(temp_password)
     user.must_change_password = True
     user.tokens_valid_after = revocation_cutoff()
 

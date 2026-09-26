@@ -141,3 +141,15 @@ class TestInjectionLog:
         r = await client.get("/api/v1/guardrails/injection-log", headers=auth_headers(admin_user))
         assert r.status_code == 200
         assert r.json() == []
+
+
+async def test_unknown_pii_entity_is_rejected(client, auth_headers, make_user):
+    from app.models.enums import UserRole
+
+    admin = await make_user(role=UserRole.admin)
+    r = await client.patch(
+        "/api/v1/guardrails/config",
+        json={"pii_entities": ["EMAIL_ADRESS"]},
+        headers=auth_headers(admin),
+    )
+    assert r.status_code == 422

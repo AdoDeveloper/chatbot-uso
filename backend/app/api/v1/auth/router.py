@@ -13,8 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.core.deps import get_client_ip, get_current_user
 from app.core.rate_limit import RateLimitExceeded, check_rate_limit
-from app.core.security import decode_token, hash_password, verify_password
-from app.core.token_revocation import is_jti_revoked, is_token_stale, revocation_cutoff, revoke_jti
+from app.core.security import decode_token, hash_password_async, verify_password_async
+from app.core.token_revocation import claim_jti, is_token_stale, revocation_cutoff, revoke_jti
 from app.db.session import get_db
 from app.models.chat_message import ChatMessage
 from app.models.enums import ReviewStatus
@@ -199,13 +199,6 @@ async def refresh(body: RefreshRequest, request: Request, db: AsyncSession = Dep
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    if await is_jti_revoked(payload.get("jti")):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Refresh token ya utilizado",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
     user = await user_service.get_by_id(db, uuid.UUID(payload["sub"]))
     if not user or not user.is_active:
         raise HTTPException(
@@ -221,10 +214,13 @@ async def refresh(body: RefreshRequest, request: Request, db: AsyncSession = Dep
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Rotación: invalida el refresh entrante para que no pueda reutilizarse.
-    exp = payload.get("exp")
-    if payload.get("jti") and exp:
-        await revoke_jti(payload["jti"], datetime.datetime.fromtimestamp(exp, tz=datetime.timezone.utc))
+    exp = datetime.datetime.fromtimestamp(payload.get("exp", 0), tz=datetime.timezone.utc)
+    if not await claim_jti(payload.get("jti"), exp):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token ya utilizado",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     return _token_response(
         user, *await rbac_service.issue_user_tokens(db, user)
@@ -277,13 +273,13 @@ async def change_password(
 ):
     await _enforce_auth_rate_limit(request, "change_password", get_settings().RATE_LIMIT_LOGIN_PER_MIN)
 
-    if not verify_password(body.current_password, current_user.hashed_password):
+    if not await verify_password_async(body.current_password, current_user.hashed_password):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Contraseña actual incorrecta")
 
-    if verify_password(body.new_password, current_user.hashed_password):
+    if await verify_password_async(body.new_password, current_user.hashed_password):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La nueva contraseña debe ser diferente a la actual")
 
-    current_user.hashed_password = hash_password(body.new_password)
+    current_user.hashed_password = await hash_password_async(body.new_password)
     current_user.must_change_password = False
     current_user.tokens_valid_after = revocation_cutoff()
     await log_action(

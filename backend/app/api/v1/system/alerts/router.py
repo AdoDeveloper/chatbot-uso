@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.deps import require_perm
+from app.core.deps import get_client_ip, require_perm
 from app.core.permissions import P
 from app.db.session import get_db
 from app.models.user import User
@@ -35,7 +35,7 @@ async def run_proactive_checks(
         resource_type="system",
         actor_id=current_user.id,
         meta={"fired_by_check": counters, "total_fired": sum(counters.values())},
-        ip=req.client.host if req.client else None,
+        ip=get_client_ip(req),
         user_agent=req.headers.get("user-agent"),
     )
     await db.commit()

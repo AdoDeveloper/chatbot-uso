@@ -392,3 +392,25 @@ class TestReplaceSourceFile:
         )
         assert r.status_code == 200, r.text
         assert not old_file.exists()
+
+
+async def test_renaming_a_source_updates_the_indexed_name(client, auth_headers, make_user, db_session, monkeypatch):
+    from app.models.enums import SourceStatus, SourceType, UserRole
+    from app.models.source import Source
+    from app.services.ingestion import vector_store
+
+    renamed: list[tuple] = []
+
+    async def _set_name(source_id, name):
+        renamed.append((source_id, name))
+
+    monkeypatch.setattr(vector_store, "set_source_name", _set_name)
+    admin = await make_user(role=UserRole.admin)
+    src = Source(name="Reglamento viejo", type=SourceType.txt, status=SourceStatus.ready)
+    db_session.add(src)
+    await db_session.commit()
+
+    r = await client.patch(f"/api/v1/sources/{src.id}", json={"name": "Reglamento 2025"}, headers=auth_headers(admin))
+
+    assert r.status_code == 200
+    assert renamed == [(str(src.id), "Reglamento 2025")]

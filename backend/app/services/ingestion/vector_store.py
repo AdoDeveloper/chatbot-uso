@@ -178,6 +178,18 @@ async def set_source_active(source_id: str, value: bool) -> None:
     )
 
 
+async def set_source_name(source_id: str, name: str) -> None:
+    client = _get_client()
+    source_filter = Filter(
+        must=[FieldCondition(key="source_id", match=MatchValue(value=source_id))]
+    )
+    await client.set_payload(
+        collection_name=COLLECTION,
+        payload={"source_name": name},
+        points=source_filter,
+    )
+
+
 async def get_chunk(point_id: str) -> dict | None:
     """Retrieve a single chunk by its Qdrant point ID."""
     client = _get_client()

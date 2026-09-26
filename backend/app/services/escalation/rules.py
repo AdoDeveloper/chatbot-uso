@@ -13,7 +13,7 @@ from app.models.enums import EscalationTrigger
 from app.models.escalation_rule import EscalationRule
 from app.models.user import User
 from app.schemas.escalation import ChannelPingResult, RuleTestContext, RuleTestResult
-from app.services.escalation.engine import evaluate_rule
+from app.services.escalation.engine import evaluate_rule, validate_trigger_config
 from app.services.notifications.smtp import get_smtp_config, send_email
 
 
@@ -36,8 +36,16 @@ async def _assert_trigger_type_available(
         )
 
 
+def _checked_config(trigger_type: EscalationTrigger, config: dict | None) -> dict:
+    try:
+        return validate_trigger_config(trigger_type, config or {})
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
 async def create_rule(db: AsyncSession, *, data: dict) -> EscalationRule:
     await _assert_trigger_type_available(db, trigger_type=data["trigger_type"])
+    data = {**data, "trigger_config": _checked_config(data["trigger_type"], data.get("trigger_config"))}
     rule = EscalationRule(**data)
     db.add(rule)
     await db.commit()
@@ -53,6 +61,11 @@ async def update_rule(db: AsyncSession, *, rule_id: uuid.UUID, changes: dict) ->
     new_trigger_type = changes.get("trigger_type")
     if new_trigger_type is not None and new_trigger_type != rule.trigger_type:
         await _assert_trigger_type_available(db, trigger_type=new_trigger_type, exclude_rule_id=rule_id)
+    if "trigger_config" in changes or new_trigger_type is not None:
+        changes = {**changes, "trigger_config": _checked_config(
+            new_trigger_type or rule.trigger_type,
+            changes["trigger_config"] if "trigger_config" in changes else rule.trigger_config,
+        )}
     for k, v in changes.items():
         setattr(rule, k, v)
     await db.commit()

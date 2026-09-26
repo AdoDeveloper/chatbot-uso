@@ -314,3 +314,15 @@ class TestUsageReport:
         body = r.json()
         assert body["total_requests"] == 0
         assert body["total_throttles"] == 0
+
+
+async def test_hour_limit_below_minute_limit_is_rejected(client, auth_headers, make_user):
+    from app.models.enums import UserRole
+
+    admin = await make_user(role=UserRole.admin)
+    r = await client.put(
+        "/api/v1/rate-limits/config",
+        json={"chat_per_min": 50, "chat_per_hour": 10},
+        headers=auth_headers(admin),
+    )
+    assert r.status_code == 422

@@ -25,7 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.ai.semantic_cache import invalidate_by_source
 from app.core.config import get_settings
-from app.core.deps import require_perm
+from app.core.deps import get_client_ip, require_perm
 from app.core.permissions import P
 from app.db.session import get_db
 from app.models.enums import ReviewStatus, SourceStatus
@@ -115,6 +115,7 @@ async def update_source(
 ):
     source = await sources_svc.get_or_404(db, source_id, load_user=True)
 
+    renamed = body.name is not None and body.name != source.name
     if body.name is not None:
         source.name = body.name
 
@@ -128,6 +129,13 @@ async def update_source(
     source.meta = current_meta
 
     await db.commit()
+    if renamed:
+        from app.services.ingestion import vector_store
+        try:
+            await vector_store.set_source_name(str(source.id), source.name)
+            await invalidate_by_source(str(source.id))
+        except Exception as exc:
+            log.warning("source.rename_propagation_failed", source_id=str(source.id), error=str(exc))
     await db.refresh(source)
 
     result = await db.execute(
@@ -204,7 +212,7 @@ async def approve_source(
         actor_id=current_user.id,
         resource_id=str(source.id),
         meta={"name": source.name},
-        ip=req.client.host if req.client else None,
+        ip=get_client_ip(req),
         user_agent=req.headers.get("user-agent"),
     )
     await db.commit()
@@ -238,7 +246,7 @@ async def reject_source(
         actor_id=current_user.id,
         resource_id=str(source.id),
         meta={"name": source.name, "reason": body.reason[:200]},
-        ip=req.client.host if req.client else None,
+        ip=get_client_ip(req),
         user_agent=req.headers.get("user-agent"),
     )
     await db.commit()
@@ -285,7 +293,7 @@ async def bulk_delete(
         resource_type="source",
         actor_id=current_user.id,
         meta={"count": len(body.source_ids), "source_ids": [str(i) for i in body.source_ids]},
-        ip=req.client.host if req.client else None,
+        ip=get_client_ip(req),
         user_agent=req.headers.get("user-agent"),
     )
     await db.commit()
@@ -306,7 +314,7 @@ async def bulk_reingest(
         resource_type="source",
         actor_id=current_user.id,
         meta={"count": count, "source_ids": [str(i) for i in body.source_ids]},
-        ip=req.client.host if req.client else None,
+        ip=get_client_ip(req),
         user_agent=req.headers.get("user-agent"),
     )
     await db.commit()
@@ -340,7 +348,7 @@ async def bulk_tag(
         resource_type="source",
         actor_id=current_user.id,
         meta={"count": len(sources), "action": body.action, "tags": body.tags},
-        ip=req.client.host if req.client else None,
+        ip=get_client_ip(req),
         user_agent=req.headers.get("user-agent"),
     )
     await db.commit()

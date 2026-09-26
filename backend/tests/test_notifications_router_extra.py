@@ -614,3 +614,18 @@ class TestSummarizePayload:
         assert result is not None
         assert len(result) <= 80
         assert result.endswith("…")
+
+
+async def test_toggling_a_rule_keeps_its_config(client, auth_headers, make_user, db_session):
+    from app.models.enums import NotificationChannel, UserRole
+    from app.models.notification_rule import NotificationRule
+
+    admin = await make_user(role=UserRole.admin)
+    rule = NotificationRule(event="doc_ready", channel=NotificationChannel.email, enabled=True, config_json={"x": 1})
+    db_session.add(rule)
+    await db_session.commit()
+
+    r = await client.put(f"/api/v1/notifications/rules/{rule.id}", json={"enabled": False}, headers=auth_headers(admin))
+
+    assert r.status_code == 200
+    assert r.json()["config_json"] == {"x": 1}

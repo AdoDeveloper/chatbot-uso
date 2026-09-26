@@ -5,7 +5,7 @@ import time
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.deps import require_perm
+from app.core.deps import get_client_ip, require_perm
 from app.core.permissions import P
 from app.db.session import get_db
 from app.models.user import User
@@ -79,7 +79,7 @@ async def discard_chunk(
         actor_id=current_user.id,
         resource_id=point_id,
         meta={"source_id": result.source_id},
-        ip=req.client.host if req.client else None,
+        ip=get_client_ip(req),
         user_agent=req.headers.get("user-agent"),
     )
     await db.commit()
@@ -101,7 +101,7 @@ async def restore_chunk(
         actor_id=current_user.id,
         resource_id=point_id,
         meta={"source_id": result.source_id},
-        ip=req.client.host if req.client else None,
+        ip=get_client_ip(req),
         user_agent=req.headers.get("user-agent"),
     )
     await db.commit()
@@ -129,12 +129,17 @@ async def test_query(
     embeddings = await embed_texts_async([body.query], prefix="query: ")
     emb = embeddings[0]
 
+    from app.services.chat.pipeline import resolve_source_ids
+    from app.services.rag.corrective import _GRADE_MAX_DOCS
+
+    source_ids = await resolve_source_ids(db, body.source_ids, use_all_sources=True)
     results = await vector_store.hybrid_search(
         query_dense=emb["dense"],
         query_sparse={"indices": emb["sparse_indices"], "values": emb["sparse_values"]},
-        source_ids=body.source_ids,
-        top_k=body.top_k,
+        source_ids=source_ids,
+        top_k=max(body.top_k, body.top_k * 5),
         score_threshold=0.0,
+        balance_sources=True,
     )
 
     results = results[: body.top_k]
@@ -144,7 +149,7 @@ async def test_query(
     if results and chain:
         set_fallback_chain(chain)
         provider, api_key = chain[0]
-        grades = await grade_documents(body.query, results, provider, api_key)
+        grades = await grade_documents(body.query, results[:_GRADE_MAX_DOCS], provider, api_key)
 
     elapsed_ms = int((time.monotonic() - start) * 1000)
 

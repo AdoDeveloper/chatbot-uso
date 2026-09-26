@@ -1,12 +1,12 @@
 """Guardrails configuration & injection log endpoints."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.deps import require_perm
+from app.core.deps import get_client_ip, require_perm
 from app.core.permissions import P
 from app.db.session import get_db
 from app.models.audit_log import AuditLog
@@ -114,8 +114,17 @@ async def update_config(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(_admin),
 ) -> OperationStatus:
+    from app.services.ai.guardrails import supported_pii_entities
     from app.services.system.settings import invalidate_runtime_overrides
     updates = body.model_dump(exclude_unset=True)
+    supported = supported_pii_entities()
+    if body.pii_entities is not None and supported is not None:
+        unknown = sorted(set(body.pii_entities) - supported)
+        if unknown:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Tipos de dato personal no reconocidos: {', '.join(unknown)}",
+            )
     for k, v in updates.items():
         await db.merge(GlobalSetting(key=k, value=v))
     await audit_svc.log_action(
@@ -124,7 +133,7 @@ async def update_config(
         resource_type="system",
         actor_id=current_user.id,
         meta=updates,
-        ip=req.client.host if req.client else None,
+        ip=get_client_ip(req),
         user_agent=req.headers.get("user-agent"),
     )
     await db.commit()
@@ -160,7 +169,7 @@ async def create_pattern(
         actor_id=current_user.id,
         resource_id=entry["id"],
         meta={"label": entry["label"]},
-        ip=req.client.host if req.client else None,
+        ip=get_client_ip(req),
         user_agent=req.headers.get("user-agent"),
     )
     await db.commit()
@@ -183,7 +192,7 @@ async def update_pattern(
         actor_id=current_user.id,
         resource_id=pattern_id,
         meta={"label": entry["label"]},
-        ip=req.client.host if req.client else None,
+        ip=get_client_ip(req),
         user_agent=req.headers.get("user-agent"),
     )
     await db.commit()
@@ -204,7 +213,7 @@ async def delete_pattern(
         resource_type="system",
         actor_id=current_user.id,
         resource_id=pattern_id,
-        ip=req.client.host if req.client else None,
+        ip=get_client_ip(req),
         user_agent=req.headers.get("user-agent"),
     )
     await db.commit()

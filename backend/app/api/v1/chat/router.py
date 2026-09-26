@@ -452,8 +452,10 @@ async def chat(
 
     if not is_authenticated_playground:
         from app.core.widget_auth import verify_widget_access
+        from app.services.widget.service import enforce_widget_caps
         try:
-            await verify_widget_access(req, db)
+            widget = await verify_widget_access(req, db)
+            await enforce_widget_caps(widget, request.session_id or "")
         except Exception:
             _llm_semaphore.release()
             raise

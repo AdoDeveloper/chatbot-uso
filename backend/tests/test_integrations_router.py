@@ -71,7 +71,26 @@ class TestAuthMethods:
         )
         assert r.status_code == 403
 
-    async def test_update_persists(self, client, admin_user, auth_headers):
+    async def test_cannot_disable_passwords_without_sso(self, client, admin_user, auth_headers):
+        r = await client.put(
+            "/api/v1/integrations/auth-methods",
+            json={"credentials_enabled": False},
+            headers=auth_headers(admin_user),
+        )
+        assert r.status_code == 400
+
+    async def test_update_persists(self, client, admin_user, auth_headers, monkeypatch):
+        from app.core.config import get_settings
+
+        s = get_settings()
+        monkeypatch.setattr(s, "MICROSOFT_CLIENT_ID", "id", raising=False)
+        monkeypatch.setattr(s, "MICROSOFT_CLIENT_SECRET", "secreto", raising=False)
+        monkeypatch.setattr(s, "MICROSOFT_TENANT_ID", "tenant", raising=False)
+        await client.put(
+            "/api/v1/integrations/oauth",
+            json={"allowed_domains": [], "is_active": True},
+            headers=auth_headers(admin_user),
+        )
         r = await client.put(
             "/api/v1/integrations/auth-methods",
             json={"credentials_enabled": False},
@@ -189,3 +208,19 @@ class TestSMTPTest:
             codigos.append(r.status_code)
 
         assert 429 in codigos
+
+
+async def test_sso_cannot_be_turned_off_while_passwords_are_off(client, auth_headers, make_user, monkeypatch):
+    from app.core.config import get_settings
+
+    admin = await make_user(role=UserRole.admin)
+    s = get_settings()
+    monkeypatch.setattr(s, "MICROSOFT_CLIENT_ID", "id", raising=False)
+    monkeypatch.setattr(s, "MICROSOFT_CLIENT_SECRET", "secreto", raising=False)
+    monkeypatch.setattr(s, "MICROSOFT_TENANT_ID", "tenant", raising=False)
+    await client.put("/api/v1/integrations/oauth", json={"allowed_domains": [], "is_active": True}, headers=auth_headers(admin))
+    await client.put("/api/v1/integrations/auth-methods", json={"credentials_enabled": False}, headers=auth_headers(admin))
+
+    r = await client.put("/api/v1/integrations/oauth", json={"allowed_domains": [], "is_active": False}, headers=auth_headers(admin))
+
+    assert r.status_code == 400

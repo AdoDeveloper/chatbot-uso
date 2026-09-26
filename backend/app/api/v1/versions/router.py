@@ -17,8 +17,10 @@ from app.core.permissions import P
 from app.db.session import get_db
 from app.models.config_version import ConfigVersion
 from app.models.user import User
+from app.services.ai.guardrails import reload_custom_patterns
 from app.services.ai.semantic_cache import clear_all
 from app.services.monitoring import versions as svc
+from app.services.system.settings import invalidate_runtime_overrides
 
 router = APIRouter(prefix="/versions", tags=["versions"])
 _reader = require_perm(P.BOT_SETTINGS_READ)
@@ -212,6 +214,8 @@ async def rollback_version(
 
     await db.commit()
     await clear_all()
+    invalidate_runtime_overrides()
+    await reload_custom_patterns(db)
     await db.refresh(rollback_version)
     await db.refresh(rollback_version, ["created_by"])
     return RollbackResult(

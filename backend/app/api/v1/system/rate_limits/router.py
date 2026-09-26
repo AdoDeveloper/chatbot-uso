@@ -4,12 +4,12 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Query, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dates import since_until
-from app.core.deps import require_perm
+from app.core.deps import get_client_ip, require_perm
 from app.core.permissions import P
 from app.core.rate_limit import (
     get_throttled_ips,
@@ -29,6 +29,12 @@ _admin  = require_perm(P.SYSTEM_MANAGE)
 class RateLimitConfig(BaseModel):
     chat_per_min: int = Field(ge=1, le=1000)
     chat_per_hour: int = Field(ge=1, le=100000)
+
+    @model_validator(mode="after")
+    def _hour_covers_minute(self) -> RateLimitConfig:
+        if self.chat_per_hour < self.chat_per_min:
+            raise ValueError("El límite por hora no puede ser menor que el límite por minuto.")
+        return self
 
 
 class ThrottledIP(BaseModel):
@@ -71,7 +77,7 @@ async def update_config(
         resource_type="system",
         actor_id=current_user.id,
         meta={"chat_per_min": body.chat_per_min, "chat_per_hour": body.chat_per_hour},
-        ip=req.client.host if req.client else None,
+        ip=get_client_ip(req),
         user_agent=req.headers.get("user-agent"),
     )
     await db.commit()
@@ -108,7 +114,7 @@ async def unblock_ip(
         resource_type="system",
         actor_id=current_user.id,
         resource_id=ip,
-        ip=req.client.host if req.client else None,
+        ip=get_client_ip(req),
         user_agent=req.headers.get("user-agent"),
     )
     await db.commit()

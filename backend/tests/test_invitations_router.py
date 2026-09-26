@@ -311,3 +311,25 @@ class TestAcceptInvitation:
         await db_session.refresh(inv)
         assert inv.is_active is False
         assert inv.accepted_at is not None
+
+
+async def test_creating_an_invitation_is_audited(client, auth_headers, make_user, db_session, monkeypatch):
+    from sqlalchemy import select
+
+    from app.api.v1.invitations import router as inv_router
+    from app.models.audit_log import AuditLog
+    from app.models.enums import UserRole
+
+    async def _no_email(inv, invited_by):
+        return False
+
+    monkeypatch.setattr(inv_router, "_send_invitation_email_for", _no_email)
+    admin = await make_user(role=UserRole.admin)
+    r = await client.post(
+        "/api/v1/users/invitations",
+        json={"email": "nuevo.auditado@usonsonate.edu.sv", "role": "editor"},
+        headers=auth_headers(admin),
+    )
+    assert r.status_code == 201
+    actions = (await db_session.execute(select(AuditLog.action))).scalars().all()
+    assert "invitation.create" in actions

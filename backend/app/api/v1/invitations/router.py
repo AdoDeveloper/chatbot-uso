@@ -23,6 +23,7 @@ from app.schemas.invitation import (
     InvitationResponse,
 )
 from app.services.system import rbac as rbac_service
+from app.services.system.audit import log_action
 from app.services.users import invitation as invitation_service
 from app.services.users import service as user_service
 
@@ -79,6 +80,7 @@ async def _send_invitation_email_for(inv: Invitation, invited_by: User) -> bool:
 @router.post("/users/invitations", response_model=InvitationResponse, status_code=status.HTTP_201_CREATED)
 async def create_invitation(
     body: InvitationCreate,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_perm(P.USERS_MANAGE)),
 ):
@@ -88,6 +90,13 @@ async def create_invitation(
         role=body.role,
         created_by=current_user,
         expires_in_days=body.expires_in_days,
+    )
+    await db.flush()
+    await log_action(
+        db, action="invitation.create", resource_type="invitation",
+        actor_id=current_user.id, resource_id=str(inv.id),
+        meta={"email": inv.email, "role": str(getattr(inv.role, "value", inv.role))},
+        ip=get_client_ip(request),
     )
     await db.commit()
     await db.refresh(inv)
@@ -102,6 +111,7 @@ async def create_invitation(
 @router.post("/users/invitations/{invitation_id}/resend", response_model=InvitationResponse)
 async def resend_invitation(
     invitation_id: uuid.UUID,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_perm(P.USERS_MANAGE)),
 ):
@@ -109,6 +119,11 @@ async def resend_invitation(
     if not inv:
         raise NotFoundError("Invitación no encontrada")
     inv = await invitation_service.resend_invitation(db, inv)
+    await log_action(
+        db, action="invitation.resend", resource_type="invitation",
+        actor_id=current_user.id, resource_id=str(inv.id), meta={"email": inv.email},
+        ip=get_client_ip(request),
+    )
     await db.commit()
     await db.refresh(inv)
 
@@ -122,26 +137,39 @@ async def resend_invitation(
 @router.delete("/users/invitations/{invitation_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def revoke_invitation(
     invitation_id: uuid.UUID,
+    request: Request,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_perm(P.USERS_MANAGE)),
+    current_user: User = Depends(require_perm(P.USERS_MANAGE)),
 ):
     result = await db.get(Invitation, invitation_id)
     if not result:
         raise NotFoundError("Invitación no encontrada")
     await invitation_service.revoke_invitation(db, result)
+    await log_action(
+        db, action="invitation.revoke", resource_type="invitation",
+        actor_id=current_user.id, resource_id=str(invitation_id), meta={"email": result.email},
+        ip=get_client_ip(request),
+    )
     await db.commit()
 
 
 @router.delete("/users/invitations/{invitation_id}/permanent", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_invitation(
     invitation_id: uuid.UUID,
+    request: Request,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_perm(P.USERS_MANAGE)),
+    current_user: User = Depends(require_perm(P.USERS_MANAGE)),
 ):
     result = await db.get(Invitation, invitation_id)
     if not result:
         raise NotFoundError("Invitación no encontrada")
+    email = result.email
     await invitation_service.delete_invitation(db, result)
+    await log_action(
+        db, action="invitation.delete", resource_type="invitation",
+        actor_id=current_user.id, resource_id=str(invitation_id), meta={"email": email},
+        ip=get_client_ip(request),
+    )
     await db.commit()
 
 
@@ -207,6 +235,13 @@ async def accept_invitation(
         db, inv, full_name=body.full_name, password=body.password
     )
     user.last_login_at = datetime.datetime.now(datetime.timezone.utc)
+    await db.flush()
+    await log_action(
+        db, action="invitation.accept", resource_type="user",
+        actor_id=user.id, resource_id=str(user.id),
+        meta={"email": user.email, "role": str(getattr(user.role, "value", user.role))},
+        ip=client_ip,
+    )
     await db.commit()
     await db.refresh(user)
 

@@ -121,3 +121,21 @@ def test_revocation_cutoff_keeps_same_second_tokens_and_rejects_older():
     assert is_token_stale({"iat": same_second}, cutoff) is False
     assert is_token_stale({"iat": same_second + 1}, cutoff) is False
     assert is_token_stale({"iat": int((cutoff - timedelta(seconds=1)).timestamp())}, cutoff) is True
+
+
+async def test_a_refresh_token_can_be_claimed_only_once(monkeypatch):
+    import asyncio
+    from datetime import datetime, timedelta, timezone
+
+    import fakeredis.aioredis
+
+    from app.core import redis as redis_mod
+    from app.core.token_revocation import claim_jti
+
+    fake = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    monkeypatch.setattr(redis_mod, "get_redis", lambda: fake)
+    exp = datetime.now(timezone.utc) + timedelta(days=1)
+
+    results = await asyncio.gather(*[claim_jti("jti-unico", exp) for _ in range(3)])
+
+    assert sorted(results) == [False, False, True]

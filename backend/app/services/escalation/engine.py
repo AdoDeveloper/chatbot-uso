@@ -172,3 +172,39 @@ def schema_for_trigger(trigger_type: EscalationTrigger) -> dict[str, Any]:
         },
     }
     return schemas.get(trigger_type, {})
+
+
+def validate_trigger_config(trigger_type: EscalationTrigger, config: dict[str, Any]) -> dict[str, Any]:
+    """Comprueba tipos y rangos contra el esquema del disparador; lanza ValueError con el motivo."""
+    schema = schema_for_trigger(trigger_type)
+    unknown = sorted(set(config) - set(schema))
+    if unknown:
+        raise ValueError(f"Campos no válidos para este tipo de activación: {', '.join(unknown)}")
+    clean: dict[str, Any] = {}
+    for key, spec in schema.items():
+        label = spec.get("label", key)
+        if key not in config:
+            if spec.get("required"):
+                raise ValueError(f"Falta el campo «{label}».")
+            continue
+        value = config[key]
+        kind = spec["type"]
+        if kind == "list[str]":
+            if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
+                raise ValueError(f"«{label}» debe ser una lista de textos.")
+            value = [v.strip() for v in value if v.strip()]
+            if spec.get("required") and not value:
+                raise ValueError(f"«{label}» necesita al menos un valor.")
+        else:
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise ValueError(f"«{label}» debe ser un número.")
+            if kind == "int":
+                if value != int(value):
+                    raise ValueError(f"«{label}» debe ser un número entero.")
+                value = int(value)
+            else:
+                value = float(value)
+            if "min" in spec and value < spec["min"] or "max" in spec and value > spec["max"]:
+                raise ValueError(f"«{label}» debe estar entre {spec.get('min')} y {spec.get('max')}.")
+        clean[key] = value
+    return clean

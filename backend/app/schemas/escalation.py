@@ -4,13 +4,13 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.models.enums import EscalationTrigger
 
 
 class EscalationRuleCreate(BaseModel):
-    name: str
+    name: str = Field(..., min_length=1, max_length=128)
     description: str = ""
     trigger_type: EscalationTrigger
     trigger_config: dict[str, Any] = {}
@@ -18,7 +18,7 @@ class EscalationRuleCreate(BaseModel):
 
 
 class EscalationRuleUpdate(BaseModel):
-    name: str | None = None
+    name: str | None = Field(None, min_length=1, max_length=128)
     description: str | None = None
     trigger_type: EscalationTrigger | None = None
     trigger_config: dict[str, Any] | None = None

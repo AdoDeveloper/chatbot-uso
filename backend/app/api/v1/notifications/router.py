@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.deps import get_current_user, require_perm
+from app.core.deps import get_client_ip, get_current_user, require_perm
 from app.core.exceptions import NotFoundError
 from app.core.permissions import P
 from app.db.session import get_db
@@ -148,7 +148,7 @@ async def update_report_schedule_config(
         resource_type="notification",
         actor_id=current_user.id,
         meta=body.model_dump(),
-        ip=req.client.host if req.client else None,
+        ip=get_client_ip(req),
         user_agent=req.headers.get("user-agent"),
     )
     await db.commit()
@@ -170,7 +170,8 @@ async def update_rule(
     rule.enabled = body.enabled
     if body.target is not None:
         rule.target = body.target
-    rule.config_json = body.config_json
+    if "config_json" in body.model_fields_set:
+        rule.config_json = body.config_json
     await audit_svc.log_action(
         db,
         action="notification_rule.update",
@@ -178,7 +179,7 @@ async def update_rule(
         actor_id=current_user.id,
         resource_id=str(rule.id),
         meta={"event": rule.event, "channel": rule.channel, "enabled": rule.enabled},
-        ip=req.client.host if req.client else None,
+        ip=get_client_ip(req),
         user_agent=req.headers.get("user-agent"),
     )
     await db.commit()
@@ -216,7 +217,7 @@ async def toggle_email_channel(
         resource_type="notification",
         actor_id=current_user.id,
         meta={"enabled": body.enabled, "affected": len(rules)},
-        ip=req.client.host if req.client else None,
+        ip=get_client_ip(req),
         user_agent=req.headers.get("user-agent"),
     )
     await db.commit()

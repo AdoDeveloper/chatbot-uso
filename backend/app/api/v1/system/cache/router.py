@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.deps import require_perm
+from app.core.deps import get_client_ip, require_perm
 from app.core.permissions import P
 from app.db.session import get_db
 from app.models.user import User
@@ -74,7 +74,7 @@ async def clear_cache(
         resource_type="system",
         actor_id=current_user.id,
         meta={"deleted": deleted},
-        ip=req.client.host if req.client else None,
+        ip=get_client_ip(req),
         user_agent=req.headers.get("user-agent"),
     )
     await db.commit()
@@ -100,7 +100,7 @@ async def delete_entry(
         resource_type="system",
         actor_id=current_user.id,
         resource_id=key,
-        ip=req.client.host if req.client else None,
+        ip=get_client_ip(req),
         user_agent=req.headers.get("user-agent"),
     )
     await db.commit()
@@ -133,7 +133,7 @@ async def update_config(
             resource_type="system",
             actor_id=current_user.id,
             meta=updates,
-            ip=req.client.host if req.client else None,
+            ip=get_client_ip(req),
             user_agent=req.headers.get("user-agent"),
         )
         await db.commit()
