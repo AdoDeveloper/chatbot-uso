@@ -35,7 +35,7 @@ redis==5.2.1           # Pinned: async API changes between minors
 PyJWT~=2.13.0
 bcrypt~=4.0.1
 python-multipart~=0.0.20
-cryptography~=46.0.6
+cryptography~=48.0.1
 
 # File handling
 aiofiles~=24.1.0
@@ -76,7 +76,7 @@ langgraph-sdk~=0.3.15
 
 # Guardrails - PII detection (Spanish)
 presidio-analyzer~=2.2.0
-presidio-anonymizer~=2.2.0
+presidio-anonymizer~=2.2.364
 
 # Email (SMTP async)
 aiosmtplib~=5.1.2
