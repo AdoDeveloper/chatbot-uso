@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.constants import PLAYGROUND_BROWSERS, PREVIEW_PRODUCTION_BROWSER
+from app.core.constants import PANEL_AUTHENTICATED_BROWSERS, PLAYGROUND_BROWSERS, PREVIEW_PRODUCTION_BROWSER
 from app.models.audit_log import AuditLog
 from app.models.chat_conversation import ChatConversation
 from app.models.chat_message import ChatMessage
@@ -72,19 +72,22 @@ def sql_date_format(db: AsyncSession, col, fmt: str):
 
 
 def _source_filter(source: str = "production"):
-    """Filter conversations by source: 'production' (widget/API) or 'playground' (test)."""
+    """'production' = visitantes (widget/API); 'playground' = pruebas hechas desde el panel."""
     if source == "playground":
-        return ChatConversation.browser.in_(PLAYGROUND_BROWSERS)
+        return ChatConversation.browser.in_(PANEL_AUTHENTICATED_BROWSERS)
     return or_(
         ChatConversation.browser.is_(None),
-        ChatConversation.browser.notin_(PLAYGROUND_BROWSERS),
+        ChatConversation.browser.notin_(PANEL_AUTHENTICATED_BROWSERS),
     )
+
+
+_PANEL_BROWSERS_SQL = ", ".join(f"'{b}'" for b in sorted(PANEL_AUTHENTICATED_BROWSERS))
 
 
 def _source_sql_where(source: str = "production") -> str:
     if source == "playground":
-        return "  AND c.browser IN ('playground', 'panel', 'admin')"
-    return "  AND (c.browser IS NULL OR c.browser NOT IN ('playground', 'panel', 'admin'))"
+        return f"  AND c.browser IN ({_PANEL_BROWSERS_SQL})"
+    return f"  AND (c.browser IS NULL OR c.browser NOT IN ({_PANEL_BROWSERS_SQL}))"
 
 
 _PROD_SQL_JOIN = "JOIN chat_conversations c ON c.id = m.conversation_id"

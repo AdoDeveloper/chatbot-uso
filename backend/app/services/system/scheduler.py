@@ -205,6 +205,11 @@ def _cumple_agenda(now: datetime, schedule: ReportSchedule) -> bool:
     return False
 
 
+def _seconds_to_next_minute() -> float:
+    now = datetime.now(timezone.utc)
+    return 60 - now.second - now.microsecond / 1_000_000 + 0.5
+
+
 async def _digest_loop() -> None:
     """Envía el reporte unanswered_digest según la cadencia configurada.
     """
@@ -216,7 +221,7 @@ async def _digest_loop() -> None:
                 from app.services.system.report_schedule import get_report_schedule
                 schedule = await get_report_schedule(db)
                 if not _cumple_agenda(now, schedule):
-                    await asyncio.sleep(60)
+                    await asyncio.sleep(_seconds_to_next_minute())
                     continue
                 today = now.astimezone(now_sv().tzinfo).strftime("%Y-%m-%d")
                 lock_key = f"scheduler:digest:{today}"
@@ -233,7 +238,7 @@ async def _digest_loop() -> None:
                     log.debug("scheduler.digest_skipped_by_lock")
         except Exception:
             log.exception("scheduler.digest_failed")
-        await asyncio.sleep(60)  # check every minute
+        await asyncio.sleep(_seconds_to_next_minute())
 
 
 async def _stale_conversations_loop() -> None:

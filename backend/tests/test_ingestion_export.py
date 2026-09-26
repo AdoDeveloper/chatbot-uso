@@ -379,3 +379,14 @@ class TestResponseWrappers:
         )
         assert resp.media_type == "application/pdf"
         assert 'reporte_completo.pdf' in resp.headers["content-disposition"]
+
+
+def test_report_text_with_ampersand_and_angle_brackets_renders():
+    sections = [
+        {"title": "RESUMEN <general>", "text": "El tema más consultado fue «Aranceles & pagos <2025>»."},
+        {"title": "TEMAS", "rows": [{"Tema": "Becas & ayudas <parciales>", "Cantidad": 3}]},
+    ]
+
+    data = build_pdf_report(sections, title="Reporte")
+
+    assert data.startswith(b"%PDF")

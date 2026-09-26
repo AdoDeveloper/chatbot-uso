@@ -140,7 +140,7 @@ async def update_report_schedule_config(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_perm(P.NOTIFICATIONS_UPDATE)),
 ):
-    """Configura la cadencia del reporte (unidad + día/mes + hora UTC)."""
+    """Configura la cadencia del reporte (unidad + día/mes + hora de El Salvador)."""
     result = await upsert_report_schedule(db, body)
     await audit_svc.log_action(
         db,

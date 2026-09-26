@@ -80,6 +80,18 @@ class TestGetChannels:
         assert "widget" not in by_channel
         assert "api" not in by_channel
 
+    async def test_panel_previews_count_as_previews_not_visitors(self, db_session):
+        widget = _conv(origin_url="https://uso.edu/inicio", browser="Chrome")
+        preview = _conv(origin_url="https://uso.edu/panel", browser="preview-production")
+        db_session.add_all([widget, preview])
+        await db_session.commit()
+
+        production = await svc.get_channels(db_session, days=7, source="production")
+        previews = await svc.get_channels(db_session, days=7, source="playground")
+
+        assert [c.channel for c in production.channels] == ["widget"]
+        assert [c.channel for c in previews.channels] == ["preview-production"]
+
     async def test_respects_until_and_since_window(self, db_session):
         old = _conv(origin_url="https://uso.edu/x", started_at=NOW - timedelta(days=60))
         recent = _conv(origin_url="https://uso.edu/y", started_at=NOW)

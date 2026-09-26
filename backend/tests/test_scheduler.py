@@ -485,3 +485,18 @@ class TestStartStop:
         scheduler.stop()
         scheduler.stop()  # no debe lanzar
         assert scheduler._health_task is None
+
+
+def test_digest_waits_until_the_start_of_the_next_minute(monkeypatch):
+    from datetime import datetime, timezone
+
+    from app.services.system import scheduler
+
+    class _Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 9, 26, 7, 59, 59, 700_000, tzinfo=timezone.utc)
+
+    monkeypatch.setattr(scheduler, "datetime", _Clock)
+
+    assert abs(scheduler._seconds_to_next_minute() - 0.8) < 1e-6

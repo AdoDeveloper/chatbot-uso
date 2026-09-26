@@ -204,6 +204,7 @@ limit_req_zone \$binary_remote_addr zone=chat_zone:10m rate=30r/m;
 server {
     listen 80;
     server_name ${DOMAIN};
+    server_tokens off;
 
     client_max_body_size 55m;
 

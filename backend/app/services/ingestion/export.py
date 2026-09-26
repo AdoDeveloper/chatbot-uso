@@ -17,6 +17,10 @@ LOGO_FILE = Path(__file__).resolve().parents[3] / "static" / "assets" / "uso_log
 
 _FORMULA_CHARS = ("=", "+", "-", "@", "|", "%")
 
+def _xml(text: str) -> str:
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
 def _safe_cell(v: Any) -> str:
     """Prefija con apóstrofe valores que Excel interpretaría como fórmula y quita caracteres de control ilegales."""
     from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
@@ -496,6 +500,10 @@ def build_pdf_report(
         textColor=colors.HexColor("#1F2937"), spaceAfter=4,
     )
 
+    report_cell_style = ParagraphStyle(
+        "ReportCell", parent=styles["Normal"], fontName="Helvetica", fontSize=8, leading=10,
+    )
+
     story: list = _cover_story(title, subtitle, page_size)
 
     page_width = page_size[0] - 3 * cm
@@ -513,7 +521,7 @@ def build_pdf_report(
 
     for section in nonempty:
         sec_title = section.get("title", "")
-        story.append(Paragraph(sec_title, sec_style))
+        story.append(Paragraph(_xml(sec_title), sec_style))
         story.append(HRFlowable(
             width="100%", thickness=0.5,
             color=colors.HexColor("#2563EB"), spaceAfter=3,
@@ -522,7 +530,7 @@ def build_pdf_report(
         if section.get("text"):
             for para in str(section["text"]).split("\n"):
                 if para.strip():
-                    story.append(Paragraph(para.strip(), body_style))
+                    story.append(Paragraph(_xml(para.strip()), body_style))
             story.append(Spacer(1, 0.3 * cm))
             continue
 
@@ -547,7 +555,7 @@ def build_pdf_report(
         col_width = page_width / col_count
 
         table_data = [headers] + [
-            [str(row.get(h, "") or "") for h in headers] for row in rows
+            [Paragraph(_xml(str(row.get(h, "") or "")), report_cell_style) for h in headers] for row in rows
         ]
         table = Table(table_data, colWidths=[col_width] * col_count, repeatRows=1)
         table.setStyle(TableStyle([
