@@ -9,7 +9,7 @@ export const EVENT_META: Record<string, { label: string; icon: LucideIcon; href?
   provider_misconfigured: { label: "Proveedor IA mal configurado", icon: Plug, href: "/dashboard/configuracion/proveedores" },
   service_down: { label: "Servicio degradado", icon: Plug, href: "/dashboard/configuracion/proveedores" },
   rate_limit_threshold: { label: "Cerca del límite de cuotas", icon: AlertCircle, href: "/dashboard/configuracion/estado/cuotas/limites" },
-  unanswered_digest: { label: "Resumen diario", icon: Inbox, href: "/dashboard/conversaciones/pendientes" },
+  unanswered_digest: { label: "Resumen de pendientes", icon: Inbox, href: "/dashboard/conversaciones/pendientes" },
 };
 
 export function formatEventFallback(value: string): string {

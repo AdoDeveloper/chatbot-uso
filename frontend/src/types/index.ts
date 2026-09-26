@@ -152,6 +152,7 @@ export interface ChatConversationOut {
   csat_comment: string | null;
   csat_reasons: string[];
   escalation_trigger_reason: string | null;
+  escalation_contact?: { type: string; value: string } | null;
   tags: string[];
   message_count: number;
   first_user_message: string | null;

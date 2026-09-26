@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Loader2, CheckCircle2, MessageSquare, TrendingUp, Timer, Star,
-  ExternalLink, Tag, X as XIcon,
+  ExternalLink, Tag, X as XIcon, Mail, Phone,
 } from "lucide-react";
 import Link from "next/link";
 import api from "@/lib/api";
@@ -196,6 +196,24 @@ function CaseCard({
             {conv.first_user_message ?? "Sin mensaje"}
           </p>
 
+          {conv.escalation_contact && (
+            <p className="mt-1 text-xs text-foreground flex items-center gap-1.5">
+              {conv.escalation_contact.type === "email" ? <Mail className="w-3.5 h-3.5 text-muted-foreground" aria-hidden="true" /> : <Phone className="w-3.5 h-3.5 text-muted-foreground" aria-hidden="true" />}
+              <span className="text-muted-foreground">{conv.escalation_contact.type === "email" ? "Correo:" : "WhatsApp:"}</span>
+              <a
+                className="font-medium text-primary hover:underline break-all"
+                href={conv.escalation_contact.type === "email"
+                  ? `mailto:${conv.escalation_contact.value}`
+                  : `https://wa.me/${conv.escalation_contact.value.replace(/[^\d]/g, "")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {conv.escalation_contact.value}
+              </a>
+            </p>
+          )}
+
           {(conv.csat_reasons?.length > 0 || conv.csat_comment) && (
             <div className="mt-1.5 flex flex-col gap-1">
               {conv.csat_reasons?.length > 0 && (
@@ -301,7 +319,7 @@ export default function EscalamientosPage() {
       escalated_only: "true",
     });
     if (tagFilter) params.set("tag", tagFilter);
-    if (dateFrom) params.set("date_from", new Date(dateFrom).toISOString());
+    if (dateFrom) params.set("date_from", new Date(dateFrom + "T00:00:00").toISOString());
     if (dateTo) params.set("date_to", new Date(dateTo + "T23:59:59").toISOString());
     return params.toString();
   }, [page, pageSize, tagFilter, dateFrom, dateTo]);

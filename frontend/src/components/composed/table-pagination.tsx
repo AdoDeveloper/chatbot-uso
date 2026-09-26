@@ -60,6 +60,9 @@ export function TablePagination({
 }: TablePaginationProps) {
   const narrow = useIsNarrow();
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  useEffect(() => {
+    if (page > totalPages) onPageChange(totalPages);
+  }, [page, totalPages, onPageChange]);
   // Sin selector de tamaño no hay nada más que mostrar en una sola página.
   if (total <= pageSize && !onPageSizeChange) return null;
 

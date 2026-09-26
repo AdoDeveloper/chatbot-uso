@@ -1,6 +1,7 @@
 "use client";
 
 import { forwardRef, useImperativeHandle, useState } from "react";
+import { isoDay } from "@/lib/utils";
 import { BarChart3 } from "lucide-react";
 import { useApi } from "@/hooks/use-api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,10 +13,6 @@ interface UsagePoint { bucket: string; requests: number; throttles: number; }
 interface UsageReport {
   hours: number; limit_per_min: number; limit_per_hour: number;
   total_requests: number; total_throttles: number; points: UsagePoint[];
-}
-
-function isoDay(d: Date): string {
-  return d.toISOString().slice(0, 10);
 }
 
 function Stat({ label, value, accent }: { label: string; value: string | number; accent?: "amber" | "red" }) {

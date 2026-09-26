@@ -83,6 +83,7 @@ export function useApi<T>(path: string | null, deps: unknown[] = []): UseApiResu
       const { data } = await api.get<T>(current, { signal });
       if (signal?.aborted) return;
       _cacheSet(current, data);
+      if (pathRef.current !== current) return;
       setData(data);
       hasData.current = true;
     } catch (err) {
@@ -90,7 +91,7 @@ export function useApi<T>(path: string | null, deps: unknown[] = []): UseApiResu
       // En revalidación de fondo, no pisamos los datos en caché con un error.
       if (!isBackground) setError(getErrorMessage(err));
     } finally {
-      if (!signal?.aborted) {
+      if (!signal?.aborted && pathRef.current === current) {
         setLoading(false);
         setRefetching(false);
       }

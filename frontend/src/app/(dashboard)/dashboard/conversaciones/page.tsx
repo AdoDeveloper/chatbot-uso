@@ -177,7 +177,7 @@ export default function HistorialPage() {
  const listQuery = useMemo(() => {
   const params = new URLSearchParams({ page: String(page), page_size: String(pageSize), source: "production", origin: originFilter });
   if (search.trim()) params.set("search", search.trim());
-  if (dateFrom) params.set("date_from", new Date(dateFrom).toISOString());
+  if (dateFrom) params.set("date_from", new Date(dateFrom + "T00:00:00").toISOString());
   if (dateTo) params.set("date_to", new Date(dateTo + "T23:59:59").toISOString());
   if (statusFilter !== "all") params.set("status", statusFilter);
   return params.toString();
@@ -206,7 +206,7 @@ export default function HistorialPage() {
   setExporting(true);
   const params = new URLSearchParams({ format, source: "production", origin: originFilter });
   if (search.trim()) params.set("search", search.trim());
-  if (dateFrom) params.set("date_from", new Date(dateFrom).toISOString());
+  if (dateFrom) params.set("date_from", new Date(dateFrom + "T00:00:00").toISOString());
   if (dateTo) params.set("date_to", new Date(dateTo + "T23:59:59").toISOString());
   if (statusFilter !== "all") params.set("status", statusFilter);
   try {

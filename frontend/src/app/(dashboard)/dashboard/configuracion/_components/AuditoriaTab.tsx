@@ -125,7 +125,7 @@ export function AuditoriaTab() {
     if (search.trim()) params.set("action", search.trim());
     if (resourceType) params.set("resource_type", resourceType);
     if (actorId) params.set("actor_id", actorId);
-    if (dateFrom) params.set("date_from", new Date(dateFrom).toISOString());
+    if (dateFrom) params.set("date_from", new Date(dateFrom + "T00:00:00").toISOString());
     if (dateTo) params.set("date_to", new Date(dateTo + "T23:59:59").toISOString());
     return params.toString();
   }, [search, resourceType, actorId, dateFrom, dateTo, page, pageSize]);
@@ -176,7 +176,7 @@ export function AuditoriaTab() {
                   if (search.trim()) params.set("action", search.trim());
                   if (resourceType) params.set("resource_type", resourceType);
                   if (actorId) params.set("actor_id", actorId);
-                  if (dateFrom) params.set("date_from", new Date(dateFrom).toISOString());
+                  if (dateFrom) params.set("date_from", new Date(dateFrom + "T00:00:00").toISOString());
                   if (dateTo) params.set("date_to", new Date(dateTo + "T23:59:59").toISOString());
                   setExporting(fmt);
                   try {

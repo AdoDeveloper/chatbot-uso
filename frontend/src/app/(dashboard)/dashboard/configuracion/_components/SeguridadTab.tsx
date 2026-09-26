@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { KeyRound, Ban, ShieldAlert, ShieldCheck, Shield, AlertTriangle, LockOpen, Loader2 } from "lucide-react";
 import api from "@/lib/api";
+import { isoDay } from "@/lib/utils";
 import { useApi, getErrorMessage } from "@/hooks/use-api";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -41,10 +42,6 @@ function fmtDelta(now: number, prev: number): { text: string; cls: string } | nu
     text: `${pct > 0 ? "+" : ""}${pct}% vs periodo previo`,
     cls: pct > 0 ? "text-destructive" : "text-brand-green",
   };
-}
-
-function isoDay(d: Date): string {
-  return d.toISOString().slice(0, 10);
 }
 
 export function SeguridadTab() {

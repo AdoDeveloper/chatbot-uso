@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import type { HeatmapCell, HeatmapWindow } from "@/types";
+import { isoDay } from "@/lib/utils";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 
 const DAYS_ES = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
@@ -85,7 +86,7 @@ function MonthBars({ cells, rangeEnd }: { cells: HeatmapCell[]; rangeEnd?: strin
   const data = useMemo(() => {
     const byDate = new Map<string, number>();
     cells.forEach((c) => { if (c.date) byDate.set(c.date, c.count); });
-    const end = rangeEnd ? new Date(rangeEnd) : new Date();
+    const end = new Date(`${rangeEnd ?? isoDay(new Date())}T00:00:00Z`);
     const days: { iso: string; label: string; count: number }[] = [];
     for (let i = 29; i >= 0; i--) {
       const d = new Date(end);
@@ -116,7 +117,7 @@ function YearBars({ cells, rangeEnd }: { cells: HeatmapCell[]; rangeEnd?: string
   // Suma por mes en vez de 365 puntos diarios: la vista anual busca
   // tendencia general (qué meses concentran más uso), no el detalle de un día.
   const data = useMemo(() => {
-    const end = rangeEnd ? new Date(rangeEnd) : new Date();
+    const end = new Date(`${rangeEnd ?? isoDay(new Date())}T00:00:00Z`);
     const byMonth = new Map<string, number>();
     cells.forEach((c) => {
       if (!c.date) return;

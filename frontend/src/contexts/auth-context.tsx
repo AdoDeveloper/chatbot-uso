@@ -76,7 +76,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [user]);
 
   useEffect(() => {
-    const token = tokenStore.getAccess();
+    const token = tokenStore.getAccess() ?? tokenStore.getRefresh();
     if (!token) {
       setLoading(false);
       return;

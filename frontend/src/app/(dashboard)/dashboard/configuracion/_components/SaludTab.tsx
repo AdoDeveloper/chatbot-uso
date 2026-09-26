@@ -4,6 +4,7 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useSt
 import { AlertTriangle, Loader2, RefreshCw, CheckCircle, Cpu, HardDrive, Activity, History } from "lucide-react";
 
 import api from "@/lib/api";
+import { isoDay } from "@/lib/utils";
 import { useApi } from "@/hooks/use-api";
 import type { HealthDetailed, UptimeRow, HealthIncident, HealthSnapshotRow } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -13,10 +14,6 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PeriodFilter } from "@/components/composed/period-filter";
 import { Loading } from "@/components/ui/loading";
 import { formatInProjectTz } from "@/lib/datetime";
-
-function isoDay(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
 
 
 function fmtDuration(s: number | null): string {

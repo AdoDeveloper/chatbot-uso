@@ -137,7 +137,12 @@ export async function streamChat(
       if (signal?.aborted) return;
       if ((err as Error).name === "AbortError" && !timedOut) return;
 
-      lastMessage = timedOut ? TIMEOUT_MESSAGE : SERVICE_UNAVAILABLE_MESSAGE;
+      // El servidor puede seguir procesando la pregunta: reenviarla la duplicaría.
+      if (timedOut) {
+        callbacks.onError(TIMEOUT_MESSAGE);
+        return;
+      }
+      lastMessage = SERVICE_UNAVAILABLE_MESSAGE;
       if (attempt < MAX_ATTEMPTS - 1) {
         try { await wait(backoffDelay(attempt), signal); } catch { return; }
         continue;
@@ -155,7 +160,12 @@ export async function streamChat(
       }
     }
 
-    if (resp.status === 429 || resp.status >= 500) {
+    if (resp.status === 504) {
+      callbacks.onError(TIMEOUT_MESSAGE);
+      return;
+    }
+
+    if (resp.status === 429 || resp.status === 502 || resp.status === 503) {
       lastMessage = resp.status === 429 ? BUSY_MESSAGE : SERVICE_UNAVAILABLE_MESSAGE;
       if (attempt < MAX_ATTEMPTS - 1) {
         try { await wait(backoffDelay(attempt, parseRetryAfter(resp)), signal); } catch { return; }

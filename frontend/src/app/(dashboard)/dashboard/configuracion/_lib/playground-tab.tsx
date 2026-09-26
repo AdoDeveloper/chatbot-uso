@@ -532,6 +532,7 @@ export function PlaygroundTab({
     });
 
     let lastMessage = TIMEOUT_MESSAGE;
+    let sessionRenewed = false;
 
     try {
       for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
@@ -567,7 +568,12 @@ export function PlaygroundTab({
         } catch {
           cleanup();
           if (!isCurrent()) return;
-          lastMessage = timedOut ? TIMEOUT_MESSAGE : OFFLINE_MESSAGE;
+          // El servidor puede seguir procesando la pregunta: reenviarla la duplicaría.
+          if (timedOut) {
+            failWith(TIMEOUT_MESSAGE);
+            return;
+          }
+          lastMessage = OFFLINE_MESSAGE;
           if (attempt < MAX_ATTEMPTS - 1) {
             try { await wait(backoffDelay(attempt), controller.signal); } catch { return; }
             continue;
@@ -578,6 +584,14 @@ export function PlaygroundTab({
         cleanup();
         if (!isCurrent()) return;
 
+        // Sin sesión válida el backend trata la petición como del widget y responde 403.
+        if ((response.status === 401 || response.status === 403) && !sessionRenewed) {
+          sessionRenewed = true;
+          await api.get("/auth/me").catch(() => undefined);
+          attempt--;
+          continue;
+        }
+
         if (response.status === 401) {
           setMessages((prev) => prev.filter((m) => !(m.role === "assistant" && m.content === "")));
           setLoading(false);
@@ -585,7 +599,12 @@ export function PlaygroundTab({
           return;
         }
 
-        if (response.status === 429 || response.status >= 500) {
+        if (response.status === 504) {
+          failWith(TIMEOUT_MESSAGE);
+          return;
+        }
+
+        if (response.status === 429 || response.status === 502 || response.status === 503) {
           lastMessage = response.status === 429 ? BUSY_MESSAGE : SERVICE_UNAVAILABLE_MESSAGE;
           if (attempt < MAX_ATTEMPTS - 1) {
             try { await wait(backoffDelay(attempt, parseRetryAfter(response)), controller.signal); } catch { return; }

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { APP_URL } from "@/lib/config";
 
 export function middleware(request: NextRequest) {
-  const token = request.cookies.get("chatbot_access")?.value;
+  const token = request.cookies.get("chatbot_access")?.value ?? request.cookies.get("chatbot_refresh")?.value;
   const { pathname } = request.nextUrl;
 
   const isAuth = pathname.startsWith("/login") || pathname.startsWith("/invite");

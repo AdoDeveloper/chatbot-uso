@@ -159,6 +159,8 @@ function BotIcon({ size = 16, logoUrl }: { size?: number; logoUrl?: string | nul
 
 const STORAGE_VERSION = 1;
 const MAX_PERSISTED_MESSAGES = 50;
+// Igual a lo que el servidor mantiene abierta una conversación inactiva (2 h + 2 h para reabrirla).
+const HISTORY_TTL_MS = 4 * 60 * 60 * 1000;
 
 interface PersistedHistory {
   v: number;
@@ -195,6 +197,11 @@ function loadHistory(apiUrl: string, apiKey: string): {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as PersistedHistory;
     if (parsed.v !== STORAGE_VERSION || !Array.isArray(parsed.messages)) return null;
+    if (!parsed.updatedAt || Date.now() - parsed.updatedAt > HISTORY_TTL_MS) {
+      window.localStorage.removeItem(storageKey(apiUrl, apiKey));
+      resetSessionId(apiUrl, apiKey);
+      return null;
+    }
     return {
       messages: parsed.messages.map((m) => ({
         ...m,
