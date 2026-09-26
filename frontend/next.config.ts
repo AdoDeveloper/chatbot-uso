@@ -43,6 +43,7 @@ export default (phase: string): NextConfig => {
 
   return {
     output: "standalone",
+    poweredByHeader: false,
     outputFileTracingRoot: path.join(__dirname),
     allowedDevOrigins: isDevelopment ? [APP_ORIGIN.hostname] : undefined,
     async rewrites() {

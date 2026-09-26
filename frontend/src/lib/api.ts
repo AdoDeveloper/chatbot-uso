@@ -109,6 +109,17 @@ api.interceptors.response.use(
       original.headers.Authorization = `Bearer ${data.access_token}`;
       return api(original);
     } catch (err) {
+      // Otra pestaña pudo renovar la sesión con el mismo refresh token (es de un solo uso).
+      for (let i = 0; i < 10; i++) {
+        const rotated = tokenStore.getRefresh();
+        const access = tokenStore.getAccess();
+        if (rotated && rotated !== refreshToken && access) {
+          processQueue(null, access);
+          original.headers.Authorization = `Bearer ${access}`;
+          return api(original);
+        }
+        await new Promise((r) => setTimeout(r, 200));
+      }
       processQueue(err, null);
       tokenStore.clear();
       if (typeof window !== "undefined") window.location.href = "/login";
