@@ -343,6 +343,7 @@ async def test_balanced_search_keeps_the_global_relevance_order(patch_client, mo
         return {"grande", "faq"}, {"grande": 500, "faq": 1}
 
     monkeypatch.setattr(vs, "get_source_info", _info)
+    monkeypatch.setattr(vs, "_source_info_cache", None)
     balanced = SimpleNamespace(points=[
         _point("faq-1", {"source_id": "faq"}, score=0.16),
         _point("g-7", {"source_id": "grande"}, score=0.03),

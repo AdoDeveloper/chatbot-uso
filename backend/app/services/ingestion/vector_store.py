@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 import uuid
 from functools import lru_cache
 
@@ -262,6 +263,21 @@ async def delete_source_except(source_id: str, keep_ids: list[str]) -> None:
     log.info("qdrant.replaced_source", source_id=source_id, kept=len(keep_ids))
 
 
+_SOURCE_INFO_TTL_SECONDS = 60.0
+_source_info_cache: tuple[float, tuple[set[str], dict[str, int]]] | None = None
+
+
+async def _cached_source_info() -> tuple[set[str], dict[str, int]]:
+    """Conteos por fuente para el balanceo; unos segundos de desfase no cambian el reparto."""
+    global _source_info_cache
+    now = time.monotonic()
+    if _source_info_cache is not None and now - _source_info_cache[0] < _SOURCE_INFO_TTL_SECONDS:
+        return _source_info_cache[1]
+    info = await get_source_info()
+    _source_info_cache = (now, info)
+    return info
+
+
 async def get_source_info() -> tuple[set[str], dict[str, int]]:
     """Retorna (source_ids, source_id->chunk_count) de todos los puntos en Qdrant."""
     client = _get_client()
@@ -336,7 +352,7 @@ async def hybrid_search(
     # ── Per-source prefetches con Weighted RRF ─────────────────────────────
     fetched = False
     if balance_sources and exclude_source_ids is None:
-        all_sids, chunk_counts = await get_source_info()
+        all_sids, chunk_counts = await _cached_source_info()
         if len(all_sids) > 1:
             # Determina qué fuentes balancear (todas o un subconjunto filtrado)
             target_sids = all_sids if source_ids is None else [s for s in all_sids if s in source_ids]

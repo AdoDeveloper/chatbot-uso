@@ -131,15 +131,15 @@ async def _run_chat_inner(
     from app.services.system.settings import get_runtime_overrides
     overrides = await get_runtime_overrides(db)
 
+    limit_error = await pipeline.check_limits(db, client_ip, request.session_id, settings)
+    if limit_error:
+        return ChatResponse(type="error", message=limit_error)
+
     guard_error, request.question = await pipeline.run_input_guardrails(
         db, request.question, client_ip, cfg
     )
     if guard_error:
         return ChatResponse(type="error", message=guard_error)
-
-    limit_error = await pipeline.check_limits(db, client_ip, request.session_id, settings)
-    if limit_error:
-        return ChatResponse(type="error", message=limit_error)
 
     if not is_playground:
         human_reply = await pipeline.human_request_reply(db, request.question)
@@ -156,7 +156,7 @@ async def _run_chat_inner(
                 response_kwargs={"rag_route": "escalation"},
             )
 
-    use_cache = not request.messages
+    use_cache = not any(m.role == "user" for m in (request.messages or []))
     if use_cache:
         cached = await pipeline.lookup_cache(db, request.question, request.source_ids, settings, use_draft)
         if cached:

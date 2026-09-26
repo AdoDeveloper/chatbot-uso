@@ -267,6 +267,14 @@ class TestParseTxt:
         with pytest.raises(RuntimeError, match="no parece texto legible"):
             await parse_txt(str(path))
 
+    async def test_reads_utf16_file_saved_by_windows_notepad(self, tmp_path):
+        path = tmp_path / "file.txt"
+        path.write_bytes("Matrícula en línea".encode("utf-16"))
+
+        text = await parse_txt(str(path))
+
+        assert text == "Matrícula en línea"
+
 
 # ── pdf.py ───────────────────────────────────────────────────────────────
 

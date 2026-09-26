@@ -100,3 +100,7 @@ class TestCasosLimite:
             "| CUM | Modalidad |\n|---|---|\n| 8.0 | Pasantía |"
         )
         assert normalizar_texto(crudo) == esperado
+
+
+def test_retorno_de_carro_aislado_separa_lineas():
+    assert normalizar_texto("Artículo 1\rArtículo 2") == "Artículo 1\nArtículo 2"

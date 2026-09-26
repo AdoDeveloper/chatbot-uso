@@ -154,6 +154,11 @@ async def lookup_cache(
     db: AsyncSession, question: str, source_ids: list[str] | None, settings, use_draft: bool = False
 ) -> dict | None:
     """Busca la respuesta primero en el caché exacto."""
+    from app.services.system.settings import get_runtime_overrides
+    overrides = await get_runtime_overrides(db)
+    if not overrides["semantic_cache_enabled"]:
+        return None
+
     key = exact_cache_key(question, source_ids, use_draft)
     try:
         exact_cached = await get_redis().get(key)
@@ -164,16 +169,13 @@ async def lookup_cache(
     except Exception as exc:
         log.warning("chat.exact_cache_read_failed", key=key[:16], error=str(exc))
 
-    from app.services.system.settings import get_runtime_overrides
-    overrides = await get_runtime_overrides(db)
-    if overrides["semantic_cache_enabled"]:
-        cached = await get_cached_response(
-            question, source_ids, use_draft=use_draft,
-            threshold=overrides["semantic_cache_threshold"],
-        )
-        if cached:
-            log.info("chat.semantic_cache_hit")
-            return {"sources": cached["sources"], "content": cached["content"]}
+    cached = await get_cached_response(
+        question, source_ids, use_draft=use_draft,
+        threshold=overrides["semantic_cache_threshold"],
+    )
+    if cached:
+        log.info("chat.semantic_cache_hit")
+        return {"sources": cached["sources"], "content": cached["content"]}
 
     return None
 
@@ -200,6 +202,11 @@ async def store_cache(
             )
             return
 
+    from app.services.system.settings import get_runtime_overrides
+    overrides = await get_runtime_overrides(db)
+    if not overrides["semantic_cache_enabled"]:
+        return
+
     try:
         await get_redis().setex(
             exact_cache_key(question, source_ids, use_draft),
@@ -209,17 +216,14 @@ async def store_cache(
     except Exception as exc:
         log.warning("chat.exact_cache_write_failed", error=str(exc))
 
-    from app.services.system.settings import get_runtime_overrides
-    overrides = await get_runtime_overrides(db)
-    if overrides["semantic_cache_enabled"]:
-        try:
-            await store_cached_response(
-                question, source_ids, sources, final_text,
-                ttl=overrides["semantic_cache_ttl"],
-                use_draft=use_draft,
-            )
-        except Exception as exc:
-            log.warning("chat.semantic_cache_write_failed", error=str(exc))
+    try:
+        await store_cached_response(
+            question, source_ids, sources, final_text,
+            ttl=overrides["semantic_cache_ttl"],
+            use_draft=use_draft,
+        )
+    except Exception as exc:
+        log.warning("chat.semantic_cache_write_failed", error=str(exc))
 
 
 async def resolve_source_ids(

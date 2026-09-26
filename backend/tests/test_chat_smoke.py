@@ -502,3 +502,54 @@ async def test_unconfirmed_context_asks_the_model_to_stick_to_it(client, admin_u
     await _post_playground_chat(client, {"question": "¿Cuándo se aprobó?"}, auth_headers(admin_user))
 
     assert "puede no responder la pregunta" in prompts[0]
+
+
+async def test_disabling_the_cache_also_skips_exact_matches(db_session, monkeypatch):
+    import fakeredis.aioredis
+
+    from app.core import redis as redis_mod
+    from app.services.system import settings as settings_service
+
+    fake = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    monkeypatch.setattr(redis_mod, "get_redis", lambda: fake)
+    monkeypatch.setattr(pipeline, "get_redis", lambda: fake)
+    await fake.set(pipeline.exact_cache_key("¿Horario?", None, False), '{"sources": [], "content": "8 a 5"}')
+
+    async def _overrides(db):
+        return {**settings_service.RUNTIME_DEFAULTS, "semantic_cache_enabled": False}
+
+    monkeypatch.setattr(settings_service, "get_runtime_overrides", _overrides)
+
+    assert await pipeline.lookup_cache(db_session, "¿Horario?", None, None) is None
+
+
+@pytest.mark.parametrize(("messages", "uses_cache"), [
+    ([{"role": "assistant", "content": "¡Hola! ¿En qué puedo ayudarle?"}], True),
+    ([{"role": "user", "content": "¿Cuánto cuesta?"}, {"role": "assistant", "content": "$25."}], False),
+])
+async def test_cache_is_used_for_the_first_question_of_a_widget_chat(
+    client, admin_user, auth_headers, mock_pipeline, monkeypatch, messages, uses_cache,
+):
+    looked_up: list[str] = []
+
+    async def _lookup_cache(db, question, *a, **k):
+        looked_up.append(question)
+        return {"content": "Respuesta en caché.", "sources": []}
+
+    async def _retrieve_context(*a, **k):
+        return [{"text": "Registro atiende de 8 a 4.", "source_name": "doc.pdf", "score": 0.9}], 1.0
+
+    async def _fake_stream_chat(**kwargs):
+        yield "De 8 a 4."
+
+    monkeypatch.setattr(pipeline, "lookup_cache", _lookup_cache)
+    monkeypatch.setattr(pipeline, "retrieve_context", _retrieve_context)
+    monkeypatch.setattr(chat_router, "stream_chat", _fake_stream_chat)
+
+    body = await _post_playground_chat(
+        client, {"question": "¿Horario de Registro?", "messages": messages}, auth_headers(admin_user)
+    )
+
+    assert bool(looked_up) is uses_cache
+    if uses_cache:
+        assert body["rag_route"] == "cache"

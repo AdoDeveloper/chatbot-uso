@@ -19,7 +19,11 @@ async def parse_txt(file_path: str) -> str:
     """Extrae texto de un archivo .txt con detección automática de encoding."""
     import aiofiles
 
-    for encoding in ("utf-8", "latin-1"):
+    async with aiofiles.open(file_path, mode="rb") as f:
+        head = await f.read(2)
+    encodings = ("utf-16",) if head in (b"\xff\xfe", b"\xfe\xff") else ("utf-8", "latin-1")
+
+    for encoding in encodings:
         try:
             async with aiofiles.open(file_path, mode="r", encoding=encoding) as f:
                 text = await f.read()

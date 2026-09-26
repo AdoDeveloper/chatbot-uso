@@ -41,6 +41,7 @@ def normalizar_texto(texto: str) -> str:
 
     texto = unicodedata.normalize("NFC", texto)
     texto = texto.translate(_TRADUCCIONES)
+    texto = texto.replace("\r\n", "\n").replace("\r", "\n")
 
     # Los caracteres de control no aportan nada y ensucian el vector; se
     # conservan salto de línea y tabulación.
@@ -49,7 +50,6 @@ def normalizar_texto(texto: str) -> str:
         if c in "\n\t" or unicodedata.category(c) != "Cc"
     )
 
-    texto = texto.replace("\r\n", "\n").replace("\r", "\n")
     texto = _GUION_CORTE.sub(r"\1\2", texto)
     texto = _SEPARADOR_PAGINA.sub("", texto)
     texto = _PIE_PAGINA.sub("", texto)

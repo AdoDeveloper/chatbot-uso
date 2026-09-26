@@ -140,6 +140,24 @@ class TestEmbedTextsAsync:
 
         assert max_concurrent == 1
 
+    async def test_repeated_query_is_embedded_once(self, fake_models, monkeypatch):
+        dense, _ = fake_models
+        calls: list[list[str]] = []
+
+        def _counting_embed(texts):
+            calls.append(list(texts))
+            return [_FakeVector([0.5]) for _ in texts]
+
+        dense.embed = _counting_embed
+        monkeypatch.setattr(embedding, "_QUERY_MEMO", type(embedding._QUERY_MEMO)())
+
+        first = await embedding.embed_texts_async(["¿Cuándo es la matrícula?"], prefix="query: ")
+        second = await embedding.embed_texts_async(["¿Cuándo es la matrícula?"], prefix="query: ")
+        await embedding.embed_texts_async(["¿Cuándo es la matrícula?"], prefix="passage: ")
+
+        assert first == second
+        assert len(calls) == 2
+
 
 @pytest.mark.slow
 class TestEmbedTextsRealModel:

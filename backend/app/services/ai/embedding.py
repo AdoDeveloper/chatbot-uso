@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+from collections import OrderedDict
 from functools import lru_cache
 
 import structlog
@@ -77,8 +78,23 @@ def embed_texts(texts: list[str], prefix: str = "") -> list[dict]:
     return results
 
 
+_QUERY_MEMO: OrderedDict[str, dict] = OrderedDict()
+_QUERY_MEMO_SIZE = 256
+
+
 async def embed_texts_async(texts: list[str], prefix: str = "") -> list[dict]:
     """Async wrapper - ejecuta la inferencia ONNX en un thread pool para no bloquear el event loop."""
+    # Una misma pregunta se vectoriza en caché, recuperación y guardado; se memoriza.
+    memo_key = prefix + texts[0] if len(texts) == 1 and prefix == "query: " else None
+    if memo_key is not None and memo_key in _QUERY_MEMO:
+        _QUERY_MEMO.move_to_end(memo_key)
+        return [dict(_QUERY_MEMO[memo_key])]
     loop = asyncio.get_running_loop()
     async with _get_onnx_sem():
-        return await loop.run_in_executor(None, embed_texts, texts, prefix)
+        result = await loop.run_in_executor(None, embed_texts, texts, prefix)
+    if memo_key is not None and result:
+        _QUERY_MEMO[memo_key] = result[0]
+        while len(_QUERY_MEMO) > _QUERY_MEMO_SIZE:
+            _QUERY_MEMO.popitem(last=False)
+        return [dict(result[0])]
+    return result
