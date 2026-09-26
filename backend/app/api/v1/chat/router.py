@@ -29,6 +29,10 @@ _llm_semaphore = asyncio.Semaphore(get_settings().LLM_MAX_CONCURRENCY)
 _LLM_QUEUE_TIMEOUT = get_settings().LLM_QUEUE_TIMEOUT_SECONDS
 _TURN_BUDGET_SECONDS = 40.0
 _MIN_LLM_SECONDS = 10.0
+_UNCONFIRMED_CONTEXT_NOTE = (
+    "\n\nLa información anterior puede no responder la pregunta. Usa solo datos que aparezcan "
+    "escritos en ella; si el dato pedido no está, di que no dispones de esa información."
+)
 _HYPHENS = str.maketrans({"\u2010": "-", "\u2011": "-"})
 
 class ChatMessage(BaseModel):
@@ -297,7 +301,7 @@ async def _run_chat_inner(
         question=request.question,
         context_chunks=llm_chunks,
         chain=chain,
-        system_prompt=cfg.system_prompt,
+        system_prompt=cfg.system_prompt + (_UNCONFIRMED_CONTEXT_NOTE if context_relevance_ratio == 0 else ""),
         temperature=cfg.temperature,
         max_tokens=min(cfg.max_tokens, overrides['max_output_tokens']),
         history=history or None,

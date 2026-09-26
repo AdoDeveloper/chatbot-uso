@@ -66,6 +66,13 @@ class TestUploadSource:
         )
         assert r.status_code == 415
 
+    async def test_executable_sent_as_text_is_rejected(self, client, admin_user, auth_headers):
+        files = {"file": ("programa.exe", io.BytesIO(b"MZ\x90\x00"), "text/plain")}
+        r = await client.post(
+            "/api/v1/sources/upload", files=files, headers=auth_headers(admin_user),
+        )
+        assert r.status_code == 415
+
     async def test_upload_empty_file_returns_400(self, client, admin_user, auth_headers):
         files = {"file": ("vacio.pdf", io.BytesIO(b""), "application/pdf")}
         r = await client.post(

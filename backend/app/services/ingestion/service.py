@@ -16,7 +16,7 @@ from app.services.ai.embedding import embed_texts_async
 from app.services.ai.semantic_cache import invalidate_by_source
 from app.services.ingestion import vector_store
 from app.services.ingestion.chunk_warnings import compute_warnings
-from app.services.ingestion.chunking import chunk_text
+from app.services.ingestion.chunking import chunk_text, strip_discarded_from_parents
 from app.services.ingestion.parsing import parse_source
 
 log = structlog.get_logger()
@@ -151,6 +151,7 @@ async def ingest(db: AsyncSession, source: Source) -> None:
 
         await vector_store.ensure_collection()
         repointed = await _carry_review_marks(db, source_id, chunks)
+        strip_discarded_from_parents(chunks)
 
         for chunk in chunks:
             chunk.setdefault("point_id", str(uuid.uuid4()))

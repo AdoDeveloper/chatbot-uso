@@ -314,6 +314,14 @@ Si el evaluador no aprueba ningún fragmento, el modelo recibe igualmente los
 no le sirven. La pregunta se registra como «sin respuesta» solo cuando la
 respuesta del modelo lo dice (`quality.is_no_answer_reply`).
 
+La búsqueda híbrida ordena los resultados por relevancia global (RRF sobre
+denso + BM25). Además hace una consulta por fuente para que un documento
+grande, como el catálogo, no deje fuera a los pequeños; esos resultados se
+agregan después de los globales, sin cambiar el orden de los más relevantes.
+Las consultas auxiliares al modelo (evaluador y reformulación) tienen un
+límite total de 15 s entre todos los proveedores; si se agota, el evaluador
+deja pasar los fragmentos.
+
 **Ahorro de tokens**:
 
 - Greeting: 0 llamadas LLM, 0 retrievals.

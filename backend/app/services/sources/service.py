@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.config import get_settings
+from app.core.deps import get_client_ip
 from app.core.exceptions import NotFoundError
 from app.models.enums import ReviewStatus, SourceStatus, SourceType
 from app.models.source import Source
@@ -22,12 +23,6 @@ from app.services.ingestion import service as ingestion
 from app.services.system import audit as audit_svc
 
 log = structlog.get_logger()
-
-_MIME_MAP: dict[str, SourceType] = {
-    "application/pdf": SourceType.pdf,
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": SourceType.docx,
-    "text/plain": SourceType.txt,
-}
 
 _EXT_MAP: dict[str, SourceType] = {
     ".pdf": SourceType.pdf,
@@ -71,8 +66,6 @@ def uploads_dir() -> Path:
 
 
 def detect_type(filename: str, content_type: str) -> SourceType:
-    if content_type in _MIME_MAP:
-        return _MIME_MAP[content_type]
     ext = Path(filename).suffix.lower()
     if ext in _EXT_MAP:
         return _EXT_MAP[ext]
@@ -99,7 +92,7 @@ async def upload_source(
 ) -> Source:
     """Sube un archivo (PDF/DOCX/TXT) y dispara la ingestión en background."""
     source_type = detect_type(file.filename or "", file.content_type or "")
-    source_name = name.strip() or Path(file.filename or "archivo").stem
+    source_name = (name.strip() or Path(file.filename or "archivo").stem)[:255]
 
     try:
         tags_list: list[str] = json.loads(tags) if tags.strip() else []
@@ -111,8 +104,7 @@ async def upload_source(
         raise HTTPException(status_code=413, detail=f"El archivo excede el límite de {max_mb} MB.")
 
     file_id = uuid.uuid4()
-    suffix = Path(file.filename or "").suffix or f".{source_type.value}"
-    dest = uploads_dir() / f"{file_id}{suffix}"
+    dest = uploads_dir() / f"{file_id}.{source_type.value}"
 
     content = await file.read()
     if len(content) == 0:
@@ -169,7 +161,7 @@ async def upload_source(
             actor_id=current_user.id,
             resource_id=str(source.id),
             meta={"name": source.name, "type": source.type.value, "size": source.file_size},
-            ip=req.client.host if req.client else None,
+            ip=get_client_ip(req),
             user_agent=req.headers.get("user-agent"),
         )
         await db.commit()
@@ -228,8 +220,7 @@ async def replace_source_file(
 
         old_path = source.file_path
         file_id = uuid.uuid4()
-        suffix = Path(file.filename or "").suffix or f".{source_type.value}"
-        dest = uploads_dir() / f"{file_id}{suffix}"
+        dest = uploads_dir() / f"{file_id}.{source_type.value}"
         async with aiofiles.open(dest, "wb") as f:
             await f.write(content)
 
@@ -251,7 +242,7 @@ async def replace_source_file(
             actor_id=current_user.id,
             resource_id=str(source.id),
             meta={"name": source.name, "new_size": source.file_size},
-            ip=req.client.host if req.client else None,
+            ip=get_client_ip(req),
             user_agent=req.headers.get("user-agent"),
         )
         await db.commit()
@@ -290,7 +281,7 @@ async def bulk_upload_sources(
     for file in files:
         try:
             source_type = detect_type(file.filename or "", file.content_type or "")
-            source_name = Path(file.filename or "archivo").stem
+            source_name = Path(file.filename or "archivo").stem[:255]
 
             content = await file.read()
             if len(content) == 0:
@@ -314,8 +305,7 @@ async def bulk_upload_sources(
                     continue
 
                 file_id = uuid.uuid4()
-                suffix = Path(file.filename or "").suffix or f".{source_type.value}"
-                dest = uploads_dir() / f"{file_id}{suffix}"
+                dest = uploads_dir() / f"{file_id}.{source_type.value}"
                 async with aiofiles.open(dest, "wb") as f:
                     await f.write(content)
 
@@ -339,7 +329,7 @@ async def bulk_upload_sources(
                     actor_id=current_user.id,
                     resource_id=str(source.id),
                     meta={"name": source.name, "type": source.type.value, "size": source.file_size},
-                    ip=req.client.host if req.client else None,
+                    ip=get_client_ip(req),
                     user_agent=req.headers.get("user-agent"),
                 )
                 await db.commit()
@@ -367,7 +357,7 @@ async def delete_source(db: AsyncSession, *, source_id: uuid.UUID, req: Request,
         actor_id=current_user.id,
         resource_id=str(source_id),
         meta={"name": source.name},
-        ip=req.client.host if req.client else None,
+        ip=get_client_ip(req),
         user_agent=req.headers.get("user-agent"),
     )
     await db.commit()

@@ -122,6 +122,8 @@ async def upsert_chunks(
             payload["parent_id"] = chunk["parent_id"]
         if "parent_text" in chunk:
             payload["parent_text"] = chunk["parent_text"]
+        if "parent_text_original" in chunk:
+            payload["parent_text_original"] = chunk["parent_text_original"]
         payload["warnings"] = chunk.get("warnings", [])
 
         points.append(
@@ -163,6 +165,25 @@ async def list_all_chunks(source_id: str) -> list[dict]:
     chunks = [{"id": str(p.id), **p.payload} for p in points]
     chunks.sort(key=lambda c: c.get("chunk_index", 0))
     return chunks
+
+
+async def list_parent_group(parent_id: str) -> list[dict]:
+    result = await _get_client().scroll(
+        collection_name=COLLECTION,
+        scroll_filter=Filter(must=[FieldCondition(key="parent_id", match=MatchValue(value=parent_id))]),
+        limit=200,
+        with_payload=True,
+        with_vectors=False,
+    )
+    return [{"id": str(p.id), **p.payload} for p in result[0]]
+
+
+async def set_parent_texts(parent_id: str, parent_text: str, original: str) -> None:
+    await _get_client().set_payload(
+        collection_name=COLLECTION,
+        payload={"parent_text": parent_text, "parent_text_original": original},
+        points=Filter(must=[FieldCondition(key="parent_id", match=MatchValue(value=parent_id))]),
+    )
 
 
 async def set_source_active(source_id: str, value: bool) -> None:
@@ -288,6 +309,30 @@ async def hybrid_search(
     # Solo los puntos de FAQ tienen is_active; must_not descarta solo las FAQ inactivas.
     inactive_filter = FieldCondition(key="is_active", match=MatchValue(value=False))
 
+    async def _global_query(fetch_limit: int):
+        must_conditions: list = []
+        must_not: list = [discard_filter, inactive_filter]
+        if source_ids:
+            must_conditions.append(FieldCondition(key="source_id", match=MatchAny(any=list(source_ids))))
+        if exclude_source_ids:
+            must_not.append(FieldCondition(key="source_id", match=MatchAny(any=list(exclude_source_ids))))
+        source_filter = Filter(must=must_conditions, must_not=must_not)
+        return await client.query_points(
+            collection_name=COLLECTION,
+            prefetch=[
+                Prefetch(query=query_dense, using=DENSE_VECTOR, limit=max(top_k * 10, 100)),
+                Prefetch(
+                    query=SparseVector(indices=query_sparse["indices"], values=query_sparse["values"]),
+                    using=SPARSE_VECTOR,
+                    limit=max(top_k * 20, 200),
+                ),
+            ],
+            query=FusionQuery(fusion=Fusion.RRF),
+            limit=fetch_limit,
+            query_filter=source_filter,
+            with_payload=True,
+        )
+
     # ── Per-source prefetches con Weighted RRF ─────────────────────────────
     fetched = False
     if balance_sources and exclude_source_ids is None:
@@ -340,47 +385,26 @@ async def hybrid_search(
                     )
                     rrf_weights.extend([weight, weight])
                 fetch_limit = max(top_k, 50)
-                results = await client.query_points(
+                balanced = await client.query_points(
                     collection_name=COLLECTION,
                     prefetch=prefetches,
                     query=RrfQuery(rrf=Rrf(k=60, weights=rrf_weights)),
                     limit=fetch_limit,
                     with_payload=True,
                 )
+                # El balanceo pone arriba el mejor fragmento de cada fuente aunque no sea
+                # relevante; el orden lo da la búsqueda global y el balanceo solo suma variedad.
+                ranked = (await _global_query(fetch_limit)).points
+                seen = {p.id for p in ranked}
+                points = ranked + [p for p in balanced.points if p.id not in seen]
                 fetched = True
 
     if not fetched:
         # ── Búsqueda unificada ──────────────────────────────────────────────
-        must_conditions: list = []
-        must_not: list = [discard_filter, inactive_filter]
-        if source_ids:
-            must_conditions.append(FieldCondition(key="source_id", match=MatchAny(any=list(source_ids))))
-        if exclude_source_ids:
-            must_not.append(FieldCondition(key="source_id", match=MatchAny(any=list(exclude_source_ids))))
-        source_filter = Filter(must=must_conditions, must_not=must_not) if (must_conditions or must_not) else None
-
-        prefetch_limit_dense = max(top_k * 10, 100)
-        prefetch_limit_sparse = max(top_k * 20, 200)
-        fetch_limit = max(top_k * 10, 100) if not source_ids else top_k
-
-        results = await client.query_points(
-            collection_name=COLLECTION,
-            prefetch=[
-                Prefetch(query=query_dense, using=DENSE_VECTOR, limit=prefetch_limit_dense),
-                Prefetch(
-                    query=SparseVector(indices=query_sparse["indices"], values=query_sparse["values"]),
-                    using=SPARSE_VECTOR,
-                    limit=prefetch_limit_sparse,
-                ),
-            ],
-            query=FusionQuery(fusion=Fusion.RRF),
-            limit=fetch_limit,
-            query_filter=source_filter,
-            with_payload=True,
-        )
+        points = (await _global_query(max(top_k * 10, 100) if not source_ids else top_k)).points
 
     # ── Post-procesamiento común ───────────────────────────────────────────
-    raw_docs = [{"score": p.score, **p.payload} for p in results.points]
+    raw_docs = [{"score": p.score, **p.payload} for p in points]
     if score_threshold > 0.0:
         before = len(raw_docs)
         raw_docs = [d for d in raw_docs if d["score"] >= score_threshold]

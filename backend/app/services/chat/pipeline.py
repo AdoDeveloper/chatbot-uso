@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import uuid
 
 import structlog
 from sqlalchemy import select
@@ -232,7 +233,13 @@ async def resolve_source_ids(
     if not use_all_sources:
         query = query.where(Source.review_status == ReviewStatus.aprobada)
     if requested_ids:
-        query = query.where(Source.id.in_(requested_ids))
+        wanted = []
+        for raw in requested_ids:
+            try:
+                wanted.append(uuid.UUID(str(raw)))
+            except ValueError:
+                continue
+        query = query.where(Source.id.in_(wanted))
 
     src_q = await db.execute(query)
     ids = [str(r[0]) for r in src_q.all()]

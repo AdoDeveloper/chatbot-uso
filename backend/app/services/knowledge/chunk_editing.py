@@ -20,6 +20,7 @@ from app.services.ai import semantic_cache as cache_svc
 from app.services.ai.embedding import embed_texts_async
 from app.services.ingestion import vector_store
 from app.services.ingestion.chunk_warnings import compute_warnings
+from app.services.ingestion.chunking import parent_without
 
 log = structlog.get_logger()
 
@@ -164,14 +165,20 @@ async def edit_chunk(
         wait=True,
     )
 
+    original = existing.get("parent_text_original")
+    if original and previous_body and previous_body in original:
+        original = original.replace(previous_body, new_text, 1)
     if new_parent_text != previous_parent_text and parent_id:
         from qdrant_client.models import FieldCondition, Filter, MatchValue
         siblings_filter = Filter(
             must=[FieldCondition(key="parent_id", match=MatchValue(value=parent_id))]
         )
+        payload = {"parent_text": new_parent_text}
+        if original:
+            payload["parent_text_original"] = original
         await client.set_payload(
             collection_name=vector_store.COLLECTION,
-            payload={"parent_text": new_parent_text},
+            payload=payload,
             points=siblings_filter,
         )
 
@@ -227,6 +234,20 @@ async def set_discarded(db: AsyncSession, *, point_id: str, value: bool, user: U
         payload={"is_discarded": value},
         points=[point_id],
     )
+    parent_id = existing.get("parent_id")
+    if parent_id:
+        group = await vector_store.list_parent_group(parent_id)
+        original = next(
+            (c["parent_text_original"] for c in group if c.get("parent_text_original")),
+            existing.get("parent_text"),
+        )
+        if original:
+            discarded = [
+                c.get("text", "") for c in group
+                if (value if c["id"] == point_id else c.get("is_discarded"))
+            ]
+            existing["parent_text"] = parent_without(original, discarded)
+            await vector_store.set_parent_texts(parent_id, existing["parent_text"], original)
 
     log.info(
         "chunk.set_discarded",

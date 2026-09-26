@@ -113,6 +113,8 @@ def _avisar_mal_configurado(provider_name: str, error: str) -> None:
 _PERMANENT_STATUS_CODES = (401, 402, 403, 404)
 _FIRST_TOKEN_TIMEOUT = 15.0
 _FALLBACK_FIRST_TOKEN_TIMEOUT = 25.0
+_AUX_BUDGET_SECONDS = 15.0
+_BACKGROUND_AUX_BUDGET_SECONDS = 90.0
 _GRADE_EXCERPT_CHARS = 500
 
 
@@ -894,22 +896,29 @@ def set_fallback_chain(chain: list) -> None:
     _fallback_chain.set(list(chain))
 
 
-async def _complete(provider: LLMProvider, api_key: str | None, messages: list[dict], **kwargs) -> str:
+async def _complete(
+    provider: LLMProvider, api_key: str | None, messages: list[dict],
+    *, budget: float = _AUX_BUDGET_SECONDS, **kwargs,
+) -> str:
     """Completa con el proveedor indicado y, si falla, con el resto de la cadena del turno."""
     candidates = [(provider, api_key)] + [
         (p, k) for p, k in (_fallback_chain.get() or []) if str(p.id) != str(provider.id)
     ]
+    deadline = asyncio.get_running_loop().time() + budget
     last_error: Exception | None = None
     for candidate, key in candidates:
         pid = str(candidate.id)
         if _breaker.is_open(pid):
             continue
+        remaining = deadline - asyncio.get_running_loop().time()
+        if remaining <= 0:
+            break
         try:
             adapter = await _get_adapter(
                 candidate.name, candidate.provider_type, candidate.model_name,
                 candidate.api_base, key, candidate.extra_headers,
             )
-            text = await adapter.complete(messages, **kwargs)
+            text = await asyncio.wait_for(adapter.complete(messages, **kwargs), timeout=remaining)
             _breaker.record_success(pid)
             return text
         except Exception as exc:
@@ -1064,7 +1073,10 @@ async def _extract_statements(
         {"role": "system", "content": prompt},
         {"role": "user", "content": f"Respuesta: {answer[:2000]}"},
     ]
-    text = await _complete(provider, api_key, messages, temperature=0.0, max_tokens=2000)
+    text = await _complete(
+        provider, api_key, messages, temperature=0.0, max_tokens=2000,
+        budget=_BACKGROUND_AUX_BUDGET_SECONDS,
+    )
     if not text or not text.strip():
         return None
     cleaned = text.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
@@ -1102,7 +1114,10 @@ async def grade_faithfulness(
             {"role": "system", "content": prompt},
             {"role": "user", "content": f"Contexto:\n{context_text}\n\nStatements:\n{stmt_list}"},
         ]
-        text = await _complete(provider, api_key, messages, temperature=0.0, max_tokens=2000)
+        text = await _complete(
+            provider, api_key, messages, temperature=0.0, max_tokens=2000,
+            budget=_BACKGROUND_AUX_BUDGET_SECONDS,
+        )
         if not text or not text.strip():
             return None
         cleaned = text.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()

@@ -471,3 +471,34 @@ async def test_faithfulness_is_skipped_outside_the_sample(client, admin_user, au
     await asyncio.sleep(0)
 
     assert calls and calls[0]["with_faithfulness"] is False
+
+
+async def test_requested_source_ids_as_text_are_resolved(db_session):
+    from app.models.enums import ReviewStatus, SourceStatus, SourceType
+    from app.models.source import Source
+
+    src = Source(name="Guía", type=SourceType.txt, status=SourceStatus.ready, review_status=ReviewStatus.aprobada)
+    db_session.add(src)
+    await db_session.commit()
+
+    ids = await pipeline.resolve_source_ids(db_session, [str(src.id), "no-es-un-id"], use_all_sources=False)
+
+    assert ids == [str(src.id)]
+
+
+async def test_unconfirmed_context_asks_the_model_to_stick_to_it(client, admin_user, auth_headers, mock_pipeline, monkeypatch):
+    async def _retrieve_context(*a, **k):
+        return [{"text": "Contenido.", "source_name": "doc.pdf", "score": 0.9, "parent_text": "Contenido."}], 0.0
+
+    prompts: list[str] = []
+
+    async def _fake_stream_chat(**kwargs):
+        prompts.append(kwargs["system_prompt"])
+        yield "No dispongo de esa información."
+
+    monkeypatch.setattr(pipeline, "retrieve_context", _retrieve_context)
+    monkeypatch.setattr(chat_router, "stream_chat", _fake_stream_chat)
+
+    await _post_playground_chat(client, {"question": "¿Cuándo se aprobó?"}, auth_headers(admin_user))
+
+    assert "puede no responder la pregunta" in prompts[0]

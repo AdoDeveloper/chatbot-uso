@@ -809,6 +809,27 @@ class TestAuxiliaryFallback:
         grades = await gw.grade_documents("p", [{"text": "a"}, {"text": "b"}], primary, "k1")
         assert grades == [True, False]
 
+    async def test_grader_gives_up_on_slow_providers_within_its_budget(self, monkeypatch):
+        import asyncio
+
+        slow = _make_provider(name="Lento", model_name="lento")
+        fast = _make_provider(name="Rápido", model_name="rapido")
+        budget = 1.0
+
+        async def fake_complete(self, messages, **kwargs):
+            if self.model_name == "lento":
+                await asyncio.sleep(5)
+            return '{"grades": [false]}'
+
+        monkeypatch.setattr(gw.OpenAICompatAdapter, "complete", fake_complete)
+        monkeypatch.setattr(gw, "_AUX_BUDGET_SECONDS", budget)
+        monkeypatch.setattr(gw._complete, "__kwdefaults__", {"budget": budget})
+        gw.set_fallback_chain([(slow, "k1"), (fast, "k2")])
+
+        grades = await asyncio.wait_for(gw.grade_documents("p", [{"text": "a"}], slow, "k1"), timeout=3)
+
+        assert grades == [True]
+
     async def test_open_circuit_provider_is_skipped(self, monkeypatch):
         primary = _make_provider(name="Groq", model_name="g")
         backup = _make_provider(name="Ollama", model_name="o")

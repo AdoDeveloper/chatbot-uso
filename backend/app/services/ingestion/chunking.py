@@ -97,6 +97,38 @@ def _detect_sections(text: str) -> list[tuple[str, str]]:
     return sections if sections else [("General", text)]
 
 
+_SECTION_PREFIX = re.compile(r"^\[Sección:.*?\]\n")
+
+
+def chunk_body(text: str) -> str:
+    return _SECTION_PREFIX.sub("", text, count=1).strip()
+
+
+def parent_without(parent_text: str, discarded_texts: list[str]) -> str:
+    """Quita del contexto padre el texto de los fragmentos descartados."""
+    for text in discarded_texts:
+        body = chunk_body(text)
+        if body:
+            parent_text = parent_text.replace(body, "", 1)
+    return parent_text
+
+
+def strip_discarded_from_parents(chunks: list[dict]) -> None:
+    groups: dict[str, list[dict]] = {}
+    for c in chunks:
+        if c.get("parent_id") and c.get("parent_text"):
+            groups.setdefault(c["parent_id"], []).append(c)
+    for group in groups.values():
+        discarded = [c["text"] for c in group if c.get("is_discarded")]
+        if not discarded:
+            continue
+        original = group[0]["parent_text"]
+        stripped = parent_without(original, discarded)
+        for c in group:
+            c["parent_text_original"] = original
+            c["parent_text"] = stripped
+
+
 def _deduplicate_headings(
     headings: list[tuple[int, str]], min_distance: int = 1
 ) -> list[tuple[int, str]]:

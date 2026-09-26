@@ -64,7 +64,12 @@ def _sign_id_token(claims: dict, private_key, audience="test-client-id") -> str:
         format=serialization.PrivateFormat.PKCS8,
         encryption_algorithm=serialization.NoEncryption(),
     )
-    payload = {**claims, "aud": audience}
+    payload = {
+        "iss": "https://login.microsoftonline.com/test-tenant-id/v2.0",
+        "tid": "test-tenant-id",
+        **claims,
+        "aud": audience,
+    }
     return jwt_module.encode(payload, private_pem, algorithm="RS256")
 
 
@@ -250,6 +255,18 @@ class TestUserProvisioning:
 
         await db_session.refresh(user)
         assert user.last_login_at is not None
+
+    async def test_token_from_another_tenant_is_rejected(
+        self, client, sso_active, make_user, patch_ms_token_exchange, patch_jwks_verify
+    ):
+        await make_user(email="usuario@empresa.com", role=UserRole.admin)
+        patch_ms_token_exchange["claims"] = {
+            "email": "usuario@empresa.com",
+            "iss": "https://login.microsoftonline.com/otro-tenant/v2.0",
+            "tid": "otro-tenant",
+        }
+        r = await _post_callback(client)
+        assert r.status_code == 401
 
     async def test_email_matching_is_case_insensitive(
         self, client, sso_active, make_user, patch_ms_token_exchange, patch_jwks_verify

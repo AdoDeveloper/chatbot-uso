@@ -108,14 +108,18 @@ async def handle_microsoft_callback(
             "/discovery/v2.0/keys"
         )
         jwks_client = PyJWKClient(jwks_url, cache_keys=True)
-        signing_key = jwks_client.get_signing_key_from_jwt(id_token)
+        import asyncio as _asyncio
+        signing_key = await _asyncio.to_thread(jwks_client.get_signing_key_from_jwt, id_token)
         import jwt as _pyjwt
         claims = _pyjwt.decode(
             id_token,
             signing_key.key,
             algorithms=["RS256"],
             audience=settings.MICROSOFT_CLIENT_ID,
+            issuer=f"https://login.microsoftonline.com/{tenant_id}/v2.0",
         )
+        if claims.get("tid") != tenant_id:
+            raise ValueError("tenant distinto al configurado")
     except Exception as exc:
         await log_action(db, action="auth.login_sso_failed", resource_type="user",
                          actor_id=None, resource_id=None, ip=client_ip, user_agent=ua,

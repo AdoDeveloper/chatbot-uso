@@ -181,3 +181,20 @@ def test_line_wrapped_phone_number_is_not_a_heading():
 
     sections = _detect_sections("Teléfono de Registro: 7851-\n7588 en horario laboral.\n\n## Otro\n\nTexto.")
     assert all("7588" not in title for title, _ in sections)
+
+
+def test_discarded_child_text_leaves_the_parent_context():
+    from app.services.ingestion.chunking import strip_discarded_from_parents
+
+    parent = "[Sección: Aranceles]\nMatrícula $50. Dato obsoleto de 2019. Cuota $80."
+    chunks = [
+        {"text": "[Sección: Aranceles | Parte 1/1, Fragmento 1/2]\nMatrícula $50.", "parent_id": "p", "parent_text": parent},
+        {"text": "[Sección: Aranceles | Parte 1/1, Fragmento 2/2]\nDato obsoleto de 2019.", "parent_id": "p",
+         "parent_text": parent, "is_discarded": True},
+    ]
+
+    strip_discarded_from_parents(chunks)
+
+    assert all("obsoleto" not in c["parent_text"] for c in chunks)
+    assert all(c["parent_text_original"] == parent for c in chunks)
+    assert "Matrícula $50." in chunks[0]["parent_text"]

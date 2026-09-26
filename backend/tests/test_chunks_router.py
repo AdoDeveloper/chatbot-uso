@@ -312,3 +312,31 @@ class TestTestQueryValidation:
             headers=auth_headers(admin_user),
         )
         assert r.status_code == 422
+
+
+async def test_discarding_a_chunk_removes_its_text_from_the_shared_context(
+    client, admin_user, auth_headers, patch_vector_store, seeded_source, monkeypatch
+):
+    from app.services.ingestion import vector_store as vs
+
+    parent = "[Sección: Capítulo 1]\nTexto vigente. Texto obsoleto."
+    keep, drop = str(uuid.uuid4()), str(uuid.uuid4())
+    for pid, text in ((keep, "Texto vigente."), (drop, "Texto obsoleto.")):
+        chunk = _fake_chunk(seeded_source, pid, text=text)
+        chunk.update(parent_id="p1", parent_text=parent)
+        patch_vector_store["store"][pid] = chunk
+    saved: list[tuple] = []
+
+    async def _group(parent_id):
+        return [c for c in patch_vector_store["store"].values() if c.get("parent_id") == parent_id]
+
+    async def _set_parent_texts(parent_id, parent_text, original):
+        saved.append((parent_id, parent_text, original))
+
+    monkeypatch.setattr(vs, "list_parent_group", _group)
+    monkeypatch.setattr(vs, "set_parent_texts", _set_parent_texts)
+
+    r = await client.post(f"/api/v1/chunks/{drop}/discard", headers=auth_headers(admin_user))
+
+    assert r.status_code == 200
+    assert saved and "obsoleto" not in saved[0][1] and saved[0][2] == parent

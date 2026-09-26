@@ -334,3 +334,26 @@ class TestHybridSearch:
         result = await vs.hybrid_search([0.1], {"indices": [1], "values": [0.5]}, top_k=5)
 
         assert len(result) == 1
+
+
+async def test_balanced_search_keeps_the_global_relevance_order(patch_client, monkeypatch):
+    from unittest.mock import AsyncMock
+
+    async def _info():
+        return {"grande", "faq"}, {"grande": 500, "faq": 1}
+
+    monkeypatch.setattr(vs, "get_source_info", _info)
+    balanced = SimpleNamespace(points=[
+        _point("faq-1", {"source_id": "faq"}, score=0.16),
+        _point("g-7", {"source_id": "grande"}, score=0.03),
+    ])
+    ranked = SimpleNamespace(points=[
+        _point("g-7", {"source_id": "grande"}, score=0.033),
+        _point("g-2", {"source_id": "grande"}, score=0.03),
+    ])
+    patch_client.query_points = AsyncMock(side_effect=[balanced, ranked])
+
+    result = await vs.hybrid_search([0.1], {"indices": [1], "values": [0.5]}, top_k=5, balance_sources=True)
+
+    assert [d["source_id"] for d in result][:2] == ["grande", "grande"]
+    assert result[-1]["source_id"] == "faq"
