@@ -165,6 +165,10 @@ Gestiona los patrones que detectan intentos de manipulación del chatbot
 (inyección de instrucciones). Incluye patrones predefinidos por el sistema y
 permite crear patrones personalizados.
 
+El interruptor general de los filtros también controla el ocultamiento de
+datos personales (correos, teléfonos, tarjetas y cuentas bancarias) en
+preguntas y respuestas: si se desactiva, esos datos dejan de ocultarse.
+
 ### 4.4 Escalamiento
 
 Configura cuándo una conversación debe derivarse a una persona. Las reglas se
@@ -227,7 +231,8 @@ deshacer).
 
 - **Pendientes**: conversaciones que el sistema marcó para atención humana.
 - **Escalamientos**: gestión de las conversaciones derivadas, con asignación a
-  responsables y seguimiento hasta su resolución.
+  responsables y seguimiento hasta su resolución. Si el visitante dejó su
+  correo o WhatsApp, aparece en la tarjeta con un enlace para contactarlo.
 
 ---
 
@@ -285,6 +290,9 @@ herramientas de mantenimiento:
 
 - **Sincronizar Qdrant ↔ BD**: elimina fragmentos huérfanos del índice.
 - **Limpiar caché**: borra el caché de respuestas.
+
+Al desactivar el caché se dejan de reutilizar tanto las respuestas a preguntas
+parecidas como las respuestas a preguntas idénticas.
 - **Limpiar P99**: elimina mediciones anómalas que distorsionan las métricas.
 
 ### 7.3 Cuotas
@@ -300,7 +308,9 @@ límite.
 - **Canales**: estado del correo saliente.
 - **Resumen de preguntas sin responder**: un correo periódico con las preguntas
   que el chatbot no pudo contestar. La cadencia (diaria, semanal, mensual o
-  anual) y la hora de envío se configuran aparte.
+  anual) y la hora de envío se configuran aparte; las cifras del correo
+  cubren el mismo periodo (el último día, la última semana, el último mes o
+  el último año).
 
 Además del correo, las notificaciones llegan a la campana en la esquina
 superior del panel. Al abrir una notificación se marca como leída
@@ -335,6 +345,11 @@ hacer clic se abre la ventana de conversación, con el mensaje de bienvenida
 configurado y, si están activas, sugerencias rápidas de preguntas frecuentes.
 El visitante escribe su pregunta y el asistente responde con base en el
 contenido aprobado en la base de conocimiento.
+
+La conversación se conserva en el navegador si el visitante recarga la
+página o vuelve más tarde, hasta 4 horas después del último mensaje; pasado
+ese tiempo el widget empieza una conversación nueva, de modo que en un equipo
+compartido el siguiente visitante no ve la conversación anterior.
 
 ### 9.2 Controles sobre cada respuesta
 
