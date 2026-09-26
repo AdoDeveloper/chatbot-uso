@@ -28,11 +28,11 @@ test.describe("Configuracion > Asistente > Previsualizar", () => {
   test("enviar un mensaje de prueba al chatbot", async ({ page, request, baseURL }) => {
     test.setTimeout(60_000);
     await page.goto("/dashboard/configuracion/asistente/previsualizar");
-    await expect(page.getByPlaceholder(/escribe un mensaje/i)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByPlaceholder(/escriba un mensaje/i)).toBeVisible({ timeout: 10_000 });
 
-    await page.getByPlaceholder(/escribe un mensaje/i).fill("Hola, esto es un mensaje de prueba E2E.");
+    await page.getByPlaceholder(/escriba un mensaje/i).fill("Hola, esto es un mensaje de prueba E2E.");
     await page.screenshot({ path: path.join(SHOT_DIR, "02-playground-mensaje.png") });
-    await page.getByPlaceholder(/escribe un mensaje/i).press("Enter");
+    await page.getByPlaceholder(/escriba un mensaje/i).press("Enter");
 
     await expect(page.locator(".animate-spin")).toHaveCount(0, { timeout: 30_000 });
     await page.screenshot({ path: path.join(SHOT_DIR, "03-playground-respuesta.png") });

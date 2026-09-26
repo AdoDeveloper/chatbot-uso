@@ -25,17 +25,17 @@ test.describe("Configuracion > Asistente > Previsualizar", () => {
     await page.getByRole("button", { name: /^todos$/i }).click();
     await expect(page.getByText(/incluye borradores/i)).toBeVisible({ timeout: 5_000 });
 
-    await expect(page.getByPlaceholder(/escribe un mensaje/i)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByPlaceholder(/escriba un mensaje/i)).toBeVisible({ timeout: 10_000 });
     const minimizeBtn = page.getByRole("button", { name: /minimizar chat/i });
     await expect(minimizeBtn).toBeVisible();
     await minimizeBtn.click();
     const reopenBtn = page.getByRole("button", { name: /abrir chat/i });
     await expect(reopenBtn).toBeVisible({ timeout: 5_000 });
     await reopenBtn.click();
-    await expect(page.getByPlaceholder(/escribe un mensaje/i)).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByPlaceholder(/escriba un mensaje/i)).toBeVisible({ timeout: 5_000 });
     await page.screenshot({ path: path.join(SHOT_DIR, "01-widget-abierto.png") });
 
-    const input = page.getByPlaceholder(/escribe un mensaje/i);
+    const input = page.getByPlaceholder(/escriba un mensaje/i);
     await input.fill("Hola, esto es un mensaje de prueba E2E del previsualizador.");
     const sendBtn = page.getByRole("button").filter({ has: page.locator("svg") }).last();
     await input.press("Enter");
@@ -51,9 +51,9 @@ test.describe("Configuracion > Asistente > Previsualizar", () => {
 
   test("escalamiento: prompt si/no, formulario de contacto (correo y whatsapp) con validacion", async ({ page }) => {
     await page.goto("/dashboard/configuracion/asistente/previsualizar");
-    await expect(page.getByPlaceholder(/escribe un mensaje/i)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByPlaceholder(/escriba un mensaje/i)).toBeVisible({ timeout: 10_000 });
 
-    const input = page.getByPlaceholder(/escribe un mensaje/i);
+    const input = page.getByPlaceholder(/escriba un mensaje/i);
     await input.fill("quiero hablar con un humano");
     await input.press("Enter");
 
@@ -93,7 +93,7 @@ test.describe("Configuracion > Asistente > Previsualizar", () => {
 
   test("menu kebab: nueva conversacion, panel de accesibilidad (tamaño de texto, alto contraste), finalizar chat", async ({ page }) => {
     await page.goto("/dashboard/configuracion/asistente/previsualizar");
-    await expect(page.getByPlaceholder(/escribe un mensaje/i)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByPlaceholder(/escriba un mensaje/i)).toBeVisible({ timeout: 10_000 });
 
     const kebabBtn = page.getByRole("button", { name: /más opciones/i });
     if (!(await kebabBtn.isVisible().catch(() => false))) {
@@ -150,7 +150,7 @@ test.describe("Configuracion > Asistente > Previsualizar", () => {
 });
 
 async function input_or_send_message(page: import("@playwright/test").Page) {
-  const input = page.getByPlaceholder(/escribe un mensaje/i);
+  const input = page.getByPlaceholder(/escriba un mensaje/i);
   if (await input.isVisible().catch(() => false)) {
     await input.fill("mensaje corto de prueba");
     await input.press("Enter");

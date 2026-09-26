@@ -13,6 +13,8 @@ const DYNAMIC_HEIGHT_ROUTES = new Set([
   "/dashboard/conversaciones/pendientes",
   "/dashboard/actividad/auditoria",
   "/dashboard/actividad/seguridad",
+  "/dashboard/actividad/inyecciones",
+  "/dashboard/conocimiento/documentos",
   "/dashboard/conversaciones",
   "/dashboard/configuracion",
   "/dashboard/configuracion/asistente",
