@@ -135,6 +135,10 @@ _CATALOG_CACHE: dict[str, tuple[float, ProviderTypeCatalog | None]] = {}
 _CATALOG_CACHE_TTL = 300.0
 
 
+def clear_catalog_cache() -> None:
+    _CATALOG_CACHE.clear()
+
+
 async def _resolve_catalog_entry(type_key: str) -> ProviderTypeCatalog | None:
     now = time.monotonic()
     cached = _CATALOG_CACHE.get(type_key)
@@ -159,9 +163,9 @@ async def _resolve_base_and_headers(
     provider_type: str, api_base: str | None, fallback_base: str | None = None,
 ) -> tuple[str | None, dict[str, str]]:
     """api_base explícito > catálogo editable > constante fija del adaptador."""
-    if api_base:
-        return api_base, {}
     entry = await _resolve_catalog_entry(provider_type)
+    if api_base:
+        return api_base, (entry.default_headers if entry else None) or {}
     if entry and entry.default_api_base:
         return entry.default_api_base, (entry.default_headers or {})
     return fallback_base, (entry.default_headers if entry else {})

@@ -96,8 +96,12 @@ const CatalogPanel = forwardRef<CatalogPanelHandle, {
    <div>
     <label className="block text-xs font-medium text-muted-foreground mb-1">Clave · type_key</label>
     <Input value={form.type_key} onChange={(e) => set("type_key", e.target.value.trim().toLowerCase())}
-     placeholder="ej. together" autoComplete="off" />
-    <p className="mt-1 text-2xs text-muted-foreground">Es el valor que se guarda como provider_type en cada proveedor. No usar espacios.</p>
+     placeholder="ej. together" autoComplete="off" disabled={!!editing?.is_builtin} />
+    <p className="mt-1 text-2xs text-muted-foreground">
+     {editing?.is_builtin
+      ? "La clave de un tipo del sistema no puede cambiarse."
+      : "Es el valor que se guarda como provider_type en cada proveedor. No usar espacios."}
+    </p>
    </div>
    <div>
     <label className="block text-xs font-medium text-muted-foreground mb-1">Nombre para mostrar</label>

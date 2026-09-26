@@ -75,7 +75,7 @@ _BUILTIN_CATALOG: list[dict] = [
 
 
 async def seed_provider_catalog(db: AsyncSession) -> None:
-    """Siembra/actualiza los tipos de proveedor conocidos al arrancar."""
+    """Siembra los tipos de proveedor conocidos que falten; no pisa lo editado en el panel."""
     existing = (await db.execute(select(ProviderTypeCatalog))).scalars().all()
     by_key = {row.type_key: row for row in existing}
 
@@ -92,14 +92,15 @@ async def seed_provider_catalog(db: AsyncSession) -> None:
                 requires_api_key=item.get("requires_api_key", True),
                 notes=item.get("notes"),
             ))
-        else:
-            row.display_name = item["display_name"]
-            row.default_api_base = item.get("default_api_base")
-            row.default_headers = item.get("default_headers", {})
-            row.requires_api_key = item.get("requires_api_key", True)
-            row.notes = item.get("notes")
+        elif not row.is_builtin:
+            row.is_builtin = True
 
     await db.commit()
+
+
+def _clear_gateway_cache() -> None:
+    from app.services.ai.llm_gateway import clear_catalog_cache
+    clear_catalog_cache()
 
 
 def _to_out(row: ProviderTypeCatalog) -> ProviderTypeCatalogOut:
@@ -136,6 +137,7 @@ async def create_type(db: AsyncSession, data: ProviderTypeCatalogCreate) -> Prov
         await db.rollback()
         raise ValueError(f"Ya existe un tipo de proveedor con la clave '{data.type_key}'.") from exc
     await db.refresh(row)
+    _clear_gateway_cache()
     log.info("provider_type_catalog.created", id=str(row.id), type_key=row.type_key)
     return _to_out(row)
 
@@ -147,7 +149,9 @@ async def update_type(
     if not row:
         return None
 
-    if data.type_key is not None:
+    if data.type_key is not None and data.type_key != row.type_key:
+        if row.is_builtin:
+            raise ValueError(f"La clave de '{row.type_key}' es del sistema y no puede cambiarse.")
         row.type_key = data.type_key
     if data.display_name is not None:
         row.display_name = data.display_name
@@ -166,6 +170,7 @@ async def update_type(
         await db.rollback()
         raise ValueError(f"Ya existe un tipo de proveedor con la clave '{data.type_key}'.") from exc
     await db.refresh(row)
+    _clear_gateway_cache()
     log.info("provider_type_catalog.updated", id=str(row.id))
     return _to_out(row)
 
@@ -178,5 +183,6 @@ async def delete_type(db: AsyncSession, catalog_id: uuid.UUID) -> bool:
         raise ValueError(f"'{row.type_key}' es un tipo de proveedor del sistema y no puede eliminarse.")
     await db.delete(row)
     await db.commit()
+    _clear_gateway_cache()
     log.info("provider_type_catalog.deleted", id=str(catalog_id))
     return True
