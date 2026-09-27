@@ -22,7 +22,7 @@ async def compute_answer_relevance(question: str, answer: str) -> float | None:
 
 _NO_ANSWER_MARKERS = re.compile(
     r"\bno (dispongo|cuento) (de|con)\b|\bno tengo (esa |la )?informaci[oó]n\b|"
-    r"\bno encontr[eé] informaci[oó]n\b|\bno (aparece|se menciona|se indica|se especifica)\b",
+    r"\bno encontr[eé] informaci[oó]n\b|\bno (se menciona|se indica|se especifica)\b",
     re.IGNORECASE,
 )
 _NO_ANSWER_OPENING = re.compile(

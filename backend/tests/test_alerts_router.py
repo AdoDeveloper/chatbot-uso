@@ -141,6 +141,8 @@ class TestRunProactiveChecks:
 
         await _enable_rule(db_session, event=NotificationEvent.rate_limit_threshold)
         await _set_hourly_count("203.0.113.7", 9)
+        from app.core import redis as redis_mod
+        await redis_mod.get_redis().set("rl:chat:min:203.0.113.7:60", 6, ex=60)
 
         r = await client.post("/api/v1/alerts/run", headers=auth_headers(admin_user))
         assert r.status_code == 200

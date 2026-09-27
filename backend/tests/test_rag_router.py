@@ -113,3 +113,34 @@ class TestEdgeCases:
     def test_26_words_is_complex(self):
         q26 = " ".join(["palabra"] * 26)
         assert classify_query(q26) == QueryRoute.COMPLEX
+
+
+@pytest.mark.parametrize("texto", ["Muchas gracias", "ok, gracias", "Perfecto"])
+def test_thanks_get_a_courteous_close_not_a_greeting(texto):
+    from app.services.rag.router import get_greeting_response
+
+    assert get_greeting_response(None, texto).startswith("Con gusto")
+
+
+def test_greeting_still_uses_the_configured_greeting():
+    from app.services.rag.router import get_greeting_response
+
+    assert get_greeting_response("Hola, bienvenido", "Hola") == "Hola, bienvenido"
+
+
+@pytest.mark.parametrize("texto, esperado", [
+    ("¿Cómo puedo mejorar mi CUM?", "factual"),
+    ("¿Qué diferencia hay entre beca y descuento?", "complex"),
+])
+def test_comparison_words_are_matched_whole(texto, esperado):
+    assert classify_query(texto) == esperado
+
+
+async def test_route_uses_the_visitor_question_not_the_expanded_one():
+    from app.services.rag.corrective import run_adaptive_rag
+
+    result = await run_adaptive_rag(
+        question="¿Cuándo es la matrícula? gracias",
+        provider=None, api_key=None, original_question="gracias",
+    )
+    assert isinstance(result, str) and result.startswith("Con gusto")

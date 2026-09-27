@@ -297,3 +297,19 @@ class TestSendEmailErrorHandling:
         )
 
         assert ok is False
+
+
+async def test_port_465_uses_direct_ssl(monkeypatch):
+    from app.services.notifications import smtp
+
+    captured = {}
+
+    async def _fake_send(msg, **kwargs):
+        captured.update(kwargs)
+
+    monkeypatch.setattr(smtp.aiosmtplib, "send", _fake_send)
+    cfg = smtp.SMTPSettings(host="smtp.x", port=465, user="u", password="p", from_email="a@x.org", tls=True)
+
+    assert await smtp.send_email(to="b@x.org", subject="s", body_html="<p>h</p>", _config=cfg) is True
+    assert captured["use_tls"] is True and captured["start_tls"] is False
+

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import uuid
 from datetime import datetime, timezone
 from typing import Any
@@ -76,14 +77,18 @@ async def send_notification(
     trigger_id = uuid.uuid4()
 
     if email_rule:
-        for to in await _email_recipients(db, email_rule.target):
+        recipients = await _email_recipients(db, email_rule.target)
+
+        async def _send(to: str) -> tuple[str, bool, str | None]:
             try:
                 ok = await smtp.send_email(to=to, subject=subject, body_html=body_html, body_text=body_text)
-                error_message = None if ok else "No se pudo enviar el correo (ver logs del servidor para el detalle)."
+                return to, ok, None if ok else "No se pudo enviar el correo (ver logs del servidor para el detalle)."
             except Exception as exc:
-                ok = False
-                error_message = str(exc)[:500]
                 log.warning("notifications.email_send_failed", notif_event=event.value, target=to, error=str(exc))
+                return to, False, str(exc)[:500]
+
+        # En paralelo: quien dispara el aviso (p. ej. un visitante que pide contacto) no espera correo por correo.
+        for to, ok, error_message in await asyncio.gather(*(_send(to) for to in recipients)):
             db.add(NotificationLog(
                 trigger_id=trigger_id,
                 event=event.value,

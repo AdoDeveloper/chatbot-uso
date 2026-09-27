@@ -3,6 +3,8 @@ Adaptive RAG Router - classifies query complexity: greeting/factual/complex.
 """
 from __future__ import annotations
 
+import re
+
 import structlog
 
 log = structlog.get_logger()
@@ -48,6 +50,34 @@ def _is_greeting_only(q: str) -> bool:
             return False
     return True
 
+_ACK_TOKENS: set[tuple[str, ...]] = {
+    ("gracias",), ("muchas", "gracias"), ("mil", "gracias"),
+    ("ok",), ("vale",), ("perfecto",), ("entendido",),
+}
+
+_ACK_RESPONSE = "Con gusto. ¿Hay algo más en lo que pueda ayudarle?"
+
+
+def _is_acknowledgement(q: str) -> bool:
+    """Agradecimiento o conformidad ("gracias", "ok"), sin saludo."""
+    words = [
+        w.strip(_WORD_STRIP).translate(_ACCENTS)
+        for w in q.strip().lower().replace(",", " ").split()
+    ]
+    words = [w for w in words if w]
+    i = 0
+    while i < len(words):
+        for length in (2, 1):
+            if tuple(words[i:i + length]) in _ACK_TOKENS:
+                i += length
+                break
+        else:
+            return False
+    return bool(words)
+
+
+_COMPARISON_RE = re.compile(r"\b(compara\w*|diferencias?|versus|vs\.?|mejor|peor|ventajas?)\b", re.IGNORECASE)
+
 _GREETING_RESPONSE = (
     "¡Hola! Soy el asistente virtual de la universidad. "
     "¿En qué puedo ayudarle? Puedo resolver dudas sobre trámites, "
@@ -69,10 +99,7 @@ def classify_query(question: str) -> str:
 
     words = q.split()
 
-    has_comparison = any(
-        kw in q.lower()
-        for kw in ["compara", "diferencia", "versus", "vs", "mejor", "peor", "ventaja"]
-    )
+    has_comparison = bool(_COMPARISON_RE.search(q))
     has_multi_question = q.count("?") > 1 or q.count("¿") > 1
     is_long = len(words) > 25
 
@@ -82,7 +109,9 @@ def classify_query(question: str) -> str:
     return QueryRoute.FACTUAL
 
 
-def get_greeting_response(custom: str | None = None) -> str:
-    """Devuelve el saludo de respuesta."""
+def get_greeting_response(custom: str | None = None, question: str | None = None) -> str:
+    """Devuelve el saludo de respuesta, o un cierre cortés si solo se agradeció."""
+    if question and _is_acknowledgement(question):
+        return _ACK_RESPONSE
     custom = (custom or "").strip()
     return custom if custom else _GREETING_RESPONSE

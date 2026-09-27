@@ -209,10 +209,24 @@ async def _run_chat_inner(
     )
 
     if isinstance(effective_source_ids, list) and len(effective_source_ids) == 0:
-        return ChatResponse(
+        # Sin fuentes aprobadas también se registra el turno: son justo las preguntas que conviene ver.
+        response = await _persist_and_respond(
+            request,
+            client_ip=client_ip,
+            origin_url=origin_url,
+            is_playground=is_playground,
+            final_text=NO_CONTEXT_MESSAGE,
             sources=[],
-            content=NO_CONTEXT_MESSAGE,
+            latency_ms=int((time.monotonic() - t_start) * 1000),
+            history=history,
+            response_kwargs={"rag_route": "factual"},
         )
+        if not is_playground:
+            from app.services.rag.corrective import _maybe_flag_unanswered
+            await _maybe_flag_unanswered(
+                request.question, response.conversation_id, provider=primary_provider, api_key=primary_key,
+            )
+        return response
 
     rag_question = pipeline.build_rag_question(request.question, history)
 
@@ -237,7 +251,7 @@ async def _run_chat_inner(
         _detected_route = "greeting"
     else:
         from app.services.rag.router import classify_query
-        _detected_route = classify_query(rag_question) if cfg.use_corrective_rag else "factual"
+        _detected_route = classify_query(request.question) if cfg.use_corrective_rag else "factual"
 
     if isinstance(rag_result, str):
         greeting_latency_ms = int((time.monotonic() - t_start) * 1000)
@@ -323,11 +337,13 @@ async def _run_chat_inner(
             full_content.append(token)
     except RuntimeError as exc:
         log.error("chat.llm_stream_failed", session_id=request.session_id, error=str(exc))
-        from app.services.monitoring.alerts import notify_provider_down
-        provider_names = [p.name for p, _key in chain]
-        task = asyncio.create_task(notify_provider_down(str(exc), providers=provider_names))
-        _background_tasks.add(task)
-        task.add_done_callback(_background_tasks.discard)
+        # Si ya llegaron tokens, un proveedor respondió y se cortó: no es una caída de toda la cadena.
+        if not full_content:
+            from app.services.monitoring.alerts import notify_provider_down
+            provider_names = [p.name for p, _key in chain]
+            task = asyncio.create_task(notify_provider_down(str(exc), providers=provider_names))
+            _background_tasks.add(task)
+            task.add_done_callback(_background_tasks.discard)
         fail_latency_ms = int((time.monotonic() - t_start) * 1000)
         return await _persist_and_respond(
             request,
@@ -342,6 +358,10 @@ async def _run_chat_inner(
         )
     finally:
         await llm_gen.aclose()
+
+    if full_content:
+        from app.services.monitoring.alerts import clear_provider_down_streak
+        await clear_provider_down_streak()
 
     provider_name = served.get("provider_name", provider_name)
     model_name = served.get("model_name", model_name)
@@ -445,6 +465,13 @@ async def chat(
     client_ip = get_client_ip(req)
     origin_url = req.headers.get("Referer") or req.headers.get("Origin")
 
+    # Se valida la clave antes de ocupar un turno de la cola del modelo.
+    if not is_authenticated_playground:
+        from app.core.widget_auth import verify_widget_access
+        from app.services.widget.service import enforce_widget_caps
+        widget = await verify_widget_access(req, db)
+        await enforce_widget_caps(widget, request.session_id or "")
+
     try:
         await asyncio.wait_for(_llm_semaphore.acquire(), timeout=_LLM_QUEUE_TIMEOUT)
     except asyncio.TimeoutError:
@@ -453,15 +480,5 @@ async def chat(
             status_code=503,
             detail="El asistente está muy solicitado en este momento. Inténtelo de nuevo en unos segundos.",
         )
-
-    if not is_authenticated_playground:
-        from app.core.widget_auth import verify_widget_access
-        from app.services.widget.service import enforce_widget_caps
-        try:
-            widget = await verify_widget_access(req, db)
-            await enforce_widget_caps(widget, request.session_id or "")
-        except Exception:
-            _llm_semaphore.release()
-            raise
 
     return await run_chat(request, db, client_ip, origin_url=origin_url)

@@ -236,7 +236,7 @@ class OpenAICompatAdapter(LLMAdapter):
         if not api_base:
             raise ValueError(
                 f"URL base desconocida para el proveedor '{provider_type}'. "
-                "Configúrala en el proveedor o en Configuración → Tipos de proveedor."
+                "Configúrela en el proveedor o en Configuración → Tipos de proveedor."
             )
         super().__init__(model_name, api_key, api_base.rstrip("/"))
         self.provider_type = provider_type
@@ -783,7 +783,7 @@ async def _get_adapter(
     adapter_cls = _ADAPTER_MAP.get(pt)
     if adapter_cls and adapter_cls in (AnthropicAdapter, GeminiAdapter, CohereAdapter,
                                         AzureOpenAIAdapter, BedrockAdapter):
-        if not api_key:
+        if not api_key and adapter_cls is not BedrockAdapter:
             raise RuntimeError(
                 f"El proveedor '{provider_name}' ({pt}) requiere una API key configurada."
             )
@@ -974,6 +974,21 @@ async def test_connection(
     return result
 
 
+def _as_verdict(value) -> bool:
+    """El modelo a veces devuelve "false" entre comillas; como texto no vacío contaría como verdadero."""
+    if isinstance(value, str):
+        return value.strip().lower() == "true"
+    return bool(value)
+
+
+def _grades_from(data) -> list:
+    if isinstance(data, list):
+        return data
+    if isinstance(data, dict) and isinstance(data.get("grades"), list):
+        return data["grades"]
+    return []
+
+
 async def grade_documents(
     question: str,
     documents: list[dict],
@@ -1005,8 +1020,7 @@ async def grade_documents(
         cleaned = text.strip()
         cleaned = cleaned.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
         try:
-            data = json.loads(cleaned)
-            grades = data.get("grades", [])
+            grades = _grades_from(json.loads(cleaned))
         except json.JSONDecodeError:
             match = re.search(r'\[(true|false)(?:\s*,\s*(true|false))*\]', cleaned, re.IGNORECASE)
             if not match:
@@ -1015,7 +1029,7 @@ async def grade_documents(
             grades = [v.lower() == "true" for v in raw]
         if len(grades) < len(documents):
             return None
-        return [bool(g) for g in grades[:len(documents)]]
+        return [_as_verdict(g) for g in grades[:len(documents)]]
 
     try:
         for intento in range(2):
@@ -1147,18 +1161,16 @@ async def grade_faithfulness(
             return None
         cleaned = text.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
         try:
-            data = json.loads(cleaned)
+            grades = _grades_from(json.loads(cleaned))
         except json.JSONDecodeError:
             match = re.search(r'\[(true|false)(?:\s*,\s*(true|false))*\]', cleaned, re.IGNORECASE)
             if not match:
                 return None
-            raw = re.findall(r'(true|false)', match.group(), re.IGNORECASE)
-            data = {"grades": [v.lower() == "true" for v in raw]}
-        grades = data.get("grades", [])
+            grades = [v.lower() == "true" for v in re.findall(r'(true|false)', match.group(), re.IGNORECASE)]
         if not grades:
             return None
         grades = grades[:len(statements)]
-        return sum(1 for g in grades if g) / len(statements)
+        return sum(1 for g in grades if _as_verdict(g)) / len(statements)
     except Exception as exc:
         log.warning("llm.faithfulness_failed", error=str(exc), provider=provider.name)
         return None

@@ -16,11 +16,11 @@ MAX_PROACTIVE_LEN = 200
 
 class WidgetConfigUpdate(BaseModel):
     chatbot_name: str | None = Field(default=None, max_length=128)
-    welcome_message: str | None = None
+    welcome_message: str | None = Field(default=None, max_length=1000)
     primary_color: str | None = None
-    position: str | None = Field(default=None, max_length=16)
-    logo_url: str | None = None
-    domain_allowlist: list[str] | None = None
+    position: str | None = Field(default=None, pattern="^(bottom-right|bottom-left|top-right|top-left)$")
+    logo_url: str | None = Field(default=None, max_length=2048)
+    domain_allowlist: list[str] | None = Field(default=None, max_length=50)
     show_sources: bool | None = None
     enable_copy_action: bool | None = None
     enable_feedback_icons: bool | None = None
@@ -49,6 +49,26 @@ class WidgetConfigUpdate(BaseModel):
         if len(raw) == 3:
             raw = "".join(c * 2 for c in raw)
         return f"#{raw.lower()}"
+
+    @field_validator("logo_url")
+    @classmethod
+    def _validate_logo_url(cls, v: str | None) -> str | None:
+        if v is None or not v.strip():
+            return None
+        v = v.strip()
+        if not (v.startswith("https://") or v.startswith("http://") or v.startswith("/")):
+            raise ValueError("El logo debe ser una dirección web (https://…) o una ruta del sitio (/…).")
+        return v
+
+    @field_validator("domain_allowlist")
+    @classmethod
+    def _validate_domains(cls, v: list[str] | None) -> list[str] | None:
+        if v is None:
+            return v
+        cleaned = [d.strip() for d in v if d and d.strip()]
+        if any(len(d) > 253 for d in cleaned):
+            raise ValueError("Cada dominio permitido debe tener como máximo 253 caracteres.")
+        return cleaned
 
     @field_validator("suggestions")
     @classmethod

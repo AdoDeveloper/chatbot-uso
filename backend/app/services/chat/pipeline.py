@@ -24,6 +24,7 @@ from app.models.widget_config import WidgetConfig
 from app.services.ai.context_budget import get_context_window, truncate_context_chunks
 from app.services.ai.guardrails import (
     check_system_prompt_leak,
+    redact_pii,
     scan_output,
     validate_input,
 )
@@ -111,7 +112,7 @@ async def run_input_guardrails(
                 "pattern": guard.matched_pattern,
                 "matched_label": guard.matched_label,
                 "matched_category": guard.matched_category,
-                "question_preview": question[:120],
+                "question_preview": redact_pii(question[:120], entities=overrides["pii_entities"]),
             },
         ))
         await db.commit()
@@ -146,7 +147,9 @@ async def check_limits(db: AsyncSession, client_ip: str, session_id: str | None,
             limit_value=per_min,
             retry_after_seconds=exc.retry_after,
         )
-        return f"Demasiadas peticiones. Espere {exc.retry_after} s e inténtelo de nuevo."
+        wait = exc.retry_after
+        espera = f"{wait} segundos" if wait < 90 else f"{-(-wait // 60)} minutos"
+        return f"Demasiadas peticiones. Espere {espera} e inténtelo de nuevo."
     return None
 
 

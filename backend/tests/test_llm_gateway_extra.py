@@ -915,3 +915,16 @@ async def test_stream_accepts_sse_lines_without_space(monkeypatch):
     tokens = [t async for t in adapter.stream_chat([{"role": "user", "content": "hola"}])]
 
     assert tokens == ["Hola"]
+
+
+@pytest.mark.parametrize("respuesta", ['{"grades": ["true", "false"]}', '[true, false]'])
+async def test_grades_accept_bare_lists_and_quoted_values(monkeypatch, respuesta):
+    async def _fake_complete(*args, **kwargs):
+        return respuesta
+
+    monkeypatch.setattr(gw, "_complete", _fake_complete)
+    provider = SimpleNamespace(id=uuid.uuid4(), name="p")
+
+    grades = await gw.grade_documents("¿Horario?", [{"text": "a"}, {"text": "b"}], provider, "k")
+
+    assert grades == [True, False]

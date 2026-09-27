@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import secrets
 
 from fastapi import HTTPException, status
@@ -31,9 +32,14 @@ async def get_by_api_key(db: AsyncSession, api_key: str) -> WidgetConfig | None:
 
 async def update_config(db: AsyncSession, updates: dict) -> WidgetConfig:
     cfg = await get_or_create(db)
+    columns = WidgetConfig.__table__.columns
     for key, val in updates.items():
-        if val is not None and hasattr(cfg, key) and key != "api_key":
-            setattr(cfg, key, val)
+        if key == "api_key" or key not in columns:
+            continue
+        # null vacía un campo opcional (sin límite, sin logo); en los obligatorios se ignora.
+        if val is None and not columns[key].nullable:
+            continue
+        setattr(cfg, key, val)
     await db.flush()
     return cfg
 
@@ -58,6 +64,10 @@ def generate_embed_code(cfg: WidgetConfig) -> EmbedCodeOut:
     return EmbedCodeOut(script_tag=script_tag, api_key=cfg.api_key)
 
 
+def _key_fingerprint(api_key: str) -> str:
+    return hashlib.sha256(api_key.encode()).hexdigest()[:16]
+
+
 async def enforce_widget_caps(widget: WidgetConfig, session_id: str) -> None:
     """Apply per-widget abuse caps (max_chats_per_session / per_day)."""
     if widget.max_chats_per_session:
@@ -69,7 +79,7 @@ async def enforce_widget_caps(widget: WidgetConfig, session_id: str) -> None:
             )
         try:
             await check_rate_limit(
-                f"widget:{widget.api_key}:session", session_id,
+                f"widget:{_key_fingerprint(widget.api_key)}:session", session_id,
                 max_requests=widget.max_chats_per_session,
                 window_seconds=4 * 3600,
             )
@@ -82,7 +92,7 @@ async def enforce_widget_caps(widget: WidgetConfig, session_id: str) -> None:
     if widget.max_chats_per_day:
         try:
             await check_rate_limit(
-                f"widget:{widget.api_key}:day", "global",
+                f"widget:{_key_fingerprint(widget.api_key)}:day", "global",
                 max_requests=widget.max_chats_per_day,
                 window_seconds=24 * 3600,
             )

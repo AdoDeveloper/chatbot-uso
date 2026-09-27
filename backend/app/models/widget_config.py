@@ -34,8 +34,8 @@ class WidgetConfig(Base):
         server_default=sa_text("('Asistente')"),
     )
     welcome_message: Mapped[str] = mapped_column(
-        Text, nullable=False, default="¡Hola! ¿En qué puedo ayudarte?",
-        server_default=sa_text("('¡Hola! ¿En qué puedo ayudarte?')"),
+        Text, nullable=False, default="¡Hola! ¿En qué puedo ayudarle?",
+        server_default=sa_text("('¡Hola! ¿En qué puedo ayudarle?')"),
     )
     primary_color: Mapped[str] = mapped_column(
         String(16), nullable=False, default="#1C386D",

@@ -97,7 +97,10 @@ async def send_email(
             port=cfg.port,
             username=cfg.user,
             password=cfg.password,
-            start_tls=cfg.tls,
+            # 465 es SSL directo; en los demás puertos TLS se negocia con STARTTLS.
+            use_tls=cfg.tls and cfg.port == 465,
+            start_tls=cfg.tls and cfg.port != 465,
+            timeout=15,
         )
         log.info("smtp.sent", to=to, subject=subject)
         return True

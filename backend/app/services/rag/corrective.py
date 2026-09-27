@@ -246,11 +246,12 @@ async def run_adaptive_rag(
 ) -> tuple[list[dict], float | None] | str:
     """Adaptive RAG entry point."""
     a_registrar = original_question or question
-    route = classify_query(question)
+    # La ruta se decide con lo que escribió el visitante, no con la consulta ampliada con el historial.
+    route = classify_query(a_registrar)
     log.info("rag.route", question=question[:80], route=route)
 
     if route == QueryRoute.GREETING:
-        return get_greeting_response(greeting_response)
+        return get_greeting_response(greeting_response, a_registrar)
 
     if route == QueryRoute.FACTUAL or not use_corrective_rag:
         docs, ratio = await run_simple_rag(
@@ -305,7 +306,8 @@ async def run_corrective_rag(
     if not context:
         context = total_docs[:_MIN_DOCS_TRAS_FILTRO]
     aprobados = final_state.get("approved_count", len(context))
-    ratio = (aprobados / len(total_docs)) if total_docs else None
+    evaluados = min(len(total_docs), _GRADE_MAX_DOCS)
+    ratio = (aprobados / evaluados) if evaluados else None
 
     log.info("rag.done", question=question[:80], context_chunks=len(context))
     return context, ratio

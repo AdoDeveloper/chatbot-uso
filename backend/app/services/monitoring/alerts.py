@@ -74,8 +74,9 @@ async def check_rate_limit_threshold(db: AsyncSession, *, ratio: float = 0.8) ->
         ip for ip in await get_throttled_ips(
             limit_per_min=int(overrides.get("rate_limit_chat_per_min") or 0) or None,
             limit_per_hour=limit_per_hour,
+            window="per_hour",
         )
-        if ip["window"] == "per_hour" and ip["current_count"] >= ratio * limit_per_hour
+        if ip["current_count"] >= ratio * limit_per_hour
     ]
     if not near:
         return 0
@@ -107,6 +108,14 @@ async def _provider_down_since() -> str:
         return stored or now_iso
     except Exception:
         return now_iso
+
+
+async def clear_provider_down_streak() -> None:
+    """Un turno respondido cierra la racha: la próxima caída contará desde su propio inicio."""
+    try:
+        await get_redis().delete(_PROVIDER_DOWN_SINCE_KEY)
+    except Exception:
+        pass
 
 
 async def notify_provider_down(error: str, providers: list[str] | None = None) -> None:

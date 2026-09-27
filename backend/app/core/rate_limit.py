@@ -140,6 +140,7 @@ async def record_throttle_event(
 async def get_throttled_ips(
     limit_per_min: int | None = None,
     limit_per_hour: int | None = None,
+    window: str | None = None,
 ) -> list[dict]:
     """Escanea Redis en busca de IPs cerca o por encima de los rate limits."""
     from app.services.system.settings import RUNTIME_DEFAULTS
@@ -163,7 +164,9 @@ async def get_throttled_ips(
                 # "chat:session" identifica sesiones, no IPs - excluir de este reporte.
                 if parts[2] == "session":
                     continue
-                window = parts[-1]
+                key_window = parts[-1]
+                if window is not None and ("per_min" if key_window == "60" else "per_hour") != window:
+                    continue
                 ip = ":".join(parts[3:-1])
                 if ip in seen:
                     continue
@@ -172,7 +175,7 @@ async def get_throttled_ips(
                 if not count:
                     continue
                 count_int = int(count)
-                is_per_min = window == "60"
+                is_per_min = key_window == "60"
                 limit = limit_per_min if is_per_min else limit_per_hour
                 threshold = threshold_min if is_per_min else threshold_hour
                 if count_int >= threshold:
