@@ -310,6 +310,29 @@ interface Message {
   ts?: number;
 }
 
+// navigator.clipboard solo existe en páginas HTTPS; el sitio anfitrión puede no serlo.
+async function copyText(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch { /* cae al método alternativo */ }
+  try {
+    const el = document.createElement("textarea");
+    el.value = text;
+    el.style.position = "fixed";
+    el.style.opacity = "0";
+    document.body.appendChild(el);
+    el.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(el);
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
 function formatTime(ts?: number): string {
   if (!ts) return "";
   try {
@@ -402,7 +425,7 @@ function MessageActions({ content, backendId, conversationId, apiUrl, apiKey, se
   const [feedback, setFeedback] = useState<"positive" | "negative" | null>(null);
 
   async function handleCopy() {
-    try { await navigator.clipboard.writeText(content); } catch { /* ignore */ }
+    if (!(await copyText(content))) return;
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
@@ -464,7 +487,7 @@ function UserMessageActions({ content, settings, ts }: {
   const [copied, setCopied] = useState(false);
 
   async function handleCopy() {
-    try { await navigator.clipboard.writeText(content); } catch { /* ignore */ }
+    if (!(await copyText(content))) return;
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
@@ -570,6 +593,7 @@ function ChatWidget({
   const [escalType, setEscalType]           = useState<"email" | "whatsapp">("email");
   const [escalValue, setEscalValue]         = useState("");
   const [escalError, setEscalError]         = useState("");
+  const [escalLimitMsg, setEscalLimitMsg]   = useState("");
 
   const [a11y, setA11y]                     = useState<A11yPrefs>(() => loadA11yPrefs(apiUrl));
   const [a11yOpen, setA11yOpen]             = useState(false);
@@ -743,6 +767,13 @@ function ChatWidget({
     setOpen(false);
   }
 
+  function openOnKey(e: KeyboardEvent) {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      setOpen(true);
+    }
+  }
+
   function handleEndChat() {
     setKebabOpen(false);
     if (escalState === "prompt" || escalState === "form") setEscalState("hidden");
@@ -774,6 +805,7 @@ function ChatWidget({
     setEscalState("hidden");
     setEscalConvId(null);
     setEscalValue("");
+    setEscalLimitMsg("");
     setKebabOpen(false);
   }
 
@@ -893,6 +925,14 @@ function ChatWidget({
         }),
       });
       if (!resp.ok) {
+        let detail = "";
+        if (resp.status === 429) {
+          try {
+            const body = await resp.json();
+            if (typeof body?.detail === "string") detail = body.detail;
+          } catch { /* sin detalle */ }
+        }
+        setEscalLimitMsg(detail);
         setEscalState("error");
         return;
       }
@@ -915,16 +955,14 @@ function ChatWidget({
     const assistantId         = uid();
     const assistantMsg: Message = { id: assistantId, role: "assistant", content: "", streaming: true };
 
-    const history: ChatHistoryMessage[] = messages
+    const isRetry = !!retryText && messages.length >= 2 && !!messages[messages.length - 1].error;
+    const history: ChatHistoryMessage[] = (isRetry ? messages.slice(0, -2) : messages)
       .filter((m) => !m.streaming && !m.error && m.content)
       .slice(-10)
       .map((m) => ({ role: m.role, content: m.content }));
 
     setMessages((prev) => {
-      let base = prev;
-      if (retryText && prev.length >= 2 && prev[prev.length - 1].error) {
-        base = prev.slice(0, -2);
-      }
+      const base = isRetry && prev.length >= 2 && prev[prev.length - 1].error ? prev.slice(0, -2) : prev;
       return [...base, userMsg, assistantMsg];
     });
     setBusy(true);
@@ -970,6 +1008,7 @@ function ChatWidget({
 
           if (escalationPrompt && convId) {
             setEscalConvId(convId);
+            setEscalLimitMsg("");
             setEscalState("prompt");
           }
 
@@ -1202,7 +1241,7 @@ function ChatWidget({
           <>
             {/* Mensajes */}
             <div class="messages" role="log" aria-live="polite">
-              {messages.map((msg) => (
+              {messages.map((msg, idx) => (
                 <div
                   key={msg.id}
                   class={`msg-row msg-row-${msg.role}${revealedId === msg.id ? " msg-revealed" : ""}`}
@@ -1238,7 +1277,7 @@ function ChatWidget({
                           ts={msg.ts}
                         />
                       )}
-                      {msg.error && !busy && lastQuestionRef.current && (
+                      {msg.error && !busy && lastQuestionRef.current && idx === messages.length - 1 && (
                         <button
                           class="retry-btn"
                           onClick={() => handleSend(lastQuestionRef.current)}
@@ -1298,7 +1337,7 @@ function ChatWidget({
                         onSubmit={(e) => { e.preventDefault(); handleEscalationSubmit(); }}
                         noValidate
                       >
-                        <p class="escal-question" id="escal-form-title">¿Cómo prefiere que lo contactemos?</p>
+                        <p class="escal-question" id="escal-form-title">¿Cómo prefiere que le contactemos?</p>
                         <div class="escal-type-row" role="radiogroup" aria-labelledby="escal-form-title">
                           <label class="escal-radio-label">
                             <input
@@ -1360,13 +1399,15 @@ function ChatWidget({
                     {escalState === "error" && (
                       <>
                         <p class="escal-error" role="alert">
-                          No se pudo enviar su solicitud. Intente de nuevo.
+                          {escalLimitMsg || "No se pudo enviar su solicitud. Intente de nuevo."}
                         </p>
-                        <div class="escal-btn-row">
-                          <button class="escal-yes-btn" onClick={() => setEscalState("form")}>
-                            Reintentar
-                          </button>
-                        </div>
+                        {!escalLimitMsg && (
+                          <div class="escal-btn-row">
+                            <button class="escal-yes-btn" onClick={() => setEscalState("form")}>
+                              Reintentar
+                            </button>
+                          </div>
+                        )}
                       </>
                     )}
                   </div>
@@ -1506,14 +1547,14 @@ function ChatWidget({
 
       {/* ── Mensaje proactivo (sobre el launcher cerrado) ── */}
       {!open && proactiveMessage && (
-        <div class="proactive-bubble" onClick={() => setOpen(true)} role="button" tabIndex={0}>
+        <div class="proactive-bubble" onClick={() => setOpen(true)} onKeyDown={openOnKey} role="button" tabIndex={0}>
           <span class="proactive-text">{proactiveMessage}</span>
         </div>
       )}
 
       {/* ── Launcher label (etiqueta junto al botón) ── */}
       {!open && activeLauncherLabel && (
-        <div class="launcher-label-wrap" onClick={() => setOpen(true)} role="button" tabIndex={0}>
+        <div class="launcher-label-wrap" onClick={() => setOpen(true)} onKeyDown={openOnKey} role="button" tabIndex={0}>
           <span class="launcher-label-text">{activeLauncherLabel}</span>
         </div>
       )}
@@ -1645,6 +1686,9 @@ function parseSuggestions(raw: string | null): string[] {
   return trimmed.split(",").map((s) => s.trim()).filter(Boolean);
 }
 
+// currentScript solo es válido durante la ejecución inicial, no dentro de DOMContentLoaded.
+const loaderScript = document.currentScript as HTMLScriptElement | null;
+
 if (!customElements.get("chatbot-widget")) {
   customElements.define("chatbot-widget", ChatbotWidgetElement);
 }
@@ -1652,7 +1696,7 @@ if (!customElements.get("chatbot-widget")) {
 function autoInit() {
   if (document.querySelector("chatbot-widget")) return;
   const script =
-    document.currentScript ??
+    loaderScript ??
     document.querySelector<HTMLScriptElement>("script[data-api-key]");
   if (!script) return;
   const el = document.createElement("chatbot-widget");
