@@ -1,4 +1,5 @@
 import { Marked } from "marked";
+import { BASE_URL } from "@/lib/config";
 
 const _marked = new Marked({ breaks: true, gfm: true, async: false });
 _marked.use({
@@ -11,7 +12,12 @@ _marked.use({
       return `<a href="${href}" target="_blank" rel="noopener noreferrer" class="pdf-link"><span class="pdf-name">${label}</span></a>`;
     },
     image({ href, text }: { href: string; text: string }) {
-      const src = href.startsWith("http") || href.startsWith("data:") || href.startsWith("/") ? href : `/uploads/${href}`;
+      // Las imágenes subidas las sirve el backend, que puede estar en otro origen que el panel.
+      const src = href.startsWith("http") || href.startsWith("data:")
+        ? href
+        : href.startsWith("/uploads/")
+          ? `${BASE_URL}${href}`
+          : href.startsWith("/") ? href : `${BASE_URL}/uploads/${href}`;
       return `<img src="${src}" alt="${text || ""}" />`;
     },
   },

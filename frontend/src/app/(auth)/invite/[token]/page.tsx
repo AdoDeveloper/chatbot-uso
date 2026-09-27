@@ -25,7 +25,12 @@ interface InviteInfo {
 const schema = z
   .object({
     full_name: z.string().min(2, { message: "El nombre debe tener al menos 2 caracteres" }),
-    password: z.string().min(8, { message: "La contraseña debe tener al menos 8 caracteres" }),
+    password: z
+      .string()
+      .min(8, { message: "La contraseña debe tener al menos 8 caracteres" })
+      .max(72, { message: "La contraseña no puede superar 72 caracteres" })
+      .regex(/[A-Z]/, { message: "Debe contener al menos una mayúscula" })
+      .regex(/[0-9]/, { message: "Debe contener al menos un número" }),
     confirm_password: z.string(),
   })
   .refine((d) => d.password === d.confirm_password, {

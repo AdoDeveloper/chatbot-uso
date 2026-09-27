@@ -19,6 +19,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatInProjectTz } from "@/lib/datetime";
 import { MessageSquare } from "lucide-react";
+import { usePermission } from "@/hooks/use-permission";
+import { PERM } from "@/lib/permissions";
 
 interface UnansweredResponse {
   groups: UnansweredGroup[];
@@ -33,6 +35,9 @@ interface FAQDraftModal {
 
 export default function PendientesPage() {
   const { toast, confirm } = useToast();
+  const can = usePermission();
+  const canResolve = can(PERM.CONVERSATIONS_UPDATE);
+  const canCreateFaq = canResolve && can(PERM.KNOWLEDGE_CREATE);
   const { data, loading, refetch: load } = useApi<UnansweredResponse>("/unanswered");
   const [faqModal, setFaqModal] = useState<FAQDraftModal | null>(null);
   const [resolving, setResolving] = useState<string | null>(null);
@@ -181,6 +186,7 @@ export default function PendientesPage() {
                               </div>
                             </div>
                             <div className="flex items-center gap-1 shrink-0">
+                              {canCreateFaq && (
                               <Tooltip content="Convertir esta pregunta en una FAQ con respuesta">
                                 <Button
                                   variant="outline"
@@ -191,6 +197,8 @@ export default function PendientesPage() {
                                   <Plus className="w-3.5 h-3.5" /> Crear
                                 </Button>
                               </Tooltip>
+                              )}
+                              {canResolve && (
                               <Tooltip content="Marcar como resuelta sin crear FAQ">
                                 <Button
                                   variant="ghost"
@@ -205,6 +213,7 @@ export default function PendientesPage() {
                                     : <CheckCircle className="w-3.5 h-3.5" />}
                                 </Button>
                               </Tooltip>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -254,7 +263,7 @@ export default function PendientesPage() {
             </label>
             <Textarea
               rows={5}
-              placeholder="Escribe la respuesta que el chatbot usará para esta pregunta..."
+              placeholder="Escriba la respuesta que el chatbot usará para esta pregunta..."
               value={faqModal?.answer ?? ""}
               onChange={(e) => setFaqModal((m) => m ? { ...m, answer: e.target.value } : null)}
               className="resize-none"

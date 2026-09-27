@@ -584,7 +584,7 @@ export function WidgetTab({
           <Input
            value={config.launcher_label ?? ""}
            onChange={(e) => setConfig((c) => c ? { ...c, launcher_label: e.target.value } : c)}
-           placeholder="¿Necesitas ayuda?"
+           placeholder="¿Necesita ayuda?"
            maxLength={80}
           />
           <p className="text-2xs text-muted-foreground mt-1">{(config.launcher_label ?? "").length}/80 caracteres</p>

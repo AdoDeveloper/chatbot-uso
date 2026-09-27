@@ -78,11 +78,14 @@ export function AddSourcePanel({ open, onClose, onCreated }: {
           "/sources/bulk-upload", form, { headers: { "Content-Type": "multipart/form-data" } }
         );
         const { created, errors: errs } = res.data;
+        if (created.length) onCreated();
         if (errs.length) {
-          setError(`${errs.length} archivo(s) con error: ${errs.map((e) => e.name).join(", ")}`);
-          if (created.length) { onCreated(); onClose(); }
+          // El panel queda abierto con los que fallaron para que se lea el motivo y se pueda reintentar.
+          const failed = new Set(errs.map((e) => e.name));
+          setFiles((prev) => prev.filter((f) => failed.has(f.name)));
+          setError(errs.map((e) => `${e.name}: ${e.error}`).join(" · "));
         } else {
-          onCreated(); onClose();
+          onClose();
         }
         return;
       }

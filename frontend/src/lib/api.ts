@@ -62,6 +62,7 @@ api.interceptors.response.use(
   (res) => res,
   async (error) => {
     const original = error.config;
+    if (!original) return Promise.reject(error);
 
     // No intentar refresh en endpoints de auth (un 401 ahí significa credenciales
     // incorrectas, no token expirado - sin este check entra en bucle de reload)

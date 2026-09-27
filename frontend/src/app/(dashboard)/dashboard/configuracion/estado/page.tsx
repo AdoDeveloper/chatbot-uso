@@ -248,8 +248,8 @@ export default function EstadoPage() {
     const ok = await confirm({
       title: "¿Limpiar historial de salud?",
       message:
-        "Elimina mediciones con latencia > 2s que distorsionan los percentiles P95/P99. " +
-        "Son datos del arranque inicial o caídas severas que ya no son representativos.",
+        "Elimina mediciones correctas pero con latencia > 2 s, que distorsionan los percentiles P95/P99. " +
+        "Las mediciones fallidas se conservan porque forman el historial de incidentes.",
       confirmText: "Limpiar historial",
       variant: "danger",
     });
@@ -362,8 +362,8 @@ export default function EstadoPage() {
               <div className="min-w-0 flex-1">
                 <h3 className="text-15 font-semibold">Limpiar historial de salud</h3>
                 <p className="text-2xs text-muted-foreground mt-0.5">
-                  Elimina mediciones con latencia &gt; 2s que distorsionan los
-                  percentiles P95/P99 (datos del arranque inicial o caídas severas).
+                  Elimina mediciones correctas con latencia &gt; 2 s que distorsionan los
+                  percentiles P95/P99. Las fallidas se conservan como historial de incidentes.
                 </p>
               </div>
             </div>

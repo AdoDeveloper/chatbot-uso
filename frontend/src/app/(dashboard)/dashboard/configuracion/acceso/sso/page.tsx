@@ -71,7 +71,7 @@ export default function SsoPage() {
 
   async function saveCredentials(enabled: boolean) {
     if (!enabled && !oauth?.is_active) {
-      toast({ type: "warning", title: "Acción no permitida", message: "Activa Microsoft SSO antes de deshabilitar el inicio de sesión con contraseña." });
+      toast({ type: "warning", title: "Acción no permitida", message: "Active Microsoft SSO antes de deshabilitar el inicio de sesión con contraseña." });
       return;
     }
     setSavingCred(true);
@@ -89,7 +89,7 @@ export default function SsoPage() {
 
   async function toggleMicrosoft(next: boolean) {
     if (!next && !credEnabled) {
-      toast({ type: "warning", title: "Acción no permitida", message: "Activa el inicio de sesión con contraseña antes de desactivar Microsoft SSO." });
+      toast({ type: "warning", title: "Acción no permitida", message: "Active el inicio de sesión con contraseña antes de desactivar Microsoft SSO." });
       return;
     }
     if (next && !oauth?.configured) {

@@ -20,7 +20,7 @@ export default function AuthError({
           Error de autenticación
         </h1>
         <p className="text-sm text-muted-foreground">
-          Hubo un problema al cargar esta página. Intenta acceder de nuevo.
+          Hubo un problema al cargar esta página. Intente acceder de nuevo.
         </p>
         <Button onClick={() => (window.location.href = "/login")}>
           Volver al inicio de sesión

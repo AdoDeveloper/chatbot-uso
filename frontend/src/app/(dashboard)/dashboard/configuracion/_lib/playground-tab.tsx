@@ -930,7 +930,7 @@ export function PlaygroundTab({
                     </svg>
                     <p className="text-xs font-semibold text-foreground">Sin conexión</p>
                     <p className="text-2xs text-muted-foreground leading-relaxed max-w-55">
-                      En este momento el asistente no está disponible. Por favor, inténtalo más tarde.
+                      En este momento el asistente no está disponible. Por favor, inténtelo más tarde.
                     </p>
                     <button
                       type="button"

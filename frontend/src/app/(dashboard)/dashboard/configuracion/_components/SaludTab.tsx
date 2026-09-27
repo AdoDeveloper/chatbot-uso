@@ -103,14 +103,15 @@ export const SaludTab = forwardRef<SaludTabHandle>(function SaludTab(_props, ref
 
   useImperativeHandle(ref, () => ({ check, refetchAll, checking }), [check, refetchAll, checking]);
 
+  // Solo relee los datos: las mediciones las toma el servidor cada 5 minutos o el botón manual.
   useEffect(() => {
     if (autoRefreshSec <= 0) return;
     const handle = setInterval(() => {
       if (checking) return;
-      void check();
+      void refetchAll();
     }, autoRefreshSec * 1000);
     return () => clearInterval(handle);
-  }, [autoRefreshSec, check, checking]);
+  }, [autoRefreshSec, refetchAll, checking]);
 
 
   if (loading && !health) {

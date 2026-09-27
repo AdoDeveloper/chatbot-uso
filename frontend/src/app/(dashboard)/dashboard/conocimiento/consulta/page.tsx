@@ -135,7 +135,7 @@ export default function ChunkTestPage() {
    <PageHeader
     icon={Search}
     title="Búsqueda"
-    tip="Pruebe qué fragmentos recupera el chatbot para una pregunta y cuáles usaría para responder, sin generar la respuesta."
+    tip="Pruebe qué fragmentos recupera el chatbot para una pregunta y cuáles usaría para responder, sin generar la respuesta. Sin filtro se buscan las mismas fuentes aprobadas que usa el chatbot; al elegir fuentes concretas también puede probar las que aún no están aprobadas."
    />
 
    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -223,7 +223,7 @@ export default function ChunkTestPage() {
         <EmptyState
          icon={Search}
          title="Escriba una pregunta para empezar"
-         description="Los resultados de la busqueda vectorial aparecerán aquí con sus scores de relevancia"
+         description="Los resultados de la búsqueda aparecerán aquí con su puntuación de relevancia"
         />
        </CardContent>
       </Card>

@@ -197,9 +197,12 @@ export default function HistorialPage() {
   const controller = new AbortController();
   api.get<ChatConversationDetail>(`/conversations/${selected}`, { signal: controller.signal })
    .then(({ data }) => setDetail(data))
-   .catch((err) => { if (!controller.signal.aborted) console.error(err); });
+   .catch((err) => {
+    if (controller.signal.aborted) return;
+    toast({ type: "error", message: getErrorMessage(err, "No se pudo abrir la conversación.") });
+   });
   return () => controller.abort();
- }, [selected]);
+ }, [selected, toast]);
 
  async function handleExport(format: string) {
   if (exporting) return;

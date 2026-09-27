@@ -55,7 +55,7 @@ export function ParamsTab({ form, set }: { form: ChatbotSettings; set: (k: keyof
    <div className="bg-card border border-border rounded-xl shadow-sm p-6 space-y-3">
     <div>
      <h3 className="text-15 font-semibold tracking-tight">Perfil del asistente</h3>
-     <p className="text-2xs text-muted-foreground mt-1">Configura todos los parámetros RAG de una vez. Los sliders debajo siguen disponibles para ajuste fino.</p>
+     <p className="text-2xs text-muted-foreground mt-1">Configure todos los parámetros de búsqueda de una vez. Los sliders debajo siguen disponibles para ajuste fino.</p>
     </div>
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
      {RAG_PRESETS.map((p) => {

@@ -28,9 +28,12 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    // El canje lo hace este servidor: sin reenviar la IP del visitante, el límite de
+    // intentos por IP se compartiría entre toda la organización.
+    const clientIp = request.headers.get("x-real-ip") ?? request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
     const resp = await fetch(`${BASE_URL}/api/v1/auth/microsoft/callback`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...(clientIp ? { "X-Real-IP": clientIp } : {}) },
       body: JSON.stringify({ code, redirect_uri: redirectUri }),
     });
 

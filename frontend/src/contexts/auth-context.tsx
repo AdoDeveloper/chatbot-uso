@@ -51,7 +51,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data } = await api.get<User>("/auth/me");
       setUser(data);
-      const next = permsFromToken();
+      // Del servidor y no del token: si cambió el rol, el token aún trae los permisos anteriores.
+      const fresh = await api.get<{ permissions: string[] }>("/rbac/my-permissions").catch(() => null);
+      const next = fresh ? new Set(fresh.data.permissions) : permsFromToken();
       setPermissions((prev) => next ?? prev);
       const currentPath = pathnameRef.current;
       if (data.must_change_password && !currentPath.startsWith("/cambiar-contrasena")) {
@@ -60,8 +62,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         window.location.href = "/dashboard";
       }
     } catch (err: unknown) {
-      // Solo un 401 real cierra sesión; un error de red/CORS/5xx no implica token inválido.
-      if (isAxiosError(err) && err.response?.status === 401) {
+      // 401 (sesión inválida) o 403 (cuenta desactivada) cierran sesión; red/CORS/5xx no.
+      if (isAxiosError(err) && (err.response?.status === 401 || err.response?.status === 403)) {
         tokenStore.clear();
         setUser(null);
         setPermissions(new Set());
@@ -105,7 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
-    // Revoca los tokens en el backend (denylist) y limpia las cookies httpOnly.
+    // Revoca los tokens en el backend (denylist) y borra las cookies de sesión.
     // Best-effort: si la red falla igualmente limpiamos el estado local.
     try {
       await api.post("/auth/logout", { refresh_token: tokenStore.getRefresh() });

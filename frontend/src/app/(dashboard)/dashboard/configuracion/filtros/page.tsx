@@ -174,7 +174,7 @@ const KNOWN_PATTERN_CATEGORIES = [
 
   function openEditPattern(p: InjectionPattern) {
     if (p.source !== "custom") {
-      toast({ type: "info", message: "Los patrones built-in no se pueden editar. Crea uno custom." });
+      toast({ type: "info", message: "Los patrones predefinidos no se pueden editar. Cree uno personalizado." });
       return;
     }
     setEditingPatternId(p.id);
@@ -284,7 +284,7 @@ const KNOWN_PATTERN_CATEGORIES = [
               {/* Toggle maestro */}
               <div className="flex items-center justify-between rounded-lg border px-4 py-3 bg-muted/20">
                 <div>
-                  <p className="text-13 font-medium">Guardrails activos</p>
+                  <p className="text-13 font-medium">Filtros activos</p>
                   <p className="text-2xs text-muted-foreground">Desactivar solo para diagnóstico. No recomendado en producción.</p>
                 </div>
                 <Switch
@@ -352,7 +352,7 @@ const KNOWN_PATTERN_CATEGORIES = [
             <CardHeader className="pb-3 border-b">
               <CardTitle className="text-15 font-semibold">Datos personales a proteger</CardTitle>
               <p className="text-2xs text-muted-foreground">
-                Activa los tipos de datos personales que deben ocultarse automáticamente en las respuestas. Cambios requieren guardar.
+                Active los tipos de datos personales que deben ocultarse automáticamente. El DUI, el NIT y los teléfonos de El Salvador se ocultan siempre. Los cambios requieren guardar.
               </p>
             </CardHeader>
             <CardContent className="pt-4">
@@ -493,7 +493,7 @@ const KNOWN_PATTERN_CATEGORIES = [
                 <div>
                   <CardTitle className="text-15 font-semibold">Patrones de bloqueo</CardTitle>
                   <p className="text-2xs text-muted-foreground mt-0.5">
-                    {patterns.length} reglas activas. Los <b>built-in</b> son definidos por el sistema; los <b>custom</b> se crean y editan manualmente.
+                    {patterns.length} reglas activas. Los <b>predefinidos</b> vienen con el sistema; los <b>personalizados</b> se crean y editan aquí.
                   </p>
                 </div>
                 <div className="grid grid-cols-1 sm:flex sm:items-center sm:justify-end gap-2">
@@ -550,7 +550,7 @@ const KNOWN_PATTERN_CATEGORIES = [
                                             : "bg-muted text-muted-foreground border-border"
                                         }`}
                                       >
-                                        {isCustom ? "custom" : "built-in"}
+                                        {isCustom ? "personalizado" : "predefinido"}
                                       </Badge>
                                       {!p.enabled && (
                                         <Badge className="text-3xs bg-muted text-muted-foreground border-border">
@@ -644,7 +644,7 @@ const KNOWN_PATTERN_CATEGORIES = [
                 <div>
                   <p className="text-13 font-medium">Log de detecciones</p>
                   <p className="text-2xs text-muted-foreground mt-0.5">
-                    El historial completo de prompts bloqueados vive en Actividad → Inyecciones.
+                    El historial completo de mensajes bloqueados está en Actividad → Inyecciones.
                   </p>
                 </div>
               </div>

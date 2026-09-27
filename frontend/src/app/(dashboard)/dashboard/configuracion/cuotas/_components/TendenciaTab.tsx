@@ -44,7 +44,6 @@ export const TendenciaTab = forwardRef<TendenciaTabHandle>(function TendenciaTab
 
   const maxRequests = Math.max(1, ...(report?.points.map((p) => p.requests) ?? [1]));
   const limitPerHour = report?.limit_per_hour ?? 0;
-  const peakAlert = limitPerHour > 0 && maxRequests >= limitPerHour * 0.8;
 
   return (
     <div className="space-y-4">
@@ -57,7 +56,10 @@ export const TendenciaTab = forwardRef<TendenciaTabHandle>(function TendenciaTab
             <CardTitle className="text-15 font-semibold flex items-center gap-1.5">
               <BarChart3 className="w-4 h-4" /> Uso vs. límite
             </CardTitle>
-            <p className="text-2xs text-muted-foreground mt-0.5">Peticiones de chat por hora vs. el techo configurado.</p>
+            <p className="text-2xs text-muted-foreground mt-0.5">
+              Consultas de chat por hora en todo el sitio. El límite se aplica a cada IP por separado:
+              los bloqueos muestran cuándo alguien lo alcanzó.
+            </p>
           </div>
           <PeriodFilter
             ariaLabel="Período de tendencia"
@@ -78,24 +80,16 @@ export const TendenciaTab = forwardRef<TendenciaTabHandle>(function TendenciaTab
           ) : (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-                <Stat label="Total requests" value={report.total_requests.toLocaleString()} />
-                <Stat label="Throttles" value={report.total_throttles.toLocaleString()} accent={report.total_throttles > 0 ? "red" : undefined} />
-                <Stat label="Pico horario" value={maxRequests.toLocaleString()} accent={peakAlert ? "amber" : undefined} />
-                <Stat label="Límite/hora" value={limitPerHour.toLocaleString()} />
+                <Stat label="Consultas" value={report.total_requests.toLocaleString()} />
+                <Stat label="Bloqueos por límite" value={report.total_throttles.toLocaleString()} accent={report.total_throttles > 0 ? "red" : undefined} />
+                <Stat label="Hora con más consultas" value={maxRequests.toLocaleString()} />
+                <Stat label="Límite por IP y hora" value={limitPerHour.toLocaleString()} />
               </div>
 
-              {peakAlert && (
-                <div className="mb-3 px-3 py-2 rounded-md border border-warning/30 bg-warning/5 text-xs text-warning">
-                  ⚠️ Pico {maxRequests} ≥ 80% del límite ({limitPerHour}/h). Considera subir el techo.
-                </div>
-              )}
-
-              <div className="space-y-1">
-                {report.points.slice().reverse().slice(0, 24).reverse().map((p) => {
+              <div className="space-y-1 max-h-96 overflow-y-auto pr-1">
+                {report.points.map((p) => {
                   const pct = Math.min(100, (p.requests / Math.max(maxRequests, 1)) * 100);
-                  const overLimit = limitPerHour > 0 && p.requests >= limitPerHour;
-                  const nearLimit = limitPerHour > 0 && p.requests >= limitPerHour * 0.8 && !overLimit;
-                  const cls = overLimit ? "bg-destructive" : nearLimit ? "bg-warning/50" : "bg-primary/70";
+                  const cls = p.throttles > 0 ? "bg-destructive" : "bg-primary/70";
                   const ts = new Date(p.bucket);
                   return (
                     <div key={p.bucket} className="flex items-center gap-2 text-2xs">
@@ -107,7 +101,9 @@ export const TendenciaTab = forwardRef<TendenciaTabHandle>(function TendenciaTab
                       </div>
                       <span className="text-foreground tabular-nums w-12 text-right shrink-0">{p.requests}</span>
                       {p.throttles > 0 && (
-                        <span className="text-destructive tabular-nums w-10 text-right shrink-0">⛔{p.throttles}</span>
+                        <span className="text-destructive tabular-nums w-16 text-right shrink-0" title="Consultas bloqueadas por límite">
+                          {p.throttles} bloq.
+                        </span>
                       )}
                     </div>
                   );

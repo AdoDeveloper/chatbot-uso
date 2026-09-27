@@ -94,7 +94,7 @@ export default function SourcesPage() {
   const handleDelete = async (s: Source) => {
     const ok = await confirm({
       title: `¿Eliminar "${s.name}"?`,
-      message: "Se eliminarán todos los vectores del índice",
+      message: "El chatbot dejará de usar este documento y se borrará su archivo. Esta acción no se puede deshacer.",
       confirmText: "Eliminar", variant: "danger",
     });
     if (!ok) return;
@@ -111,7 +111,7 @@ export default function SourcesPage() {
   const handleApprove = async (s: Source) => {
     const ok = await confirm({
       title: `¿Aprobar "${s.name}"?`,
-      message: "Al aprobar confirmas que la fuente es correcta. El chatbot podrá consultarla.",
+      message: "Al aprobar confirma que la fuente es correcta. El chatbot podrá consultarla.",
       confirmText: "Aprobar",
     });
     if (!ok) return;
@@ -159,7 +159,7 @@ export default function SourcesPage() {
   async function bulkDeleteSelected() {
     const ok = await confirm({
       title: `¿Eliminar ${selectedIds.size} fuentes?`,
-      message: "Se eliminarán todos los vectores del índice de cada una.",
+      message: "El chatbot dejará de usar estos documentos y se borrarán sus archivos. Esta acción no se puede deshacer.",
       confirmText: "Eliminar", variant: "danger",
     });
     if (!ok) return;
@@ -284,7 +284,7 @@ export default function SourcesPage() {
             </div>
           </div>
 
-          {can(PERM.KNOWLEDGE_UPDATE) && (
+          {can(PERM.KNOWLEDGE_CREATE) && (
             <Button size="sm" onClick={() => setPanelOpen(true)} className="gap-1.5 ml-auto shrink-0">
               <Plus className="w-3.5 h-3.5" /> Agregar
             </Button>
@@ -326,8 +326,8 @@ export default function SourcesPage() {
             <EmptyState
               icon={Database}
               title="Sin documentos"
-              description="Agrega un archivo para comenzar"
-              action={can(PERM.KNOWLEDGE_UPDATE) ? (
+              description="Agregue un archivo para comenzar"
+              action={can(PERM.KNOWLEDGE_CREATE) ? (
                 <Button variant="outline" size="sm" onClick={() => setPanelOpen(true)} className="gap-1.5">
                   <Plus className="w-3.5 h-3.5" /> Agregar
                 </Button>

@@ -242,7 +242,7 @@ export default function EscalamientoConfigPage() {
       <PageHeader
         icon={UserRound}
         title="Escalamiento"
-        tip="Configura cuándo y cómo el chatbot transfiere conversaciones a un agente humano."
+        tip="Configure cuándo y cómo el chatbot transfiere conversaciones a una persona."
         action={
           <Button variant="outline" size="sm" onClick={handleTest} disabled={testing} className="gap-1.5">
             {testing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
@@ -282,7 +282,7 @@ export default function EscalamientoConfigPage() {
             </CardHeader>
             <CardContent className="pt-4">
               {rules.length === 0 ? (
-                <EmptyState icon={Mail} title="Sin reglas" description="Agrega una regla para activar el escalamiento" />
+                <EmptyState icon={Mail} title="Sin reglas" description="Agregue una regla para activar el escalamiento" />
               ) : (
                 <ul className="space-y-2.5">
                   {rules.map((rule) => (

@@ -86,7 +86,7 @@ function UserAvatar({ name, email }: { name: string; email: string }) {
 }
 
 const editUserSchema = z.object({
-  fullName: z.string().min(1, "El nombre no puede estar vacío"),
+  fullName: z.string().trim().min(2, "El nombre debe tener al menos 2 caracteres"),
   role: z.string(),
   isActive: z.boolean(),
 });

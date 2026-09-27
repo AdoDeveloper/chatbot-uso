@@ -141,7 +141,7 @@ export default function DashboardPage() {
    {/* Franja de acciones rápidas */}
    {can(PERM.KNOWLEDGE_UPDATE) && (
     <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-6">
-     <QuickAction href="/dashboard/conocimiento/documentos" icon={Upload} label="Subir fuente" hint="Añade a la base de conocimiento" />
+     <QuickAction href="/dashboard/conocimiento/documentos" icon={Upload} label="Subir fuente" hint="Añadir a la base de conocimiento" />
      <QuickAction href="/dashboard/conversaciones" icon={MessageSquare} label="Conversaciones" hint="Revisar chats recientes" />
      <QuickAction href="/dashboard/conversaciones/escalamientos" icon={Inbox} label="Escalamientos" hint="Bandeja de casos por atender" />
      <QuickAction href="/dashboard/configuracion/asistente/previsualizar" icon={Play} label="Previsualizar" hint="Chat de prueba en vivo" />

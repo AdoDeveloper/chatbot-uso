@@ -156,9 +156,9 @@ test.describe("Configuracion > Asistente > Apariencia", () => {
     const captacionSwitch = page.getByText(/^captación$/i).locator("../..").locator('[role="switch"]');
     const wasOpen = (await captacionSwitch.getAttribute("aria-checked")) === "true";
     if (!wasOpen) await captacionSwitch.click();
-    await expect(page.getByPlaceholder(/necesitas ayuda/i)).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByPlaceholder(/necesitas? ayuda/i)).toBeVisible({ timeout: 5_000 });
 
-    const labelInput = page.getByPlaceholder(/necesitas ayuda/i);
+    const labelInput = page.getByPlaceholder(/necesitas? ayuda/i);
     const originalLabel = await labelInput.inputValue();
     await labelInput.fill("Hola E2E");
     await expect(page.getByText(/8\/80 caracteres/)).toBeVisible();

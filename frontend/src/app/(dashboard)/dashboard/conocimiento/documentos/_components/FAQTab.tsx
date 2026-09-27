@@ -235,7 +235,7 @@ export default function FAQTab() {
           skeleton={<CardContent className="py-6 space-y-3">{[1,2,3,4].map(i => <Skeleton key={i} className="h-12 w-full" />)}</CardContent>}
           empty={
             entries.length === 0 ? (
-              <CardContent><EmptyState icon={BookOpen} title="Sin entradas de FAQ" description="Crea pares de pregunta/respuesta para el chatbot." /></CardContent>
+              <CardContent><EmptyState icon={BookOpen} title="Sin entradas de FAQ" description="Cree pares de pregunta y respuesta para el chatbot." /></CardContent>
             ) : (
               <CardContent><EmptyState icon={Search} title="Sin resultados" description="Ningún item coincide con los filtros aplicados." /></CardContent>
             )

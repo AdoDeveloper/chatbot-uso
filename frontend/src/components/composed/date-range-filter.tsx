@@ -69,7 +69,8 @@ function DateField({
     else if (digits.length > 2) next = `${digits.slice(0, 2)}/${digits.slice(2)}`
     setText(next)
     const iso = displayToIso(next)
-    if (iso) onChange(iso)
+    // Los mismos límites que aplica el calendario; fuera de rango se descarta al salir del campo.
+    if (iso && (!min || iso >= min) && (!max || iso <= max)) onChange(iso)
   }
 
   function handleBlur() {

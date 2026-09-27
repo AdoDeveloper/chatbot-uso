@@ -568,7 +568,7 @@ export default function PublicacionesPage() {
           <Input
             value={rejectTarget?.reason ?? ""}
             onChange={(e) => setRejectTarget((p) => p ? { ...p, reason: e.target.value } : p)}
-            placeholder="Indica por qué se rechaza esta fuente..."
+            placeholder="Indique por qué se rechaza esta fuente..."
             onKeyDown={(e) => e.key === "Enter" && handleReject()}
             autoFocus
           />
