@@ -56,7 +56,7 @@ class WidgetConfigUpdate(BaseModel):
         if v is None or not v.strip():
             return None
         v = v.strip()
-        if not (v.startswith("https://") or v.startswith("http://") or v.startswith("/")):
+        if not v.startswith(("https://", "http://", "/")):
             raise ValueError("El logo debe ser una dirección web (https://…) o una ruta del sitio (/…).")
         return v
 

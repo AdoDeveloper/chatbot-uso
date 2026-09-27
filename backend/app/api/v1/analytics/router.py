@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_client_ip, require_perm
 from app.core.permissions import P
+from app.core.timezone import utc_to_sv
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.analytics import (
@@ -29,7 +30,6 @@ from app.schemas.analytics import (
     PeriodComparison,
 )
 from app.services.monitoring import analytics as svc
-from app.core.timezone import utc_to_sv
 from app.services.system import audit as audit_svc
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])

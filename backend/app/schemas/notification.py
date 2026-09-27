@@ -1,10 +1,9 @@
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import datetime
 from typing import Any
-
-import re
 
 from pydantic import BaseModel, Field
 

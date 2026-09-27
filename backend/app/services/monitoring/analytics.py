@@ -5,7 +5,11 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.constants import PANEL_AUTHENTICATED_BROWSERS, PLAYGROUND_BROWSERS, PREVIEW_PRODUCTION_BROWSER
+from app.core.constants import (
+    PANEL_AUTHENTICATED_BROWSERS,
+    PLAYGROUND_BROWSERS,
+    PREVIEW_PRODUCTION_BROWSER,
+)
 from app.models.audit_log import AuditLog
 from app.models.chat_conversation import ChatConversation
 from app.models.chat_message import ChatMessage

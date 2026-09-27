@@ -89,7 +89,11 @@ async def export_logs(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_perm(P.AUDIT_READ)),
 ):
-    from app.services.ingestion.export import excel_response, local_datetime, pdf_response
+    from app.services.ingestion.export import (
+        excel_response,
+        local_datetime,
+        pdf_response,
+    )
 
     q = select(AuditLog).options(selectinload(AuditLog.actor)).order_by(AuditLog.created_at.desc())
     if action:

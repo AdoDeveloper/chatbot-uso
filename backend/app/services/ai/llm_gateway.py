@@ -127,7 +127,7 @@ def _is_permanent_failure(exc: BaseException) -> bool:
 
 def _sse_payload(line: str) -> str:
     data = line[5:]
-    return data[1:] if data.startswith(" ") else data
+    return data.removeprefix(" ")
 
 
 def _is_retryable(exc: BaseException) -> bool:

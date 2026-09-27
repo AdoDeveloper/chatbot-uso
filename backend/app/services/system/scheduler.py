@@ -231,7 +231,10 @@ async def _digest_loop() -> None:
                 lock_key = f"scheduler:digest:{today}"
                 if await _acquire_once(lock_key, ttl=82800):  # 23h - libera antes del próximo día
                     from app.models.enums import NotificationEvent
-                    from app.services.notifications.digest import PERIOD_DAYS, collect_digest_stats
+                    from app.services.notifications.digest import (
+                        PERIOD_DAYS,
+                        collect_digest_stats,
+                    )
                     from app.services.notifications.service import send_notification
                     stats = await collect_digest_stats(db, PERIOD_DAYS.get(schedule.unit, 1))
                     # Enviar solo si hay algo que reportar (pendientes o actividad del periodo).

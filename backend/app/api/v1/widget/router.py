@@ -66,7 +66,7 @@ class _PublicEscalationContactBody(BaseModel):
     contact_value: str = Field(..., min_length=1, max_length=200)
 
     @model_validator(mode="after")
-    def _validate_contact(self) -> "_PublicEscalationContactBody":
+    def _validate_contact(self) -> _PublicEscalationContactBody:
         value = self.contact_value.strip()
         if self.contact_type == "email":
             if not _CONTACT_EMAIL_RE.match(value):

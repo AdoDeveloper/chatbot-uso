@@ -14,7 +14,12 @@ from app.core.config import get_settings
 from app.core.deps import get_client_ip, get_current_user
 from app.core.rate_limit import RateLimitExceeded, check_rate_limit
 from app.core.security import decode_token, hash_password_async, verify_password_async
-from app.core.token_revocation import claim_jti, is_token_stale, revocation_cutoff, revoke_jti
+from app.core.token_revocation import (
+    claim_jti,
+    is_token_stale,
+    revocation_cutoff,
+    revoke_jti,
+)
 from app.db.session import get_db
 from app.models.chat_message import ChatMessage
 from app.models.enums import ReviewStatus

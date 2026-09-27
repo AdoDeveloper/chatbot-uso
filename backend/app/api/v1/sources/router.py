@@ -23,7 +23,6 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.ai.semantic_cache import invalidate_by_source
 from app.core.config import get_settings
 from app.core.deps import get_client_ip, require_perm
 from app.core.permissions import P
@@ -33,6 +32,7 @@ from app.models.source import Source
 from app.models.user import User
 from app.schemas.common import BulkQueueResult, BulkUploadResult, OperationStatus
 from app.schemas.source import SourceResponse, SourceUpdateMeta
+from app.services.ai.semantic_cache import invalidate_by_source
 from app.services.sources import service as sources_svc
 from app.services.system import audit as audit_svc
 

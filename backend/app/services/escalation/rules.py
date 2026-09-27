@@ -64,7 +64,7 @@ async def update_rule(db: AsyncSession, *, rule_id: uuid.UUID, changes: dict) ->
     if "trigger_config" in changes or new_trigger_type is not None:
         changes = {**changes, "trigger_config": _checked_config(
             new_trigger_type or rule.trigger_type,
-            changes["trigger_config"] if "trigger_config" in changes else rule.trigger_config,
+            changes.get("trigger_config", rule.trigger_config),
         )}
     for k, v in changes.items():
         setattr(rule, k, v)
