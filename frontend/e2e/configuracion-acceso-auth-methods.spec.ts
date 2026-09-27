@@ -1,5 +1,7 @@
 import { test, expect } from "@playwright/test";
 
+const BACKEND_URL = "http://127.0.0.1:8000";
+
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;
 
@@ -18,13 +20,13 @@ test.describe("Configuracion > Acceso > SSO > Inicio de sesion con contrasena", 
     await page.goto("/dashboard/configuracion/acceso/sso");
     const authHeader = await authHeaderFor(page);
 
-    const oauthResp = await request.get("/api/v1/integrations/oauth", { headers: { Authorization: authHeader } });
+    const oauthResp = await request.get(`${BACKEND_URL}/api/v1/integrations/oauth`, { headers: { Authorization: authHeader } });
     const oauth: { is_active: boolean; configured: boolean } = await oauthResp.json();
     if (!oauth.is_active || !oauth.configured) {
       test.skip(true, "Microsoft SSO no esta activo/configurado en este entorno; no es seguro apagar el login por contraseña sin una via de acceso alterna real");
     }
 
-    const originalResp = await request.get("/api/v1/integrations/auth-methods", { headers: { Authorization: authHeader } });
+    const originalResp = await request.get(`${BACKEND_URL}/api/v1/integrations/auth-methods`, { headers: { Authorization: authHeader } });
     expect(originalResp.ok()).toBeTruthy();
     const original: { credentials_enabled: boolean } = await originalResp.json();
 
@@ -32,7 +34,7 @@ test.describe("Configuracion > Acceso > SSO > Inicio de sesion con contrasena", 
     async function restore() {
       if (restored) return;
       restored = true;
-      const resp = await request.put("/api/v1/integrations/auth-methods", {
+      const resp = await request.put(`${BACKEND_URL}/api/v1/integrations/auth-methods`, {
         headers: { Authorization: authHeader, "Content-Type": "application/json" },
         data: { credentials_enabled: original.credentials_enabled },
       });
@@ -41,7 +43,7 @@ test.describe("Configuracion > Acceso > SSO > Inicio de sesion con contrasena", 
 
     try {
       const toggled = !original.credentials_enabled;
-      const toggleResp = await request.put("/api/v1/integrations/auth-methods", {
+      const toggleResp = await request.put(`${BACKEND_URL}/api/v1/integrations/auth-methods`, {
         headers: { Authorization: authHeader, "Content-Type": "application/json" },
         data: { credentials_enabled: toggled },
       });
@@ -49,14 +51,14 @@ test.describe("Configuracion > Acceso > SSO > Inicio de sesion con contrasena", 
       const toggledBody: { credentials_enabled: boolean } = await toggleResp.json();
       expect(toggledBody.credentials_enabled).toBe(toggled);
 
-      const verifyResp = await request.get("/api/v1/integrations/auth-methods", { headers: { Authorization: authHeader } });
+      const verifyResp = await request.get(`${BACKEND_URL}/api/v1/integrations/auth-methods`, { headers: { Authorization: authHeader } });
       const verifyBody: { credentials_enabled: boolean } = await verifyResp.json();
       expect(verifyBody.credentials_enabled).toBe(toggled);
     } finally {
       await restore();
     }
 
-    const finalResp = await request.get("/api/v1/integrations/auth-methods", { headers: { Authorization: authHeader } });
+    const finalResp = await request.get(`${BACKEND_URL}/api/v1/integrations/auth-methods`, { headers: { Authorization: authHeader } });
     const finalBody: { credentials_enabled: boolean } = await finalResp.json();
     expect(finalBody.credentials_enabled, "credentials_enabled no quedo restaurado a su valor original").toBe(original.credentials_enabled);
   });

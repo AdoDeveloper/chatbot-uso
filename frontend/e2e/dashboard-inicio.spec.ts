@@ -1,5 +1,7 @@
 import { test, expect } from "@playwright/test";
 
+const BACKEND_URL = "http://127.0.0.1:8000";
+
 const E2E_USER = process.env.E2E_USER;
 const E2E_PASS = process.env.E2E_PASS;
 
@@ -102,7 +104,7 @@ test.describe("Dashboard inicio - OnboardingWizard", () => {
     }
     const authHeader = { Authorization: `Bearer ${token}` };
 
-    const providersResp = await page.request.get("/api/v1/providers", { headers: authHeader });
+    const providersResp = await page.request.get(`${BACKEND_URL}/api/v1/providers`, { headers: authHeader });
     if (!providersResp.ok()) {
       test.skip(true, `GET /api/v1/providers devolvió ${providersResp.status()}, no se puede manipular el estado del sistema`);
     }
@@ -114,7 +116,7 @@ test.describe("Dashboard inicio - OnboardingWizard", () => {
     }
 
     const wasDismissed = (
-      await (await page.request.get("/api/v1/auth/onboarding-status", { headers: authHeader })).json()
+      await (await page.request.get(`${BACKEND_URL}/api/v1/auth/onboarding-status`, { headers: authHeader })).json()
     ).dismissed as boolean;
 
     let restored = false;
@@ -122,19 +124,19 @@ test.describe("Dashboard inicio - OnboardingWizard", () => {
       if (restored) return;
       restored = true;
       await Promise.all(activeProviders.map((p) =>
-        page.request.patch(`/api/v1/providers/${p.id}`, { headers: authHeader, data: { is_active: true } }),
+        page.request.patch(`${BACKEND_URL}/api/v1/providers/${p.id}`, { headers: authHeader, data: { is_active: true } }),
       ));
       if (wasDismissed) {
-        await page.request.post("/api/v1/auth/onboarding-dismiss", { headers: authHeader });
+        await page.request.post(`${BACKEND_URL}/api/v1/auth/onboarding-dismiss`, { headers: authHeader });
       }
     }
 
     try {
       await Promise.all(activeProviders.map((p) =>
-        page.request.patch(`/api/v1/providers/${p.id}`, { headers: authHeader, data: { is_active: false } }),
+        page.request.patch(`${BACKEND_URL}/api/v1/providers/${p.id}`, { headers: authHeader, data: { is_active: false } }),
       ));
       // Un-dismiss so this run isn't skipped by a prior dismiss.
-      await page.request.post("/api/v1/auth/onboarding-reset", { headers: authHeader });
+      await page.request.post(`${BACKEND_URL}/api/v1/auth/onboarding-reset`, { headers: authHeader });
 
       await page.goto("/dashboard");
       const wizard = page.getByRole("heading", { name: /bienvenido al panel del chatbot uso/i });
