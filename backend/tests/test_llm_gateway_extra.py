@@ -291,7 +291,7 @@ class TestStreamChatOrchestration:
             yield "x"
 
         monkeypatch.setattr(gw.OpenAICompatAdapter, "stream_chat", fake_stream)
-        history = [{"role": "user", "content": f"msg{i}"} for i in range(10)]
+        history = [{"role": ("user", "assistant")[i % 2], "content": f"msg{i}"} for i in range(10)]
         async for _ in gw.stream_chat(
             "pregunta final", [{"text": "d"}], [(provider, "key")], history=history,
         ):
@@ -889,3 +889,29 @@ class TestFirstTokenTimeout:
 
         assert chunks == ["hola"]
         assert served["provider_name"] == "Respaldo lento"
+
+
+def test_turns_start_with_the_user_and_alternate():
+    turns = gw._alternating_turns([
+        {"role": "assistant", "content": "Hola, soy el asistente."},
+        {"role": "user", "content": "¿Horario?"},
+        {"role": "user", "content": "¿De la biblioteca?"},
+        {"role": "assistant", "content": "De 7 a 17 h."},
+        {"role": "user", "content": "¿Y sábados?"},
+    ])
+
+    assert [t["role"] for t in turns] == ["user", "assistant", "user"]
+    assert turns[0]["content"] == "¿Horario?\n\n¿De la biblioteca?"
+
+
+async def test_stream_accepts_sse_lines_without_space(monkeypatch):
+    def handler(request):
+        body = 'data:{"choices":[{"delta":{"content":"Hola"}}]}\n\ndata:[DONE]\n\n'
+        return httpx.Response(200, text=body, headers={"content-type": "text/event-stream"})
+
+    _patch_client(monkeypatch, handler)
+    adapter = gw.OpenAICompatAdapter("openai", "m", "k", "https://x.test/v1")
+
+    tokens = [t async for t in adapter.stream_chat([{"role": "user", "content": "hola"}])]
+
+    assert tokens == ["Hola"]

@@ -216,12 +216,19 @@ async def list_entries(limit: int = 20) -> list[dict]:
 
 
 async def delete_entry(key: str) -> bool:
-    """Borra una entrada del caché semántico."""
+    """Borra una entrada del caché semántico y su copia exacta."""
     if not key.startswith(CACHE_PREFIX):
         return False
     try:
         redis = get_redis()
-        await redis.delete(key)
+        entry = await redis.hmget(key, "question", "source_ids")
+        keys = [key]
+        if entry and entry[0] is not None:
+            scope = key[len(CACHE_PREFIX):].split(":", 1)[0]
+            q = entry[0].lower().strip()
+            h = hashlib.sha256(f"{q}|{entry[1] or '[]'}|{scope}".encode()).hexdigest()
+            keys.append(f"chat:v1:{h}")
+        await redis.delete(*keys)
     except Exception:
         pass
     return True

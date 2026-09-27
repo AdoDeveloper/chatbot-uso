@@ -102,3 +102,19 @@ class TestStoreCachedResponseAtomicTTL:
         ttl = await _fake_redis.ttl(key)
         assert ttl > 0, f"la clave se guardó sin TTL (ttl={ttl})"
         assert ttl <= 999
+
+
+async def test_deleting_an_entry_also_removes_its_exact_copy(monkeypatch, _fake_redis):
+    from app.services.chat.pipeline import exact_cache_key
+
+    async def _fake_embed(texts, prefix=""):
+        return [{"dense": [0.3] * 8} for _ in texts]
+
+    monkeypatch.setattr(cache_svc, "embed_texts_async", _fake_embed)
+    question = "¿Cuándo son las inscripciones?"
+    await cache_svc.store_cached_response(question, ["s1"], [], "respuesta")
+    await _fake_redis.set(exact_cache_key(question, ["s1"]), "{}")
+
+    await cache_svc.delete_entry(cache_svc._cache_key(question, ["s1"]))
+
+    assert await _fake_redis.exists(exact_cache_key(question, ["s1"])) == 0

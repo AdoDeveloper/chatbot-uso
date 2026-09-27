@@ -138,6 +138,21 @@ class TestUpdateProvider:
         assert r.status_code == 200
         assert r.json()["name"] == "Groq secundario"
 
+    async def test_editing_a_blocked_provider_unblocks_it(self, client, admin_user, auth_headers, monkeypatch):
+        from app.services.ai import llm_gateway as gw
+
+        monkeypatch.setattr(gw, "_breaker", gw.CircuitBreaker())
+        created = await _create_provider(client, admin_user, auth_headers)
+        gw._breaker.force_open(created["id"])
+
+        r = await client.patch(
+            f"/api/v1/providers/{created['id']}",
+            json={"api_key": "clave-corregida"},
+            headers=auth_headers(admin_user),
+        )
+        assert r.status_code == 200
+        assert gw._breaker.is_open(created["id"]) is False
+
     async def test_rejects_api_base_over_max_length(self, client, admin_user, auth_headers):
         created = await _create_provider(client, admin_user, auth_headers)
         r = await client.patch(

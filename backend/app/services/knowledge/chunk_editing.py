@@ -132,11 +132,12 @@ async def edit_chunk(
     new_warnings = compute_warnings(new_text, get_env_settings().CHATBOT_CHUNK_PARENT_SIZE)
 
     # 2b. Recomponer parent_text para que el contexto que ve el LLM refleje la edición
+    new_body = re.sub(r"^\[Sección:.*?\]\n", "", new_text, count=1)
     previous_parent_text = existing.get("parent_text")
     new_parent_text = previous_parent_text
     parent_id = existing.get("parent_id")
     if previous_parent_text and previous_body and previous_body in previous_parent_text:
-        new_parent_text = previous_parent_text.replace(previous_body, new_text, 1)
+        new_parent_text = previous_parent_text.replace(previous_body, new_body, 1)
 
     # 3. Upsert de vuelta en Qdrant (mismo point_id = actualización)
     from qdrant_client.models import PointStruct, SparseVector
@@ -167,7 +168,7 @@ async def edit_chunk(
 
     original = existing.get("parent_text_original")
     if original and previous_body and previous_body in original:
-        original = original.replace(previous_body, new_text, 1)
+        original = original.replace(previous_body, new_body, 1)
     if new_parent_text != previous_parent_text and parent_id:
         from qdrant_client.models import FieldCondition, Filter, MatchValue
         siblings_filter = Filter(

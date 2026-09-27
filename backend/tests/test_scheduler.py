@@ -279,7 +279,7 @@ class TestWarmupLoop:
             with pytest.raises(_StopLoop):
                 await scheduler._warmup_loop()
 
-        embed_mock.assert_awaited_once_with(["ping"], prefix="query: ")
+        embed_mock.assert_awaited_once_with(["ping"], prefix="passage: ")
 
     async def test_survives_exception_in_embedding(self):
         async def fake_sleep(seconds):
@@ -500,3 +500,19 @@ def test_digest_waits_until_the_start_of_the_next_minute(monkeypatch):
     monkeypatch.setattr(scheduler, "datetime", _Clock)
 
     assert abs(scheduler._seconds_to_next_minute() - 0.8) < 1e-6
+
+
+@pytest.mark.parametrize("local_day, day_of_month, expected", [
+    ((2026, 2, 28), 31, True),
+    ((2026, 4, 30), 31, True),
+    ((2026, 4, 29), 31, False),
+    ((2026, 5, 31), 31, True),
+])
+def test_monthly_report_falls_on_the_last_day_when_the_month_is_shorter(local_day, day_of_month, expected):
+    from app.core.timezone import sv_to_utc
+    from app.schemas.report_schedule import ReportSchedule
+    from app.services.system.scheduler import _cumple_agenda
+
+    now = sv_to_utc(datetime(*local_day, 8, 0))
+    schedule = ReportSchedule(unit="monthly", hour=8, minute=0, day_of_month=day_of_month)
+    assert _cumple_agenda(now, schedule) is expected

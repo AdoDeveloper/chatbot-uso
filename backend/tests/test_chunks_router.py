@@ -67,6 +67,9 @@ def patch_vector_store(monkeypatch):
                     store[p.id] = {**store[p.id], **p.payload, "id": p.id}
 
         async def set_payload(self, *, collection_name, payload, points):
+            if not isinstance(points, list):
+                set_payload_calls.append({"filter": points, "payload": payload})
+                return
             for pid in points:
                 set_payload_calls.append({"id": pid, "payload": payload})
                 if pid in store:
@@ -195,6 +198,22 @@ class TestEditChunk:
         assert edit.new_content == "texto nuevo"
         assert edit.reason == "corrección ortográfica"
         assert edit.edited_by_id == admin_user.id
+
+    async def test_edit_keeps_the_section_header_out_of_the_parent_context(
+        self, client, admin_user, auth_headers, patch_vector_store, seeded_source,
+    ):
+        point_id = str(uuid.uuid4())
+        chunk = _fake_chunk(seeded_source, point_id, text="[Sección: Becas | Parte 1/1, Fragmento 1/2]\nCUM mínimo 7.0")
+        chunk.update(parent_id="p1", parent_text="[Sección: Becas]\nCUM mínimo 7.0\nOtro requisito")
+        patch_vector_store["store"][point_id] = chunk
+
+        r = await client.patch(
+            f"/api/v1/chunks/{point_id}/content",
+            json={"text": "[Sección: Becas | Parte 1/1, Fragmento 1/2]\nCUM mínimo 7.5"},
+            headers=auth_headers(admin_user),
+        )
+        assert r.status_code == 200
+        assert r.json()["parent_text"] == "[Sección: Becas]\nCUM mínimo 7.5\nOtro requisito"
 
     async def test_edit_chunk_source_missing_returns_404(
         self, client, admin_user, auth_headers, patch_vector_store

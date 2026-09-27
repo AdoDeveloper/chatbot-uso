@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import calendar
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -152,7 +153,7 @@ async def _warmup_loop() -> None:
     while True:
         try:
             from app.services.ai.embedding import embed_texts_async
-            await embed_texts_async(["ping"], prefix="query: ")
+            await embed_texts_async(["ping"], prefix="passage: ")
             log.debug("scheduler.embedding_warmup_ok")
         except Exception:
             log.warning("scheduler.embedding_warmup_failed")
@@ -198,10 +199,13 @@ def _cumple_agenda(now: datetime, schedule: ReportSchedule) -> bool:
         return True
     if schedule.unit == "weekly":
         return local.weekday() in (schedule.days_of_week or [])
+    # Un día que el mes no tiene (31 en abril, 29 de febrero) cae en el último día del mes.
+    last_day = calendar.monthrange(local.year, local.month)[1]
+    target_day = min(schedule.day_of_month or 1, last_day)
     if schedule.unit == "monthly":
-        return local.day == schedule.day_of_month
+        return local.day == target_day
     if schedule.unit == "yearly":
-        return local.month == schedule.month and local.day == schedule.day_of_month
+        return local.month == schedule.month and local.day == target_day
     return False
 
 

@@ -48,9 +48,12 @@ async def get_runtime_overrides(db: AsyncSession) -> dict:
             select(GlobalSetting).where(GlobalSetting.key.in_(tuple(effective)))
         )
         for row in result.scalars().all():
-            if row.value is not None:
-                default = effective[row.key]
-                effective[row.key] = type(default)(row.value)
+            if row.value is None:
+                continue
+            try:
+                effective[row.key] = type(RUNTIME_DEFAULTS[row.key])(row.value)
+            except (TypeError, ValueError):
+                log.warning("settings.runtime_override_invalid", key=row.key)
     except Exception as exc:
         log.warning("settings.runtime_overrides_load_failed", error=str(exc))
 

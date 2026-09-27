@@ -18,7 +18,7 @@ from app.schemas.provider import (
     ProviderTestResult,
     ProviderUpdate,
 )
-from app.services.ai.llm_gateway import test_connection
+from app.services.ai.llm_gateway import reset_provider_breaker, test_connection
 from app.services.system import settings as settings_service
 from app.services.system.audit import log_action
 
@@ -75,6 +75,7 @@ async def update_provider(
         ip=get_client_ip(request),
     )
     await db.commit()
+    reset_provider_breaker(str(provider_id))
     return result
 
 
@@ -155,6 +156,8 @@ async def test_saved_provider(
         latency_ms=result.get("latency_ms"),
         error=result.get("error"),
     )
+    if result.get("success"):
+        reset_provider_breaker(str(provider_id))
     return ProviderTestResult(**result)
 
 

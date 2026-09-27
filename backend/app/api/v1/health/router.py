@@ -133,7 +133,7 @@ async def health_detailed(_: object = Depends(_system_read)):
 
     try:
         from app.services.ai.embedding import embed_texts_async
-        await embed_texts_async(["test"], prefix="query: ")
+        await embed_texts_async(["test"], prefix="passage: ")
         services.append(ServiceStatus(name="Embedding Model", status="ok"))
     except Exception as exc:
         overall = "degraded"

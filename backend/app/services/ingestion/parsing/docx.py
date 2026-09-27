@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import zipfile
 
 import structlog
@@ -142,6 +143,10 @@ def _page_margins(doc, attr: str) -> list[str]:
 
 async def parse_docx(file_path: str) -> str:
     """Extrae texto de un archivo DOCX preservando estructura."""
+    return await asyncio.to_thread(_parse_docx_sync, file_path)
+
+
+def _parse_docx_sync(file_path: str) -> str:
     try:
         from docx import Document
         from docx.oxml.ns import qn

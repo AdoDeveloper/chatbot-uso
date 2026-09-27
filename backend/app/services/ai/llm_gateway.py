@@ -125,6 +125,11 @@ def _is_permanent_failure(exc: BaseException) -> bool:
     )
 
 
+def _sse_payload(line: str) -> str:
+    data = line[5:]
+    return data[1:] if data.startswith(" ") else data
+
+
 def _is_retryable(exc: BaseException) -> bool:
     if isinstance(exc, httpx.HTTPStatusError):
         return exc.response.status_code in (500, 502, 503, 504)
@@ -133,6 +138,11 @@ def _is_retryable(exc: BaseException) -> bool:
 
 _CATALOG_CACHE: dict[str, tuple[float, ProviderTypeCatalog | None]] = {}
 _CATALOG_CACHE_TTL = 300.0
+
+
+def reset_provider_breaker(provider_id: str) -> None:
+    """Vuelve a habilitar un proveedor bloqueado tras corregirlo o probarlo con éxito."""
+    _breaker.record_success(provider_id)
 
 
 def clear_catalog_cache() -> None:
@@ -261,9 +271,9 @@ class OpenAICompatAdapter(LLMAdapter):
         ) as resp:
             resp.raise_for_status()
             async for line in resp.aiter_lines():
-                if not line.startswith("data: "):
+                if not line.startswith("data:"):
                     continue
-                data = line[6:]
+                data = _sse_payload(line)
                 if data.strip() == "[DONE]":
                     break
                 try:
@@ -343,9 +353,9 @@ class AzureOpenAIAdapter(LLMAdapter):
         ) as resp:
             resp.raise_for_status()
             async for line in resp.aiter_lines():
-                if not line.startswith("data: "):
+                if not line.startswith("data:"):
                     continue
-                data = line[6:]
+                data = _sse_payload(line)
                 if data.strip() == "[DONE]":
                     break
                 try:
@@ -433,10 +443,10 @@ class AnthropicAdapter(LLMAdapter):
         ) as resp:
             resp.raise_for_status()
             async for line in resp.aiter_lines():
-                if not line.startswith("data: "):
+                if not line.startswith("data:"):
                     continue
                 try:
-                    event = json.loads(line[6:])
+                    event = json.loads(_sse_payload(line))
                     if event.get("type") == "content_block_delta":
                         text = event.get("delta", {}).get("text", "")
                         if text:
@@ -519,10 +529,10 @@ class GeminiAdapter(LLMAdapter):
         ) as resp:
             resp.raise_for_status()
             async for line in resp.aiter_lines():
-                if not line.startswith("data: "):
+                if not line.startswith("data:"):
                     continue
                 try:
-                    chunk = json.loads(line[6:])
+                    chunk = json.loads(_sse_payload(line))
                     for candidate in chunk.get("candidates", []):
                         for part in candidate.get("content", {}).get("parts", []):
                             text = part.get("text", "")
@@ -612,10 +622,10 @@ class CohereAdapter(LLMAdapter):
         ) as resp:
             resp.raise_for_status()
             async for line in resp.aiter_lines():
-                if not line.startswith("data: "):
+                if not line.startswith("data:"):
                     continue
                 try:
-                    event = json.loads(line[6:])
+                    event = json.loads(_sse_payload(line))
                     if event.get("type") == "content-delta":
                         text = (
                             event.get("delta", {})
@@ -792,6 +802,19 @@ async def _get_adapter(
 _SYSTEM_TEMPLATE = DEFAULT_SYSTEM_PROMPT
 
 
+def _alternating_turns(turns: list[dict]) -> list[dict]:
+    """Empieza por el usuario y une turnos seguidos del mismo rol (Anthropic y Gemini lo exigen)."""
+    out: list[dict] = []
+    for t in turns:
+        if not out and t["role"] != "user":
+            continue
+        if out and out[-1]["role"] == t["role"]:
+            out[-1] = {"role": t["role"], "content": f"{out[-1]['content']}\n\n{t['content']}"}
+        else:
+            out.append({"role": t["role"], "content": t["content"]})
+    return out
+
+
 async def stream_chat(
     question: str,
     context_chunks: list[dict],
@@ -815,9 +838,7 @@ async def stream_chat(
     )
 
     messages: list[dict] = [{"role": "system", "content": prompt}]
-    if history:
-        messages.extend(history[-6:])
-    messages.append({"role": "user", "content": question})
+    messages.extend(_alternating_turns([*(history or [])[-6:], {"role": "user", "content": question}]))
 
     plain_chain = [
         (str(provider.id), provider.name, provider.model_name, provider.provider_type,
