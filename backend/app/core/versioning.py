@@ -30,6 +30,9 @@ _VERSIONED_ROUTES: list[tuple[str, str, str]] = [
 
 
 def _match_route(method: str, path: str) -> str | None:
+    # Probar la conexión de un proveedor no cambia la configuración.
+    if path.rstrip("/").endswith("/test"):
+        return None
     for route_method, route_prefix, trigger in _VERSIONED_ROUTES:
         if method == route_method and path.startswith(route_prefix):
             return trigger

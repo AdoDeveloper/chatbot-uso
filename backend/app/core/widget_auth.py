@@ -22,7 +22,7 @@ async def _extract_api_key(request: Request) -> str:
     if not key:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Widget API key required (X-Widget-Key header or widget_key param)",
+            detail="Falta la clave del widget.",
         )
     return key
 
@@ -37,7 +37,7 @@ async def require_widget_key(
     if cfg is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Invalid widget API key",
+            detail="La clave del widget no es válida.",
         )
     return cfg
 
@@ -52,6 +52,14 @@ def _extract_origin_host(request: Request) -> str | None:
         return parsed.hostname
     except Exception:
         return None
+
+
+def _normalize_pattern(pattern: str) -> str:
+    """Admite entradas como "https://www.uso.edu.sv/" además de "www.uso.edu.sv"."""
+    p = pattern.strip().lower()
+    if "://" in p:
+        p = p.split("://", 1)[1]
+    return p.split("/", 1)[0].split(":", 1)[0]
 
 
 async def verify_widget_access(
@@ -72,15 +80,15 @@ async def verify_widget_access(
         if get_settings().ENVIRONMENT == "production":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Origin header required for widget requests",
+                detail="No se pudo identificar el sitio de origen.",
             )
         return cfg
 
     for pattern in allowlist:
-        if fnmatch(host, pattern):
+        if fnmatch(host.lower(), _normalize_pattern(pattern)):
             return cfg
 
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
-        detail=f"Origin '{host}' not in allowed domains",
+        detail="Este sitio no está autorizado para usar el widget.",
     )

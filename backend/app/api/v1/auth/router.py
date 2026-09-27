@@ -36,6 +36,7 @@ from app.services.users import service as user_service
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 _bearer = HTTPBearer(auto_error=False)
+_SSO_PER_MIN = 30
 
 async def _get_setting(db: AsyncSession, key: str) -> str | None:
     result = await db.execute(select(GlobalSetting.value).where(GlobalSetting.key == key))
@@ -117,7 +118,9 @@ async def microsoft_callback(
     """Recibe el authorization code de Microsoft."""
     from app.services.auth import sso as sso_service
 
-    await _enforce_auth_rate_limit(request, "sso", get_settings().RATE_LIMIT_LOGIN_PER_MIN)
+    # El canje suele llegar desde el servidor del panel (una sola IP para toda la organización)
+    # y el código de Microsoft es de un solo uso: no es un vector de adivinación de contraseñas.
+    await _enforce_auth_rate_limit(request, "sso", max(get_settings().RATE_LIMIT_LOGIN_PER_MIN, _SSO_PER_MIN))
     return await sso_service.handle_microsoft_callback(
         db, request=request, code=body.code, redirect_uri=body.redirect_uri,
     )

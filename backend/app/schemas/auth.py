@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 class LoginRequest(BaseModel):
@@ -37,7 +37,13 @@ class RefreshRequest(BaseModel):
 
 class ChangePasswordRequest(BaseModel):
     current_password: str
-    new_password: str = Field(..., min_length=8, max_length=128)
+    new_password: str = Field(..., min_length=8, max_length=72)
+
+    @field_validator("new_password")
+    @classmethod
+    def _rules(cls, v: str) -> str:
+        from app.core.security import check_password_rules
+        return check_password_rules(v)
 
 
 class RoleSummaryOut(BaseModel):

@@ -22,6 +22,22 @@ async def _get_setting(db: AsyncSession, key: str) -> str | None:
     return row
 
 
+_JWKS_CLIENTS: dict = {}
+
+
+def _jwks_client(tenant_id: str):
+    """Un cliente por tenant: conserva las claves públicas entre inicios de sesión."""
+    from jwt import PyJWKClient
+
+    client = _JWKS_CLIENTS.get(tenant_id)
+    if client is None:
+        client = PyJWKClient(
+            f"https://login.microsoftonline.com/{tenant_id}/discovery/v2.0/keys", cache_keys=True,
+        )
+        _JWKS_CLIENTS[tenant_id] = client
+    return client
+
+
 def _token_response(user, access: str, refresh: str) -> TokenResponse:
     return TokenResponse(
         access_token=access,
@@ -102,12 +118,7 @@ async def handle_microsoft_callback(
         raise _GENERIC
 
     try:
-        from jwt import PyJWKClient
-        jwks_url = (
-            f"https://login.microsoftonline.com/{settings.MICROSOFT_TENANT_ID}"
-            "/discovery/v2.0/keys"
-        )
-        jwks_client = PyJWKClient(jwks_url, cache_keys=True)
+        jwks_client = _jwks_client(tenant_id)
         import asyncio as _asyncio
         signing_key = await _asyncio.to_thread(jwks_client.get_signing_key_from_jwt, id_token)
         import jwt as _pyjwt

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from contextlib import asynccontextmanager
 
 import structlog
 from sqlalchemy import func, select, text
@@ -25,25 +26,29 @@ _SEED_LOCK_NAME = "chatbot_seed_admin"
 _DEFAULTS_LOCK_NAME = "chatbot_seed_defaults"
 
 
-async def _db_lock(db: AsyncSession, name: str) -> None:
-    from app.core.config import get_settings
-    url = get_settings().DATABASE_URL
-    if url.startswith("mysql"):
-        await db.execute(text("SELECT GET_LOCK(:n, 30)"), {"n": name})
-
-
-async def _db_unlock(db: AsyncSession, name: str) -> None:
-    from app.core.config import get_settings
-    url = get_settings().DATABASE_URL
-    if url.startswith("mysql"):
-        await db.execute(text("SELECT RELEASE_LOCK(:n)"), {"n": name})
+@asynccontextmanager
+async def _named_lock(name: str):
+    """GET_LOCK en una conexión propia: el commit de la sesión la devolvería al pool con el bloqueo tomado."""
+    if not get_settings().DATABASE_URL.startswith("mysql"):
+        yield
+        return
+    from app.db.session import engine
+    async with engine.connect() as conn:
+        await conn.execute(text("SELECT GET_LOCK(:n, 30)"), {"n": name})
+        try:
+            yield
+        finally:
+            await conn.execute(text("SELECT RELEASE_LOCK(:n)"), {"n": name})
 
 
 async def seed_first_admin(db: AsyncSession) -> None:
     """Crea el primer admin si la tabla de usuarios está vacía."""
-    try:
-        await _db_lock(db, _SEED_LOCK_NAME)
+    async with _named_lock(_SEED_LOCK_NAME):
+        await _seed_first_admin(db)
 
+
+async def _seed_first_admin(db: AsyncSession) -> None:
+    try:
         count = await db.scalar(select(func.count()).select_from(User))
         if count:
             return
@@ -91,14 +96,11 @@ async def seed_first_admin(db: AsyncSession) -> None:
         await db.rollback()
         logger.exception("seed.admin_failed - el admin inicial NO fue creado")
         raise
-    finally:
-        await _db_unlock(db, _SEED_LOCK_NAME)
 
 
 async def seed_defaults(db: AsyncSession) -> None:
     """Crea registros por defecto para widget, notificaciones y escalamiento."""
-    await _db_lock(db, _DEFAULTS_LOCK_NAME)
-    try:
+    async with _named_lock(_DEFAULTS_LOCK_NAME):
         wc_count = await db.scalar(select(func.count()).select_from(WidgetConfig))
         if not wc_count:
             db.add(WidgetConfig())
@@ -149,5 +151,3 @@ async def seed_defaults(db: AsyncSession) -> None:
             ))
 
         await db.commit()
-    finally:
-        await _db_unlock(db, _DEFAULTS_LOCK_NAME)

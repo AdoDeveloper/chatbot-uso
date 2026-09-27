@@ -26,7 +26,7 @@ from app.core.exceptions import DomainError
 from app.core.logging import get_logger, setup_logging
 from app.core.versioning import VersioningMiddleware
 from app.db import session as db_session
-from app.models.enums import SourceStatus
+from app.models.enums import ReviewStatus, SourceStatus
 from app.models.source import Source
 from app.services.ai.embedding import _get_dense_model, _get_sparse_model
 from app.services.ai.guardrails import _get_presidio_analyzer, _get_presidio_anonymizer
@@ -60,19 +60,27 @@ async def lifespan(app: FastAPI):
 
         # MySQL no soporta RETURNING en UPDATE - SELECT previo para contar,
         # luego UPDATE sin RETURNING.
+        # La cola de ingesta vive en memoria: tras un reinicio, lo pendiente tampoco se procesará.
+        interrupted = Source.status.in_((SourceStatus.processing, SourceStatus.pending))
         stuck_result = await db.execute(
-            select(Source.id)
-            .where(Source.status == SourceStatus.processing, Source.deleted_at.is_(None))
+            select(Source.id).where(interrupted, Source.deleted_at.is_(None))
         )
         stuck_ids = stuck_result.fetchall()
         if stuck_ids:
             await db.execute(
                 update(Source)
-                .where(Source.status == SourceStatus.processing, Source.deleted_at.is_(None))
+                .where(interrupted, Source.deleted_at.is_(None))
                 .values(
                     status=SourceStatus.error,
                     error_message="Ingesta interrumpida por reinicio del servidor. Use 'Reingestar' para volver a intentarlo.",
+                    progress_stage=None,
                 )
+            )
+            await db.execute(
+                update(Source)
+                .where(Source.id.in_([row[0] for row in stuck_ids]))
+                .where(Source.review_status == ReviewStatus.procesando)
+                .values(review_status=ReviewStatus.pendiente_revision)
             )
             await db.commit()
             logger.warning("startup.reset_stuck_sources", count=len(stuck_ids))
@@ -118,6 +126,18 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down")
 
 
+_PUBLIC_UPLOAD_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
+
+
+class _ImagesOnlyStaticFiles(StaticFiles):
+    """Solo imágenes: los documentos subidos se descargan por la ruta autenticada del panel."""
+
+    async def get_response(self, path: str, scope: Scope) -> Response:
+        if Path(path).suffix.lower() not in _PUBLIC_UPLOAD_EXTENSIONS:
+            return JSONResponse(status_code=404, content={"detail": "Not Found"})
+        return await super().get_response(path, scope)
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
 
@@ -139,14 +159,14 @@ def create_app() -> FastAPI:
         if len(body) > settings.MAX_JSON_BODY_SIZE_MB * 1024 * 1024:
             return HTTPException(
                 status_code=413,
-                detail=f"Payload too large. Maximum size is {settings.MAX_JSON_BODY_SIZE_MB}MB.",
+                detail=f"El contenido enviado es demasiado grande (máximo {settings.MAX_JSON_BODY_SIZE_MB:g} MB).",
             )
         try:
             data = json.loads(body.decode("utf-8"))
 
             def check_depth(obj, current_depth=0):
                 if current_depth > settings.MAX_JSON_DEPTH:
-                    raise ValueError(f"JSON depth exceeds maximum of {settings.MAX_JSON_DEPTH}")
+                    raise ValueError("El contenido enviado tiene demasiados niveles de anidación.")
                 if isinstance(obj, dict):
                     return max((check_depth(v, current_depth + 1) for v in obj.values()), default=0)
                 if isinstance(obj, list):
@@ -154,8 +174,10 @@ def create_app() -> FastAPI:
                 return current_depth
 
             check_depth(data)
-        except json.JSONDecodeError:
-            return HTTPException(status_code=400, detail="Invalid JSON payload")
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return HTTPException(status_code=400, detail="El contenido enviado no es un JSON válido.")
+        except RecursionError:
+            return HTTPException(status_code=400, detail="El contenido enviado tiene demasiados niveles de anidación.")
         except ValueError as e:
             return HTTPException(status_code=400, detail=str(e))
         return None
@@ -175,12 +197,15 @@ def create_app() -> FastAPI:
                 await self.app(scope, receive, send)
                 return
 
+            max_bytes = settings.MAX_JSON_BODY_SIZE_MB * 1024 * 1024
             body = b""
             more_body = True
             while more_body:
                 message = await receive()
                 body += message.get("body", b"")
                 more_body = message.get("more_body", False)
+                if len(body) > max_bytes:
+                    break
 
             error = _check_json_body(body)
             if error is not None:
@@ -206,7 +231,11 @@ def create_app() -> FastAPI:
         loc = first.get("loc", ())
         field = " → ".join(str(p) for p in loc if p != "body")
         msg = first.get("msg", "Datos inválidos")
-        detail = f"{field}: {msg}" if field else msg
+        if first.get("type") == "value_error":
+            # Mensajes escritos por nosotros en los validadores: ya son legibles, sin prefijo ni campo técnico.
+            detail = msg.removeprefix("Value error, ")
+        else:
+            detail = f"{field}: {msg}" if field else msg
         logger.warning("request_validation_error", path=req.url.path, field=field, msg=msg)
         return JSONResponse(status_code=422, content={"detail": detail})
 
@@ -378,7 +407,7 @@ def create_app() -> FastAPI:
     if uploads_dir.is_dir():
         app.mount(
             "/uploads",
-            StaticFiles(directory=str(uploads_dir)),
+            _ImagesOnlyStaticFiles(directory=str(uploads_dir)),
             name="uploads",
         )
 

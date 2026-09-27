@@ -193,3 +193,14 @@ class TestLogout:
             "/api/v1/auth/logout", json={}, headers=auth_headers(admin_user),
         )
         assert r.status_code == 200
+
+
+async def test_password_rule_message_is_readable(client, make_user, auth_headers):
+    user = await make_user(role=UserRole.admin)
+    r = await client.post(
+        "/api/v1/auth/change-password",
+        json={"current_password": "Test1234!", "new_password": "sinmayuscula1"},
+        headers=auth_headers(user),
+    )
+    assert r.status_code == 422
+    assert r.json()["detail"] == "Debe contener al menos una mayúscula"

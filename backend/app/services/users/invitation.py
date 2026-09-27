@@ -38,7 +38,7 @@ async def create_invitation(
     if (active_count or 0) >= _MAX_ACTIVE_INVITATIONS_PER_EMAIL:
         raise HTTPException(
             status_code=409,
-            detail=f"Ya existen {_MAX_ACTIVE_INVITATIONS_PER_EMAIL} invitaciones activas para ese correo. Revócalas antes de crear una nueva.",
+            detail=f"Ya existen {_MAX_ACTIVE_INVITATIONS_PER_EMAIL} invitaciones activas para ese correo. Revóquelas antes de crear una nueva.",
         )
     token = secrets.token_urlsafe(48)
     expires_at = datetime.now(timezone.utc) + timedelta(days=expires_in_days)

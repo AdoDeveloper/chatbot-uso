@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from app.models.enums import UserRole
 
@@ -33,7 +33,13 @@ class InvitationResponse(BaseModel):
 
 class InvitationAcceptRequest(BaseModel):
     full_name: str = Field(min_length=2, max_length=255)
-    password: str = Field(min_length=8, max_length=100)
+    password: str = Field(min_length=8, max_length=72)
+
+    @field_validator("password")
+    @classmethod
+    def _rules(cls, v: str) -> str:
+        from app.core.security import check_password_rules
+        return check_password_rules(v)
 
 
 class InvitationPublicResponse(BaseModel):

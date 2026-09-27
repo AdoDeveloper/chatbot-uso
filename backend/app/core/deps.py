@@ -74,7 +74,7 @@ def require_permission(module: str, action: str):
         if not allowed:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Sin permiso para {module}.{action}",
+                detail="No tiene permiso para realizar esta acción.",
             )
         return current_user
     return checker

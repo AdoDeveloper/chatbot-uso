@@ -364,3 +364,23 @@ def test_proxy_headers_are_ignored_when_the_request_does_not_come_from_the_proxy
 
     assert get_client_ip(req("8.8.8.8", {"X-Real-IP": "203.0.113.5"})) == "8.8.8.8"
     assert get_client_ip(req("10.0.0.2", {"X-Real-IP": "8.8.4.4"})) == "8.8.4.4"
+
+
+async def test_clearing_a_widget_limit_removes_it(db_session):
+    from app.services.widget import service as widget_svc
+
+    await widget_svc.update_config(db_session, {"max_chats_per_session": 20, "logo_url": "https://x.test/l.png"})
+    cfg = await widget_svc.update_config(db_session, {"max_chats_per_session": None, "logo_url": None, "chatbot_name": None})
+
+    assert cfg.max_chats_per_session is None
+    assert cfg.logo_url is None
+    assert cfg.chatbot_name
+
+
+@pytest.mark.parametrize("pattern", ["https://www.USO.edu.sv/", "www.uso.edu.sv", "*.uso.edu.sv", "www.uso.edu.sv:443"])
+def test_allowlist_entries_are_normalized(pattern):
+    from fnmatch import fnmatch
+
+    from app.core.widget_auth import _normalize_pattern
+
+    assert fnmatch("www.uso.edu.sv", _normalize_pattern(pattern))

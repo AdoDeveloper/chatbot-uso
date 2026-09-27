@@ -28,6 +28,15 @@ _WEAK_PASSWORD_PATTERN = re.compile(
 )
 
 
+def check_password_rules(password: str) -> str:
+    """Regla de las contraseñas que elige una persona: mayúscula y número."""
+    if not re.search(r"[A-Z]", password):
+        raise ValueError("Debe contener al menos una mayúscula")
+    if not re.search(r"\d", password):
+        raise ValueError("Debe contener al menos un número")
+    return password
+
+
 def _is_common_password(password: str) -> bool:
     """Verifica si la contraseña está en la lista de contraseñas débiles comunes."""
     return password.lower() in _COMMON_WEAK_PASSWORDS
@@ -42,8 +51,9 @@ def hash_password(password: str) -> str:
     """Genera el hash de la contraseña con bcrypt, validando requisitos mínimos de seguridad."""
     if len(password) < 8:
         raise ValidationError("La contraseña debe tener al menos 8 caracteres.")
-    if len(password) > 512:
-        raise ValidationError("La contraseña es demasiado larga.")
+    # bcrypt solo usa los primeros 72 bytes: más allá se ignoraría en silencio.
+    if len(password.encode()) > 72:
+        raise ValidationError("La contraseña es demasiado larga (máximo 72 caracteres).")
     if _is_common_password(password):
         raise ValidationError("La contraseña es demasiado común. Elija una más segura.")
     if _has_weak_pattern(password):

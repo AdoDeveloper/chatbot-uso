@@ -90,6 +90,8 @@ def patch_jwks_verify(monkeypatch, rsa_keypair):
     # El código hace `from jwt import PyJWKClient` dentro de la función -
     # el nombre se resuelve en el módulo jwt en el momento de la llamada.
     monkeypatch.setattr(jwt_module, "PyJWKClient", _FakeJWKClient)
+    from app.services.auth import sso as sso_mod
+    monkeypatch.setattr(sso_mod, "_JWKS_CLIENTS", {})
 
 
 @pytest.fixture

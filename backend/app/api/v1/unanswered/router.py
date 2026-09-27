@@ -50,9 +50,9 @@ async def _require_conversations_update_and_knowledge_create(
     if current_user.must_change_password:
         raise HTTPException(status_code=403, detail="Debe cambiar su contraseña antes de continuar")
     if not await has_permission(db, current_user.role, "conversations", "update"):
-        raise HTTPException(status_code=403, detail="Sin permiso para conversations.update")
+        raise HTTPException(status_code=403, detail="No tiene permiso para realizar esta acción.")
     if not await has_permission(db, current_user.role, "knowledge", "create"):
-        raise HTTPException(status_code=403, detail="Sin permiso para knowledge.create")
+        raise HTTPException(status_code=403, detail="No tiene permiso para realizar esta acción.")
     return current_user
 
 
