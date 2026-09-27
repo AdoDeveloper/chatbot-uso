@@ -509,8 +509,10 @@ necesita la IP real de cada visitante:
 
 - nginx debe fijar `X-Real-IP $remote_addr` (como en la configuración de
   arriba) y el backend no debe quedar accesible desde fuera sin pasar por nginx
-  (escucha solo en `127.0.0.1:8000`). Si se expone directamente, cualquiera
-  puede enviar su propio `X-Real-IP`.
+  (escucha solo en `127.0.0.1:8000`). Como resguardo, el backend solo acepta
+  `X-Real-IP` y `X-Forwarded-For` cuando la conexión llega desde una dirección
+  local o de red privada (el proxy); una conexión directa desde internet usa
+  su propia IP.
 - Si hay otro proxy delante de nginx (Cloudflare, un balanceador), nginx verá la
   IP de ese proxy para todos los visitantes. En ese caso configure
   `set_real_ip_from` y `real_ip_header` con los rangos de ese proxy.

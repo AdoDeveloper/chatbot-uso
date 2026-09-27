@@ -24,7 +24,8 @@ una mayúscula y un número).
 
 Los administradores pueden invitar a nuevos usuarios. El invitado recibe un
 **correo con un enlace** para crear su cuenta. El enlace expira pasado un tiempo;
-si caduca, debe solicitarse una nueva invitación.
+si caduca, debe solicitarse una nueva invitación. No se puede invitar a un
+correo que ya tiene cuenta.
 
 ### 1.3 Roles
 
@@ -163,7 +164,10 @@ IA, por eso conviene un valor bajo (20% por defecto); 0% la desactiva.
 
 Gestiona los patrones que detectan intentos de manipulación del chatbot
 (inyección de instrucciones). Incluye patrones predefinidos por el sistema y
-permite crear patrones personalizados.
+permite crear patrones personalizados. Los patrones predefinidos solo actúan
+cuando el mensaje se dirige al asistente («olvida tus instrucciones»); una
+pregunta como «¿qué pasa si un estudiante ignora las reglas de la biblioteca?»
+se responde con normalidad.
 
 El interruptor general de los filtros también controla el ocultamiento de
 datos personales (correos, teléfonos, tarjetas y cuentas bancarias) en
@@ -182,6 +186,10 @@ basan en disparadores como:
   inscribirse?») no la activa. Puede definir frases propias.
 - Proporción alta de valoraciones negativas, palabras clave críticas, baja
   confianza de la búsqueda o detección de bucles.
+
+Las palabras clave críticas se comparan como palabras completas, sin distinguir
+mayúsculas ni tildes y admitiendo el plural: «queja» detecta «quejas», y «robo»
+no se activa con «Robótica».
 
  Incluye una herramienta para **probar reglas** y un envío
 de **correo de prueba** para verificar las notificaciones.
@@ -229,7 +237,9 @@ deshacer).
 
 ### 5.2 Pendientes y escalamientos
 
-- **Pendientes**: conversaciones que el sistema marcó para atención humana.
+- **Pendientes**: preguntas que el chatbot no pudo responder, agrupadas por
+  tema. Cada una puede convertirse en FAQ o marcarse como resuelta; al hacerlo
+  también se resuelven las repeticiones idénticas de la misma pregunta.
 - **Escalamientos**: gestión de las conversaciones derivadas, con asignación a
   responsables y seguimiento hasta su resolución. Si el visitante dejó su
   correo o WhatsApp, aparece en la tarjeta con un enlace para contactarlo.
@@ -243,6 +253,9 @@ deshacer).
 Métricas de uso del chatbot: consultas por periodo, tasa de resolución,
 latencia, canales, dispositivos, páginas de origen, temas más consultados,
 mapa de calor de horarios y **valoración de respuestas** (positivas/negativas).
+Todas las secciones siguen el rango de fechas elegido, incluida la comparación
+con el periodo anterior (del mismo largo e inmediatamente previo); el mapa de
+calor usa su propio selector de ventana.
 
 El selector **Producción / Previsualizar** separa el tráfico real de los
 visitantes (widget y API) de las pruebas hechas desde el panel en Asistente →
@@ -276,7 +289,8 @@ se muestran según los permisos de cada usuario.
   está configurado). Solo se aceptan cuentas de la organización configurada y
   que ya existan como usuarios del panel. El acceso con contraseña no se puede
   desactivar mientras Microsoft SSO no esté activo, para que nadie quede sin
-  poder entrar.
+  poder entrar; y si Microsoft deja de estar operativo después, el acceso con
+  contraseña vuelve a funcionar automáticamente.
 - **Invitaciones**: crear, reenviar, revocar y aceptar invitaciones queda
   registrado en Actividad → Auditoría.
 
@@ -290,10 +304,12 @@ herramientas de mantenimiento:
 
 - **Sincronizar Qdrant ↔ BD**: elimina fragmentos huérfanos del índice.
 - **Limpiar caché**: borra el caché de respuestas.
+- **Limpiar P99**: elimina mediciones correctas pero anómalamente lentas que
+  distorsionan las métricas; las mediciones fallidas se conservan como
+  historial de incidentes.
 
 Al desactivar el caché se dejan de reutilizar tanto las respuestas a preguntas
 parecidas como las respuestas a preguntas idénticas.
-- **Limpiar P99**: elimina mediciones anómalas que distorsionan las métricas.
 
 ### 7.3 Cuotas
 
@@ -310,7 +326,8 @@ límite.
   que el chatbot no pudo contestar. La cadencia (diaria, semanal, mensual o
   anual) y la hora de envío se configuran aparte; las cifras del correo
   cubren el mismo periodo (el último día, la última semana, el último mes o
-  el último año).
+  el último año). Si se elige un día que el mes no tiene (por ejemplo, el 31),
+  el reporte se envía el último día de ese mes.
 
 Además del correo, las notificaciones llegan a la campana en la esquina
 superior del panel. Al abrir una notificación se marca como leída
@@ -393,7 +410,8 @@ navegador del visitante):
 Al finalizar la conversación (menú de opciones → Finalizar chat), se invita
 al visitante a calificarla del 1 al 5, opcionalmente indicar un motivo y
 dejar un comentario. Estos datos alimentan el indicador de satisfacción en
-Estadísticas.
+Estadísticas. Finalizar el chat cierra esa conversación: al volver a escribir
+empieza una nueva, con o sin encuesta.
 
 ### 9.6 Solicitar contacto humano (escalamiento)
 

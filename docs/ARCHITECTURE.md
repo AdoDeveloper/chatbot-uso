@@ -408,7 +408,7 @@ chatbot-uso/
 | Widget público | Validación de API key + allowlist de dominios por `Origin`; los topes por sesión y diarios se aplican también en `POST /chat` |
 | Subida de archivos | Tipo decidido por la extensión (.pdf/.docx/.txt) y guardado con esa extensión, no por el `Content-Type` del cliente |
 | Auditoría | `audit_logs` con la IP real del cliente; incluye invitaciones, cambios de configuración y revelado de claves de proveedores |
-| IP real tras proxy | `X-Real-IP` que fija nginx, o el último valor de `X-Forwarded-For`. `CF-Connecting-IP` no se usa porque el cliente puede falsearlo |
+| IP real tras proxy | `X-Real-IP` que fija nginx, o el último valor de `X-Forwarded-For`, solo si la conexión viene de una red local o privada (el proxy). `CF-Connecting-IP` no se usa porque el cliente puede falsearlo |
 
 ## 9. Notificaciones (correo + bandeja in-app)
 
