@@ -749,8 +749,14 @@ function ChatWidget({
     if (settings.enable_csat && conversationId && csatState === "hidden") {
       setCsatState("pending");
     } else {
+      handleClearConversation();
       setOpen(false);
     }
+  }
+
+  function handleCloseAfterCsat() {
+    handleClearConversation();
+    setOpen(false);
   }
 
   function handleClearConversation() {
@@ -848,6 +854,7 @@ function ChatWidget({
       setEscalState("hidden");
       setCsatState("pending");
     } else {
+      setEscalState("hidden");
       setOpen(false);
     }
   }
@@ -927,6 +934,7 @@ function ChatWidget({
     abortRef.current = abort;
 
     const isCurrent = () => abortRef.current === abort;
+    let streamed = "";
 
     await streamChat(
       apiUrl, q, null,
@@ -939,6 +947,7 @@ function ChatWidget({
         },
         onToken(token) {
           if (!isCurrent()) return;
+          streamed += token;
           setMessages((prev) =>
             prev.map((m) =>
               m.id === assistantId ? { ...m, content: m.content + token } : m,
@@ -947,17 +956,13 @@ function ChatWidget({
         },
         onDone(messageId, convId, escalationPrompt) {
           if (!isCurrent()) return;
-          let finalText = "";
-          setMessages((prev) => {
-            const updated = prev.map((m) => {
-              if (m.id !== assistantId) return m;
-              const done = { ...m, streaming: false, backendId: messageId, ts: Date.now() };
-              if (m.content) return done;
-              return { ...done, content: EMPTY_RESPONSE_MESSAGE, error: true };
-            });
-            finalText = updated.find((m) => m.id === assistantId)?.content ?? "";
-            return updated;
-          });
+          const finalText = streamed || EMPTY_RESPONSE_MESSAGE;
+          setMessages((prev) => prev.map((m) => {
+            if (m.id !== assistantId) return m;
+            const done = { ...m, streaming: false, backendId: messageId, ts: Date.now() };
+            if (m.content) return done;
+            return { ...done, content: EMPTY_RESPONSE_MESSAGE, error: true };
+          }));
           setBusy(false);
           abortRef.current = null;
           emit("message:received", { text: finalText, messageId });
@@ -1452,12 +1457,10 @@ function ChatWidget({
                 <SuccessIcon />
                 <div class="csat-thanks">¡Muchas gracias!</div>
                 <div class="csat-thanks-actions">
-                  {settings.show_new_chat_button && messages.length > 1 && (
-                    <button class="csat-thanks-btn" onClick={handleClearConversation}>
-                      Nueva conversación
-                    </button>
-                  )}
-                  <button class="csat-thanks-btn" onClick={handleMinimize}>
+                  <button class="csat-thanks-btn" onClick={handleClearConversation}>
+                    Nueva conversación
+                  </button>
+                  <button class="csat-thanks-btn" onClick={handleCloseAfterCsat}>
                     Cerrar
                   </button>
                 </div>

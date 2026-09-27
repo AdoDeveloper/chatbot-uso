@@ -40,7 +40,7 @@ export default function PendientesPage() {
   async function handleResolve(questionId: string) {
     const ok = await confirm({
       title: "¿Marcar como resuelta?",
-      message: "La pregunta se marcará como resuelta y dejará de aparecer en pendientes.",
+      message: "La pregunta y sus repeticiones idénticas se marcarán como resueltas y dejarán de aparecer en pendientes.",
       confirmText: "Marcar resuelta",
     });
     if (!ok) return;
@@ -68,7 +68,7 @@ export default function PendientesPage() {
         answer: faqModal.answer.trim(),
         tags: faqModal.question.detected_topic ? [faqModal.question.detected_topic] : [],
       });
-      toast({ type: "success", message: "FAQ creada y pregunta marcada como resuelta." });
+      toast({ type: "success", message: "FAQ creada; la pregunta y sus repeticiones quedaron resueltas." });
       setFaqModal(null);
       load();
     } catch (err) {

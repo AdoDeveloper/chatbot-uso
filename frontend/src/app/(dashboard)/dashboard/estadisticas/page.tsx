@@ -143,13 +143,6 @@ function MetricasTab() {
  // No se consulta nada hasta tener ambas fechas de un rango válido.
  const periodReady = !!dateFrom && !!dateTo && dateFrom <= dateTo;
 
- // Días equivalentes al rango, usados por endpoints que aún piden `days`.
- const compDays = periodReady
-  ? Math.max(1, Math.round((new Date(dateTo).getTime() - new Date(dateFrom).getTime()) / 86_400_000) + 1)
-  : 7;
-
- const timelineDays = Math.min(compDays, 30);
-
  const src = `source=${source}`;
 
  // Un useApi por endpoint: cada sección refetchea solo cuando cambia SU query, y los
@@ -160,13 +153,13 @@ function MetricasTab() {
  const qTimeseries = useApi<{ points: TimeSeriesPoint[] }>(periodReady ? `/analytics/timeseries?${periodQuery}&${src}` : null);
  const qRoutes = useApi<{ routes: RouteStat[] }>(periodReady ? `/analytics/routes?${periodQuery}&${src}` : null);
  const qLatency = useApi<{ points: LatencyPoint[] }>(periodReady ? `/analytics/latency/timeseries?${periodQuery}&${src}` : null);
-  const qTimeline = useApi<{ events: ActivityEvent[]; days: number }>(periodReady ? `/analytics/timeline?days=${timelineDays}&limit=40&${src}` : null);
- const qComparison = useApi<PeriodComparison>(periodReady ? `/analytics/comparison?days=${compDays}&${src}` : null);
- const qChannels = useApi<{ channels: ChannelStat[]; days: number }>(periodReady ? `/analytics/channels?days=${compDays}&${src}` : null);
- const qCache = useApi<CacheStats>(periodReady ? `/analytics/cache?days=${compDays}&${src}` : null);
- const qPages = useApi<{ pages: PageStat[]; days: number }>(periodReady ? `/analytics/pages?days=${compDays}&${src}` : null);
- const qFeedback = useApi<AnalyticsFeedback>(periodReady ? `/analytics/feedback?days=${compDays}&${src}` : null);
- const qCsat = useApi<AnalyticsCsat>(periodReady ? `/analytics/csat?days=${compDays}&${src}` : null);
+  const qTimeline = useApi<{ events: ActivityEvent[]; days: number }>(periodReady ? `/analytics/timeline?${periodQuery}&limit=40&${src}` : null);
+ const qComparison = useApi<PeriodComparison>(periodReady ? `/analytics/comparison?${periodQuery}&${src}` : null);
+ const qChannels = useApi<{ channels: ChannelStat[]; days: number }>(periodReady ? `/analytics/channels?${periodQuery}&${src}` : null);
+ const qCache = useApi<CacheStats>(periodReady ? `/analytics/cache?${periodQuery}&${src}` : null);
+ const qPages = useApi<{ pages: PageStat[]; days: number }>(periodReady ? `/analytics/pages?${periodQuery}&${src}` : null);
+ const qFeedback = useApi<AnalyticsFeedback>(periodReady ? `/analytics/feedback?${periodQuery}&${src}` : null);
+ const qCsat = useApi<AnalyticsCsat>(periodReady ? `/analytics/csat?${periodQuery}&${src}` : null);
  const qQuality = useApi<AnalyticsResponseQuality>(periodReady ? `/analytics/quality?${periodQuery}` : null);
 
  const queries = [
@@ -552,7 +545,7 @@ function MetricasTab() {
          side="bottom" align="start"
         />
        </div>
-       <CardDescription>Últimos {timelineDays} días · {timeline.length} eventos</CardDescription>
+       <CardDescription>Periodo seleccionado · {timeline.length} eventos</CardDescription>
       </div>
      </div>
     </CardHeader>
@@ -647,8 +640,9 @@ function PeriodComparisonPanel({ comparison, loading }: {
  const fmtMs = (ms: number) => `${(ms / 1000).toFixed(1)}s`;
  const fmtPct = (n: number) => `${n.toFixed(1)}%`;
  const fmtRange = (start: string, end: string) => {
-  const s = new Date(start);
-  const e = new Date(end);
+  // Fechas sin hora: se leen como día local, no como medianoche UTC.
+  const s = new Date(`${start}T00:00:00`);
+  const e = new Date(`${end}T00:00:00`);
   // Formato corto y legible: "22 abr → 28 abr"
   const opts: Intl.DateTimeFormatOptions = { day: "2-digit", month: "short" };
   return `${s.toLocaleDateString("es", opts)} → ${e.toLocaleDateString("es", opts)}`;
