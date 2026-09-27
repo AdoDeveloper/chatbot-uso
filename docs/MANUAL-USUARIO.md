@@ -17,7 +17,7 @@ Guía de uso del panel administrativo del chatbot institucional.
 3. Pulse **Iniciar sesión**.
 
 Si su cuenta es nueva, el sistema le pedirá **cambiar la contraseña** en el
-primer acceso. Establezca una contraseña personal (mínimo 8 caracteres, con
+primer acceso. Establezca una contraseña personal (entre 8 y 72 caracteres, con
 una mayúscula y un número).
 
 ### 1.2 Invitaciones
@@ -59,7 +59,9 @@ que guía los pasos iniciales en orden:
 2. Activar y probar el modelo.
 3. Subir el primer documento.
 4. Aprobar el documento.
-5. Probar una pregunta.
+5. Probar una pregunta en la previsualización del asistente.
+
+Cada paso enlaza directamente a la pantalla donde se completa.
 
 ---
 
@@ -75,6 +77,8 @@ En **Conocimiento → Documentos** puede:
 - **Subir documentos**: PDF, DOCX o TXT. Arrastre los archivos o
   pulse para seleccionarlos. Puede subir varios a la vez. El tipo se reconoce
   por la extensión del archivo (.pdf, .docx o .txt); cualquier otra se rechaza.
+  Si algunos archivos de una subida múltiple fallan, el panel queda abierto
+  solo con esos archivos y el motivo de cada uno, para corregirlos y reintentar.
 - **Renombrar**: el nuevo nombre se aplica también a las fuentes que cita el
   asistente en sus respuestas.
 - **Seguir el progreso**: cada documento pasa por las etapas de extracción,
@@ -90,6 +94,8 @@ En **Conocimiento → Documentos** puede:
   y aparece un aviso junto al estado con el motivo.
 - **Reemplazar**: sube una nueva versión del archivo. Como el contenido cambió,
   el documento vuelve a quedar *pendiente de revisión*.
+- **Eliminar**: el chatbot deja de usar el documento y se borra su archivo del
+  servidor. La eliminación no se puede deshacer.
 
 ### 3.2 Fragmentos (chunks)
 
@@ -120,8 +126,10 @@ contiene la URL hace que el asistente a veces diga que no tiene el dato.
 La pantalla **Consulta** permite hacer una pregunta de prueba directamente
 contra la base de conocimiento para ver qué fragmentos recupera el sistema, sin
 generar una respuesta completa. Usa la misma búsqueda que el chat e indica qué
-fragmentos considera relevantes el evaluador. Útil para verificar que un
-documento se indexó bien.
+fragmentos considera relevantes el evaluador. Sin elegir fuentes busca en las
+mismas fuentes aprobadas que usa el chat; eligiendo fuentes concretas también
+puede probar documentos pendientes de revisión antes de aprobarlos. Útil para
+verificar que un documento se indexó bien.
 
 ---
 
@@ -170,8 +178,9 @@ pregunta como «¿qué pasa si un estudiante ignora las reglas de la biblioteca?
 se responde con normalidad.
 
 El interruptor general de los filtros también controla el ocultamiento de
-datos personales (correos, teléfonos, tarjetas y cuentas bancarias) en
-preguntas y respuestas: si se desactiva, esos datos dejan de ocultarse.
+datos personales (correos, teléfonos, tarjetas y cuentas bancarias; el DUI,
+el NIT y los teléfonos de El Salvador siempre) en preguntas y respuestas: si
+se desactiva, esos datos dejan de ocultarse.
 
 ### 4.4 Escalamiento
 
@@ -231,7 +240,8 @@ siguiente, por lo que conviene dejarlo vacío o con un valor holgado.
 
 En **Conversaciones** se revisa todo el historial de interacciones: mensajes,
 fuentes citadas, latencia, valoración (👍/👎) y ruta seguida por el sistema.
-Se pueden filtrar, etiquetar, exportar (CSV/PDF) y eliminar de forma
+Se pueden filtrar, etiquetar, exportar (Excel/PDF, con los mismos filtros
+aplicados en la lista, incluido el estado) y eliminar de forma
 permanente (solo con el permiso correspondiente; la eliminación no se puede
 deshacer).
 
@@ -315,7 +325,9 @@ parecidas como las respuestas a preguntas idénticas.
 
 Límites de uso del chat por minuto y por hora, editables directamente desde el
 panel, con la tendencia de consumo y la lista de usuarios que alcanzaron el
-límite.
+límite. Los límites se aplican a cada dirección IP por separado; la pestaña de
+tendencia muestra las consultas por hora de todo el sitio y marca en rojo las
+horas en las que alguna IP fue bloqueada por alcanzar su límite.
 
 ### 7.4 Notificaciones
 
