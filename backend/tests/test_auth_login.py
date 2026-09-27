@@ -11,6 +11,18 @@ async def admin_user(make_user):
     return await make_user(role=UserRole.admin)
 
 
+@pytest.fixture
+async def microsoft_ready(db_session, monkeypatch):
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "MICROSOFT_CLIENT_ID", "cid")
+    monkeypatch.setattr(settings, "MICROSOFT_CLIENT_SECRET", "secret")
+    monkeypatch.setattr(settings, "MICROSOFT_TENANT_ID", "tid")
+    db_session.add(GlobalSetting(key="oauth_active", value=True))
+    await db_session.commit()
+
+
 class TestAuthProviders:
     async def test_defaults_credentials_enabled_no_microsoft(self, client):
         r = await client.get("/api/v1/auth/providers")
@@ -19,13 +31,21 @@ class TestAuthProviders:
         assert body["credentials"] is True
         assert body["microsoft"] is False
 
-    async def test_reflects_disabled_credentials_setting(self, client, db_session):
+    async def test_reflects_disabled_credentials_setting(self, client, db_session, microsoft_ready):
         db_session.add(GlobalSetting(key="auth_credentials_enabled", value=False))
         await db_session.commit()
 
         r = await client.get("/api/v1/auth/providers")
         assert r.status_code == 200
         assert r.json()["credentials"] is False
+        assert r.json()["microsoft"] is True
+
+    async def test_credentials_come_back_when_microsoft_is_not_ready(self, client, db_session):
+        db_session.add(GlobalSetting(key="auth_credentials_enabled", value=False))
+        await db_session.commit()
+
+        r = await client.get("/api/v1/auth/providers")
+        assert r.json()["credentials"] is True
 
 
 class TestLogin:
@@ -70,7 +90,7 @@ class TestLogin:
         )
         assert r.status_code == 403
 
-    async def test_credentials_disabled_globally_returns_403(self, client, admin_user, db_session):
+    async def test_credentials_disabled_globally_returns_403(self, client, admin_user, db_session, microsoft_ready):
         db_session.add(GlobalSetting(key="auth_credentials_enabled", value=False))
         await db_session.commit()
 
@@ -79,6 +99,16 @@ class TestLogin:
             json={"email": admin_user.email, "password": "Test1234!"},
         )
         assert r.status_code == 403
+
+    async def test_password_login_works_if_microsoft_stops_being_available(self, client, admin_user, db_session):
+        db_session.add(GlobalSetting(key="auth_credentials_enabled", value=False))
+        await db_session.commit()
+
+        r = await client.post(
+            "/api/v1/auth/login",
+            json={"email": admin_user.email, "password": "Test1234!"},
+        )
+        assert r.status_code == 200
 
 
 class TestMe:

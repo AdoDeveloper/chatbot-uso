@@ -121,6 +121,18 @@ class TestInjectionsByCategory:
         assert len(categories) >= 1
         assert categories[0]["count"] >= categories[-1]["count"]
 
+    async def test_uses_the_category_saved_with_the_block(self, client, admin_user, auth_headers, db_session):
+        db_session.add(AuditLog(
+            id=uuid.uuid4(), action="guardrails.injection_detected", resource_type="chat",
+            ip="198.51.100.1", created_at=datetime.now(timezone.utc),
+            meta_json={"pattern": "regex-que-ya-cambio", "matched_category": "Secuestro de rol",
+                       "matched_label": "Reasignación de identidad"},
+        ))
+        await db_session.commit()
+
+        r = await client.get("/api/v1/security/injections/by-category", headers=auth_headers(admin_user))
+        assert r.json() == [{"category": "Secuestro de rol", "count": 1, "sample_label": "Reasignación de identidad"}]
+
 
 class TestInjectionSamples:
     async def test_requires_perm(self, client, viewer_user, auth_headers):

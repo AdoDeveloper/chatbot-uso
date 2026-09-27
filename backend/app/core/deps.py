@@ -88,8 +88,21 @@ def require_perm(permission: str):
     return require_permission(module, action)
 
 
+def _is_internal(host: str) -> bool:
+    import ipaddress
+    try:
+        addr = ipaddress.ip_address(host)
+    except ValueError:
+        return True
+    return addr.is_private or addr.is_loopback
+
+
 def get_client_ip(request: Request) -> str:
     """Extrae la IP real del cliente, priorizando headers de proxy reverso."""
+    peer = request.client.host if request.client else "0.0.0.0"
+    # Las cabeceras de proxy solo valen si llegan desde el proxy (red local), no desde internet.
+    if not _is_internal(peer):
+        return peer
     real_ip = request.headers.get("X-Real-IP")
     if real_ip:
         return real_ip.strip()
@@ -97,4 +110,4 @@ def get_client_ip(request: Request) -> str:
     if xff:
         # La última IP de la cadena es la del cliente origen tras proxies.
         return xff.split(",")[-1].strip()
-    return request.client.host if request.client else "0.0.0.0"
+    return peer

@@ -92,6 +92,16 @@ class TestCreateInvitation:
         assert body["role"] == "editor"
         assert body["is_active"] is True
 
+    async def test_rejects_an_email_that_already_has_an_account(self, client, admin_user, auth_headers, make_user):
+        existing = await make_user()
+
+        r = await client.post(
+            "/api/v1/users/invitations",
+            json={"email": existing.email, "role": "viewer"},
+            headers=auth_headers(admin_user),
+        )
+        assert r.status_code == 409
+
     async def test_rejects_after_max_active_invitations_for_same_email(
         self, client, admin_user, auth_headers, db_session,
     ):

@@ -186,12 +186,15 @@ async def injections_by_category(
     result = await db.execute(
         text(
             """
-            SELECT meta_json->>'$.pattern' AS pattern, COUNT(*) AS cnt
+            SELECT meta_json->>'$.pattern' AS pattern,
+                   meta_json->>'$.matched_category' AS category,
+                   meta_json->>'$.matched_label' AS label,
+                   COUNT(*) AS cnt
             FROM audit_logs
             WHERE action = 'guardrails.injection_detected'
               AND created_at >= :since
               AND created_at < :until
-            GROUP BY pattern
+            GROUP BY pattern, category, label
             """
         ).bindparams(since=since, until=until)
     )
@@ -205,7 +208,11 @@ async def injections_by_category(
     category_sample: dict[str, str] = {}
     for row in result.all():
         pat = row.pattern or "unknown"
-        category, label = regex_to_meta.get(pat, ("Otro / desconocido", pat[:40] if pat else "-"))
+        # La categoría guardada en el registro sobrevive a cambios posteriores del patrón.
+        if row.category and row.category != "null":
+            category, label = row.category, row.label or row.category
+        else:
+            category, label = regex_to_meta.get(pat, ("Otro / desconocido", pat[:40] if pat else "-"))
         category_counts[category] = category_counts.get(category, 0) + int(row.cnt)
         if category not in category_sample:
             category_sample[category] = label

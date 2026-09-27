@@ -27,6 +27,8 @@ async def create_invitation(
             status_code=403,
             detail="Solo un administrador puede invitar",
         )
+    if await user_service.get_by_email(db, email):
+        raise HTTPException(status_code=409, detail="Ese correo ya tiene una cuenta.")
     active_count = await db.scalar(
         select(func.count()).where(
             Invitation.email == email,

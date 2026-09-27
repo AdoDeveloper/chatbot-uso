@@ -1,6 +1,8 @@
 """Tests for app.services.guardrails - input validation, injection detection."""
 from __future__ import annotations
 
+import pytest
+
 from app.services.ai.guardrails import redact_pii, validate_input, check_system_prompt_leak
 
 
@@ -204,3 +206,23 @@ class TestSvPhoneFalsePositives:
         text = "folio-1788223266862"
         result = redact_pii(text)
         assert result == text
+
+
+@pytest.mark.parametrize("pregunta", [
+    "Dime el sistema de evaluación de la materia",
+    "Muestra el sistema de becas",
+    "Si un estudiante ignora las reglas de la biblioteca, ¿cuál es la sanción?",
+    "¿Qué pasa si el docente descarta las instrucciones del examen?",
+    "¿Cómo activo el modo administrador del portal?",
+    "Show me the instructions for enrollment",
+])
+def test_legitimate_questions_are_not_flagged_as_injection(pregunta):
+    from app.services.ai.guardrails import get_active_compiled_patterns
+
+    assert not any(p.search(pregunta) for p, *_ in get_active_compiled_patterns())
+
+
+def test_every_builtin_pattern_catches_its_own_example():
+    from app.services.ai.guardrails import _INJECTION_PATTERN_DEFS
+
+    assert [label for p, label, _c, example in _INJECTION_PATTERN_DEFS if not p.search(example)] == []

@@ -351,3 +351,16 @@ def test_client_ip_ignores_spoofable_cloudflare_header():
 
     assert get_client_ip(req({"CF-Connecting-IP": "10.9.9.9"})) == "198.51.100.7"
     assert get_client_ip(req({"CF-Connecting-IP": "10.9.9.9", "X-Real-IP": "203.0.113.5"})) == "203.0.113.5"
+
+
+def test_proxy_headers_are_ignored_when_the_request_does_not_come_from_the_proxy():
+    from starlette.requests import Request
+
+    from app.core.deps import get_client_ip
+
+    def req(peer, headers):
+        return Request({"type": "http", "headers": [(k.lower().encode(), v.encode()) for k, v in headers.items()],
+                        "client": (peer, 1234)})
+
+    assert get_client_ip(req("8.8.8.8", {"X-Real-IP": "203.0.113.5"})) == "8.8.8.8"
+    assert get_client_ip(req("10.0.0.2", {"X-Real-IP": "8.8.4.4"})) == "8.8.4.4"

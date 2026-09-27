@@ -64,6 +64,21 @@ def _token_response(user, access: str, refresh: str) -> TokenResponse:
     )
 
 
+async def _microsoft_ready(db: AsyncSession) -> bool:
+    settings = get_settings()
+    is_active = bool(await _get_setting(db, "oauth_active") or False)
+    return bool(
+        is_active and settings.MICROSOFT_CLIENT_ID and settings.MICROSOFT_CLIENT_SECRET
+        and settings.MICROSOFT_TENANT_ID
+    )
+
+
+async def _credentials_enabled(db: AsyncSession, microsoft_ready: bool) -> bool:
+    """Sin Microsoft operativo la contraseña queda habilitada, para no dejar a nadie fuera."""
+    raw = await _get_setting(db, "auth_credentials_enabled")
+    return raw is None or bool(raw) or not microsoft_ready
+
+
 class AuthProviders(BaseModel):
     credentials: bool
     microsoft: bool
@@ -74,17 +89,11 @@ class AuthProviders(BaseModel):
 @router.get("/providers", response_model=AuthProviders)
 async def get_providers(db: AsyncSession = Depends(get_db)):
     """Endpoint público (sin auth) que indica qué métodos de login están activos."""
-    credentials_raw = await _get_setting(db, "auth_credentials_enabled")
-    credentials_enabled = bool(credentials_raw) if credentials_raw is not None else True
-
-    # Credenciales de Microsoft vienen del .env (no de la DB)
     settings = get_settings()
     client_id = settings.MICROSOFT_CLIENT_ID
-    client_secret = settings.MICROSOFT_CLIENT_SECRET
     tenant_id = settings.MICROSOFT_TENANT_ID or ""
-    is_active = bool(await _get_setting(db, "oauth_active") or False)
-
-    microsoft_ready = bool(is_active and client_id and client_secret and tenant_id)
+    microsoft_ready = await _microsoft_ready(db)
+    credentials_enabled = await _credentials_enabled(db, microsoft_ready)
 
     return AuthProviders(
         credentials=credentials_enabled,
@@ -120,8 +129,7 @@ async def login(body: LoginRequest, request: Request, db: AsyncSession = Depends
     await _enforce_auth_rate_limit(request, "login", get_settings().RATE_LIMIT_LOGIN_PER_MIN)
 
     # Aplica el setting credentials_enabled - rechaza a nivel de backend
-    credentials_raw = await _get_setting(db, "auth_credentials_enabled")
-    if credentials_raw is not None and not bool(credentials_raw):
+    if not await _credentials_enabled(db, await _microsoft_ready(db)):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="El acceso por credenciales está deshabilitado. Use Microsoft SSO.",
