@@ -321,6 +321,11 @@ async def update_conversation_status(
     if body.status == ConversationStatus.resolved:
         conv.resolved_at = datetime.now(timezone.utc)
         conv.resolved_by_user_id = current_user.id
+    else:
+        conv.resolved_at = None
+        conv.resolved_by_user_id = None
+        if body.status == ConversationStatus.escalated and conv.escalated_at is None:
+            conv.escalated_at = datetime.now(timezone.utc)
     await db.commit()
     return {"id": str(conv.id), "status": conv.status.value}
 

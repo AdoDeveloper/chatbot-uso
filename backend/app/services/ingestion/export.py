@@ -21,10 +21,12 @@ def _xml(text: str) -> str:
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def _safe_cell(v: Any) -> str:
+def _safe_cell(v: Any) -> str | int | float:
     """Prefija con apóstrofe valores que Excel interpretaría como fórmula y quita caracteres de control ilegales."""
     from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
 
+    if isinstance(v, (int, float)) and not isinstance(v, bool):
+        return v
     s = str(v) if v is not None else ""
     s = ILLEGAL_CHARACTERS_RE.sub("", s)
     if s and s[0] in _FORMULA_CHARS:
@@ -90,7 +92,7 @@ def build_excel(
     header_fill = PatternFill("solid", fgColor="1E40AF")
     header_font = Font(bold=True, color="FFFFFF")
     for col_idx, h in enumerate(headers, 1):
-        cell = ws.cell(row=header_row, column=col_idx, value=h)
+        cell = ws.cell(row=header_row, column=col_idx, value=_safe_cell(h))
         cell.fill = header_fill
         cell.font = header_font
         cell.alignment = Alignment(horizontal="center", vertical="center")
@@ -98,8 +100,8 @@ def build_excel(
     for r_idx, row in enumerate(rows):
         excel_row = header_row + 1 + r_idx
         fill = "FFFFFF" if r_idx % 2 == 0 else "F1F5F9"
-        for col_idx, v in enumerate(row.values(), 1):
-            cell = ws.cell(row=excel_row, column=col_idx, value=_safe_cell(v))
+        for col_idx, h in enumerate(headers, 1):
+            cell = ws.cell(row=excel_row, column=col_idx, value=_safe_cell(row.get(h)))
             cell.fill = PatternFill("solid", fgColor=fill)
             cell.alignment = Alignment(vertical="center")
 

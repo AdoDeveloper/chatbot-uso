@@ -372,7 +372,7 @@ class TestSnapshotForRangeAndPeriodComparison:
         db_session.add(_msg(conv.id, role=MessageRole.user, created_at=NOW))
         await db_session.commit()
 
-        result = await svc.get_period_comparison(db_session, days=7, until=NOW)
+        result = await svc.get_period_comparison(db_session, days=7, until=NOW + timedelta(minutes=1))
         assert result.current.queries == 1
         assert result.previous.queries == 0
         assert result.deltas["queries"] is None
@@ -393,7 +393,7 @@ class TestSnapshotForRangeAndPeriodComparison:
         ])
         await db_session.commit()
 
-        result = await svc.get_period_comparison(db_session, days=7, until=NOW)
+        result = await svc.get_period_comparison(db_session, days=7, until=NOW + timedelta(minutes=1))
         assert result.current.queries == 2
         assert result.previous.queries == 1
         assert result.deltas["queries"] == 100.0
@@ -433,7 +433,7 @@ class TestSnapshotForRangeAndPeriodComparison:
         ))
         await db_session.commit()
 
-        result = await svc.get_period_comparison(db_session, days=7, until=NOW)
+        result = await svc.get_period_comparison(db_session, days=7, until=NOW + timedelta(minutes=1))
         assert result.current.avg_latency_sample_size == 1
         assert result.deltas["avg_latency_ms"] is None
         assert result.deltas["p95_latency_ms"] is None
@@ -785,3 +785,13 @@ class TestGetTimeseries:
         result = await svc.get_timeseries(db_session, days=30)
         assert len(result.points) == 1
         assert result.points[0].count == 2
+
+
+async def test_comparison_uses_the_selected_range_end_without_shifting(db_session):
+    from app.core.timezone import sv_to_utc
+
+    until = sv_to_utc(datetime(2026, 3, 8))
+    result = await svc.get_period_comparison(db_session, days=7, until=until)
+
+    assert (result.current.range_start, result.current.range_end) == ("2026-03-01", "2026-03-07")
+    assert (result.previous.range_start, result.previous.range_end) == ("2026-02-22", "2026-02-28")

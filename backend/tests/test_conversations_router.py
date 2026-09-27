@@ -96,6 +96,21 @@ class TestUpdateConversationStatus:
         assert conv.resolved_at is not None
         assert conv.resolved_by_user_id == admin_user.id
 
+    async def test_reopening_clears_the_resolution(self, client, admin_user, auth_headers, db_session):
+        conv = await _make_conversation(db_session)
+        for status in ("resolved", "escalated"):
+            r = await client.patch(
+                f"/api/v1/conversations/{conv.id}/status",
+                json={"status": status},
+                headers=auth_headers(admin_user),
+            )
+            assert r.status_code == 200
+
+        await db_session.refresh(conv)
+        assert conv.resolved_at is None
+        assert conv.resolved_by_user_id is None
+        assert conv.escalated_at is not None
+
 
 class TestRecordCsat:
     async def test_requires_auth(self, client):

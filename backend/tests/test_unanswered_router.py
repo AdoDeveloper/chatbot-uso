@@ -41,6 +41,21 @@ class TestResolveQuestion:
         assert q.resolved_by_id == admin_user.id
         assert q.resolved_at is not None
 
+    async def test_resolve_also_closes_identical_pending_questions(
+        self, client, admin_user, auth_headers, make_question, db_session,
+    ):
+        q = await make_question(question="¿Cuál es el horario?")
+        twin = await make_question(question="  ¿cuál es el HORARIO?")
+        other = await make_question(question="¿Dónde queda la biblioteca?")
+
+        r = await client.post(f"/api/v1/unanswered/{q.id}/resolve", headers=auth_headers(admin_user))
+        assert r.status_code == 204
+
+        for item in (twin, other):
+            await db_session.refresh(item)
+        assert twin.status == UnansweredStatus.resolved
+        assert other.status == UnansweredStatus.open
+
 
 class TestCreateFaqFromUnanswered:
     async def test_create_faq_not_found(self, client, admin_user, auth_headers):

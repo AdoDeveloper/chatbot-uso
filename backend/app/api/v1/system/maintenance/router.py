@@ -63,7 +63,9 @@ async def purge_health_outliers(
     """Elimina snapshots de salud con latencias anómalas (> 2 s)."""
     threshold = 2_000
     result = await db.execute(
-        delete(HealthSnapshot).where(HealthSnapshot.latency_ms > threshold)
+        delete(HealthSnapshot)
+        .where(HealthSnapshot.latency_ms > threshold)
+        .where(HealthSnapshot.is_ok.is_(True))
     )
     deleted = result.rowcount or 0
     await audit_svc.log_action(

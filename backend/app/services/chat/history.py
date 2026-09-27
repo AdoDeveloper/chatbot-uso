@@ -208,11 +208,12 @@ async def list_conversations(
     # Búsqueda de texto: encuentra conversaciones con mensajes coincidentes
     if search and search.strip():
         from sqlalchemy import exists
-        term = f"%{search.strip()}%"
+        escaped = search.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        term = f"%{escaped}%"
         msg_filter = exists(
             select(ChatMessage.id)
             .where(ChatMessage.conversation_id == ChatConversation.id)
-            .where(ChatMessage.content.ilike(term))
+            .where(ChatMessage.content.ilike(term, escape="\\"))
         )
         base = base.where(msg_filter)
         count_base = count_base.where(msg_filter)

@@ -105,6 +105,22 @@ class TestKeywordDetectedTrigger:
         assert matches is False
         assert "Ninguna keyword crítica" in detail
 
+    @pytest.mark.parametrize("message, expected", [
+        ("Quiero información de Robótica Aplicada", False),
+        ("Hubo un robo en el aula", True),
+        ("Me acosó un compañero", True),
+        ("Denuncio acoso de un compañero", True),
+        ("Tengo varias quejas", True),
+        ("URGENTE necesito ayuda", True),
+    ])
+    def test_keywords_match_whole_words_ignoring_accents(self, message, expected):
+        matches, _ = engine.evaluate_rule(
+            trigger_type=EscalationTrigger.keyword_detected,
+            trigger_config={"keywords": ["robo", "acoso", "queja", "urgente"]},
+            context={"user_message": message},
+        )
+        assert matches is expected
+
 
 class TestConfidenceBelowTrigger:
     def test_not_enough_scores(self):

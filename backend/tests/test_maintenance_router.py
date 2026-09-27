@@ -138,6 +138,7 @@ class TestPurgeHealthOutliers:
             HealthSnapshot(id=uuid.uuid4(), service_name="qdrant", is_ok=True, latency_ms=100, recorded_at=now),
             HealthSnapshot(id=uuid.uuid4(), service_name="mysql", is_ok=True, latency_ms=2500, recorded_at=now),
             HealthSnapshot(id=uuid.uuid4(), service_name="redis", is_ok=True, latency_ms=1999, recorded_at=now),
+            HealthSnapshot(id=uuid.uuid4(), service_name="qdrant", is_ok=False, latency_ms=5000, recorded_at=now),
         ])
         await db_session.commit()
 

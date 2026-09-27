@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_client_ip, get_current_user, require_perm
@@ -23,6 +23,22 @@ from app.schemas.unanswered import (
 from app.services.system import audit as audit_svc
 
 router = APIRouter(prefix="/unanswered", tags=["unanswered"])
+
+
+async def _resolve_with_duplicates(db: AsyncSession, q: UnansweredQuestion, user: User) -> int:
+    """Resuelve la pregunta y las pendientes con el mismo texto; devuelve cuántas cerró."""
+    same = (await db.execute(
+        select(UnansweredQuestion)
+        .where(UnansweredQuestion.status != UnansweredStatus.resolved)
+        .where(func.lower(func.trim(UnansweredQuestion.question)) == q.question.strip().lower())
+    )).scalars().all()
+    now = datetime.now(timezone.utc)
+    closed = {q.id: q, **{d.id: d for d in same}}
+    for item in closed.values():
+        item.status = UnansweredStatus.resolved
+        item.resolved_by_id = user.id
+        item.resolved_at = now
+    return len(closed)
 
 
 async def _require_conversations_update_and_knowledge_create(
@@ -87,16 +103,14 @@ async def resolve_question(
     q = result.scalar_one_or_none()
     if not q:
         raise NotFoundError("Pregunta no encontrada")
-    q.status = UnansweredStatus.resolved
-    q.resolved_by_id = current_user.id
-    q.resolved_at = datetime.now(timezone.utc)
+    closed = await _resolve_with_duplicates(db, q, current_user)
     await audit_svc.log_action(
         db,
         action="unanswered.resolve",
         resource_type="unanswered_question",
         actor_id=current_user.id,
         resource_id=str(q.id),
-        meta={"question": q.question},
+        meta={"question": q.question, "resolved_count": closed},
         ip=get_client_ip(req),
         user_agent=req.headers.get("user-agent"),
     )
@@ -128,16 +142,14 @@ async def create_faq_from_unanswered(
         tags=body.tags,
         created_by_id=current_user.id,
     )
-    q.status = UnansweredStatus.resolved
-    q.resolved_by_id = current_user.id
-    q.resolved_at = datetime.now(timezone.utc)
+    closed = await _resolve_with_duplicates(db, q, current_user)
     await audit_svc.log_action(
         db,
         action="unanswered.create_faq",
         resource_type="unanswered_question",
         actor_id=current_user.id,
         resource_id=str(q.id),
-        meta={"question": q.question, "faq_id": str(entry.id)},
+        meta={"question": q.question, "faq_id": str(entry.id), "resolved_count": closed},
         ip=get_client_ip(req),
         user_agent=req.headers.get("user-agent"),
     )

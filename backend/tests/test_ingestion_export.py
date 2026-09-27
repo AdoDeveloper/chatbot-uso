@@ -101,7 +101,17 @@ class TestBuildExcel:
         assert ws.cell(row=6, column=2).value == "Consultas"
         # Filas de datos.
         assert ws.cell(row=7, column=1).value == "Matriculas"
-        assert ws.cell(row=7, column=2).value == "10"
+        assert ws.cell(row=7, column=2).value == 10
+
+    def test_values_follow_the_header_even_if_keys_come_in_another_order(self):
+        rows = [
+            {"Tema": "Matriculas", "Consultas": 10},
+            {"Consultas": -3, "Tema": "Becas"},
+        ]
+        from openpyxl import load_workbook
+        ws = load_workbook(io.BytesIO(build_excel(rows))).active
+
+        assert [ws.cell(row=8, column=c).value for c in (1, 2)] == ["Becas", -3]
 
     def test_formula_like_value_is_escaped_in_cell(self):
         rows = [{"Campo": "=2+2"}]

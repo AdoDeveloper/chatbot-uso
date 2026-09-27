@@ -77,10 +77,11 @@ def _eval_keyword_detected(ctx: dict, cfg: dict) -> tuple[bool, str]:
         keywords = [k.strip() for k in keywords.split(",") if k.strip()]
     if not keywords:
         return False, "La regla no tiene keywords configuradas."
-    msg = (ctx.get("user_message") or "").lower()
+    msg = _normalize(ctx.get("user_message") or "")
     if not msg:
         return False, "Sin mensaje de usuario en el contexto."
-    matched = [k for k in keywords if k.lower() in msg]
+    # Palabra completa, admitiendo plural: "robo" no debe saltar con "robótica".
+    matched = [k for k in keywords if re.search(rf"\b{re.escape(_normalize(k.strip()))}(?:s|es)?\b", msg)]
     if matched:
         return True, f"Keyword crítica detectada: {', '.join(matched)}."
     return False, "Ninguna keyword crítica encontrada."

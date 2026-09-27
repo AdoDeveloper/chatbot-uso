@@ -736,9 +736,10 @@ async def _snapshot_for_range(
     p95_latency = float(_percentile(_lat_vals2, 0.95))
     latency_sample_size = len(_lat_vals2)
 
+    from app.core.timezone import utc_to_sv
     return PeriodSnapshot(
-        range_start=range_start.date().isoformat(),
-        range_end=(range_end - timedelta(seconds=1)).date().isoformat(),
+        range_start=utc_to_sv(range_start).date().isoformat(),
+        range_end=utc_to_sv(range_end - timedelta(seconds=1)).date().isoformat(),
         queries=queries,
         unique_sessions=sessions,
         containment_rate=containment_rate,
@@ -753,11 +754,13 @@ async def get_period_comparison(
     until: datetime | None = None,
 ) -> PeriodComparison:
     """Compara la ventana de N días con los N días anteriores."""
-    anchor = until or datetime.now(timezone.utc)
     from app.core.timezone import sv_to_utc, utc_to_sv
-    anchor_sv = utc_to_sv(anchor)
-    end_sv = anchor_sv.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
-    end = sv_to_utc(end_sv)
+    if until is not None:
+        # `until` ya es el fin exclusivo del rango (medianoche local del día siguiente).
+        end = until
+    else:
+        today_sv = utc_to_sv(datetime.now(timezone.utc)).replace(hour=0, minute=0, second=0, microsecond=0)
+        end = sv_to_utc(today_sv + timedelta(days=1))
     cur_start = end - timedelta(days=days)
     prev_end = cur_start
     prev_start = prev_end - timedelta(days=days)
