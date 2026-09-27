@@ -253,9 +253,9 @@ curl http://localhost:8000/api/v1/health/live  # → {"status":"ok"}
 
 > El primer arranque de `uvicorn` ya siembra el admin inicial y los
 > datos por defecto automáticamente (`app/main.py`, evento de arranque). Si
-> necesitas migrar y sembrar la base de datos SIN levantar el servidor (por
+> necesita migrar y sembrar la base de datos SIN levantar el servidor (por
 > ejemplo en un script de CI o para verificar antes de exponer el servicio),
-> usa `python -m scripts.init_db` en vez de correr `alembic upgrade head`
+> use `python -m scripts.init_db` en vez de correr `alembic upgrade head`
 > manualmente - hace ambos pasos en uno solo y es seguro repetirlo.
 
 ### 6. Frontend (Next.js)

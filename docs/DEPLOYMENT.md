@@ -268,7 +268,7 @@ SMTP_PORT=587
 SMTP_USER=correo@tudominio.com
 SMTP_PASSWORD=APP_PASSWORD
 SMTP_FROM=noreply@tudominio.com
-SMTP_TLS=true
+SMTP_TLS=true   # puerto 465: SSL directo; otros puertos: STARTTLS
 
 # Microsoft SSO (opcional). TENANT_ID es el Directory (tenant) ID de la
 # universidad: solo se aceptan cuentas de ese tenant ("common" no funciona).
@@ -710,7 +710,7 @@ openssl rand -hex 16   # PASSWORD_REDIS
 openssl rand -hex 32   # API_KEY_QDRANT
 ```
 
-Más `FIRST_ADMIN_PASSWORD` (≥12 chars, mayúscula, minúscula, dígito y símbolo).
+Más `FIRST_ADMIN_PASSWORD` (≥12 chars y como máximo 72, mayúscula, minúscula, dígito y símbolo).
 
 ---
 

@@ -108,7 +108,7 @@ completa de la API. Solo están disponibles en un entorno con
 | GET | `/conversations/tags` | Etiquetas existentes |
 | GET | `/conversations/csat-reason-labels` | Etiquetas legibles de los motivos CSAT configurados |
 | POST | `/conversations/bulk` | Acciones en lote |
-| GET | `/conversations/export` | Exportar (CSV/PDF) |
+| GET | `/conversations/export` | Exportar (Excel/PDF) con los mismos filtros del listado, incluido `status` |
 | PATCH | `/conversations/messages/{id}/feedback` | Valorar un mensaje |
 
 ## Preguntas sin responder (`/unanswered`)

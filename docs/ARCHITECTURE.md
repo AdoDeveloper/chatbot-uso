@@ -398,15 +398,15 @@ chatbot-uso/
 | Autenticación | JWT (access + refresh) con rotación de refresh; cada refresh se reclama de forma atómica en Redis (`SET NX`), así que dos peticiones simultáneas con el mismo token no obtienen dos sesiones |
 | Invalidación de sesiones | Denylist de `jti` en Redis (logout) + `tokens_valid_after` por usuario (cambio de contraseña) |
 | Autorización | RBAC con 3 roles fijos (admin/editor/viewer), definidos en código (`SYSTEM_ROLES`); permisos `(módulo, acción)` verificados contra BD en cada petición, sin UI para crear roles ni reasignar permisos |
-| Contraseñas | bcrypt, ejecutado fuera del hilo principal para no frenar el resto de peticiones |
+| Contraseñas | bcrypt, ejecutado fuera del hilo principal para no frenar el resto de peticiones; entre 8 y 72 caracteres (bcrypt ignora lo que pasa de 72 bytes), con mayúscula y número |
 | Microsoft SSO | `id_token` validado por firma, audiencia, emisor y `tid` del tenant configurado; solo entran usuarios ya creados |
 | Secretos en reposo | Cifrado Fernet (API keys de proveedores) con derivación PBKDF2-HMAC-SHA256 |
-| Anti–fuerza bruta | Rate limit por IP en endpoints de auth (Redis, con fallback en memoria) |
-| Guardrails de entrada | Detección de inyección de prompts por regex (built-in + personalizables) |
+| Anti–fuerza bruta | Rate limit por IP en endpoints de auth (Redis, con fallback en memoria); el canje de Microsoft SSO admite al menos 30 por minuto porque el código es de un solo uso |
+| Guardrails de entrada | Detección de inyección de prompts por regex (predefinidos + personalizables) |
 | Redacción de PII | Presidio en español: email, teléfono, tarjeta, IBAN + documentos de El Salvador (DUI, NIT, NRC) |
 | Rate limiting del chat | Multidimensional: por IP/minuto, por IP/hora y por sesión |
 | Widget público | Validación de API key + allowlist de dominios por `Origin`; los topes por sesión y diarios se aplican también en `POST /chat` |
-| Subida de archivos | Tipo decidido por la extensión (.pdf/.docx/.txt) y guardado con esa extensión, no por el `Content-Type` del cliente |
+| Subida de archivos | Tipo decidido por la extensión (.pdf/.docx/.txt) y guardado con esa extensión, no por el `Content-Type` del cliente; lectura por bloques con corte al superar el límite. `/uploads` solo sirve imágenes: los documentos se descargan por la ruta autenticada del panel, y se borran del disco al eliminar la fuente |
 | Auditoría | `audit_logs` con la IP real del cliente; incluye invitaciones, cambios de configuración y revelado de claves de proveedores |
 | IP real tras proxy | `X-Real-IP` que fija nginx, o el último valor de `X-Forwarded-For`, solo si la conexión viene de una red local o privada (el proxy). `CF-Connecting-IP` no se usa porque el cliente puede falsearlo |
 
