@@ -29,6 +29,7 @@ from app.schemas.analytics import (
     PeriodComparison,
 )
 from app.services.monitoring import analytics as svc
+from app.core.timezone import utc_to_sv
 from app.services.system import audit as audit_svc
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
@@ -286,11 +287,12 @@ _REPORT_META = {
 }
 
 
-def _fmt_delta(val: float | None) -> str:
+def _fmt_delta(val: float | None, unit: str = "%") -> str:
+    """Las tasas varían en puntos porcentuales (unit="pp"), el resto en porcentaje relativo."""
     if val is None:
         return "N/D"
     sign = "+" if val >= 0 else ""
-    return f"{sign}{val:.1f}%"
+    return f"{sign}{val:.1f}{' pp' if unit == 'pp' else '%'}"
 
 
 _TRIGGER_LABELS = {
@@ -383,7 +385,7 @@ async def _build_report_sections(
                         "Métrica": "Tasa de contención (%)",
                         curr_label: f"{c.containment_rate:.1f}",
                         prev_label: f"{p.containment_rate:.1f}",
-                        "Variación": _fmt_delta(comp.deltas.get("containment_rate")),
+                        "Variación": _fmt_delta(comp.deltas.get("containment_rate"), unit="pp"),
                     },
                     {
                         "Métrica": "Latencia promedio (ms)",
@@ -442,13 +444,8 @@ async def _build_report_sections(
         csat = esc.get("csat_avg")
         esc_total = esc.get("total", 0)
         by_status = esc.get("by_status", {})
-        total_queries = comp.current.queries if comp else 0
-        # Tasa de contención: porcentaje de conversaciones resueltas sin
-        # intervención humana.
-        containment = (
-            f"{max(0.0, (1 - esc_total / total_queries) * 100):.1f}"
-            if total_queries > 0 else "N/D"
-        )
+        # La misma tasa de contención que la comparativa, para no dar dos cifras distintas.
+        containment = f"{comp.current.containment_rate:.1f}" if comp and comp.current.queries else "N/D"
         sections.append({
             "title": "RESUMEN DE ESCALAMIENTOS",
             "rows": [
@@ -497,11 +494,10 @@ async def _build_report_sections(
                 f"Los usuarios valoraron {fb.summary.total} respuestas, "
                 f"con un {fb.summary.positive_rate:.1f}% de reacciones positivas."
             )
-        if containment != "N/D":
+        if esc_total:
             summary_parts.append(
-                f"La tasa de contención fue del {containment}%: "
-                f"{esc_total} conversaciones requirieron atención humana"
-                + (f", de las cuales {esc.get('resolved_count', 0)} ya fueron resueltas." if esc_total else ".")
+                f"{esc_total} conversaciones requirieron atención humana, de las cuales "
+                f"{esc.get('resolved_count', 0)} ya fueron resueltas."
             )
         if summary_parts:
             sections.insert(0, {
@@ -522,7 +518,7 @@ async def _build_report_sections(
                 sections.append({
                     "title": "PREGUNTAS SIN RESPONDER MÁS RECIENTES",
                     "rows": [
-                        {"Pregunta": q, "Fecha": ts.strftime("%Y-%m-%d %H:%M") if ts else ""}
+                        {"Pregunta": q, "Fecha": utc_to_sv(ts).strftime("%Y-%m-%d %H:%M") if ts else ""}
                         for q, ts in unanswered["recent"]
                     ],
                 })
@@ -536,7 +532,7 @@ async def _build_report_sections(
                 "title": "RESUMEN",
                 "text": (
                     f"Se registraron {total_q} consultas en el período, con un "
-                    f"promedio de {total_q / max(len(ts.points), 1):.1f} por día. "
+                    f"promedio de {total_q / max(days, 1):.1f} por día. "
                     + (f"El día de mayor actividad fue el {peak.date} con {peak.count} consultas." if peak else "")
                 ),
             })
@@ -576,7 +572,8 @@ async def _build_report_sections(
             sections.append({
                 "title": "DISTRIBUCIÓN POR CANAL DE ENTRADA",
                 "rows": [
-                    {"Canal": ch.channel, "Consultas": ch.count, "Porcentaje (%)": f"{ch.percentage:.1f}"}
+                    {"Canal": {"widget": "Widget", "api": "API", "playground": "Previsualización", "unknown": "Desconocido"}.get(ch.channel, ch.channel),
+                     "Consultas": ch.count, "Porcentaje (%)": f"{ch.percentage:.1f}"}
                     for ch in channels.channels
                 ],
                 "chart": {"type": "pie", "label": "Canal", "value": "Consultas"},
@@ -591,12 +588,9 @@ async def _build_report_sections(
         esc_total = esc.get("total", 0)
         by_status = esc.get("by_status", {})
 
-        ts = await svc.get_timeseries(db, days=days, source=source, until=until)
-        total_queries = sum(pt.count for pt in ts.points)
-        containment = (
-            f"{max(0.0, (1 - esc_total / total_queries) * 100):.1f}"
-            if total_queries > 0 else "N/D"
-        )
+        comp = await svc.get_period_comparison(db, days=days, source=source, until=until)
+        total_queries = comp.current.queries
+        containment = f"{comp.current.containment_rate:.1f}" if total_queries > 0 else "N/D"
 
         sections.append({
             "title": "INDICADORES PRINCIPALES",
@@ -629,7 +623,7 @@ async def _build_report_sections(
             sections.append({
                 "title": "DESGLOSE POR ESTADO",
                 "rows": [
-                    {"Estado": state, "Cantidad": count}
+                    {"Estado": {"escalated": "Pendientes", "resolved": "Resueltas"}.get(state, state), "Cantidad": count}
                     for state, count in by_status.items()
                 ],
                 "chart": {"type": "pie", "label": "Estado", "value": "Cantidad"},
@@ -688,7 +682,7 @@ async def _build_report_sections(
             "chart": {"type": "pie", "label": "Estado", "value": "Fuentes"},
         })
 
-        quality = await svc.get_source_quality(db, days=days)
+        quality = await svc.get_source_quality(db, days=days, until=until)
         if quality.sources:
             sections.append({
                 "title": "FUENTES MÁS UTILIZADAS EN LAS RESPUESTAS",
@@ -734,7 +728,7 @@ async def _build_report_sections(
                 sections.append({
                     "title": "PREGUNTAS SIN RESPONDER MÁS RECIENTES",
                     "rows": [
-                        {"Pregunta": q, "Fecha": ts.strftime("%Y-%m-%d %H:%M") if ts else ""}
+                        {"Pregunta": q, "Fecha": utc_to_sv(ts).strftime("%Y-%m-%d %H:%M") if ts else ""}
                         for q, ts in unanswered["recent"]
                     ],
                 })

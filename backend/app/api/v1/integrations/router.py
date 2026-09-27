@@ -240,7 +240,7 @@ async def test_smtp(
     )
     content += tpl.detail_table(
         {"Servidor": f"{cfg.host}:{cfg.port}", "Remitente": cfg.from_email,
-         "Cifrado": "STARTTLS" if cfg.tls else "Sin cifrado"},
+         "Cifrado": ("SSL" if cfg.port == 465 else "STARTTLS") if cfg.tls else "Sin cifrado"},
         heading_text="Parámetros utilizados",
     )
     ok = await smtp.send_email(

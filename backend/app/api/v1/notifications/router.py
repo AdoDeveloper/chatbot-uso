@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,6 +25,7 @@ from app.schemas.notification import (
     NotificationRuleOut,
     NotificationRuleUpdate,
     NotificationTriggerOut,
+    normalize_email_targets,
 )
 from app.schemas.report_schedule import ReportSchedule
 from app.services.notifications.audience import visible_events as _visible_events
@@ -168,8 +169,12 @@ async def update_rule(
     if not rule:
         raise NotFoundError("Regla no encontrada")
     rule.enabled = body.enabled
-    if body.target is not None:
-        rule.target = body.target
+    # Solo se valida una lista nueva: un valor ya guardado no debe impedir activar o desactivar la regla.
+    if body.target is not None and body.target != rule.target:
+        try:
+            rule.target = normalize_email_targets(body.target) if body.target.strip() else body.target
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     if "config_json" in body.model_fields_set:
         rule.config_json = body.config_json
     await audit_svc.log_action(
@@ -261,8 +266,8 @@ async def notifications_inbox(
                 target=_mask_target(log.target),
                 status=log.status,
                 error_message=log.error_message,
-                created_at=str(log.created_at),
-                read_at=str(log.read_at) if log.read_at else None,
+                created_at=log.created_at.isoformat(),
+                read_at=log.read_at.isoformat() if log.read_at else None,
                 summary=_summarize_payload(log.event, log.payload_json),
             )
             for log in logs
@@ -343,11 +348,11 @@ async def list_notifications(
         items.append(NotificationTriggerOut(
             id=str(trigger_id),
             event=rows[0].event,
-            created_at=str(max(r.created_at for r in rows)),
+            created_at=max(r.created_at for r in rows).isoformat(),
             channels=channel_items,
             summary=_summarize_payload(rows[0].event, rows[0].payload_json),
             own_log_id=str(own_row.id) if own_row else None,
-            own_read_at=str(own_row.read_at) if own_row and own_row.read_at else None,
+            own_read_at=own_row.read_at.isoformat() if own_row and own_row.read_at else None,
         ))
 
     return NotificationListOut(items=items, total=total, page=page, page_size=page_size)

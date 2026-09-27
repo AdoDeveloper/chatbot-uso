@@ -4,8 +4,8 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from pydantic import BaseModel, Field
 from sqlalchemy import func as sa_func
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -44,7 +44,7 @@ class VersionDetailOut(VersionOut):
 
 
 class VersionCreate(BaseModel):
-    description: str = ""
+    description: str = Field("", max_length=500)
     force: bool = False
 
 
@@ -202,6 +202,7 @@ async def diff_version(
 @router.post("/{version_id}/rollback", response_model=RollbackResult)
 async def rollback_version(
     version_id: uuid.UUID,
+    req: Request,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(_admin),
 ):
@@ -210,8 +211,16 @@ async def rollback_version(
             db, version_id=version_id, user_id=user.id,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(status_code=404, detail="Versión no encontrada") from exc
 
+    from app.core.deps import get_client_ip
+    from app.services.system.audit import log_action
+    await log_action(
+        db, action="version.rollback", resource_type="config_version", actor_id=user.id,
+        resource_id=str(version_id),
+        meta={"new_version": rollback_version.version_number, "warnings": warnings},
+        ip=get_client_ip(req), user_agent=req.headers.get("user-agent"),
+    )
     await db.commit()
     await clear_all()
     invalidate_runtime_overrides()

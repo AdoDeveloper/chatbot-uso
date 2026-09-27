@@ -114,7 +114,7 @@ async def edit_chunk(
 
     source_id_str = existing.get("source_id")
     if not source_id_str:
-        raise HTTPException(status_code=500, detail="Chunk sin source_id en payload")
+        raise HTTPException(status_code=500, detail="El fragmento no está asociado a ningún documento.")
 
     source = await db.get(Source, uuid.UUID(source_id_str))
     if not source:
@@ -166,10 +166,11 @@ async def edit_chunk(
         wait=True,
     )
 
-    original = existing.get("parent_text_original")
+    previous_original = existing.get("parent_text_original")
+    original = previous_original
     if original and previous_body and previous_body in original:
         original = original.replace(previous_body, new_body, 1)
-    if new_parent_text != previous_parent_text and parent_id:
+    if parent_id and (new_parent_text != previous_parent_text or original != previous_original):
         from qdrant_client.models import FieldCondition, Filter, MatchValue
         siblings_filter = Filter(
             must=[FieldCondition(key="parent_id", match=MatchValue(value=parent_id))]

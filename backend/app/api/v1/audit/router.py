@@ -89,9 +89,9 @@ async def export_logs(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_perm(P.AUDIT_READ)),
 ):
-    from app.services.ingestion.export import excel_response, pdf_response
+    from app.services.ingestion.export import excel_response, local_datetime, pdf_response
 
-    q = select(AuditLog).order_by(AuditLog.created_at.desc())
+    q = select(AuditLog).options(selectinload(AuditLog.actor)).order_by(AuditLog.created_at.desc())
     if action:
         q = q.where(AuditLog.action.ilike(f"%{action}%"))
     if resource_type:
@@ -110,11 +110,11 @@ async def export_logs(
 
     rows = [
         {
-            "Fecha": str(log.created_at)[:19],
+            "Fecha": local_datetime(log.created_at),
             "Acción": log.action,
             "Tipo recurso": log.resource_type,
             "ID recurso": log.resource_id or "",
-            "Actor ID": str(log.actor_id) if log.actor_id else "",
+            "Usuario": log.actor.full_name if log.actor else "",
             "IP": log.ip or "",
         }
         for log in logs

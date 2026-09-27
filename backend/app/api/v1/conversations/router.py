@@ -26,7 +26,7 @@ from app.schemas.chat_history import (
 )
 from app.services.chat import history as svc
 from app.services.escalation import lifecycle as lifecycle_svc
-from app.services.ingestion.export import excel_response, pdf_response
+from app.services.ingestion.export import excel_response, local_datetime, pdf_response
 from app.services.system import audit as audit_svc
 
 
@@ -109,12 +109,13 @@ async def export_conversations(
     search: str | None = Query(None),
     date_from: datetime | None = Query(None),
     date_to: datetime | None = Query(None),
+    status_filter: ConversationStatus | None = Query(None, alias="status"),
     source: str = _SourceQ,
     origin: str = _OriginQ,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_perm(P.CONVERSATIONS_READ)),
 ):
-    """Exporta conversaciones como Excel o PDF."""
+    """Exporta conversaciones como Excel o PDF, con los mismos filtros que el listado."""
     try:
         await check_rate_limit(
             "chat:export", str(current_user.id),
@@ -123,13 +124,14 @@ async def export_conversations(
     except RateLimitExceeded as exc:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"Demasiadas exportaciones. Reintenta en {exc.retry_after}s.",
+            detail=f"Demasiadas exportaciones. Inténtelo de nuevo en {-(-exc.retry_after // 60)} minutos.",
             headers={"Retry-After": str(exc.retry_after)},
         )
 
     convs_page, _ = await svc.list_conversations(
         db, page=1, page_size=5000,
         search=search, date_from=date_from, date_to=date_to, source=source, origin=origin,
+        status_filter=status_filter,
     )
     conv_ids = [c.id for c in convs_page]
 
@@ -147,15 +149,16 @@ async def export_conversations(
             rows.append({
                 "Conversación ID": str(conv.id),
                 "Sesión": conv.session_id,
-                "Inicio": str(conv.started_at)[:19],
-                "Rol": msg.role.value if hasattr(msg.role, "value") else str(msg.role),
+                "Inicio": local_datetime(conv.started_at),
+                "Rol": {"user": "Usuario", "assistant": "Asistente"}.get(
+                    msg.role.value if hasattr(msg.role, "value") else str(msg.role), str(msg.role)),
                 "Contenido": msg.content,
                 "Latencia ms": msg.latency_ms,
                 "Ruta RAG": msg.rag_route or "",
                 "Valoración": {"positive": "Positiva", "negative": "Negativa"}.get(
                     (msg.feedback.value if hasattr(msg.feedback, "value") else str(msg.feedback)) if msg.feedback else "",
                     "") if msg.feedback else "",
-                "Fecha mensaje": str(msg.created_at)[:19],
+                "Fecha mensaje": local_datetime(msg.created_at),
             })
 
     if format == "pdf":
@@ -196,7 +199,7 @@ async def bulk_action(
     if body.action == "delete":
         from app.services.system.rbac import has_permission
         if not await has_permission(db, current_user.role, "conversations", "delete"):
-            raise HTTPException(status_code=403, detail="Sin permiso para conversations.delete")
+            raise HTTPException(status_code=403, detail="No tiene permiso para realizar esta acción.")
         result = await db.execute(
             select(ChatConversation).where(ChatConversation.id.in_(body.conversation_ids))
         )

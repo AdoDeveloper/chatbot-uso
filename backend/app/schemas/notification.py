@@ -4,7 +4,9 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel
+import re
+
+from pydantic import BaseModel, Field
 
 from app.models.enums import NotificationChannel, NotificationEvent
 
@@ -21,9 +23,21 @@ class NotificationRuleOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+_EMAIL_RE = re.compile(r"^[^\s@,]+@[^\s@,]+\.[^\s@,]{2,}$")
+
+
+def normalize_email_targets(v: str) -> str:
+    """Lista de correos separada por comas; ValueError con los que no son válidos."""
+    addresses = [a.strip() for a in v.split(",") if a.strip()]
+    invalid = [a for a in addresses if not _EMAIL_RE.match(a)]
+    if invalid:
+        raise ValueError(f"Correo no válido: {', '.join(invalid)}")
+    return ", ".join(addresses)
+
+
 class NotificationRuleUpdate(BaseModel):
     enabled: bool
-    target: str | None = None
+    target: str | None = Field(None, max_length=1000)
     config_json: dict[str, Any] = {}
 
 

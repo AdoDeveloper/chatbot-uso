@@ -250,7 +250,7 @@ async def get_injection_log(
             action=log.action,
             ip=log.ip,
             meta_json=log.meta_json,
-            created_at=str(log.created_at),
+            created_at=log.created_at.isoformat(),
         )
         for log in logs
     ]

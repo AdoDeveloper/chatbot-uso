@@ -310,3 +310,26 @@ class TestSafeRepr:
         repr_str = repr(rule)
         assert "NotificationRule" in repr_str
         assert str(rule.id) in repr_str
+
+
+async def test_rule_rejects_invalid_recipients_but_keeps_toggle_working(client, admin_user, auth_headers, db_session):
+    from sqlalchemy import select
+
+    from app.models.notification_rule import NotificationRule
+
+    rule = (await db_session.execute(select(NotificationRule).limit(1))).scalar_one_or_none()
+    if rule is None:
+        import pytest
+        pytest.skip("sin reglas sembradas")
+    r = await client.put(
+        f"/api/v1/notifications/rules/{rule.id}",
+        json={"enabled": True, "target": "no-es-correo"},
+        headers=auth_headers(admin_user),
+    )
+    assert r.status_code == 422
+    r = await client.put(
+        f"/api/v1/notifications/rules/{rule.id}",
+        json={"enabled": False, "target": "a@uso.edu.sv,  b@uso.edu.sv"},
+        headers=auth_headers(admin_user),
+    )
+    assert r.status_code == 200 and r.json()["target"] == "a@uso.edu.sv, b@uso.edu.sv"

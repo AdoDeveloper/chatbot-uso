@@ -1040,7 +1040,7 @@ async def get_csat(
     labels = await csat_reasons_svc.labels_map(db)
     top_reasons = sorted(
         (
-            CsatReasonCount(id=rid, label=labels.get(rid, rid), count=cnt)
+            CsatReasonCount(id=rid, label=labels.get(rid, "Motivo eliminado"), count=cnt)
             for rid, cnt in reason_counts.items()
         ),
         key=lambda r: r.count,

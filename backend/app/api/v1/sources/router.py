@@ -110,8 +110,9 @@ async def get_source(
 async def update_source(
     source_id: uuid.UUID,
     body: SourceUpdateMeta,
+    req: Request,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_perm(P.KNOWLEDGE_UPDATE)),
+    current_user: User = Depends(require_perm(P.KNOWLEDGE_UPDATE)),
 ):
     source = await sources_svc.get_or_404(db, source_id, load_user=True)
 
@@ -128,6 +129,12 @@ async def update_source(
         current_meta["tags"] = body.tags
     source.meta = current_meta
 
+    await audit_svc.log_action(
+        db, action="source.update", resource_type="source", actor_id=current_user.id,
+        resource_id=str(source.id),
+        meta={"name": source.name, "fields": sorted(body.model_dump(exclude_unset=True))},
+        ip=get_client_ip(req), user_agent=req.headers.get("user-agent"),
+    )
     await db.commit()
     if renamed:
         from app.services.ingestion import vector_store
@@ -147,9 +154,10 @@ async def update_source(
 @router.post("/{source_id}/ingest", response_model=SourceResponse)
 async def reingest_source(
     source_id: uuid.UUID,
+    req: Request,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_perm(P.KNOWLEDGE_UPDATE)),
+    current_user: User = Depends(require_perm(P.KNOWLEDGE_UPDATE)),
 ):
     source = await sources_svc.get_or_404(db, source_id)
     if source.status == SourceStatus.processing:
@@ -159,6 +167,11 @@ async def reingest_source(
         )
     source.status = SourceStatus.pending
     source.error_message = None
+    await audit_svc.log_action(
+        db, action="source.reingest", resource_type="source", actor_id=current_user.id,
+        resource_id=str(source.id), meta={"name": source.name},
+        ip=get_client_ip(req), user_agent=req.headers.get("user-agent"),
+    )
     await db.commit()
     await db.refresh(source)
     background_tasks.add_task(sources_svc.run_ingestion, source.id)
@@ -383,6 +396,22 @@ async def download_source(
     return FileResponse(path, filename=filename, media_type="application/octet-stream")
 
 
+def _extract_preview(p: Path, ext: str) -> str:
+    """Extracción síncrona (pypdf/python-docx); se ejecuta en un hilo para no frenar el chat."""
+    if ext in (".txt", ".md", ".csv"):
+        return p.read_text(encoding="utf-8", errors="replace")
+    if ext == ".pdf":
+        from pypdf import PdfReader
+        reader = PdfReader(str(p))
+        return "\n\n".join(page.extract_text() or "" for page in reader.pages[:5])
+    from docx import Document
+
+    from app.services.ingestion.parsing.docx import _check_zip_bomb
+    _check_zip_bomb(str(p))
+    doc = Document(str(p))
+    return "\n".join(par.text for par in doc.paragraphs[:200])
+
+
 @router.get("/{source_id}/preview", response_model=dict)
 async def preview_source(
     source_id: uuid.UUID,
@@ -402,27 +431,15 @@ async def preview_source(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="El archivo ya no está disponible en disco.",
             )
+        ext = p.suffix.lower()
+        if ext not in (".txt", ".md", ".csv", ".pdf", ".docx"):
+            raise HTTPException(
+                status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                detail=f"No hay vista previa para archivos {ext}.",
+            )
         try:
-            ext = p.suffix.lower()
-            if ext in (".txt", ".md", ".csv"):
-                preview_text = p.read_text(encoding="utf-8", errors="replace")
-            elif ext == ".pdf":
-                from pypdf import PdfReader
-                reader = PdfReader(str(p))
-                pages = [page.extract_text() or "" for page in reader.pages[:5]]
-                preview_text = "\n\n".join(pages)
-            elif ext in (".docx",):
-                from docx import Document
-
-                from app.services.ingestion.parsing.docx import _check_zip_bomb
-                _check_zip_bomb(str(p))
-                doc = Document(str(p))
-                preview_text = "\n".join(par.text for par in doc.paragraphs[:200])
-            else:
-                raise HTTPException(
-                    status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-                    detail=f"Preview no soportado para archivos {ext}.",
-                )
+            import asyncio
+            preview_text = await asyncio.to_thread(_extract_preview, p, ext)
         except HTTPException:
             raise
         except Exception as e:

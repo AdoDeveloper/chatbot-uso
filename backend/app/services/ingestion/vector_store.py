@@ -88,6 +88,7 @@ async def ensure_collection() -> None:
     # por punto y el grafo HNSW no construye enlaces conscientes del filtro.
     for field_name, field_schema in (
         ("source_id", PayloadSchemaType.KEYWORD),
+        ("parent_id", PayloadSchemaType.KEYWORD),
         ("is_discarded", PayloadSchemaType.BOOL),
         ("is_active", PayloadSchemaType.BOOL),
     ):
@@ -150,20 +151,25 @@ ALL_CHUNKS_CAP = 2000
 
 
 async def list_all_chunks(source_id: str) -> list[dict]:
-    """Trae todos los chunks de una fuente en una sola llamada, ordenados por chunk_index."""
+    """Trae todos los chunks de una fuente, por páginas, ordenados por chunk_index."""
     client = _get_client()
     source_filter = Filter(
         must=[FieldCondition(key="source_id", match=MatchValue(value=source_id))]
     )
-    result = await client.scroll(
-        collection_name=COLLECTION,
-        scroll_filter=source_filter,
-        limit=ALL_CHUNKS_CAP,
-        with_payload=True,
-        with_vectors=False,
-    )
-    points, _ = result
-    chunks = [{"id": str(p.id), **p.payload} for p in points]
+    chunks: list[dict] = []
+    offset = None
+    while True:
+        points, offset = await client.scroll(
+            collection_name=COLLECTION,
+            scroll_filter=source_filter,
+            limit=ALL_CHUNKS_CAP,
+            offset=offset,
+            with_payload=True,
+            with_vectors=False,
+        )
+        chunks.extend({"id": str(p.id), **p.payload} for p in points)
+        if offset is None:
+            break
     chunks.sort(key=lambda c: c.get("chunk_index", 0))
     return chunks
 

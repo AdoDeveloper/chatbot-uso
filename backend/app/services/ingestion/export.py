@@ -34,6 +34,21 @@ def _safe_cell(v: Any) -> str | int | float:
     return s
 
 
+def local_datetime(dt) -> str:
+    """Fecha y hora de El Salvador para los reportes (en BD se guardan en UTC)."""
+    from app.core.timezone import utc_to_sv
+    return utc_to_sv(dt).strftime("%d/%m/%Y %H:%M:%S") if dt else ""
+
+
+def _column_union(rows: list[dict[str, Any]]) -> list[str]:
+    """Columnas de todas las filas en orden de aparición: una tabla puede mezclar secciones distintas."""
+    seen: dict[str, None] = {}
+    for row in rows:
+        for key in row:
+            seen.setdefault(key, None)
+    return list(seen)
+
+
 def _num(v: Any) -> float | None:
     """Convierte valores de celda como "1,204" u "87%" a float para graficar."""
     if isinstance(v, (int, float)) and not isinstance(v, bool):
@@ -76,7 +91,7 @@ def build_excel(
         wb.save(buf)
         return buf.getvalue()
 
-    headers = list(first_nonempty.keys())
+    headers = _column_union(rows)
     n_cols = len(headers)
 
     # ── Membrete: institución, título y metadatos ──
@@ -218,7 +233,7 @@ def build_pdf(
     from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table
 
     buf = io.BytesIO()
-    page = landscape(A4) if rows and len(rows[0]) > 5 else A4
+    page = landscape(A4) if len(_column_union(rows)) > 5 else A4
     # Margen superior amplio para dejar espacio al membrete dibujado.
     doc = SimpleDocTemplate(
         buf, pagesize=page,
@@ -251,7 +266,7 @@ def build_pdf(
     if not first_nonempty:
         story.append(Paragraph("Sin datos para mostrar.", meta_style))
     else:
-        headers = list(first_nonempty.keys())
+        headers = _column_union(rows)
         col_count = len(headers)
         col_width = (page[0] - 3 * cm) / col_count
 
@@ -552,7 +567,7 @@ def build_pdf_report(
             story.append(Spacer(1, 0.3 * cm))
             continue
 
-        headers = list(first_nonempty.keys())
+        headers = _column_union(rows)
         col_count = len(headers)
         col_width = page_width / col_count
 

@@ -20,7 +20,7 @@ from app.schemas.provider import (
 )
 from app.services.ai.llm_gateway import reset_provider_breaker, test_connection
 from app.services.system import settings as settings_service
-from app.services.system.audit import log_action
+from app.services.system.audit import log_action, mask_headers
 
 router = APIRouter(prefix="/providers", tags=["providers"])
 
@@ -65,7 +65,7 @@ async def update_provider(
     result = await settings_service.update_provider(db, provider_id, data)
     if not result:
         raise NotFoundError("Proveedor no encontrado")
-    changed = {k: v for k, v in data.model_dump(exclude_unset=True).items() if k != "api_key"}
+    changed = mask_headers({k: v for k, v in data.model_dump(exclude_unset=True).items() if k != "api_key"})
     if "api_key" in data.model_dump(exclude_unset=True):
         changed["api_key"] = "***"
     await log_action(

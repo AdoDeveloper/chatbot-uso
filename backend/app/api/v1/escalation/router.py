@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.deps import require_perm
+from app.core.deps import get_client_ip, require_perm
 from app.core.permissions import P
 from app.db.session import get_db
 from app.models.enums import EscalationTrigger
@@ -24,6 +24,7 @@ from app.services.escalation import metrics as escalation_metrics
 from app.services.escalation import rules as rules_svc
 from app.services.escalation import service as svc
 from app.services.escalation.engine import schema_for_trigger
+from app.services.system.audit import log_action
 
 router = APIRouter(prefix="/escalation", tags=["escalation"])
 
@@ -36,32 +37,50 @@ async def list_rules(
     return await rules_svc.list_rules(db)
 
 
+async def _audit(db: AsyncSession, req: Request, user: User, action: str, rule_id, meta: dict) -> None:
+    await log_action(
+        db, action=action, resource_type="escalation_rule", actor_id=user.id,
+        resource_id=str(rule_id), meta=meta,
+        ip=get_client_ip(req), user_agent=req.headers.get("user-agent"),
+    )
+    await db.commit()
+
+
 @router.post("/rules", response_model=EscalationRuleOut, status_code=status.HTTP_201_CREATED)
 async def create_rule(
     body: EscalationRuleCreate,
+    req: Request,
     db: AsyncSession = Depends(get_db),
-    _: object = Depends(require_perm(P.ESCALATION_UPDATE)),
+    current_user: User = Depends(require_perm(P.ESCALATION_UPDATE)),
 ):
-    return await rules_svc.create_rule(db, data=body.model_dump())
+    rule = await rules_svc.create_rule(db, data=body.model_dump())
+    await _audit(db, req, current_user, "escalation_rule.create", rule.id, {"name": rule.name})
+    return rule
 
 
 @router.patch("/rules/{rule_id}", response_model=EscalationRuleOut)
 async def update_rule(
     rule_id: uuid.UUID,
     body: EscalationRuleUpdate,
+    req: Request,
     db: AsyncSession = Depends(get_db),
-    _: object = Depends(require_perm(P.ESCALATION_UPDATE)),
+    current_user: User = Depends(require_perm(P.ESCALATION_UPDATE)),
 ):
-    return await rules_svc.update_rule(db, rule_id=rule_id, changes=body.model_dump(exclude_unset=True))
+    changes = body.model_dump(exclude_unset=True)
+    rule = await rules_svc.update_rule(db, rule_id=rule_id, changes=changes)
+    await _audit(db, req, current_user, "escalation_rule.update", rule.id, {"name": rule.name, "fields": sorted(changes)})
+    return rule
 
 
 @router.delete("/rules/{rule_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_rule(
     rule_id: uuid.UUID,
+    req: Request,
     db: AsyncSession = Depends(get_db),
-    _: object = Depends(require_perm(P.ESCALATION_UPDATE)),
+    current_user: User = Depends(require_perm(P.ESCALATION_UPDATE)),
 ):
     await rules_svc.delete_rule(db, rule_id=rule_id)
+    await _audit(db, req, current_user, "escalation_rule.delete", rule_id, {})
 
 
 @router.post("/smtp-ping", response_model=ChannelPingResult)

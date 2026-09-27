@@ -65,6 +65,19 @@ def uploads_dir() -> Path:
     return p
 
 
+async def _read_limited(file: UploadFile, max_mb: int) -> bytes:
+    """Lee por bloques y corta en cuanto se pasa del límite, sin cargar el archivo entero."""
+    limit = max_mb * 1024 * 1024
+    chunks: list[bytes] = []
+    total = 0
+    while chunk := await file.read(1024 * 1024):
+        total += len(chunk)
+        if total > limit:
+            raise HTTPException(status_code=413, detail=f"El archivo excede el límite de {max_mb} MB.")
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
 def detect_type(filename: str, content_type: str) -> SourceType:
     ext = Path(filename).suffix.lower()
     if ext in _EXT_MAP:
@@ -106,7 +119,7 @@ async def upload_source(
     file_id = uuid.uuid4()
     dest = uploads_dir() / f"{file_id}.{source_type.value}"
 
-    content = await file.read()
+    content = await _read_limited(file, max_mb)
     if len(content) == 0:
         raise HTTPException(status_code=400, detail="El archivo está vacío.")
     if len(content) > max_mb * 1024 * 1024:
@@ -191,7 +204,7 @@ async def replace_source_file(
     if file.size is not None and file.size > max_mb * 1024 * 1024:
         raise HTTPException(status_code=413, detail=f"El archivo excede el límite de {max_mb} MB.")
 
-    content = await file.read()
+    content = await _read_limited(file, max_mb)
     if len(content) == 0:
         raise HTTPException(status_code=400, detail="El archivo está vacío.")
     if len(content) > max_mb * 1024 * 1024:
@@ -283,7 +296,7 @@ async def bulk_upload_sources(
             source_type = detect_type(file.filename or "", file.content_type or "")
             source_name = Path(file.filename or "archivo").stem[:255]
 
-            content = await file.read()
+            content = await _read_limited(file, max_mb)
             if len(content) == 0:
                 errors.append({"name": file.filename, "error": "El archivo está vacío."})
                 continue
@@ -347,6 +360,16 @@ async def bulk_upload_sources(
     return BulkUploadResult(created=created, errors=errors)
 
 
+def _remove_file(file_path: str | None) -> None:
+    """Las fuentes eliminadas no se pueden restaurar: su archivo ya no se necesita."""
+    if not file_path:
+        return
+    try:
+        Path(file_path).unlink(missing_ok=True)
+    except Exception as exc:
+        log.warning("sources.file_cleanup_failed", error=str(exc))
+
+
 async def delete_source(db: AsyncSession, *, source_id: uuid.UUID, req: Request, current_user: User) -> None:
     source = await get_or_404(db, source_id)
     source.deleted_at = datetime.now(timezone.utc)
@@ -361,6 +384,7 @@ async def delete_source(db: AsyncSession, *, source_id: uuid.UUID, req: Request,
         user_agent=req.headers.get("user-agent"),
     )
     await db.commit()
+    _remove_file(source.file_path)
     from app.services.ai import semantic_cache as cache_svc
     from app.services.ingestion.vector_store import delete_source as qdrant_delete
     try:
@@ -390,6 +414,8 @@ async def bulk_delete_sources(db: AsyncSession, *, source_ids: list[uuid.UUID]) 
         except Exception as exc:
             log.warning("sources.vector_cleanup_failed", source_id=str(source.id), error=str(exc))
     await db.commit()
+    for source in sources:
+        _remove_file(source.file_path)
     if deleted_any:
         try:
             await cache_svc.invalidate_by_source("bulk")

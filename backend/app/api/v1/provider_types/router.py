@@ -16,7 +16,7 @@ from app.schemas.provider_type_catalog import (
     ProviderTypeCatalogUpdate,
 )
 from app.services.system import provider_catalog as svc
-from app.services.system.audit import log_action
+from app.services.system.audit import log_action, mask_headers
 
 router = APIRouter(prefix="/provider-types", tags=["provider-types"])
 
@@ -69,7 +69,7 @@ async def update_provider_type(
     await log_action(
         db, action="provider_type.update", resource_type="provider_type_catalog",
         actor_id=current_user.id, resource_id=str(catalog_id),
-        meta={"changes": data.model_dump(exclude_unset=True)}, ip=get_client_ip(request),
+        meta={"changes": mask_headers(data.model_dump(exclude_unset=True))}, ip=get_client_ip(request),
     )
     await db.commit()
     return row

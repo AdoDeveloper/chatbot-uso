@@ -215,3 +215,20 @@ class TestGetIncidents:
         incidents = await health.get_incidents(db_session, since=now - timedelta(hours=2), until=now)
         assert len(incidents) == 1
         assert incidents[0]["samples"] == 2
+
+
+async def test_incident_open_at_the_end_of_a_past_range_gets_its_real_end(db_session):
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    db_session.add_all([
+        health.HealthSnapshot(service_name="Qdrant", is_ok=False, error="timeout", recorded_at=now - timedelta(hours=3)),
+        health.HealthSnapshot(service_name="Qdrant", is_ok=True, recorded_at=now - timedelta(hours=1)),
+    ])
+    await db_session.commit()
+
+    incidents = await health.get_incidents(
+        db_session, since=now - timedelta(hours=4), until=now - timedelta(hours=2),
+    )
+
+    assert len(incidents) == 1
+    assert incidents[0]["ended_at"] is not None
+    assert incidents[0]["duration_seconds"] == 7200

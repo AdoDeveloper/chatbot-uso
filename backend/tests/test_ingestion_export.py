@@ -400,3 +400,16 @@ def test_report_text_with_ampersand_and_angle_brackets_renders():
     data = build_pdf_report(sections, title="Reporte")
 
     assert data.startswith(b"%PDF")
+
+
+def test_excel_keeps_columns_that_only_later_rows_have():
+    rows = [
+        {"Sección": "KPIs", "Métrica": "Consultas", "Valor": 10},
+        {"Sección": "Latencia", "Métrica": "2026-09-01", "Promedio (ms)": 850},
+    ]
+    from openpyxl import load_workbook
+    ws = load_workbook(io.BytesIO(build_excel(rows))).active
+
+    assert [ws.cell(row=6, column=c).value for c in (1, 2, 3, 4)] == ["Sección", "Métrica", "Valor", "Promedio (ms)"]
+    assert ws.cell(row=8, column=4).value == 850
+

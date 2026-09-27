@@ -212,12 +212,19 @@ async def get_uptime_summary(
     for r in lat_q.all():
         lats_by_svc.setdefault(r.service_name, []).append(r.latency_ms)
 
-    last_q = await db.execute(
-        select(HealthSnapshot)
+    latest = (
+        select(HealthSnapshot.service_name, func.max(HealthSnapshot.recorded_at).label("at"))
         .where(HealthSnapshot.recorded_at >= since, HealthSnapshot.recorded_at <= until)
-        .order_by(HealthSnapshot.service_name, HealthSnapshot.recorded_at.desc())
+        .group_by(HealthSnapshot.service_name)
+        .subquery()
     )
-    # Quedarse con el registro más reciente por servicio.
+    last_q = await db.execute(
+        select(HealthSnapshot).join(
+            latest,
+            (HealthSnapshot.service_name == latest.c.service_name)
+            & (HealthSnapshot.recorded_at == latest.c.at),
+        )
+    )
     last_by_svc: dict[str, HealthSnapshot] = {}
     for r in last_q.scalars().all():
         last_by_svc.setdefault(r.service_name, r)
@@ -295,6 +302,25 @@ async def get_incidents(
 
     if current is not None:
         incidents.append(current)
+
+    # Un incidente abierto al cierre de un rango pasado puede haber terminado después.
+    for inc in incidents:
+        if inc["ended_at"] is not None:
+            continue
+        recovered = (await db.execute(
+            select(func.min(HealthSnapshot.recorded_at))
+            .where(HealthSnapshot.service_name == inc["service_name"])
+            .where(HealthSnapshot.is_ok.is_(True))
+            .where(HealthSnapshot.recorded_at > until)
+        )).scalar_one_or_none()
+        if recovered is not None:
+            if recovered.tzinfo is None:
+                recovered = recovered.replace(tzinfo=timezone.utc)
+            started = datetime.fromisoformat(inc["started_at"])
+            if started.tzinfo is None:
+                started = started.replace(tzinfo=timezone.utc)
+            inc["ended_at"] = recovered.isoformat()
+            inc["duration_seconds"] = int((recovered - started).total_seconds())
 
     incidents.sort(key=lambda x: x["started_at"], reverse=True)
     return incidents

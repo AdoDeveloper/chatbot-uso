@@ -15,7 +15,7 @@ def _point(point_id, payload, score=None):
 
 
 # Los campos por los que filtra hybrid_search, más el índice de texto.
-_EXPECTED_INDEXES = {"text", "source_id", "is_discarded", "is_active"}
+_EXPECTED_INDEXES = {"text", "source_id", "parent_id", "is_discarded", "is_active"}
 
 
 def _indexed_fields(client) -> set[str]:
@@ -358,3 +358,19 @@ async def test_balanced_search_keeps_the_global_relevance_order(patch_client, mo
 
     assert [d["source_id"] for d in result][:2] == ["grande", "grande"]
     assert result[-1]["source_id"] == "faq"
+
+
+async def test_list_all_chunks_reads_every_page(monkeypatch):
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    pages = [
+        ([SimpleNamespace(id=f"a{i}", payload={"chunk_index": i}) for i in range(3)], "next"),
+        ([SimpleNamespace(id="b0", payload={"chunk_index": 3})], None),
+    ]
+    client = SimpleNamespace(scroll=AsyncMock(side_effect=pages))
+    monkeypatch.setattr(vs, "_get_client", lambda: client)
+
+    chunks = await vs.list_all_chunks("src")
+
+    assert [c["id"] for c in chunks] == ["a0", "a1", "a2", "b0"]

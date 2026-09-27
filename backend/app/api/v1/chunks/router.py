@@ -132,7 +132,8 @@ async def test_query(
     from app.services.chat.pipeline import resolve_source_ids
     from app.services.rag.corrective import _GRADE_MAX_DOCS
 
-    source_ids = await resolve_source_ids(db, body.source_ids, use_all_sources=True)
+    # Sin filtro, las mismas fuentes que usa el chat (aprobadas); eligiendo fuentes se prueban también las pendientes.
+    source_ids = await resolve_source_ids(db, body.source_ids, use_all_sources=bool(body.source_ids))
     results = await vector_store.hybrid_search(
         query_dense=emb["dense"],
         query_sparse={"indices": emb["sparse_indices"], "values": emb["sparse_values"]},

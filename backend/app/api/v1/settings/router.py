@@ -3,16 +3,17 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.deps import require_perm
+from app.core.deps import get_client_ip, require_perm
 from app.core.permissions import P
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.settings import ChatbotSettings, ChatbotSettingsWithWarnings
 from app.services.system import settings as settings_service
+from app.services.system.audit import log_action
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -39,12 +40,22 @@ def _validate_settings(data: ChatbotSettings) -> list[str]:
     return warnings
 
 
+async def _audit(db: AsyncSession, req: Request, user: User, action: str, data: ChatbotSettings) -> None:
+    await log_action(
+        db, action=action, resource_type="settings", actor_id=user.id,
+        meta={"fields": sorted(data.model_dump(exclude_unset=True))},
+        ip=get_client_ip(req), user_agent=req.headers.get("user-agent"),
+    )
+
+
 @router.put("", response_model=ChatbotSettingsWithWarnings)
 async def update_settings(
     data: ChatbotSettings,
+    req: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_perm(P.BOT_SETTINGS_UPDATE)),
 ) -> ChatbotSettingsWithWarnings:
+    await _audit(db, req, current_user, "settings.update", data)
     result = await settings_service.update_settings(db, data, current_user.id)
     warnings = _validate_settings(result)
     return ChatbotSettingsWithWarnings(**result.model_dump(), warnings=warnings)
@@ -72,6 +83,7 @@ async def export_settings(
 
 @router.post("/import", response_model=ChatbotSettingsWithWarnings)
 async def import_settings(
+    req: Request,
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_perm(P.BOT_SETTINGS_UPDATE)),
@@ -91,6 +103,8 @@ async def import_settings(
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="El archivo no es un JSON válido.")
 
+    if not isinstance(bundle, dict):
+        raise HTTPException(status_code=400, detail="El archivo no tiene el formato de una configuración exportada.")
     if bundle.get("version") != _EXPORT_VERSION:
         raise HTTPException(
             status_code=400,
@@ -102,6 +116,7 @@ async def import_settings(
     except Exception as exc:
         raise HTTPException(status_code=422, detail=f"Configuración inválida: {exc}")
 
+    await _audit(db, req, current_user, "settings.import", data)
     result = await settings_service.update_settings(db, data, current_user.id)
     warnings = _validate_settings(result)
     return ChatbotSettingsWithWarnings(**result.model_dump(), warnings=warnings)
