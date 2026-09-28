@@ -104,11 +104,12 @@ test("descartar/restaurar y editar el contenido de un chunk", async ({ page }) =
   await expect(page.getByText(/ningún fragmento de esta página coincide/i)).toBeVisible({ timeout: 5_000 });
   await searchInput.fill("");
 
+  // El texto del fragmento se muestra siempre completo, sin recorte.
   const chunkText = firstRow.locator("p.text-sm").first();
+  await expect(chunkText).toHaveClass(/whitespace-pre-wrap/);
+  await expect(chunkText).not.toHaveClass(/line-clamp/);
   await chunkText.click();
   await expect(chunkText).toHaveClass(/whitespace-pre-wrap/);
-  await chunkText.click();
-  await expect(chunkText).toHaveClass(/line-clamp-2/);
 
   await page.goto("/dashboard/conocimiento/documentos");
   const cleanupRow = page.locator("tr", { hasText: sourceName });

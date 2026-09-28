@@ -91,7 +91,7 @@ export default function CambiarContrasenaPage() {
                 <p className="text-2xs font-semibold uppercase tracking-widest text-white/50 leading-none mb-0.5">
                   Panel de Administración
                 </p>
-                <p className="text-lg font-bold text-white tracking-tight leading-tight truncate">
+                <p className="text-lg font-bold text-white tracking-tight leading-tight min-w-0 wrap-anywhere">
                   Chatbot USO
                 </p>
               </div>

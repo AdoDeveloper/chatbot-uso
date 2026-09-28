@@ -222,7 +222,7 @@ export const SaludTab = forwardRef<SaludTabHandle>(function SaludTab(_props, ref
                       <span className="text-sm font-semibold text-foreground">{service.name}</span>
                     </div>
                     {service.detail && (
-                      <p className="text-2xs text-muted-foreground mt-0.5 pl-4.5 truncate">{service.detail}</p>
+                      <p className="text-2xs text-muted-foreground mt-0.5 pl-4.5 min-w-0 wrap-anywhere">{service.detail}</p>
                     )}
                   </TableCell>
                   <TableCell>
@@ -330,7 +330,7 @@ export const SaludTab = forwardRef<SaludTabHandle>(function SaludTab(_props, ref
                     </span>
                   </TableCell>
                   <TableCell className="text-xs tabular-nums text-muted-foreground">{inc.samples}</TableCell>
-                  <TableCell className="text-2xs font-mono text-muted-foreground truncate max-w-md">
+                  <TableCell className="text-2xs font-mono text-muted-foreground min-w-0 wrap-anywhere max-w-md">
                     {inc.last_error ?? "N/A"}
                   </TableCell>
                 </TableRow>

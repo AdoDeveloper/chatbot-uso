@@ -22,7 +22,7 @@ export function PageHeader({ title, action, badge, icon: Icon, tip }: PageHeader
           </div>
         )}
         <div className="min-w-0 flex items-center gap-2 flex-wrap">
-          <h1 className="text-lg font-semibold tracking-tight text-foreground leading-tight truncate">
+          <h1 className="text-lg font-semibold tracking-tight text-foreground leading-tight min-w-0 wrap-anywhere">
             {title}
           </h1>
           {tip && <HelpTip description={tip} side="bottom" align="start" />}

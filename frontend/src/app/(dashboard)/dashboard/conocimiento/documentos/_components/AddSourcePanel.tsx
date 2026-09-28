@@ -169,7 +169,7 @@ export function AddSourcePanel({ open, onClose, onCreated }: {
             <ul className="space-y-1 mt-1">
               {files.map((f, i) => (
                 <li key={f.name} className="flex items-center justify-between text-xs bg-muted/50 rounded-lg px-3 py-1.5">
-                  <span className="truncate max-w-70 font-medium">{f.name}</span>
+                  <span className="min-w-0 wrap-anywhere max-w-70 font-medium">{f.name}</span>
                   <span className="text-muted-foreground ml-2 shrink-0">{fmtSize(f.size)}</span>
                   <button
                     type="button"

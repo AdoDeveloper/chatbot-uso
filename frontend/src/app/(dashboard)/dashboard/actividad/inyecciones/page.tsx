@@ -75,11 +75,11 @@ export default function InyeccionesPage() {
                 <ShieldAlert className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
                 <div className="min-w-0 flex-1">
                   <p className="text-13 font-medium">{ev.meta_json?.reason ?? "Inyección detectada"}</p>
-                  <p className="text-2xs text-muted-foreground mt-0.5 truncate">
+                  <p className="text-2xs text-muted-foreground mt-0.5 min-w-0 wrap-anywhere">
                     IP {ev.ip ?? "N/A"} · {formatInProjectTz(ev.created_at)}
                   </p>
                   {ev.meta_json?.question_preview && (
-                    <p className="text-2xs text-muted-foreground mt-1 italic line-clamp-2">
+                    <p className="text-2xs text-muted-foreground mt-1 italic wrap-anywhere">
                       {ev.meta_json.question_preview}
                     </p>
                   )}

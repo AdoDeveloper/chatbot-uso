@@ -351,7 +351,7 @@ export function AuditoriaTab() {
                   >
                     {isSystem ? "S" : actorInitials(actor)}
                   </div>
-                  <span className="text-13 font-semibold text-foreground truncate">
+                  <span className="text-13 font-semibold text-foreground min-w-0 wrap-anywhere">
                     {isSystem ? "sistema" : actor.split(" ")[0] + (actor.split(" ")[1] ? ` ${actor.split(" ")[1][0]}.` : "")}
                   </span>
                 </div>
@@ -404,7 +404,7 @@ export function AuditoriaTab() {
                 {!detail.actor_name ? "S" : actorInitials(detail.actor_name ?? "sistema")}
               </div>
               <div className="min-w-0">
-                <p className="font-semibold text-foreground truncate">{detail.actor_name ?? "sistema"}</p>
+                <p className="font-semibold text-foreground min-w-0 wrap-anywhere">{detail.actor_name ?? "sistema"}</p>
                 <p className="text-2xs text-muted-foreground">{ACTION_LABELS[detail.action] ?? formatFallback(detail.action)}</p>
               </div>
             </div>

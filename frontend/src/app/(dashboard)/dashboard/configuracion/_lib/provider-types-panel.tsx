@@ -227,7 +227,7 @@ export function ProviderTypesPanel({
          </TableCell>
          <TableCell><p className="text-13 font-medium text-foreground">{t.display_name}</p></TableCell>
          <TableCell className="hidden md:table-cell">
-          <p className="text-13 text-muted-foreground truncate max-w-64">{t.default_api_base ?? "-"}</p>
+          <p className="text-13 text-muted-foreground min-w-0 wrap-anywhere max-w-64">{t.default_api_base ?? "-"}</p>
          </TableCell>
          <TableCell className="hidden lg:table-cell">
           <p className="text-13 text-muted-foreground">{t.requires_api_key ? "Sí" : "No"}</p>
@@ -236,7 +236,7 @@ export function ProviderTypesPanel({
           {t.notes ? (
            <span className="text-2xs text-warning flex items-center gap-1 max-w-64">
             <AlertCircle className="w-3 h-3 flex-shrink-0" />
-            <span className="truncate">{t.notes}</span>
+            <span className="min-w-0 wrap-anywhere">{t.notes}</span>
            </span>
           ) : <span className="text-muted-foreground">-</span>}
          </TableCell>

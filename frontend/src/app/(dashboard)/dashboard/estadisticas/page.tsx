@@ -123,6 +123,27 @@ interface ActivityData {
 }
 
 
+const TOPIC_AXIS_WIDTH = 130;
+const TOPIC_LINE_CHARS = 20;
+
+// Recharts no parte las etiquetas del eje: se reparten en líneas para mostrar el tema completo.
+function WrappedTopicTick({ x, y, payload }: { x?: number; y?: number; payload?: { value: string } }) {
+ const lines: string[] = [];
+ for (const word of String(payload?.value ?? "").split(/\s+/)) {
+  const last = lines[lines.length - 1];
+  if (last !== undefined && (last + " " + word).length <= TOPIC_LINE_CHARS) lines[lines.length - 1] = `${last} ${word}`;
+  else lines.push(word);
+ }
+ const lineHeight = 12;
+ return (
+  <text x={x} y={(y ?? 0) - ((lines.length - 1) * lineHeight) / 2} textAnchor="end" fontSize={12} fill="currentColor" className="fill-muted-foreground">
+   {lines.map((line, i) => (
+    <tspan key={i} x={x} dy={i === 0 ? 4 : lineHeight}>{line}</tspan>
+   ))}
+  </text>
+ );
+}
+
 const PIE_COLORS = [CHART_NAVY, CHART_TEAL, CHART_GREEN, "var(--color-warning)", "var(--color-destructive)", "var(--color-brand-cornflower)"];
 const ROUTE_LABELS: Record<string, string> = { greeting: "Saludo", factual: "Factual", complex: "Complejo" };
 
@@ -197,9 +218,9 @@ function MetricasTab() {
 
 
  // Gráfico de barras de tópicos: altura dinámica, sin tope
- const chartHeight = Math.max(220, topics.length * 32);
+ const chartHeight = Math.max(220, topics.reduce((h, t) => h + 20 + 12 * Math.ceil(t.topic.length / TOPIC_LINE_CHARS), 0));
  const chartData = topics.map((t) => ({
-  name: t.topic.length > 22 ? t.topic.slice(0, 22) + "…" : t.topic,
+  name: t.topic,
   count: t.count,
   rate: t.resolution_rate,
  }));
@@ -367,7 +388,7 @@ function MetricasTab() {
          <BarChart data={chartData} layout="vertical" margin={{ left: 0, right: 16, top: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" horizontal={false} />
           <XAxis type="number" tickLine={false} axisLine={false} />
-          <YAxis dataKey="name" type="category" width={130} tickLine={false} axisLine={false} />
+          <YAxis dataKey="name" type="category" width={TOPIC_AXIS_WIDTH} tickLine={false} axisLine={false} tick={<WrappedTopicTick />} interval={0} />
           <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
           <Bar dataKey="count" radius={[0, 4, 4, 0]} fill="var(--color-count)" maxBarSize={24} />
          </BarChart>
@@ -392,7 +413,7 @@ function MetricasTab() {
        <div className="space-y-3.5 max-h-100 overflow-y-auto pr-1">
         {topics.map((topic) => (
          <div key={topic.topic} className="flex items-center gap-3">
-          <span className="w-36 truncate text-sm">{topic.topic}</span>
+          <span className="w-36 min-w-0 wrap-anywhere text-sm">{topic.topic}</span>
           <div className="flex-1">
            <Progress
             value={topic.resolution_rate}
@@ -585,7 +606,7 @@ function MetricasTab() {
                    <p className="text-13 font-medium text-foreground leading-snug">{e.title}</p>
                    {e.detail && <p className="text-2xs text-muted-foreground mt-0.5 leading-snug">{e.detail}</p>}
                  </TableCell>
-                 <TableCell className="hidden md:table-cell w-36 text-2xs text-muted-foreground truncate">
+                 <TableCell className="hidden md:table-cell w-36 text-2xs text-muted-foreground min-w-0 wrap-anywhere">
                    {showActor && e.actor_name ? e.actor_name : "N/A"}
                  </TableCell>
                </TableRow>
@@ -1137,7 +1158,7 @@ function PagesPanel({ pages, loading }: { pages: PageStat[]; loading: boolean })
          <Globe className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
          <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-1">
-           <span className="text-sm truncate max-w-[60%]" title={p.page}>{displayLabel}</span>
+           <span className="text-sm min-w-0 wrap-anywhere max-w-[60%]" title={p.page}>{displayLabel}</span>
            <span className="text-2xs text-muted-foreground tabular-nums shrink-0">{p.count} · {p.percentage.toFixed(1)}%</span>
           </div>
           <Progress value={p.percentage} className="h-1.5" />

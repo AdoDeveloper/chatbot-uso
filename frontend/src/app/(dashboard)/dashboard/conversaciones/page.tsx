@@ -121,10 +121,10 @@ function SourcesDisclosure({ sources }: { sources: ChatMessageOut["sources_json"
       {sources.map((s) => (
        <li key={s.source_name} className="text-3xs text-muted-foreground border-l-2 border-border pl-2 py-0.5">
        <div className="flex items-center justify-between gap-2">
-        <span className="truncate font-medium text-foreground/80">{s.source_name}</span>
+        <span className="min-w-0 wrap-anywhere font-medium text-foreground/80">{s.source_name}</span>
         <span className="tabular-nums shrink-0">{(s.score * 100).toFixed(0)}%</span>
        </div>
-       {s.content && <p className="mt-0.5 line-clamp-2 leading-snug">{s.content}</p>}
+       {s.content && <p className="mt-0.5 wrap-anywhere leading-snug">{s.content}</p>}
       </li>
      ))}
     </ul>
@@ -349,7 +349,7 @@ export default function HistorialPage() {
          className={`w-full text-left px-4 py-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50 ${selected === c.id ? "bg-primary/5" : "hover:bg-muted/50"}`}
         >
          <div className="flex items-baseline justify-between gap-2 mb-1">
-          <span className="truncate text-13 text-foreground">
+          <span className="min-w-0 wrap-anywhere text-13 text-foreground">
            {c.first_user_message || <em className="text-muted-foreground">Sin mensajes</em>}
           </span>
           <span className="text-2xs text-muted-foreground shrink-0 tabular-nums">{timeAgo(c.last_message_at)}</span>
@@ -411,7 +411,7 @@ export default function HistorialPage() {
           </Button>
          )}
         </div>
-<p className="text-2xs text-muted-foreground truncate">
+<p className="text-2xs text-muted-foreground min-w-0 wrap-anywhere">
           {timeAgo(detail.last_message_at)} · {detail.browser ?? "Desconocido"} · {detail.message_count} mensajes
           {" · "}
           <span className="font-mono" title={detail.session_id}>{detail.session_id.slice(0, 8)}…</span>

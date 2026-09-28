@@ -254,10 +254,10 @@ export default function FAQTab() {
           renderRow={(entry) => (
             <TableRow>
               <TableCell className="font-medium text-sm align-top">
-                <p className="line-clamp-2">{entry.question}</p>
+                <p className=" wrap-anywhere">{entry.question}</p>
               </TableCell>
               <TableCell className="text-sm text-muted-foreground align-top hidden lg:table-cell">
-                <p className="line-clamp-2">{entry.answer}</p>
+                <p className=" wrap-anywhere">{entry.answer}</p>
               </TableCell>
               <TableCell className="align-top hidden md:table-cell">
                 <div className="flex flex-wrap gap-1">

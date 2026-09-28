@@ -295,7 +295,7 @@ export default function EscalamientoConfigPage() {
                         />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <p className="text-13 font-medium truncate min-w-0 max-w-full" title={rule.name}>{rule.name}</p>
+                            <p className="text-13 font-medium min-w-0 wrap-anywhere max-w-full" title={rule.name}>{rule.name}</p>
                             <Badge variant={rule.enabled ? "success" : "secondary"} className="text-3xs shrink-0">
                               {rule.enabled ? "Activa" : "Inactiva"}
                             </Badge>

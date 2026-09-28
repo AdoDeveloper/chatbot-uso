@@ -109,7 +109,7 @@ export function ReplaceFileModal({ source, onClose, onReplaced }: {
         {file ? (
           <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
             <div className="min-w-0">
-              <p className="text-13 font-medium text-foreground truncate">{file.name}</p>
+              <p className="text-13 font-medium text-foreground min-w-0 wrap-anywhere">{file.name}</p>
               <p className="text-2xs text-muted-foreground">{fmtSize(file.size)}</p>
             </div>
             <Button variant="ghost" size="icon-xs" onClick={() => setFile(null)} disabled={submitting}>

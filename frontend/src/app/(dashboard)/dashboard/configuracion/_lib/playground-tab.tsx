@@ -162,7 +162,7 @@ function SourceCard({
           {index + 1}
         </span>
         <FileText className="w-3 h-3 text-muted-foreground shrink-0" />
-        <span className="text-2xs font-medium text-foreground flex-1 min-w-0 truncate">
+        <span className="text-2xs font-medium text-foreground flex-1 min-w-0 wrap-anywhere">
           {source}
         </span>
         <span
@@ -172,7 +172,7 @@ function SourceCard({
           {score.toFixed(2)}
         </span>
       </div>
-      <p className="text-2xs text-muted-foreground line-clamp-2 leading-relaxed pl-5">
+      <p className="text-2xs text-muted-foreground wrap-anywhere leading-relaxed pl-5">
         {text}
       </p>
       <div className="pl-5">
@@ -722,7 +722,7 @@ export function PlaygroundTab({
             </div>
             <div className="flex-1 mx-2 bg-muted/70 rounded px-2.5 py-0.5 flex items-center gap-1.5 max-w-xs">
               <Globe className="w-2.5 h-2.5 text-muted-foreground shrink-0" />
-              <span className="text-3xs text-muted-foreground truncate">
+              <span className="text-3xs text-muted-foreground min-w-0 wrap-anywhere">
                 https://www.universidad.edu.sv
               </span>
             </div>
@@ -807,7 +807,7 @@ export function PlaygroundTab({
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-white truncate">
+                    <p className="text-sm font-semibold text-white min-w-0 wrap-anywhere">
                       {chatbotName}
                     </p>
                     <p className="text-2xs text-white/75">
@@ -1427,7 +1427,7 @@ export function PlaygroundTab({
 
             <div className={`items-center gap-2 self-center md:self-auto ${widgetOpen ? "hidden md:flex" : "flex"}`}>
               {!widgetOpen && launcherLabel && (
-                <div className="bg-white text-slate-800 border border-slate-200 rounded-full shadow-md px-3 py-1.5 text-xs font-medium max-w-[60vw] md:max-w-[200px] truncate">
+                <div className="bg-white text-slate-800 border border-slate-200 rounded-full shadow-md px-3 py-1.5 text-xs font-medium max-w-[60vw] md:max-w-[200px] min-w-0 wrap-anywhere">
                   {launcherLabel}
                 </div>
               )}
@@ -1492,12 +1492,12 @@ export function PlaygroundTab({
                       <Zap className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
                       <div className="min-w-0">
                         {meta.provider && (
-                          <p className="text-xs font-medium text-foreground truncate">
+                          <p className="text-xs font-medium text-foreground min-w-0 wrap-anywhere">
                             {meta.provider}
                           </p>
                         )}
                         {meta.model && (
-                          <p className="text-2xs text-muted-foreground truncate">
+                          <p className="text-2xs text-muted-foreground min-w-0 wrap-anywhere">
                             {meta.model}
                           </p>
                         )}

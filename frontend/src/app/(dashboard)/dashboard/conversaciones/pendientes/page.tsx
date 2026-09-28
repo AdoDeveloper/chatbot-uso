@@ -92,7 +92,7 @@ export default function PendientesPage() {
       <ConversacionesTabs />
       <div className="mb-4 pb-4 border-b border-border">
         <div className="flex items-center gap-2">
-          <h2 className="text-base font-semibold flex-1 min-w-0 truncate">Preguntas pendientes</h2>
+          <h2 className="text-base font-semibold flex-1 min-w-0 wrap-anywhere">Preguntas pendientes</h2>
         </div>
         <p className="text-2xs text-muted-foreground mt-0.5">
            Agrupadas por tema. Pueden convertirse en FAQ o marcarse como resueltas tras añadir el

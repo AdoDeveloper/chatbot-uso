@@ -362,9 +362,7 @@
     text-decoration: none;
     font-weight: 600;
     max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
     vertical-align: middle;
     font-size: 13px;
   }
@@ -379,8 +377,7 @@
   }
   .md-content a.pdf-link .pdf-name {
     min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow-wrap: anywhere;
   }
   .md-content a.pdf-link:hover { background: color-mix(in srgb, var(--pdf-link-color, #1e40af) 18%, transparent); }
   .md-content code { background: rgba(0,0,0,0.06); padding: 1px 5px; border-radius: 4px; font-family: "Fira Code", Consolas, monospace; font-size: 12.5px; }

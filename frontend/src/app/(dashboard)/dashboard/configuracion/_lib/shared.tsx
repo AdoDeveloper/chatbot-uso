@@ -24,7 +24,7 @@ export function CollapsibleCard({
      <h3 className="text-15 font-semibold tracking-tight">{title}</h3>
      {description && <p className="text-2xs text-muted-foreground mt-1">{description}</p>}
      {!open && preview && (
-      <p className="text-2xs text-muted-foreground/80 mt-1.5 truncate font-mono">{preview}</p>
+      <p className="text-2xs text-muted-foreground/80 mt-1.5 min-w-0 wrap-anywhere whitespace-pre-line font-mono">{preview}</p>
      )}
     </div>
     <ChevronRight

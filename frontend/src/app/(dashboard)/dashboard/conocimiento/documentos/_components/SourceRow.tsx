@@ -229,7 +229,7 @@ export function SourceRow({
       </TableCell>
       <TableCell className="max-w-40 sm:max-w-none">
        <div className="flex items-center gap-1.5 min-w-0">
-        <span className="font-semibold text-foreground text-13 truncate">{source.name}</span>
+        <span className="font-semibold text-foreground text-13 min-w-0 wrap-anywhere">{source.name}</span>
         <span className="text-3xs uppercase bg-muted text-muted-foreground px-1.5 py-0.5 rounded font-medium tracking-wide shrink-0">
          {TYPE_LABEL[source.type] ?? formatSourceFallback(source.type)}
         </span>

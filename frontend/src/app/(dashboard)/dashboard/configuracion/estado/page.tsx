@@ -87,7 +87,7 @@ function CacheEntriesModal({ open, onClose, onChanged }: { open: boolean; onClos
           <ul className="space-y-2 max-h-96 overflow-y-auto">
             {entries.map((entry) => (
               <li key={entry.key} className="flex items-center gap-3 rounded-lg border px-3 py-2 bg-muted/30">
-                <p className="text-13 flex-1 min-w-0 truncate" title={entry.question}>{entry.question}</p>
+                <p className="text-13 flex-1 min-w-0 wrap-anywhere" title={entry.question}>{entry.question}</p>
                 {canManage && (
                 <Button
                   variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
@@ -293,7 +293,7 @@ export default function EstadoPage() {
   return (
     <div>
       <div className="flex items-center mb-6">
-        <h2 className="text-base font-semibold flex-1 min-w-0 truncate">Salud de los servicios</h2>
+        <h2 className="text-base font-semibold flex-1 min-w-0 wrap-anywhere">Salud de los servicios</h2>
       </div>
 
       <section className="mb-10">

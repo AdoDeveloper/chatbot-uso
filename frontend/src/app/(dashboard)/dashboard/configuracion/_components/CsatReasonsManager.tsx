@@ -189,12 +189,12 @@ export function CsatReasonsManager() {
                 type="button"
                 onClick={() => startEdit(reason)}
                 title="Clic para editar"
-                className={`flex-1 min-w-0 text-left text-xs truncate ${reason.enabled ? "" : "text-muted-foreground line-through"}`}
+                className={`flex-1 min-w-0 text-left text-xs wrap-anywhere ${reason.enabled ? "" : "text-muted-foreground line-through"}`}
               >
                 {reason.label}
               </button>
             ) : (
-              <span className={`flex-1 min-w-0 text-left text-xs truncate ${reason.enabled ? "" : "text-muted-foreground line-through"}`}>
+              <span className={`flex-1 min-w-0 text-left text-xs wrap-anywhere ${reason.enabled ? "" : "text-muted-foreground line-through"}`}>
                 {reason.label}
               </span>
             )}

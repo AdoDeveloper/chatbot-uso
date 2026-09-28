@@ -180,13 +180,13 @@ function NotificationsPanel({
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
-                      <p className={`text-xs ${itemUnread ? "font-semibold" : "font-normal"} truncate`}>
+                      <p className={`text-xs ${itemUnread ? "font-semibold" : "font-normal"} min-w-0 wrap-anywhere`}>
                         {item.summary || meta.label}
                       </p>
                       {itemUnread && <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />}
                     </div>
                     {failed && item.error_message && (
-                      <p className="text-3xs text-destructive truncate mt-0.5">{item.error_message}</p>
+                      <p className="text-3xs text-destructive min-w-0 wrap-anywhere mt-0.5">{item.error_message}</p>
                     )}
                     <p className="text-3xs text-muted-foreground mt-0.5">{timeAgo(item.created_at)}</p>
                   </div>

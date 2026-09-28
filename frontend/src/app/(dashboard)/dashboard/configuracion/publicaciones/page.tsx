@@ -111,8 +111,8 @@ function DiffSection({ section, changes }: { section: string; changes: DiffChang
               {changes.map((c, i) => (
                 <TableRow key={i} className={c.action === "added" ? "bg-brand-green/10 hover:bg-brand-green/10" : c.action === "removed" ? "bg-destructive/5 hover:bg-destructive/5" : ""}>
                   <TableCell className="font-mono text-xs">{c.key}</TableCell>
-                  <TableCell className="text-muted-foreground max-w-48 truncate">{formatDiffValue(c.old)}</TableCell>
-                  <TableCell className="max-w-48 truncate">{formatDiffValue(c.new)}</TableCell>
+                  <TableCell className="text-muted-foreground max-w-48 min-w-0 wrap-anywhere">{formatDiffValue(c.old)}</TableCell>
+                  <TableCell className="max-w-48 min-w-0 wrap-anywhere">{formatDiffValue(c.new)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -162,7 +162,7 @@ function PendingSourcesList({
           <div key={s.id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-muted/30 border border-border/50">
             <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
             <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-medium">{s.name}</p>
+              <p className="min-w-0 wrap-anywhere text-xs font-medium">{s.name}</p>
               <p className="text-3xs text-muted-foreground tabular-nums">
                 {s.type.toUpperCase()} · {s.chunk_count ?? 0} fragmentos
               </p>
@@ -483,7 +483,7 @@ export default function PublicacionesPage() {
                           </Badge>
                         )}
                       </div>
-                      <p className="text-13 text-muted-foreground truncate mt-0.5">{v.change_summary || v.description}</p>
+                      <p className="text-13 text-muted-foreground min-w-0 wrap-anywhere mt-0.5">{v.change_summary || v.description}</p>
                       <p className="text-2xs text-muted-foreground/60 mt-0.5">
                         {formatInProjectTz(v.created_at, { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                         {v.created_by_name && ` · ${v.created_by_name}`}

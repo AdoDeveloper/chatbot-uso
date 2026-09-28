@@ -559,10 +559,10 @@ function ProviderRow({
     )}
    </TableCell>
    <TableCell className="max-w-32 sm:max-w-none">
-    <p className="text-13 font-medium text-foreground truncate">{p.name}</p>
+    <p className="text-13 font-medium text-foreground min-w-0 wrap-anywhere">{p.name}</p>
    </TableCell>
    <TableCell className="hidden md:table-cell">
-    <p className="text-13 text-foreground truncate max-w-56">{p.model_name}</p>
+    <p className="text-13 text-foreground min-w-0 wrap-anywhere max-w-56">{p.model_name}</p>
    </TableCell>
    <TableCell className="hidden sm:table-cell">
     {p.is_active

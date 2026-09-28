@@ -205,7 +205,7 @@ export function SeguridadTab() {
                     <div key={g.ip ?? "null"} className={`flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-lg border bg-card px-3 py-2 ${isThrottled ? "border-destructive/40 bg-destructive/5" : "border-border"}`}>
                       <div className="flex flex-1 items-center gap-2 min-w-[10rem]">
                         <Ban className={`w-3.5 h-3.5 shrink-0 ${isThrottled ? "text-destructive" : "text-muted-foreground"}`} />
-                        <code className="text-2xs font-mono truncate">{g.ip ?? "N/A"}</code>
+                        <code className="text-2xs font-mono min-w-0 wrap-anywhere">{g.ip ?? "N/A"}</code>
                         <span className="text-2xs text-muted-foreground whitespace-nowrap">
                           · {g.distinct_emails} correo{g.distinct_emails === 1 ? "" : "s"}
                         </span>
@@ -347,7 +347,7 @@ export function SeguridadTab() {
                     ) : (
                       <Badge variant="outline" className="font-mono">N/A</Badge>
                     )}
-                    {s.pattern && <Badge variant="secondary" className="font-mono text-3xs max-w-sm truncate">{s.pattern}</Badge>}
+                    {s.pattern && <Badge variant="secondary" className="font-mono text-3xs max-w-sm min-w-0 wrap-anywhere">{s.pattern}</Badge>}
                   </div>
                 </div>
               ))}

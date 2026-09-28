@@ -265,7 +265,7 @@ export default function NotificacionesHistorialPage() {
                       <div className="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0" title={meta.label}>
                         <Icon className="w-3.5 h-3.5" />
                       </div>
-                      <span className="truncate">{item.summary || meta.label}</span>
+                      <span className="min-w-0 wrap-anywhere">{item.summary || meta.label}</span>
                     </div>
                   </TableCell>
                   <TableCell className="hidden md:table-cell">

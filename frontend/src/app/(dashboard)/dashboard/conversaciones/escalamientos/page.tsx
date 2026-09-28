@@ -96,7 +96,7 @@ function MetricsPanel({ metrics, loading }: { metrics: EscalationMetrics | null;
               const label = TRIGGER_LABEL_SHORT[trigger as EscalationTrigger | "manual" | "user_consent"] ?? formatTriggerFallback(trigger);
               return (
                 <div key={trigger} className="flex items-center gap-3">
-                  <span className="text-13 text-foreground w-40 shrink-0 truncate">{label}</span>
+                  <span className="text-13 text-foreground w-40 shrink-0 min-w-0 wrap-anywhere">{label}</span>
                   <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
                     <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
                   </div>
@@ -179,7 +179,7 @@ function CaseCard({
               const detail = rest.join(":").trim();
               const label = TRIGGER_DISPLAY[prefix?.trim() as keyof typeof TRIGGER_DISPLAY] ?? formatTriggerFallback(prefix?.trim() ?? conv.escalation_trigger_reason);
               return (
-                <Badge variant="warning" size="xs" className="max-w-40 sm:max-w-56 truncate" title={conv.escalation_trigger_reason}>
+                <Badge variant="warning" size="xs" className="max-w-40 sm:max-w-56 min-w-0 wrap-anywhere" title={conv.escalation_trigger_reason}>
                   {detail ? `${label}: ${detail}` : label}
                 </Badge>
               );
@@ -192,7 +192,7 @@ function CaseCard({
             )}
           </div>
 
-          <p className="text-13 text-foreground leading-snug line-clamp-2">
+          <p className="text-13 text-foreground leading-snug wrap-anywhere">
             {conv.first_user_message ?? "Sin mensaje"}
           </p>
 
@@ -226,7 +226,7 @@ function CaseCard({
                 </div>
               )}
               {conv.csat_comment && (
-                <p className="text-2xs text-muted-foreground italic leading-snug line-clamp-2">
+                <p className="text-2xs text-muted-foreground italic leading-snug wrap-anywhere">
                   &quot;{conv.csat_comment}&quot;
                 </p>
               )}
@@ -463,7 +463,7 @@ export default function EscalamientosPage() {
         {/* Encabezado: contador + filtros */}
         <div className="flex flex-col gap-3 px-5 py-4 border-b border-border/60">
           <div className="flex items-center gap-2">
-            <h2 className="text-base font-semibold flex-1 min-w-0 truncate">{FILTER_LABELS[filter]}</h2>
+            <h2 className="text-base font-semibold flex-1 min-w-0 wrap-anywhere">{FILTER_LABELS[filter]}</h2>
             {!loading && (
               <Badge variant="outline" className="tabular-nums shrink-0">
                 {total} caso{total !== 1 ? "s" : ""}

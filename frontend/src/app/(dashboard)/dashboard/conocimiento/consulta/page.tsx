@@ -179,7 +179,7 @@ export default function ChunkTestPage() {
               active ? prev.filter((id) => id !== s.id) : [...prev, s.id]
              )
             }
-            className={`h-7 max-w-full truncate px-3 text-xs font-medium rounded-full border transition ${
+            className={`h-7 max-w-full min-w-0 wrap-anywhere px-3 text-xs font-medium rounded-full border transition ${
              active ? "bg-primary text-primary-foreground border-primary" : "bg-background text-muted-foreground border-border hover:bg-muted-foreground/10 hover:text-foreground"
             }`}
             title={s.name}

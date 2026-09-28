@@ -271,7 +271,6 @@ export default function SourceChunksPage() {
          const isExpanded = expanded === chunk.id;
          const isBusy = busyChunk === chunk.id;
          const charCount = chunk.text.length;
-         const shortId = chunk.id.length > 12 ? `${chunk.id.slice(0, 6)}…${chunk.id.slice(-4)}` : chunk.id;
          return (
           <TableRow key={chunk.id} className={`group ${chunk.is_discarded ? "opacity-60" : ""}`}>
            <TableCell className="align-top">
@@ -282,20 +281,20 @@ export default function SourceChunksPage() {
              <button
               type="button"
               onClick={() => copyId(chunk.id)}
-              className="inline-flex items-center gap-0.5 py-1 -my-1 text-3xs font-mono text-muted-foreground hover:text-foreground transition rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-              aria-label={`Copiar ID del fragmento ${shortId}`}
+              className="inline-flex items-start gap-0.5 py-1 -my-1 text-3xs font-mono text-left break-all text-muted-foreground hover:text-foreground transition rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+              aria-label={`Copiar ID del fragmento ${chunk.id}`}
              >
               <Copy className="w-3 h-3" aria-hidden="true" />
-              {shortId}
+              {chunk.id}
              </button>
             </Tooltip>
            </TableCell>
-           <TableCell className="text-2xs text-muted-foreground truncate max-w-40 align-top hidden md:table-cell">
+           <TableCell className="text-2xs text-muted-foreground min-w-0 wrap-anywhere max-w-40 align-top hidden md:table-cell">
             {chunk.section || "N/A"}
            </TableCell>
            <TableCell className="align-top">
             <p
-             className={`text-sm ${isExpanded ? "whitespace-pre-wrap" : "line-clamp-2"} cursor-pointer`}
+             className="text-sm whitespace-pre-wrap wrap-anywhere cursor-pointer"
              onClick={() => setExpanded(isExpanded ? null : chunk.id)}
             >
              {chunk.text}

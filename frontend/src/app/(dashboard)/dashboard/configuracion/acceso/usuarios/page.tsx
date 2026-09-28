@@ -151,7 +151,7 @@ function EditUserPanel({ user, meId, availableRoles, onClose, onSaved }: {
             <UserAvatar name={user.full_name} email={user.email} />
             <div className="min-w-0">
               <p className="font-semibold text-foreground text-sm">{user.full_name}</p>
-              <p className="text-2xs text-muted-foreground truncate">{user.email}</p>
+              <p className="text-2xs text-muted-foreground min-w-0 wrap-anywhere">{user.email}</p>
             </div>
           </div>
           {error && <Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertDescription>{error}</AlertDescription></Alert>}
@@ -496,7 +496,7 @@ function UsuariosTab() {
       <Card className="overflow-hidden">
         <div className="flex flex-col gap-3 px-5 py-4 border-b border-border/60">
           <div className="flex items-center gap-2 min-w-0">
-            <h3 className="text-sm font-semibold text-foreground truncate">Equipo</h3>
+            <h3 className="text-sm font-semibold text-foreground min-w-0 wrap-anywhere">Equipo</h3>
             <span className="text-2xs px-1.5 py-0.5 rounded-full font-semibold bg-muted text-muted-foreground shrink-0">{usersTotal}</span>
           </div>
           {canManageUsers && (
@@ -531,8 +531,8 @@ function UsuariosTab() {
                 <div className="flex items-center gap-3 min-w-0">
                   <UserAvatar name={u.full_name} email={u.email} />
                   <div className="min-w-0">
-                    <p className="text-13 font-semibold text-foreground truncate leading-tight">{u.full_name}</p>
-                    <p className="text-2xs text-muted-foreground truncate">{u.email}</p>
+                    <p className="text-13 font-semibold text-foreground min-w-0 wrap-anywhere leading-tight">{u.full_name}</p>
+                    <p className="text-2xs text-muted-foreground min-w-0 wrap-anywhere">{u.email}</p>
                   </div>
                 </div>
               </TableCell>
@@ -594,7 +594,7 @@ function UsuariosTab() {
             const statusMeta = INVITE_STATUS_META[status];
             return (
             <TableRow>
-              <TableCell className="truncate max-w-40" title={inv.email}>{inv.email}</TableCell>
+              <TableCell className="min-w-0 wrap-anywhere max-w-40" title={inv.email}>{inv.email}</TableCell>
               <TableCell className="hidden sm:table-cell">
                 <Badge variant="outline" size="sm" className={`border-transparent ${roleBadgeClass(inv.role)}`}>
                   {availableRoles.find((r) => r.name === inv.role)?.display_name ?? inv.role}

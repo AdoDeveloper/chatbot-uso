@@ -163,7 +163,7 @@ export function OnboardingWizard() {
                       {step.title}
                     </p>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                  <p className="text-xs text-muted-foreground mt-0.5 wrap-anywhere">
                     {blocked ?? step.description}
                   </p>
                 </div>

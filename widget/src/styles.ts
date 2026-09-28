@@ -140,9 +140,7 @@ export const STYLES = `
   font-size: 14px;
   line-height: 20px;
   display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .header-status {
@@ -306,9 +304,7 @@ export const STYLES = `
   text-decoration: none;
   font-weight: 600;
   max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
   vertical-align: middle;
   font-size: 13px;
 }
@@ -323,8 +319,7 @@ export const STYLES = `
 }
 .md a.pdf-link .pdf-name {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 .md a.pdf-link:hover { background: color-mix(in srgb, var(--color-primary) 18%, transparent); }
 
@@ -488,10 +483,7 @@ export const STYLES = `
   font-size: 12px;
   color: #4b5563;
   line-height: 1.5;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  overflow-wrap: anywhere;
 }
 
 .input-row {
@@ -736,7 +728,8 @@ export const STYLES = `
   font-size: 13px;
   font-weight: 500;
   box-shadow: 0 2px 10px rgba(0,0,0,0.12);
-  white-space: nowrap;
+  max-width: min(260px, calc(100vw - 96px));
+  overflow-wrap: anywhere;
   transition: background 0.15s;
 }
 

@@ -224,7 +224,7 @@ export default function DashboardPage() {
           <div key={s.name} className="flex items-center justify-between gap-2 text-2xs">
            <div className="flex items-center gap-2 min-w-0">
             <span className={`w-2 h-2 rounded-full shrink-0 ${cls}`} />
-            <span className="text-foreground truncate">{s.name}</span>
+            <span className="text-foreground min-w-0 wrap-anywhere">{s.name}</span>
            </div>
            <span className={`tabular-nums shrink-0 ${ok ? "text-muted-foreground" : warn ? "text-warning font-semibold" : "text-destructive font-semibold"}`}>
             {s.latency_ms != null ? `${s.latency_ms}ms` : (SERVICE_STATUS_LABEL[s.status] ?? formatServiceStatusFallback(s.status))}
@@ -286,7 +286,7 @@ export default function DashboardPage() {
           s.status === "error" ? "bg-destructive" : "bg-warning animate-pulse"
          }`} />
          <div className="min-w-0 flex-1">
-           <p className="truncate text-13 font-medium">{s.name}</p>
+           <p className="min-w-0 wrap-anywhere text-13 font-medium">{s.name}</p>
            <p className="mt-0.5 text-2xs text-muted-foreground tabular-nums">
            {s.type.toUpperCase()} · {s.chunk_count ?? 0} fragmentos
           </p>
@@ -346,7 +346,7 @@ export default function DashboardPage() {
          >
           <UserRound className={`h-4 w-4 shrink-0 ${urgent ? "text-destructive" : "text-warning"}`} />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-13 font-medium">{c.first_user_message ?? "Sin mensaje"}</p>
+            <p className="min-w-0 wrap-anywhere text-13 font-medium">{c.first_user_message ?? "Sin mensaje"}</p>
             <p className="mt-0.5 text-2xs text-muted-foreground tabular-nums">
             {c.message_count} mensajes · esperando {timeLabel}
            </p>
@@ -398,7 +398,7 @@ export default function DashboardPage() {
            <CheckCircle2 className="h-3 w-3" />
           </span>
           <div className="flex-1 min-w-0">
-           <p className="text-13 font-medium truncate">{p.name}</p>
+           <p className="text-13 font-medium min-w-0 wrap-anywhere">{p.name}</p>
            <p className="text-2xs text-muted-foreground">{p.model_name}</p>
           </div>
           <Badge variant="secondary" className="text-3xs font-mono shrink-0">#{p.priority}</Badge>
@@ -431,8 +431,8 @@ function QuickAction({
     <Icon className="h-4 w-4" />
    </div>
    <div className="min-w-0 flex-1">
-    <p className="text-13 font-medium truncate">{label}</p>
-    <p className="text-2xs text-muted-foreground truncate">{hint}</p>
+    <p className="text-13 font-medium min-w-0 wrap-anywhere">{label}</p>
+    <p className="text-2xs text-muted-foreground min-w-0 wrap-anywhere">{hint}</p>
    </div>
    <ArrowUpRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
   </Link>
@@ -451,7 +451,7 @@ function SecurityRow({
   <div className="flex items-center justify-between gap-2">
    <div className="flex items-center gap-2 min-w-0">
     <Icon className={`h-3.5 w-3.5 shrink-0 ${bad ? "text-destructive" : "text-muted-foreground"}`} />
-    <span className="text-13 text-foreground truncate">{label}</span>
+    <span className="text-13 text-foreground min-w-0 wrap-anywhere">{label}</span>
    </div>
    <span className={`text-13 font-semibold tabular-nums shrink-0 ${bad ? "text-destructive" : "text-muted-foreground"}`}>
     {value}
@@ -548,7 +548,7 @@ function WorkflowCycle({
          }`}>
           {isOk ? "✓" : i + 1}
          </span>
-         <span className={`text-xs font-semibold truncate ${
+         <span className={`text-xs font-semibold min-w-0 wrap-anywhere ${
           isOk ? "text-success" : isPending ? "text-warning" : "text-muted-foreground"
          }`}>
           {phase.label}
