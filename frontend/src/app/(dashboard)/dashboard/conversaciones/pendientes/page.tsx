@@ -167,8 +167,8 @@ export default function PendientesPage() {
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0 flex-1">
                               <p className="text-sm">{q.question}</p>
-                              <div className="flex items-center gap-3 mt-1">
-                                <p className="text-2xs text-muted-foreground flex items-center gap-1">
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1">
+                                <p className="text-2xs text-muted-foreground flex items-center gap-1 whitespace-nowrap">
                                   <Clock className="w-3 h-3" />
                                   {formatInProjectTz(q.created_at, { dateStyle: "short", timeStyle: "short" })}
                                 </p>
@@ -176,7 +176,7 @@ export default function PendientesPage() {
                                   <Tooltip content="Ver la conversación original">
                                     <Link
                                       href={`/dashboard/conversaciones?id=${q.conversation_id}`}
-                                      className="text-xs text-primary hover:underline flex items-center gap-0.5"
+                                      className="text-xs text-primary hover:underline flex items-center gap-0.5 whitespace-nowrap"
                                     >
                                       <ExternalLink className="w-3 h-3" />
                                       Ver conversación

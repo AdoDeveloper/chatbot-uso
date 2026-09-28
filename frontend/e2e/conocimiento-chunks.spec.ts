@@ -39,13 +39,13 @@ test("descartar/restaurar y editar el contenido de un chunk", async ({ page }) =
   await expect(row.getByText("Listo", { exact: true })).toBeVisible({ timeout: 60_000 });
 
   await row.getByRole("button").last().click();
-  const verChunks = page.getByRole("menuitem", { name: /ver chunks/i });
+  const verChunks = page.getByRole("menuitem", { name: /ver fragmentos/i });
   if (!(await verChunks.isVisible().catch(() => false))) {
     test.skip(true, "la fuente no generó chunks indexables (contenido muy corto o filtrado)");
   }
   await verChunks.click();
   await expect(page).toHaveURL(/\/chunks$/, { timeout: 10_000 });
-  await expect(page.getByRole("heading", { name: /chunks indexados/i })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole("heading", { name: /fragmentos indexados/i })).toBeVisible({ timeout: 10_000 });
   await page.screenshot({ path: path.join(SHOT_DIR, "01-lista-chunks.png") });
 
   const firstRow = page.locator("tbody tr").first();
@@ -62,7 +62,7 @@ test("descartar/restaurar y editar el contenido de un chunk", async ({ page }) =
   await firstRow.getByRole("button").last().click();
   await page.getByRole("menuitem", { name: /editar contenido/i }).click();
   const editDialog = page.getByRole("dialog");
-  await expect(editDialog.getByRole("heading", { name: /editar chunk/i })).toBeVisible();
+  await expect(editDialog.getByRole("heading", { name: /editar fragmento/i })).toBeVisible();
   const textarea = editDialog.locator("textarea").first();
   const original = await textarea.inputValue();
   await textarea.fill(`${original} [editado por E2E]`);
@@ -101,7 +101,7 @@ test("descartar/restaurar y editar el contenido de un chunk", async ({ page }) =
   await searchInput.fill("editado por e2e");
   await expect(page.getByText(/coinciden\./i)).toBeVisible({ timeout: 5_000 });
   await searchInput.fill("texto que definitivamente no existe en ningún chunk xyz123");
-  await expect(page.getByText(/ningún chunk de esta página coincide/i)).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByText(/ningún fragmento de esta página coincide/i)).toBeVisible({ timeout: 5_000 });
   await searchInput.fill("");
 
   const chunkText = firstRow.locator("p.text-sm").first();
@@ -148,13 +148,13 @@ test("filtro de warnings por tipo (chunk corto)", async ({ page }) => {
   await expect(row.getByText("Listo", { exact: true })).toBeVisible({ timeout: 60_000 });
 
   await row.getByRole("button").last().click();
-  const verChunks = page.getByRole("menuitem", { name: /ver chunks/i });
+  const verChunks = page.getByRole("menuitem", { name: /ver fragmentos/i });
   if (!(await verChunks.isVisible().catch(() => false))) {
     test.skip(true, "la fuente no generó chunks indexables (contenido muy corto o filtrado)");
   }
   await verChunks.click();
   await expect(page).toHaveURL(/\/chunks$/, { timeout: 10_000 });
-  await expect(page.getByRole("heading", { name: /chunks indexados/i })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole("heading", { name: /fragmentos indexados/i })).toBeVisible({ timeout: 10_000 });
   // La lista carga asincrona: da tiempo antes de descartar el warning banner.
   await page.locator("tbody tr").first().waitFor({ timeout: 10_000 }).catch(() => {});
 

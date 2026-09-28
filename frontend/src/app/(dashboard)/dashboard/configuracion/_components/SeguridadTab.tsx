@@ -202,12 +202,12 @@ export function SeguridadTab() {
                   const isThrottled = g.ip != null && throttled.some((t) => t.ip === g.ip);
                   const throttleInfo = g.ip != null ? throttled.find((t) => t.ip === g.ip) : null;
                   return (
-                    <div key={g.ip ?? "null"} className={`flex items-center justify-between rounded-lg border bg-card px-3 py-2 ${isThrottled ? "border-destructive/40 bg-destructive/5" : "border-border"}`}>
-                      <div className="flex items-center gap-2 min-w-0">
+                    <div key={g.ip ?? "null"} className={`flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-lg border bg-card px-3 py-2 ${isThrottled ? "border-destructive/40 bg-destructive/5" : "border-border"}`}>
+                      <div className="flex flex-1 items-center gap-2 min-w-[10rem]">
                         <Ban className={`w-3.5 h-3.5 shrink-0 ${isThrottled ? "text-destructive" : "text-muted-foreground"}`} />
                         <code className="text-2xs font-mono truncate">{g.ip ?? "N/A"}</code>
-                        <span className="text-2xs text-muted-foreground">
-                          · {g.distinct_emails} email{g.distinct_emails === 1 ? "" : "s"}
+                        <span className="text-2xs text-muted-foreground whitespace-nowrap">
+                          · {g.distinct_emails} correo{g.distinct_emails === 1 ? "" : "s"}
                         </span>
                         {isThrottled && (
                           <Badge className="text-3xs bg-destructive/10 text-destructive border-destructive/30">

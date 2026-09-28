@@ -185,17 +185,16 @@ export function CsatReasonsManager() {
                 className="h-7 text-xs flex-1"
               />
             ) : canUpdate ? (
-              <Tooltip content="Clic para editar">
-                <button
-                  type="button"
-                  onClick={() => startEdit(reason)}
-                  className={`flex-1 text-left text-xs truncate ${reason.enabled ? "" : "text-muted-foreground line-through"}`}
-                >
-                  {reason.label}
-                </button>
-              </Tooltip>
+              <button
+                type="button"
+                onClick={() => startEdit(reason)}
+                title="Clic para editar"
+                className={`flex-1 min-w-0 text-left text-xs truncate ${reason.enabled ? "" : "text-muted-foreground line-through"}`}
+              >
+                {reason.label}
+              </button>
             ) : (
-              <span className={`flex-1 text-left text-xs truncate ${reason.enabled ? "" : "text-muted-foreground line-through"}`}>
+              <span className={`flex-1 min-w-0 text-left text-xs truncate ${reason.enabled ? "" : "text-muted-foreground line-through"}`}>
                 {reason.label}
               </span>
             )}

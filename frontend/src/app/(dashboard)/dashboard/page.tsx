@@ -288,7 +288,7 @@ export default function DashboardPage() {
          <div className="min-w-0 flex-1">
            <p className="truncate text-13 font-medium">{s.name}</p>
            <p className="mt-0.5 text-2xs text-muted-foreground tabular-nums">
-           {s.type.toUpperCase()} · {s.chunk_count ?? 0} chunks
+           {s.type.toUpperCase()} · {s.chunk_count ?? 0} fragmentos
           </p>
          </div>
          <Badge

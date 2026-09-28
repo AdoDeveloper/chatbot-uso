@@ -235,7 +235,7 @@ export default function EstadoPage() {
       void saludRef.current?.refetchAll();
       toast({
         type: "success",
-        message: `${data.orphan_chunks_deleted} chunks huérfanos eliminados.`,
+        message: `${data.orphan_chunks_deleted} fragmentos sin documento eliminados.`,
       });
     } catch (err) {
       toast({ type: "error", message: getErrorMessage(err, "No se pudo sincronizar Qdrant.") });
@@ -307,7 +307,7 @@ export default function EstadoPage() {
 
       <section>
         <div className="mb-3">
-          <h2 className="text-base font-semibold">Recovery</h2>
+          <h2 className="text-base font-semibold">Recuperación</h2>
           <p className="text-2xs text-muted-foreground mt-0.5">
             <strong>No es necesario ejecutarlas en uso normal</strong>: al eliminar
             un documento, los fragmentos del índice y el caché ya se limpian

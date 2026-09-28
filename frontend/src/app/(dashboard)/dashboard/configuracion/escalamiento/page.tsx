@@ -15,7 +15,6 @@ import { TRIGGER_LABEL_LONG } from "@/lib/escalation-labels";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Tooltip } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -296,7 +295,7 @@ export default function EscalamientoConfigPage() {
                         />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <Tooltip content={rule.name}><p className="text-13 font-medium truncate min-w-0">{rule.name}</p></Tooltip>
+                            <p className="text-13 font-medium truncate min-w-0 max-w-full" title={rule.name}>{rule.name}</p>
                             <Badge variant={rule.enabled ? "success" : "secondary"} className="text-3xs shrink-0">
                               {rule.enabled ? "Activa" : "Inactiva"}
                             </Badge>
@@ -410,7 +409,7 @@ export default function EscalamientoConfigPage() {
                   <Mail className="w-4 h-4 text-muted-foreground shrink-0" />
                   <div>
                     <p className="text-13 font-medium">Prueba de SMTP</p>
-                    <p className="text-2xs text-muted-foreground">Envía un email de prueba a su cuenta para verificar la entrega.</p>
+                    <p className="text-2xs text-muted-foreground">Envía un correo de prueba a su cuenta para verificar la entrega.</p>
                   </div>
                 </div>
                 <Button

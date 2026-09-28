@@ -42,8 +42,8 @@ test.describe("Conocimiento > Documentos > controles avanzados de fila", () => {
     await page.getByRole("menuitem", { name: /vista previa/i }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByText(/contenido extraído/i)).toBeVisible({ timeout: 10_000 });
-    await expect(dialog.getByText(/chunks/i).first()).toBeVisible();
-    await expect(dialog.getByText(/hits 7d/i)).toBeVisible();
+    await expect(dialog.getByText(/fragmentos/i).first()).toBeVisible();
+    await expect(dialog.getByText(/usos \(7 días\)/i)).toBeVisible();
     await expect(dialog.getByText(/último uso/i)).toBeVisible();
     await page.screenshot({ path: path.join(SHOT_DIR, "01-vista-previa.png") });
 

@@ -76,7 +76,7 @@ function StatCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1">
-            <p className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground truncate">
+            <p className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground leading-snug min-w-0 break-words hyphens-auto">
               {title}
             </p>
             {tip && <HelpTip description={tip} side="bottom" align="start" />}

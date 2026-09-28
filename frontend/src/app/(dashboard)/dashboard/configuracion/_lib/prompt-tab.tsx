@@ -9,7 +9,7 @@ export function PromptTab({ form, set }: { form: ChatbotSettings; set: (k: keyof
   <div className="space-y-5">
    <CollapsibleCard
     title="Prompt del sistema"
-    description={<>Instrucciones base del modelo. Usa <code className="text-xs bg-muted px-1 rounded">{"{context}"}</code> para insertar las fuentes recuperadas.</>}
+    description={<>Instrucciones base del modelo. Use <code className="text-xs bg-muted px-1 rounded">{"{context}"}</code> para insertar las fuentes recuperadas.</>}
     preview={form.system_prompt.split("\n").slice(0, 2).join(" · ").slice(0, 140) + (form.system_prompt.length > 140 ? "…" : "")}
    >
     <Textarea value={form.system_prompt} onChange={(e) => set("system_prompt", e.target.value)}

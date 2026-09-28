@@ -23,7 +23,7 @@ test.describe("Configuracion > Estado", () => {
 
   test("sincronizar qdrant (recovery, idempotente)", async ({ page }) => {
     await page.goto("/dashboard/configuracion/estado");
-    await expect(page.getByRole("heading", { name: /recovery/i })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("heading", { name: /recuperación/i })).toBeVisible({ timeout: 10_000 });
 
     await page.getByRole("button", { name: /sincronizar ahora/i }).click();
     const confirmDialog = page.locator("div.fixed.inset-0.z-\\[200\\]");

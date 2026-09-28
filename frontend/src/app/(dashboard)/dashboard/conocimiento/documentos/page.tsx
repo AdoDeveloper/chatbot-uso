@@ -255,7 +255,7 @@ export default function SourcesPage() {
           tip="Fuentes con ingesta terminada. Solo las aprobadas son visibles al chatbot."
         />
         <StatCard
-          title="Chunks indexados"
+          title="Fragmentos indexados"
           value={totalChunks.toLocaleString()}
           tip="Fragmentos almacenados en el índice vectorial."
         />
@@ -365,7 +365,7 @@ export default function SourcesPage() {
             { id: "fuente", header: "Documento" },
             { id: "estado", header: "Estado", className: "w-24", hideBelow: "sm" },
             { id: "revision", header: "Revisión", className: "w-28", hideBelow: "sm" },
-            { id: "chunks", header: "Chunks", className: "w-24", hideBelow: "md" },
+            { id: "chunks", header: "Fragmentos", className: "w-24", hideBelow: "md" },
             { id: "etiquetas", header: "Etiquetas", className: "w-56", hideBelow: "lg" },
             { id: "acciones", header: "Acciones", className: "whitespace-nowrap text-right", sticky: true },
           ]}

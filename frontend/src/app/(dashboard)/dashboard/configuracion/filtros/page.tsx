@@ -519,15 +519,15 @@ const KNOWN_PATTERN_CATEGORIES = [
                         <button
                           type="button"
                           onClick={() => setOpenCategories((s) => ({ ...s, [cat]: !s[cat] }))}
-                          className="w-full flex items-center justify-between px-3 py-2 bg-muted/30 hover:bg-muted/50 transition-colors"
+                          className="w-full flex flex-wrap items-center justify-between gap-x-2 gap-y-1 px-3 py-2 text-left bg-muted/30 hover:bg-muted/50 transition-colors"
                         >
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2 min-w-0">
                             {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                             <span className="text-13 font-medium">{cat}</span>
-                            <Badge variant="outline" className="text-3xs tabular-nums">{items.length} patrones</Badge>
+                            <Badge variant="outline" className="text-3xs tabular-nums whitespace-nowrap">{items.length} patrones</Badge>
                           </div>
                           {blocked > 0 && (
-                            <Badge className="text-3xs tabular-nums bg-destructive/15 text-destructive border-destructive/30">
+                            <Badge className="text-3xs tabular-nums whitespace-nowrap bg-destructive/15 text-destructive border-destructive/30">
                               {blocked} bloqueo{blocked === 1 ? "" : "s"} (30d)
                             </Badge>
                           )}

@@ -278,6 +278,8 @@ export function PlaygroundTab({
     const mql = window.matchMedia("(max-width: 767px)");
     const onChange = () => setIsMobilePreview(mql.matches);
     onChange();
+    // En mobile el chat abierto tapa toda la página: se empieza cerrado.
+    if (mql.matches) setWidgetOpen(false);
     mql.addEventListener("change", onChange);
     return () => mql.removeEventListener("change", onChange);
   }, []);
@@ -1473,7 +1475,7 @@ export function PlaygroundTab({
               <div className="flex flex-col items-center justify-center gap-3 px-6 py-10 text-center h-full">
                 <MessageSquare className="w-9 h-9 text-muted-foreground/20" />
                 <p className="text-2xs text-muted-foreground leading-relaxed">
-                  Envía un mensaje para ver el diagnóstico de la respuesta: proveedor, latencia y fuentes RAG consultadas.
+                  Envíe un mensaje para ver el diagnóstico de la respuesta: proveedor, latencia y fuentes consultadas.
                 </p>
               </div>
             )}

@@ -320,7 +320,7 @@ export function SourceRow({
          {isReady && source.chunk_count > 0 && (
           <DropdownMenuItem onClick={() => router.push(`/dashboard/conocimiento/documentos/${source.id}/chunks`)}>
            <FileSearch className="w-3.5 h-3.5 mr-2" />
-           Ver chunks
+           Ver fragmentos
           </DropdownMenuItem>
          )}
          {errorTooltip && (
@@ -371,11 +371,11 @@ export function SourceRow({
           {quality && (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <div className="border border-border rounded-md px-3 py-2">
-                <p className="text-3xs uppercase tracking-wider text-muted-foreground">Chunks</p>
+                <p className="text-3xs uppercase tracking-wider text-muted-foreground">Fragmentos</p>
                 <p className="text-lg font-bold tabular-nums">{quality.total_chunks.toLocaleString()}</p>
               </div>
               <div className="border border-border rounded-md px-3 py-2">
-                <p className="text-3xs uppercase tracking-wider text-muted-foreground">Hits 7d</p>
+                <p className="text-3xs uppercase tracking-wider text-muted-foreground">Usos (7 días)</p>
                 <p className={`text-lg font-bold tabular-nums ${quality.hits_7d > 0 ? "text-success" : "text-muted-foreground"}`}>
                   {quality.hits_7d}
                 </p>

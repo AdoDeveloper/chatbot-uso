@@ -94,7 +94,7 @@ export default function SourceChunksPage() {
    toast({ type: "error", message: "No se pudo copiar." });
    return;
   }
-  toast({ type: "success", message: "ID del chunk copiado." });
+  toast({ type: "success", message: "ID del fragmento copiado." });
  }
 
  const chunksQuery = useMemo(() => {
@@ -113,7 +113,7 @@ export default function SourceChunksPage() {
   useApi<ChunkListResponse>(`/chunks/source/${sourceId}?${chunksQuery}`);
 
  useEffect(() => {
-  if (chunksError) toast({ type: "error", message: "No se pudieron cargar los chunks de esta fuente." });
+  if (chunksError) toast({ type: "error", message: "No se pudieron cargar los fragmentos de este documento." });
  }, [chunksError, toast]);
 
  async function toggleDiscard(chunk: ChunkOut) {
@@ -124,9 +124,9 @@ export default function SourceChunksPage() {
    setData((prev) => prev
     ? { ...prev, chunks: prev.chunks.map((c) => c.id === chunk.id ? { ...c, is_discarded: !chunk.is_discarded } : c) }
     : prev);
-   toast({ type: "success", message: chunk.is_discarded ? "Chunk restaurado." : "Chunk descartado." });
+   toast({ type: "success", message: chunk.is_discarded ? "Fragmento restaurado." : "Fragmento descartado." });
   } catch (err) {
-   toast({ type: "error", message: getErrorMessage(err, "No se pudo actualizar el chunk.") });
+   toast({ type: "error", message: getErrorMessage(err, "No se pudo actualizar el fragmento.") });
   } finally {
    setBusyChunk(null);
   }
@@ -149,9 +149,9 @@ export default function SourceChunksPage() {
  return (
   <PageShell
    icon={Layers}
-   title="Chunks indexados"
+   title="Fragmentos indexados"
    description={
-      (data ? `${data.total} chunks en esta fuente` : "Cargando...") +
+      (data ? `${data.total} fragmentos en este documento` : "Cargando...") +
       (data?.chunks?.[0]?.source_name ? ` · ${data.chunks[0].source_name}` : "")
    }
    before={
@@ -174,9 +174,9 @@ export default function SourceChunksPage() {
      <CardContent>
       <EmptyState
        icon={Layers}
-       title={warningFilter ? "Sin chunks que coincidan" : "Sin chunks"}
+       title={warningFilter ? "Sin fragmentos que coincidan" : "Sin fragmentos"}
        description={warningFilter
-        ? "Ningún chunk tiene esa advertencia. Limpia el filtro para ver todos."
+        ? "Ningún fragmento tiene esa advertencia. Limpie el filtro para ver todos."
         : "Este documento aún no ha sido indexado"}
       />
      </CardContent>
@@ -192,7 +192,7 @@ export default function SourceChunksPage() {
          value={search}
          onChange={(e) => setSearch(e.target.value)}
          placeholder="Buscar en página actual..."
-         aria-label="Buscar en chunks de la página actual"
+         aria-label="Buscar en los fragmentos de la página actual"
          className="pl-8 h-9"
         />
        </div>
@@ -212,7 +212,7 @@ export default function SourceChunksPage() {
       <div className="flex flex-wrap items-center gap-2 px-5 pt-4">
        <AlertTriangle className="h-4 w-4 text-warning shrink-0" />
        <span className="text-13 font-medium text-warning">
-        {totalWarnings} {totalWarnings === 1 ? "chunk necesita" : "chunks necesitan"} atención:
+        {totalWarnings} {totalWarnings === 1 ? "fragmento necesita" : "fragmentos necesitan"} atención:
        </span>
        <div className="flex gap-1.5 flex-wrap">
         {(Object.entries(data.warning_counts) as [WarningFlag, number][]).map(([k, n]) => {
@@ -264,7 +264,7 @@ export default function SourceChunksPage() {
         {filteredChunks.length === 0 && search.trim() ? (
          <TableRow>
           <TableCell colSpan={7} className="text-center py-8 text-sm text-muted-foreground">
-           Ningún chunk de esta página coincide con &ldquo;{search}&rdquo;.
+           Ningún fragmento de esta página coincide con &ldquo;{search}&rdquo;.
           </TableCell>
          </TableRow>
         ) : filteredChunks.map((chunk) => {
@@ -278,12 +278,12 @@ export default function SourceChunksPage() {
             <Badge variant="secondary" className="font-mono text-xs">{chunk.chunk_index}</Badge>
            </TableCell>
            <TableCell className="align-top hidden lg:table-cell">
-            <Tooltip content={`ID Qdrant: ${chunk.id} · clic para copiar`}>
+            <Tooltip content={`ID interno: ${chunk.id} · clic para copiar`}>
              <button
               type="button"
               onClick={() => copyId(chunk.id)}
               className="inline-flex items-center gap-0.5 py-1 -my-1 text-3xs font-mono text-muted-foreground hover:text-foreground transition rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-              aria-label={`Copiar ID del chunk ${shortId}`}
+              aria-label={`Copiar ID del fragmento ${shortId}`}
              >
               <Copy className="w-3 h-3" aria-hidden="true" />
               {shortId}
@@ -303,7 +303,7 @@ export default function SourceChunksPage() {
             <div className="flex items-center gap-2 mt-1.5">
              <Tooltip content={`${charCount} caracteres`}>
               <span className="text-3xs tabular-nums text-muted-foreground">
-               {charCount.toLocaleString()} chars
+               {charCount.toLocaleString()} caracteres
               </span>
              </Tooltip>
             </div>
@@ -396,7 +396,7 @@ export default function SourceChunksPage() {
       pageSize={pageSize}
       onPageChange={setPage}
       onPageSizeChange={(n) => { setPageSize(n); setPage(1); }}
-      itemLabel={warningFilter ? "chunks · filtro activo" : "chunks"}
+      itemLabel={warningFilter ? "fragmentos · filtro activo" : "fragmentos"}
      />
     </Card>
    )}
@@ -418,7 +418,7 @@ export default function SourceChunksPage() {
    <Modal
     open={!!previewChunk}
     onClose={() => setPreviewChunk(null)}
-    title={`Chunk #${previewChunk?.chunk_index}`}
+    title={`Fragmento #${previewChunk?.chunk_index}`}
     size="3xl"
     subtitle={previewChunk ? `${previewChunk.text.length.toLocaleString()} caracteres` : undefined}
     footer={
@@ -465,7 +465,7 @@ function ChunkEditDialog({
   setSaving(true);
   try {
    await api.patch(`/chunks/${chunk.id}/content`, { text, reason: reason.trim() || undefined });
-   toast({ type: "success", message: "Chunk editado y re-indexado." });
+   toast({ type: "success", message: "Fragmento editado; el cambio ya se aplica en las respuestas." });
    onSaved();
   } catch (err) {
    toast({ type: "error", message: getErrorMessage(err, "No se pudo guardar.") });
@@ -478,7 +478,7 @@ function ChunkEditDialog({
    <Modal
     open={open}
     onClose={onClose}
-    title={`Editar chunk #${chunk?.chunk_index}`}
+    title={`Editar fragmento #${chunk?.chunk_index}`}
     size="3xl"
     footer={
      <>
@@ -547,14 +547,14 @@ function ChunkHistorySheet({
     open={open}
     onClose={onClose}
     title="Historial de ediciones"
-    subtitle={chunk ? `Chunk #${chunk.chunk_index} · ${chunk.id.slice(0, 8)}` : undefined}
+    subtitle={chunk ? `Fragmento #${chunk.chunk_index} · ${chunk.id.slice(0, 8)}` : undefined}
     size="2xl"
    >
     <div className="space-y-4">
      {loading ? (
       <Loading />
      ) : history.length === 0 ? (
-      <EmptyState icon={Clock} title="Sin ediciones" description="Este chunk nunca ha sido modificado." />
+      <EmptyState icon={Clock} title="Sin ediciones" description="Este fragmento nunca ha sido modificado." />
      ) : (
       history.map((edit) => (
        <div key={edit.id} className="rounded-lg border border-border bg-card p-4 space-y-3">

@@ -62,6 +62,17 @@ const RESOURCE_TYPE_LABELS: Record<string, string> = {
   llm_provider: "Proveedor",
   provider_type_catalog: "Tipo de proveedor",
   conversation: "Conversación",
+  settings: "Configuración",
+  integration: "Integración",
+  system: "Sistema",
+  escalation_rule: "Regla de escalamiento",
+  faq: "FAQ",
+  chunk: "Fragmento",
+  config_version: "Versión",
+  invitation: "Invitación",
+  notification: "Notificación",
+  unanswered_question: "Pregunta pendiente",
+  analytics: "Estadísticas",
 };
 
 const RESOURCE_TYPES = [
@@ -92,6 +103,49 @@ const ACTION_LABELS: Record<string, string> = {
   "user.update": "Editó un usuario",
   "user.delete": "Eliminó un usuario",
   "user.reset_password": "Restableció la contraseña de un usuario",
+  "provider.api_key_revealed": "Mostró la clave de un proveedor",
+  "source.update": "Editó una fuente",
+  "source.reingest": "Reprocesó una fuente",
+  "source.bulk_delete": "Eliminó varias fuentes",
+  "source.bulk_reingest": "Reprocesó varias fuentes",
+  "source.bulk_tag": "Etiquetó varias fuentes",
+  "faq.create": "Creó una FAQ",
+  "faq.update": "Editó una FAQ",
+  "faq.delete": "Eliminó una FAQ",
+  "chunk.discard": "Descartó un fragmento",
+  "chunk.restore": "Restauró un fragmento",
+  "settings.update": "Editó la configuración del asistente",
+  "settings.import": "Importó la configuración del asistente",
+  "version.rollback": "Restauró una versión",
+  "version.snapshot": "Guardó un punto de restauración",
+  "escalation_rule.create": "Creó una regla de escalamiento",
+  "escalation_rule.update": "Editó una regla de escalamiento",
+  "escalation_rule.delete": "Eliminó una regla de escalamiento",
+  "integrations.auth_methods.update": "Cambió los métodos de inicio de sesión",
+  "integrations.oauth.update": "Cambió la configuración de Microsoft SSO",
+  "guardrails.update_config": "Editó la configuración de filtros",
+  "guardrails.pattern.create": "Creó un patrón de bloqueo",
+  "guardrails.pattern.update": "Editó un patrón de bloqueo",
+  "guardrails.pattern.delete": "Eliminó un patrón de bloqueo",
+  "cache.clear": "Vació la caché",
+  "cache.delete_entry": "Eliminó una entrada de la caché",
+  "cache.update_config": "Editó la configuración de la caché",
+  "rate_limits.update_config": "Editó los límites de uso",
+  "rate_limits.unblock_ip": "Desbloqueó una IP",
+  "maintenance.sync_qdrant": "Sincronizó el índice de búsqueda",
+  "maintenance.purge_health_outliers": "Limpió el historial de salud",
+  "alerts.run_proactive_checks": "Ejecutó las revisiones de alertas",
+  "analytics.export": "Exportó estadísticas",
+  "notification_rule.update": "Editó una regla de notificación",
+  "notification_rule.toggle_email": "Activó o desactivó avisos por correo",
+  "report_schedule.update": "Editó la programación de reportes",
+  "unanswered.create_faq": "Creó una FAQ desde una pregunta pendiente",
+  "unanswered.resolve": "Resolvió una pregunta pendiente",
+  "invitation.create": "Creó una invitación",
+  "invitation.resend": "Reenvió una invitación",
+  "invitation.revoke": "Revocó una invitación",
+  "invitation.delete": "Eliminó una invitación",
+  "invitation.accept": "Aceptó una invitación",
 };
 
 function formatFallback(value: string): string {
@@ -209,7 +263,7 @@ export function AuditoriaTab() {
             <select
               value={resourceType}
               onChange={(e) => { setResourceType(e.target.value); setPage(1); }}
-              className="h-7 px-2 text-xs border border-border rounded-lg bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 min-w-0"
+              className="h-7 w-full sm:w-auto sm:max-w-48 px-2 text-xs border border-border rounded-lg bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 min-w-0"
               aria-label="Filtrar por tipo de recurso"
             >
               {RESOURCE_TYPES.map((rt) => (
@@ -222,7 +276,7 @@ export function AuditoriaTab() {
             <select
               value={actorId}
               onChange={(e) => { setActorId(e.target.value); setPage(1); }}
-              className="h-7 px-2 text-xs border border-border rounded-lg bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 min-w-0"
+              className="h-7 w-full sm:w-auto sm:max-w-48 px-2 text-xs border border-border rounded-lg bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 min-w-0"
               aria-label="Filtrar por actor"
             >
               <option value="">Todos</option>
@@ -303,7 +357,7 @@ export function AuditoriaTab() {
                 </div>
               </td>
               <td className="px-3 py-2 align-top">
-                <p className="text-13 text-muted-foreground leading-snug">{ACTION_LABELS[entry.action] ?? formatFallback(entry.action)}</p>
+                <p className="min-w-40 text-13 text-muted-foreground leading-snug">{ACTION_LABELS[entry.action] ?? formatFallback(entry.action)}</p>
               </td>
               <td className="px-3 py-2 align-top hidden md:table-cell">
                 <span className="text-2xs text-muted-foreground">
