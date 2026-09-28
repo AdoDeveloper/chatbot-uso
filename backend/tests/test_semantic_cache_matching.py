@@ -9,6 +9,7 @@ from app.services.ai import semantic_cache as cache_svc
 @pytest.fixture(autouse=True)
 def _fake_redis(monkeypatch):
     import fakeredis.aioredis
+
     from app.core import redis as redis_mod
 
     fake = fakeredis.aioredis.FakeRedis(decode_responses=True)
@@ -78,13 +79,13 @@ class TestGetCachedResponseMatching:
 
     async def test_best_match_wins_among_multiple_entries(self, monkeypatch):
         monkeypatch.setattr(cache_svc, "embed_texts_async", _embed_fixed([1.0, 0.0, 0.0]))
-        await cache_svc.store_cached_response("pregunta A", None, [], "respuesta A")
+        await cache_svc.store_cached_response("¿Dónde queda la biblioteca?", None, [], "respuesta A")
 
         monkeypatch.setattr(cache_svc, "embed_texts_async", _embed_fixed([0.0, 1.0, 0.0]))
-        await cache_svc.store_cached_response("pregunta B", None, [], "respuesta B")
+        await cache_svc.store_cached_response("¿Cuánto cuesta la matrícula?", None, [], "respuesta B")
 
         monkeypatch.setattr(cache_svc, "embed_texts_async", _embed_fixed([0.0, 0.99, 0.14]))
-        result = await cache_svc.get_cached_response("pregunta parecida a B", None, threshold=0.5)
+        result = await cache_svc.get_cached_response("¿Cuál es el costo de matricularse?", None, threshold=0.5)
         assert result is not None
         assert result["content"] == "respuesta B"
 
@@ -169,3 +170,36 @@ class TestInvalidateBySourceDeletion:
     async def test_invalidate_with_no_entries_returns_zero(self):
         deleted_count = await cache_svc.invalidate_by_source("some-source")
         assert deleted_count == 0
+
+
+class TestQuestionScopeGuard:
+    """Una pregunta más específica no hereda la respuesta de la general, aunque los embeddings coincidan."""
+
+    async def _hit(self, monkeypatch, stored: str, asked: str):
+        monkeypatch.setattr(cache_svc, "embed_texts_async", _embed_fixed([1.0, 0.0, 0.0]))
+        await cache_svc.store_cached_response(stored, None, [], "respuesta guardada")
+        return await cache_svc.get_cached_response(asked, None, threshold=0.9)
+
+    async def test_more_specific_question_is_a_miss(self, monkeypatch):
+        assert await self._hit(
+            monkeypatch, "¿Cuáles son las modalidades de graduación?",
+            "En posgrado, ¿qué modalidades de graduación hay?",
+        ) is None
+
+    async def test_more_general_question_is_a_miss(self, monkeypatch):
+        assert await self._hit(
+            monkeypatch, "En posgrado, ¿qué modalidades de graduación hay?",
+            "¿Cuáles son las modalidades de graduación?",
+        ) is None
+
+    async def test_same_content_with_other_filler_words_is_a_hit(self, monkeypatch):
+        assert await self._hit(
+            monkeypatch, "¿Cuáles son las modalidades de graduación?",
+            "¿Qué modalidades de graduación hay?",
+        ) is not None
+
+    async def test_different_numbers_are_a_miss(self, monkeypatch):
+        assert await self._hit(
+            monkeypatch, "Tengo CUM de 7.5, ¿qué modalidades puedo elegir?",
+            "Tengo CUM de 8.5, ¿qué modalidades puedo elegir?",
+        ) is None

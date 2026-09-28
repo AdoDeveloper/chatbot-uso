@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
+import unicodedata
 from typing import Any
 
 import numpy as np
@@ -38,6 +40,36 @@ def _threshold() -> float:
 def _sids_token(source_ids: list[str] | None) -> str:
     """Token determinista de los source_ids para comparar scope de fuentes."""
     return json.dumps(sorted(source_ids or []))
+
+
+_FILLER_WORDS = frozenset([
+    "a", "al", "algo", "alguna", "alguno", "cual", "cuales", "cuando", "cuanto", "cuanta",
+    "cuantos", "cuantas", "como", "con", "de", "del", "donde", "el", "ella", "ellos", "en",
+    "entre", "es", "esa", "ese", "eso", "esta", "este", "esto", "estan", "existe", "existen",
+    "fue", "ha", "hacer", "hay", "la", "las", "le", "les", "lo", "los", "me", "mi", "mis",
+    "necesito", "o", "para", "pero", "por", "puede", "puedo", "pueden", "que", "quien", "quiero",
+    "se", "ser", "si", "sin", "sobre", "son", "su", "sus", "tambien", "tengo", "tiene", "tienen",
+    "tu", "un", "una", "unas", "uno", "unos", "y", "ya", "yo",
+])
+
+
+def _content_terms(question: str) -> tuple[set[str], set[str]]:
+    """Raíces de las palabras con contenido y los números de una pregunta."""
+    text = unicodedata.normalize("NFD", question.lower())
+    text = "".join(ch for ch in text if unicodedata.category(ch) != "Mn")
+    words = re.findall(r"\d+(?:[.,]\d+)?|[a-zñ]+", text)
+    numbers = {w.replace(",", ".") for w in words if w[0].isdigit()}
+    stems = {w[:5] for w in words if not w[0].isdigit() and w not in _FILLER_WORDS and len(w) > 2}
+    return stems, numbers
+
+
+def _same_question_scope(new_question: str, cached_question: str) -> bool:
+    """Una pregunta más específica que otra («en posgrado…») no puede reutilizar su respuesta."""
+    new_stems, new_numbers = _content_terms(new_question)
+    old_stems, old_numbers = _content_terms(cached_question)
+    if new_numbers != old_numbers:
+        return False
+    return not (new_stems != old_stems and (new_stems <= old_stems or old_stems <= new_stems))
 
 
 def cosine_similarity(a: list[float], b: list[float]) -> float:
@@ -88,6 +120,8 @@ async def get_cached_response(
                     if not entry or "embedding" not in entry:
                         continue
                     if entry.get("source_ids", "__missing__") != want_sids:
+                        continue
+                    if not _same_question_scope(question, entry.get("question", "")):
                         continue
                     cached_emb = json.loads(entry["embedding"])
                     sim = cosine_similarity(query_emb, cached_emb)

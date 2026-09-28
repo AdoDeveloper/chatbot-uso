@@ -33,7 +33,8 @@ _UNCONFIRMED_CONTEXT_NOTE = (
     "\n\nLa información anterior puede no responder la pregunta. Usa solo datos que aparezcan "
     "escritos en ella; si el dato pedido no está, di que no dispones de esa información."
 )
-_HYPHENS = str.maketrans({"\u2010": "-", "\u2011": "-"})
+# Guiones y espacios tipogr\u00e1ficos que algunos modelos emiten: se ven igual pero rompen b\u00fasquedas y copiado.
+_OUTPUT_CHARS = str.maketrans({"\u2010": "-", "\u2011": "-", "\u202f": " ", "\u00a0": " "})
 
 class ChatMessage(BaseModel):
     role: str = Field(..., max_length=32)
@@ -365,7 +366,7 @@ async def _run_chat_inner(
 
     provider_name = served.get("provider_name", provider_name)
     model_name = served.get("model_name", model_name)
-    final_text = "".join(full_content).translate(_HYPHENS)
+    final_text = "".join(full_content).translate(_OUTPUT_CHARS)
     if not final_text.strip():
         log.warning(
             "chat.empty_response", session_id=request.session_id,
