@@ -52,6 +52,10 @@ tareas más comunes. La **tasa de resolución** es el porcentaje de preguntas
 sin respuesta de la semana que el equipo ya atendió (por ejemplo, creando una
 FAQ); si en la semana no hubo preguntas sin respuesta, muestra 100%.
 
+El panel se puede usar desde el celular o la tablet: el menú lateral se
+abre con el botón de la esquina superior izquierda, y las tablas anchas
+(auditoría, documentos, usuarios) se desplazan de lado dentro de su tarjeta.
+
 Si el sistema está recién instalado, aparece un **asistente de configuración**
 que guía los pasos iniciales en orden:
 
@@ -100,7 +104,7 @@ En **Conocimiento → Documentos** puede:
 ### 3.2 Fragmentos (chunks)
 
 Cada documento se divide en **fragmentos** para que el chatbot pueda buscar en
-él. Desde el detalle de un documento puede revisar sus fragmentos, ver
+él. Desde el menú de cada documento (**Ver fragmentos**) puede revisar sus fragmentos, ver
 advertencias automáticas (fragmento muy corto, muy largo, con datos personales)
 y descartar fragmentos individuales que no deban usarse; el texto descartado
 deja de llegar al asistente, también dentro del contexto que comparte con los
@@ -177,7 +181,7 @@ cuando el mensaje se dirige al asistente («olvida tus instrucciones»); una
 pregunta como «¿qué pasa si un estudiante ignora las reglas de la biblioteca?»
 se responde con normalidad.
 
-El interruptor general de los filtros también controla el ocultamiento de
+El interruptor general (**Filtros activos**) también controla el ocultamiento de
 datos personales (correos, teléfonos, tarjetas y cuentas bancarias; el DUI,
 el NIT y los teléfonos de El Salvador siempre) en preguntas y respuestas: si
 se desactiva, esos datos dejan de ocultarse.
@@ -224,7 +228,9 @@ siguiente, por lo que conviene dejarlo vacío o con un valor holgado.
 ### 4.7 Previsualizar e Historial
 
 - **Previsualizar** (Asistente → Previsualizar): prueba el chatbot tal como lo
-  vería un visitante, con la configuración vigente.
+  vería un visitante, con la configuración vigente. En el celular el chat de
+  prueba empieza cerrado; al tocar el botón se abre a pantalla completa, igual
+  que el widget real.
 - **Historial**: historial de cambios de la configuración. Cada cambio se
   aplica **de inmediato** al widget (no hay un paso de publicación aparte), y
   el sistema guarda una versión **automáticamente** cada vez que se modifica
@@ -309,10 +315,11 @@ se muestran según los permisos de cada usuario.
 Salud en vivo de los servicios (base de datos, caché, vector store, modelo de
 embeddings) con uptime y percentiles de respuesta. Incluye la configuración del
 **caché de respuestas** (activación, vigencia en horas y umbral de similitud,
-entre 0,95 y 0,99) y
-herramientas de mantenimiento:
+entre 0,95 y 0,99) y, en el apartado **Recuperación**, herramientas de
+mantenimiento que no hace falta usar en el uso normal:
 
-- **Sincronizar Qdrant ↔ BD**: elimina fragmentos huérfanos del índice.
+- **Sincronizar Qdrant ↔ BD**: elimina del índice los fragmentos cuyo documento
+  ya no existe.
 - **Limpiar caché**: borra el caché de respuestas.
 - **Limpiar P99**: elimina mediciones correctas pero anómalamente lentas que
   distorsionan las métricas; las mediciones fallidas se conservan como
@@ -353,7 +360,8 @@ canales a la vez (por ejemplo, correo + varios administradores en la app).
 ## 8. Actividad (auditoría y seguridad)
 
 - **Auditoría**: registro de todas las acciones realizadas en el sistema (quién,
-  qué, cuándo, desde qué IP).
+  qué, cuándo, desde qué IP), con la acción descrita en español. Se puede
+  filtrar por recurso, persona y fechas, y exportar a Excel o PDF.
 - **Seguridad**: resumen de eventos de seguridad e intentos de acceso fallidos.
 - **Inyecciones**: intentos de manipulación del chatbot detectados por los
   filtros, agrupados por categoría.
