@@ -207,14 +207,15 @@ async def injections_by_category(
     category_counts: dict[str, int] = {}
     category_sample: dict[str, str] = {}
     for row in result.all():
-        pat = row.pattern or "unknown"
+        # ->> convierte un null de JSON en el texto "null".
+        pat, cat, lab = ((v if v and v != "null" else None) for v in (row.pattern, row.category, row.label))
         # La categoría guardada en el registro sobrevive a cambios posteriores del patrón.
-        if row.category and row.category != "null":
-            category, label = row.category, row.label or row.category
+        if cat:
+            category, label = cat, lab or cat
         else:
-            category, label = regex_to_meta.get(pat, ("Otro / desconocido", pat[:40] if pat else "-"))
+            category, label = regex_to_meta.get(pat or "", ("Otro / desconocido", None))
         category_counts[category] = category_counts.get(category, 0) + int(row.cnt)
-        if category not in category_sample:
+        if label and category not in category_sample:
             category_sample[category] = label
 
     return sorted(

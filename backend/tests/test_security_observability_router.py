@@ -133,6 +133,17 @@ class TestInjectionsByCategory:
         r = await client.get("/api/v1/security/injections/by-category", headers=auth_headers(admin_user))
         assert r.json() == [{"category": "Secuestro de rol", "count": 1, "sample_label": "Reasignación de identidad"}]
 
+    async def test_unknown_category_has_no_null_label(self, client, admin_user, auth_headers, db_session):
+        db_session.add(AuditLog(
+            id=uuid.uuid4(), action="guardrails.injection_detected", resource_type="chat",
+            ip="198.51.100.2", created_at=datetime.now(timezone.utc),
+            meta_json={"pattern": None, "matched_category": None, "matched_label": None},
+        ))
+        await db_session.commit()
+
+        r = await client.get("/api/v1/security/injections/by-category", headers=auth_headers(admin_user))
+        assert r.json() == [{"category": "Otro / desconocido", "count": 1, "sample_label": None}]
+
 
 class TestInjectionSamples:
     async def test_requires_perm(self, client, viewer_user, auth_headers):
