@@ -19,6 +19,7 @@ const DYNAMIC_HEIGHT_ROUTES = new Set([
   "/dashboard/configuracion",
   "/dashboard/configuracion/asistente",
   "/dashboard/configuracion/asistente/apariencia",
+  "/dashboard/configuracion/asistente/prompt",
   "/dashboard/configuracion/notificaciones",
   "/dashboard/configuracion/acceso",
   "/dashboard/configuracion/acceso/sso",
