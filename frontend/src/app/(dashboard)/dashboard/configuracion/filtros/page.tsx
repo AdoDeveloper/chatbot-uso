@@ -422,7 +422,7 @@ const KNOWN_PATTERN_CATEGORIES = [
                   {testing ? "Probando…" : "Probar"}
                 </Button>
                 {testText && (
-                  <Button size="sm" variant="ghost" onClick={() => { setTestText(""); setTestResult(null); }}>
+                  <Button size="sm" variant="outline" onClick={() => { setTestText(""); setTestResult(null); }}>
                     Limpiar
                   </Button>
                 )}

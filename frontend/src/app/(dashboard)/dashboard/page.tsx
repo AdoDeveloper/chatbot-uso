@@ -160,7 +160,7 @@ export default function DashboardPage() {
          <p className="text-2xs text-muted-foreground mt-0.5">Últimos 7 días</p>
        </div>
        <Link href="/dashboard/actividad/seguridad">
-        <Button variant="ghost" size="sm" className="text-2xs text-muted-foreground h-7">Ver detalle</Button>
+        <Button variant="outline" size="sm" className="text-2xs text-muted-foreground h-7">Ver detalle</Button>
        </Link>
       </CardHeader>
       <CardContent className="pt-4 space-y-2.5">
@@ -207,7 +207,7 @@ export default function DashboardPage() {
          <p className="text-2xs text-muted-foreground mt-0.5">Estado de servicios</p>
        </div>
        <Link href="/dashboard/configuracion/estado">
-        <Button variant="ghost" size="sm" className="text-2xs text-muted-foreground h-7">Ver detalle</Button>
+        <Button variant="outline" size="sm" className="text-2xs text-muted-foreground h-7">Ver detalle</Button>
        </Link>
       </CardHeader>
       <CardContent className="pt-4 space-y-2">
@@ -249,7 +249,7 @@ export default function DashboardPage() {
         <p className="text-2xs text-muted-foreground mt-0.5">{sources.length} documentos</p>
       </div>
       <Link href="/dashboard/conocimiento/documentos">
-       <Button variant="ghost" size="sm" className="gap-1 text-muted-foreground h-7 text-xs">
+       <Button variant="outline" size="sm" className="gap-1 text-muted-foreground h-7 text-xs">
         Ver todos <ArrowUpRight className="h-3 w-3" />
        </Button>
       </Link>
@@ -312,7 +312,7 @@ export default function DashboardPage() {
         <p className="text-2xs text-muted-foreground mt-0.5">Conversaciones que esperan atención humana</p>
       </div>
       <Link href="/dashboard/conversaciones/escalamientos">
-       <Button variant="ghost" size="sm" className="gap-1 text-muted-foreground h-7 text-xs">
+       <Button variant="outline" size="sm" className="gap-1 text-muted-foreground h-7 text-xs">
         Ver bandeja <ArrowUpRight className="h-3 w-3" />
        </Button>
       </Link>
@@ -369,7 +369,7 @@ export default function DashboardPage() {
         <p className="text-2xs text-muted-foreground mt-0.5">{activeProviders.length} activos en cadena</p>
       </div>
        <Link href="/dashboard/configuracion/proveedores">
-       <Button variant="ghost" size="sm" className="text-2xs text-muted-foreground h-7">Gestionar</Button>
+       <Button variant="outline" size="sm" className="text-2xs text-muted-foreground h-7">Gestionar</Button>
       </Link>
      </CardHeader>
      <CardContent className="pt-4">

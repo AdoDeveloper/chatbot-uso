@@ -136,7 +136,7 @@ export const LimitesTab = forwardRef<LimitesTabHandle>(function LimitesTab(_prop
                   <div className="flex items-center gap-2">
                     <Badge variant="outline" className="text-destructive border-destructive/40">Throttle</Badge>
                     {canUpdate && (
-                      <Button variant="ghost" size="sm" onClick={() => unblockIp(t.ip)} className="gap-1.5">
+                      <Button variant="outline" size="sm" onClick={() => unblockIp(t.ip)} className="gap-1.5">
                         <Unlock className="w-3.5 h-3.5" /> Desbloquear
                       </Button>
                     )}

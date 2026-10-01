@@ -125,7 +125,7 @@ const CatalogPanel = forwardRef<CatalogPanelHandle, {
    <div>
     <div className="flex items-center justify-between mb-1">
      <label className="text-xs font-medium text-muted-foreground">Headers HTTP extra</label>
-     <Button variant="ghost" size="xs" onClick={addHeader} className="text-muted-foreground hover:text-primary">
+     <Button variant="outline" size="xs" onClick={addHeader} className="text-muted-foreground hover:text-primary">
       <Plus className="w-3 h-3" /> Agregar
      </Button>
     </div>

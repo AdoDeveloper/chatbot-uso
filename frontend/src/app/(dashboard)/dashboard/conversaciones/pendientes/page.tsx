@@ -201,7 +201,7 @@ export default function PendientesPage() {
                               {canResolve && (
                               <Tooltip content="Marcar como resuelta sin crear FAQ">
                                 <Button
-                                  variant="ghost"
+                                  variant="outline"
                                   size="sm"
                                   onClick={() => handleResolve(q.id)}
                                   disabled={resolving === q.id}

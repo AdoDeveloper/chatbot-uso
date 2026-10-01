@@ -164,7 +164,7 @@ const CacheConfigCard = forwardRef<CacheConfigCardHandle>(function CacheConfigCa
           </p>
         </div>
         {!!data?.total_entries && (
-          <Button variant="ghost" size="sm" className="gap-1.5 shrink-0 text-13" onClick={() => setShowEntries(true)}>
+          <Button variant="outline" size="sm" className="gap-1.5 shrink-0 text-13" onClick={() => setShowEntries(true)}>
             <List className="w-3.5 h-3.5" /> Ver entradas
           </Button>
         )}

@@ -268,7 +268,7 @@ export default function EscalamientoConfigPage() {
                 {canUpdate && (
                 <div className="grid grid-cols-1 sm:flex sm:justify-end">
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
                     className="gap-1 text-13 text-primary"
                     onClick={() => { setEditingRule(null); resetRule(EMPTY_RULE); setShowRuleModal(true); }}
@@ -437,7 +437,7 @@ export default function EscalamientoConfigPage() {
         footer={
           <>
             <Button
-              variant="ghost"
+              variant="outline"
               onClick={() => { setRuleTestForm(watchRule()); setRuleTestResult(null); setShowRuleTestModal(true); }}
               disabled={!watchRule("name").trim()}
               className="mr-auto gap-1.5"

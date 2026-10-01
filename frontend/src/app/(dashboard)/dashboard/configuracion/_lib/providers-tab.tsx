@@ -232,7 +232,7 @@ const ProviderPanel = forwardRef<ProviderPanelHandle, {
      <label className="text-xs font-medium text-muted-foreground">
       Headers HTTP extra <span className="text-muted-foreground font-normal">· opcional</span>
      </label>
-     <Button variant="ghost" size="xs" onClick={addHeader} className="text-muted-foreground hover:text-primary">
+     <Button variant="outline" size="xs" onClick={addHeader} className="text-muted-foreground hover:text-primary">
       <Plus className="w-3 h-3" /> Agregar
      </Button>
     </div>

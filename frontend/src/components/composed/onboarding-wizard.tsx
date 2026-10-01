@@ -180,7 +180,7 @@ export function OnboardingWizard() {
                     </Button>
                   </Link>
                 ) : (
-                  <Button size="sm" variant="ghost" disabled className="gap-1.5 opacity-40">
+                  <Button size="sm" variant="outline" disabled className="gap-1.5 opacity-40">
                     Bloqueado
                   </Button>
                 )}

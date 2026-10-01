@@ -558,7 +558,7 @@ export default function EscalamientosPage() {
 <span className="text-13 font-medium tabular-nums">
             {selectedIds.size} seleccionada{selectedIds.size !== 1 ? "s" : ""}
            </span>
-          <Button size="sm" variant="ghost" onClick={clearSelection} className="h-7 px-2 text-xs">
+          <Button size="sm" variant="outline" onClick={clearSelection} className="h-7 px-2 text-xs">
             <XIcon className="w-3 h-3 mr-1" /> Limpiar
           </Button>
           {canUpdate && (
@@ -592,7 +592,7 @@ export default function EscalamientosPage() {
               </Button>
               <Button
                 size="sm"
-                variant="ghost"
+                variant="outline"
                 onClick={() => bulkApply("remove_tag")}
                 disabled={bulkBusy || !bulkTagInput.trim()}
                 className="gap-1.5 text-xs h-7 text-muted-foreground"

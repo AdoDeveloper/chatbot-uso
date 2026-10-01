@@ -18,7 +18,7 @@ export function FloatingSaveBar({
     <span className="h-1.5 w-1.5 rounded-full bg-warning animate-pulse shrink-0" />
     <span className="text-13 font-medium text-foreground whitespace-nowrap">Cambios sin guardar</span>
     {onDiscard && (
-     <Button variant="ghost" size="sm" onClick={onDiscard}
+     <Button variant="outline" size="sm" onClick={onDiscard}
       className="h-7 px-2.5 text-muted-foreground hover:text-foreground">
       Descartar
      </Button>
