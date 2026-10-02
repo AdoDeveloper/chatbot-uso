@@ -29,8 +29,8 @@ class WidgetConfigUpdate(BaseModel):
     show_bot_icon: bool | None = None
     suggestions: list[str] | None = None
     proactive_message: str | None = Field(default=None, max_length=MAX_PROACTIVE_LEN)
-    max_chats_per_session: int | None = None
-    max_chats_per_day: int | None = None
+    max_chats_per_session: int | None = Field(default=None, ge=1, le=100000)
+    max_chats_per_day: int | None = Field(default=None, ge=1, le=100000)
     show_end_chat_button: bool | None = None
     show_new_chat_button: bool | None = None
     enable_csat: bool | None = None

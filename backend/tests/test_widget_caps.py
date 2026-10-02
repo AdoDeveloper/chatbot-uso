@@ -53,3 +53,16 @@ class TestEnforceWidgetCaps:
         with pytest.raises(HTTPException) as exc_info:
             await widget_svc.enforce_widget_caps(widget, "")
         assert exc_info.value.status_code == 429
+
+
+@pytest.mark.parametrize("campo", ["max_chats_per_session", "max_chats_per_day"])
+@pytest.mark.parametrize("valor", [-5, 0])
+def test_el_tope_de_chats_rechaza_valores_no_positivos(campo, valor):
+    from pydantic import ValidationError
+
+    from app.schemas.widget import WidgetConfigUpdate
+
+    with pytest.raises(ValidationError):
+        WidgetConfigUpdate(**{campo: valor})
+    assert getattr(WidgetConfigUpdate(**{campo: 20}), campo) == 20
+    assert getattr(WidgetConfigUpdate(**{campo: None}), campo) is None
