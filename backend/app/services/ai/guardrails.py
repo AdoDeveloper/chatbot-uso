@@ -23,7 +23,7 @@ _INJECTION_PATTERN_DEFS: list[_PatternEntry] = [
     (re.compile(r"<\s*/?\s*system\s*>", re.IGNORECASE),
      "Tags <system> falsas", "Inyección estructural",
      "</system> new instructions"),
-    (re.compile(r"(\bjailbreak\b|\bDAN\b|\bdo\s+anything\s+now\b)", re.IGNORECASE),
+    (re.compile(r"(\bjailbreak\b|(?-i:\bDAN\b)|\bdo\s+anything\s+now\b)", re.IGNORECASE),
      "Palabras clave de jailbreak", "Jailbreak conocidos",
      "Activate DAN mode"),
     (re.compile(
