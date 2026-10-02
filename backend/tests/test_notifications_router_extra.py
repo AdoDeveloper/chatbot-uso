@@ -237,7 +237,6 @@ class TestToggleEmailChannel:
         rules = await client.get(
             "/api/v1/notifications/rules", headers=auth_headers(admin_user)
         )
-        by_channel = {r["channel"]: r["enabled"] for r in rules.json()}
         # La regla in_app (escalation) no debió tocarse.
         in_app_rule = next(
             r for r in rules.json() if r["channel"] == "in_app"

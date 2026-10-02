@@ -266,7 +266,6 @@ class TestWarmupLoop:
     async def test_calls_embed_texts_after_initial_delay(self):
         calls = [0]
         embed_mock = AsyncMock()
-        sleep_mock = AsyncMock(side_effect=lambda s: _sleep_raises_after(calls)(s))
 
         async def fake_sleep(seconds):
             if seconds == 30:

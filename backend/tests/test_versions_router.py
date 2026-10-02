@@ -197,7 +197,7 @@ class TestDiffVersion:
 
     async def test_diff_against_previous_version(self, client, admin_user, auth_headers, db_session):
         await _add_setting(db_session, "greeting_response", "Bot Uno")
-        v1 = await client.post("/api/v1/versions", json={"description": "v1"}, headers=auth_headers(admin_user))
+        await client.post("/api/v1/versions", json={"description": "v1"}, headers=auth_headers(admin_user))
 
         await _add_setting(db_session, "greeting_response", "Bot Dos")
         v2 = await client.post("/api/v1/versions", json={"description": "v2"}, headers=auth_headers(admin_user))
